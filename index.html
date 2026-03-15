@@ -468,6 +468,7 @@ function initMap() {
     mapInstance.remove();
     mapInstance = null;
   }
+  window._mf = {...mapFilters};
   setTimeout(() => {
     const mapEl = document.getElementById('map');
     if (!mapEl) return;
@@ -934,8 +935,9 @@ function render() {
 // ── GLOBAL HANDLERS ──
 window.goBack = () => { view = 'lista'; editId = null; editEqId = null; form = emptyForm(); equipoForm = emptyEF(); showSelector = false; render(); };
 window.switchTab = t => {
-  tab = t; view = 'lista'; editId = null; editEqId = null; render();
-  if (t === 'mapa') setTimeout(initMap, 150);
+  tab = t; view = 'lista'; editId = null; editEqId = null;
+  render();
+  if (t === 'mapa') setTimeout(initMap, 200);
 };
 window.setFilter = f => { filterStatus = f; render(); };
 window.setSearch = v => { search = v; render(); };
@@ -982,7 +984,7 @@ window.delEquipo = handleDelEq;
 window.toggleMapFilter = st => {
   mapFilters[st] = !mapFilters[st];
   render();
-  setTimeout(initMap, 100);
+  setTimeout(initMap, 200);
 };
 </script>
 </body>
