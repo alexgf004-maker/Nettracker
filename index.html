@@ -859,7 +859,10 @@ function render() {
     <button class="nav-btn ${tab==='instalaciones'?'active':''}" onclick="switchTab('instalaciones')">
       <span class="nav-icon">⚡</span><span class="nav-label">Instalaciones</span>
     </button>
-<button class="nav-btn ${tab==='inventario'?'active':''}" onclick="switchTab('inventario')">
+    <button class="nav-btn ${tab==='mapa'?'active':''}" onclick="switchTab('mapa')">
+      <span class="nav-icon">📍</span><span class="nav-label">Mapa</span>
+    </button>
+    <button class="nav-btn ${tab==='inventario'?'active':''}" onclick="switchTab('inventario')">
       <span class="nav-icon">📦</span><span class="nav-label">Inventario</span>
     </button>
   </nav>`;
