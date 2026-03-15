@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0057b8">
+  <title>CPT INNOVA</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    :root {
+      --primary: #0057b8;
+      --primary-dark: #003d8f;
+      --primary-light: #e8f0fb;
+      --accent: #00aaff;
+      --accent-light: #e0f4ff;
+      --bg: #f0f4f8;
+      --white: #ffffff;
+      --text: #0a1628;
+      --text2: #4a5568;
+      --text3: #94a3b8;
+      --border: #dde3ed;
+      --border2: #edf2f7;
+      --green: #059669;
+      --green-light: #ecfdf5;
+      --yellow: #d97706;
+      --yellow-light: #fffbeb;
+      --red: #dc2626;
+      --red-light: #fef2f2;
+      --shadow: 0 1px 3px rgba(0,10,40,.07), 0 1px 2px rgba(0,10,40,.05);
+      --shadow-md: 0 4px 16px rgba(0,10,40,.10);
+      --shadow-lg: 0 8px 32px rgba(0,10,40,.14);
+      --shadow-blue: 0 4px 16px rgba(0,87,184,.25);
+      --radius: 16px;
+      --radius-sm: 10px;
+      --font: 'Plus Jakarta Sans', sans-serif;
+      --mono: 'JetBrains Mono', monospace;
+    }
+
+    body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; max-width: 480px; margin: 0 auto; }
+
+    /* HEADER */
+    header {
+      background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 60%, #0077cc 100%);
+      padding: 14px 18px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 50;
+      box-shadow: var(--shadow-blue);
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .logo-mark {
+      width: 36px; height: 36px;
+      background: rgba(255,255,255,.15);
+      border: 1px solid rgba(255,255,255,.25);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; flex-shrink: 0;
+      backdrop-filter: blur(8px);
+    }
+    .logo-text { font-size: 17px; font-weight: 800; color: #fff; letter-spacing: -.3px; }
+    .logo-sub { font-size: 10px; color: rgba(255,255,255,.65); margin-top: 1px; letter-spacing: .3px; }
+    .back-btn {
+      background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.25);
+      color: #fff; border-radius: 10px; width: 36px; height: 36px;
+      cursor: pointer; font-size: 17px; display: flex; align-items: center; justify-content: center;
+      backdrop-filter: blur(8px);
+    }
+
+    /* BOTTOM NAV */
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 100%; max-width: 480px;
+      background: var(--white); border-top: 1px solid var(--border);
+      display: flex; z-index: 50;
+      box-shadow: 0 -2px 12px rgba(0,10,40,.07);
+    }
+    .nav-btn { flex: 1; padding: 10px 4px 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; background: none; border: none; position: relative; }
+    .nav-icon { font-size: 22px; }
+    .nav-label { font-size: 10px; color: var(--text3); font-weight: 600; letter-spacing: .2px; }
+    .nav-btn.active .nav-label { color: var(--primary); }
+    .nav-btn.active::after { content: ''; position: absolute; top: 0; left: 20%; right: 20%; height: 2px; background: var(--primary); border-radius: 0 0 4px 4px; }
+
+    /* BUTTONS */
+    .btn { width: 100%; border: none; border-radius: var(--radius-sm); padding: 14px; font-family: var(--font); font-weight: 700; font-size: 15px; cursor: pointer; margin-bottom: 10px; transition: all .15s; }
+    .btn-primary { background: linear-gradient(135deg, var(--primary) 0%, #0077cc 100%); color: #fff; box-shadow: var(--shadow-blue); }
+    .btn-primary:active { transform: scale(.98); opacity: .9; }
+    .btn-danger { background: var(--red-light); color: var(--red); border: 1px solid #fecaca; }
+    .btn-secondary { background: var(--white); color: var(--text2); border: 1px solid var(--border); }
+    .btn-small {
+      background: rgba(255,255,255,.2); color: #fff;
+      border: 1px solid rgba(255,255,255,.3);
+      border-radius: 10px; padding: 8px 16px;
+      font-family: var(--font); font-weight: 700; font-size: 13px;
+      cursor: pointer; white-space: nowrap;
+      backdrop-filter: blur(8px);
+    }
+
+    /* CONTENT */
+    .content { padding: 16px 16px 90px; }
+
+    /* STATS */
+    .stats-bar { display: flex; gap: 8px; margin-bottom: 16px; }
+    .stat-chip {
+      flex: 1; background: var(--white); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 10px 6px;
+      display: flex; flex-direction: column; align-items: center;
+      cursor: pointer; box-shadow: var(--shadow); transition: all .15s;
+    }
+    .stat-chip.active { border-color: var(--primary); background: var(--primary-light); }
+    .stat-num { font-size: 20px; font-weight: 800; font-family: var(--mono); }
+    .stat-label { font-size: 9px; color: var(--text3); margin-top: 2px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; }
+
+    /* SEARCH */
+    .search-wrap { position: relative; margin-bottom: 16px; }
+    .search-icon { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); font-size: 16px; color: var(--text3); }
+    .search-input {
+      width: 100%; background: var(--white); border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm); padding: 12px 12px 12px 40px;
+      color: var(--text); font-family: var(--font); font-size: 14px; outline: none;
+      box-shadow: var(--shadow); transition: border-color .15s;
+    }
+    .search-input:focus { border-color: var(--accent); }
+
+    /* CARDS */
+    .list { display: flex; flex-direction: column; gap: 10px; }
+    .card {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 0; cursor: pointer;
+      box-shadow: var(--shadow); transition: all .15s; overflow: hidden;
+    }
+    .card:active { transform: scale(.99); box-shadow: var(--shadow-md); }
+    .card-stripe { height: 3px; background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%); }
+    .card-stripe.yellow { background: linear-gradient(90deg, var(--yellow) 0%, #fbbf24 100%); }
+    .card-stripe.gray { background: var(--border); }
+    .card-inner { padding: 14px 16px; }
+    .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
+    .card-serie { font-size: 16px; font-weight: 800; color: var(--text); font-family: var(--mono); letter-spacing: -.3px; }
+    .badge { font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 20px; white-space: nowrap; letter-spacing: .2px; }
+    .badge-green { background: var(--green-light); color: var(--green); }
+    .badge-yellow { background: var(--yellow-light); color: var(--yellow); }
+    .badge-gray { background: var(--border2); color: var(--text3); }
+    .badge-blue { background: var(--primary-light); color: var(--primary); }
+    .badge-red { background: var(--red-light); color: var(--red); }
+    .card-sub { font-size: 12px; color: var(--text3); margin-bottom: 6px; font-weight: 500; }
+    .card-lugar { font-size: 13px; color: var(--text2); margin-bottom: 10px; }
+    .card-footer { display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid var(--border2); }
+    .card-date { font-size: 11px; color: var(--text3); font-family: var(--mono); font-weight: 500; }
+    .days-tag { font-size: 11px; font-weight: 700; font-family: var(--mono); }
+
+    /* EMPTY */
+    .empty { text-align: center; padding: 60px 20px; }
+    .empty-icon { font-size: 52px; margin-bottom: 14px; opacity: .35; }
+    .empty-text { color: var(--text3); font-size: 14px; margin-bottom: 20px; font-weight: 500; }
+
+    /* FORM */
+    .page-title { font-size: 22px; font-weight: 800; color: var(--text); letter-spacing: -.5px; margin-bottom: 20px; }
+    .form-section { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow); }
+    .form-section-title { font-size: 10px; font-weight: 700; color: var(--primary); letter-spacing: 1px; margin-bottom: 12px; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
+    .form-section-title::before { content: ''; width: 3px; height: 12px; background: var(--primary); border-radius: 2px; display: inline-block; }
+    .field { margin-bottom: 12px; }
+    .field label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 5px; }
+    input, textarea, select {
+      width: 100%; background: var(--bg); border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm); padding: 12px 14px;
+      color: var(--text); font-family: var(--font); font-size: 14px; outline: none;
+      transition: border-color .15s, background .15s;
+    }
+    input:focus, textarea:focus, select:focus { border-color: var(--accent); background: var(--white); }
+    textarea { min-height: 80px; resize: vertical; }
+    input[type=date]::-webkit-calendar-picker-indicator { opacity: .5; }
+    .row { display: flex; gap: 10px; }
+    .row .field { flex: 1; }
+    select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
+
+    /* LOCATION */
+    .loc-toggle { display: flex; background: var(--bg); border-radius: 10px; padding: 3px; margin-bottom: 12px; border: 1px solid var(--border); }
+    .loc-tab { flex: 1; padding: 8px; border: none; border-radius: 8px; background: none; font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--text3); cursor: pointer; transition: all .15s; }
+    .loc-tab.active { background: var(--white); color: var(--primary); box-shadow: var(--shadow); }
+    .gps-btn { width: 100%; padding: 12px; border: 1.5px dashed var(--accent); border-radius: var(--radius-sm); background: var(--accent-light); color: var(--primary); font-family: var(--font); font-size: 14px; font-weight: 600; cursor: pointer; transition: all .15s; }
+    .gps-tag { margin-top: 6px; font-size: 11px; color: var(--primary); font-family: var(--mono); background: var(--primary-light); padding: 6px 10px; border-radius: 6px; }
+
+    /* EQUIPO PREVIEW */
+    .equipo-preview { background: var(--primary-light); border: 1.5px solid var(--primary); border-radius: var(--radius-sm); padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; }
+    .change-btn { font-size: 12px; color: var(--primary); background: var(--white); border: 1px solid var(--primary); border-radius: 6px; padding: 5px 12px; cursor: pointer; font-family: var(--font); font-weight: 600; }
+
+    /* DETAIL */
+    .detail-hero {
+      background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 60%, #0077cc 100%);
+      border-radius: var(--radius); padding: 20px; margin-bottom: 12px;
+      box-shadow: var(--shadow-blue); color: #fff;
+    }
+    .detail-serie { font-size: 26px; font-weight: 800; color: #fff; font-family: var(--mono); letter-spacing: -.5px; }
+    .detail-modelo { font-size: 13px; color: rgba(255,255,255,.7); margin-top: 3px; font-weight: 500; }
+    .detail-grid { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 12px; box-shadow: var(--shadow); }
+    .detail-row { display: flex; padding: 12px 16px; border-bottom: 1px solid var(--border2); }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-label { width: 42%; font-size: 11px; font-weight: 700; color: var(--text3); padding-top: 2px; flex-shrink: 0; text-transform: uppercase; letter-spacing: .3px; }
+    .detail-value { font-size: 14px; color: var(--text); flex: 1; font-weight: 500; }
+    .map-link {
+      display: block; text-align: center; color: var(--primary); font-size: 13px;
+      font-weight: 700; text-decoration: none;
+      background: var(--primary-light); border: 1px solid var(--primary);
+      border-radius: var(--radius-sm); padding: 12px; margin-bottom: 10px;
+    }
+    .alert-banner { border-radius: var(--radius-sm); padding: 12px 16px; font-size: 13px; margin-bottom: 12px; font-weight: 600; }
+    .alert-yellow { background: var(--yellow-light); border: 1px solid #fcd34d; color: var(--yellow); }
+    .alert-red { background: var(--red-light); border: 1px solid #fca5a5; color: var(--red); }
+
+    /* HISTORIAL */
+    .historial-card { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; box-shadow: var(--shadow); }
+    .historial-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+    .historial-lugar { font-size: 14px; font-weight: 700; color: var(--text); }
+    .historial-caso { font-size: 12px; color: var(--text3); margin-top: 2px; font-family: var(--mono); }
+    .historial-fecha { font-size: 11px; color: var(--text3); font-family: var(--mono); text-align: right; line-height: 1.5; }
+    .section-title { font-size: 10px; font-weight: 700; color: var(--text3); letter-spacing: 1px; margin-bottom: 10px; text-transform: uppercase; }
+
+    /* SELECTOR */
+    .selector-item { background: var(--white); border: 1.5px solid var(--border); border-radius: var(--radius-sm); padding: 14px; cursor: pointer; transition: all .15s; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .selector-item:active { border-color: var(--primary); background: var(--primary-light); }
+    .selector-item.disabled { opacity: .4; pointer-events: none; }
+
+    /* FAULT OPTIONS */
+    .fault-option { padding: 13px 16px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 8px; cursor: pointer; font-size: 15px; font-weight: 600; color: var(--text2); background: var(--white); transition: all .15s; display: flex; align-items: center; gap: 10px; }
+    .fault-option.selected { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
+
+    /* TOAST */
+    .toast {
+      position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+      background: var(--primary-dark); color: #fff;
+      padding: 12px 20px; border-radius: 12px; font-size: 14px;
+      z-index: 400; box-shadow: var(--shadow-blue);
+      max-width: 90%; text-align: center; font-weight: 600;
+      animation: toastIn .25s ease;
+    }
+    @keyframes toastIn { from{opacity:0;transform:translateX(-50%) translateY(12px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+
+    /* LOADING */
+    .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 16px; background: var(--bg); }
+    .spinner { width: 36px; height: 36px; border: 3px solid var(--primary-light); border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { font-size: 14px; color: var(--text3); font-weight: 600; letter-spacing: .5px; }
+
+    .divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+    /* MAP */
+    .map-container { position: relative; height: calc(100vh - 120px); }
+    #map { width: 100%; height: 100%; z-index: 1; }
+    .map-legend { position: absolute; bottom: 16px; left: 16px; background: white; border-radius: 12px; padding: 10px 14px; box-shadow: var(--shadow-md); z-index: 10; font-size: 12px; font-weight: 600; }
+    .map-legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .map-legend-item:last-child { margin-bottom: 0; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .map-no-gps { text-align: center; padding: 12px 16px; background: var(--yellow-light); border: 1px solid #fcd34d; border-radius: 10px; margin: 12px 16px 0; font-size: 13px; color: var(--yellow); font-weight: 600; }
+    .map-popup-serie { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; color: #0a1628; }
+    .map-popup-sub { font-size: 12px; color: #4a5568; margin-top: 2px; }
+    .map-popup-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; margin-top: 6px; }
+  </style>
+</head>
+<body>
+<div id="app"><div class="loading"><div class="spinner"></div><div class="loading-text">CONECTANDO...</div></div></div>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, onValue, push, update, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDmwLWle24Nldh-Y6YBmYLaaDA6ZTpuKuc",
+  authDomain: "pqfind.firebaseapp.com",
+  databaseURL: "https://pqfind-default-rtdb.firebaseio.com",
+  projectId: "pqfind",
+  storageBucket: "pqfind.firebasestorage.app",
+  messagingSenderId: "666556457981",
+  appId: "1:666556457981:web:2d3dfbecfd3e515387ef94"
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const db = getDatabase(fbApp);
+const installsRef = ref(db, 'analizadores');
+const equiposRef = ref(db, 'equipos');
+
+// ── STATE ──
+let records = [];
+let equipos = [];
+let tab = 'instalaciones';
+let view = 'lista';
+let editId = null;
+let editEqId = null;
+let filterStatus = 'TODOS';
+let search = '';
+let showSelector = false;
+let showRetiroModal = false;
+let retiroId = null;
+let retiroForm = { sinProblema: null, fallas: [], descripcion: '' };
+let locMode = 'gps';
+let mapInstance = null;
+let mapInitialized = false;
+let selectorSearch = '';
+let form = emptyForm();
+let equipoForm = emptyEF();
+
+function emptyForm() {
+  return { equipoId: null, serie: '', modelo: '', caso: '', lugar: '', lat: null, lng: null, fechaInstalacion: today(), fechaRetiro: '', notas: '' };
+}
+function emptyEF() {
+  return { serie: '', modelo: '', notas: '' };
+}
+function today() { return new Date().toISOString().split('T')[0]; }
+function fmtDate(d) { if (!d) return '—'; const [y,m,dd] = d.split('-'); return `${dd}/${m}/${y}`; }
+function daysUntil(d) { const [y,m,dd] = d.split('-').map(Number); const r = new Date(y, m-1, dd); const n = new Date(); n.setHours(0,0,0,0); r.setHours(0,0,0,0); return Math.round((r-n)/86400000); }
+function calcSt(r) { if (r.retirado) return 'RETIRADO'; const d = daysUntil(r.fechaRetiro); return d <= 3 ? 'PROXIMO' : 'ACTIVO'; }
+function eqSt(eq) { return records.find(r => r.equipoId === eq.id && !r.retirado) ? 'instalado' : 'disponible'; }
+
+// ── FIREBASE LISTENERS ──
+// Simple approach: each listener independently updates its array and re-renders
+onValue(installsRef, snap => {
+  records = [];
+  snap.forEach(child => {
+    records.push({ id: child.key, ...child.val() });
+  });
+  records.sort((a, b) => (b.fechaRegistro || '').localeCompare(a.fechaRegistro || ''));
+  render();
+});
+
+onValue(equiposRef, snap => {
+  equipos = [];
+  snap.forEach(child => {
+    equipos.push({ id: child.key, ...child.val() });
+  });
+  equipos.sort((a, b) => (a.serie || '').localeCompare(b.serie || ''));
+  render();
+});
+
+// ── TOAST ──
+let toastTimer;
+function showToast(msg) {
+  clearTimeout(toastTimer);
+  let t = document.getElementById('toast');
+  if (!t) { t = document.createElement('div'); t.id = 'toast'; t.className = 'toast'; document.body.appendChild(t); }
+  t.textContent = msg;
+  t.style.display = 'block';
+  toastTimer = setTimeout(() => { t.style.display = 'none'; }, 3500);
+}
+
+// ── GPS ──
+function getGPS() {
+  if (!navigator.geolocation) return showToast('GPS no disponible');
+  const btn = document.getElementById('gps-btn');
+  if (btn) { btn.textContent = 'Obteniendo ubicación...'; btn.disabled = true; }
+  navigator.geolocation.getCurrentPosition(pos => {
+    form.lat = pos.coords.latitude.toFixed(6);
+    form.lng = pos.coords.longitude.toFixed(6);
+    if (!form.lugar) form.lugar = `${(+form.lat).toFixed(4)}, ${(+form.lng).toFixed(4)}`;
+    render();
+    showToast('📍 Ubicación capturada');
+  }, () => { showToast('No se pudo obtener ubicación GPS'); render(); }, { enableHighAccuracy: true, timeout: 12000 });
+}
+
+// ── SAVE DEPLOY ──
+function handleSave() {
+  if (!form.equipoId) return showToast('Selecciona un equipo del inventario');
+  if (!form.caso.trim()) return showToast('Ingresa el código de caso / campaña');
+  if (!form.fechaRetiro) return showToast('Ingresa la fecha de retiro');
+  if (!form.lugar.trim()) return showToast('Ingresa la ubicación del equipo');
+  const payload = { ...form, retirado: false, fechaRegistro: today() };
+  if (editId) {
+    const id = editId;
+    editId = null; view = 'lista'; form = emptyForm();
+    update(ref(db, `analizadores/${id}`), payload).then(() => showToast('✅ Actualizado'));
+  } else {
+    const savedPayload = {...payload};
+    view = 'lista'; form = emptyForm();
+    push(installsRef, savedPayload).then(newRef => {
+      showToast('✅ Instalación registrado');
+      setTimeout(() => {
+        if (confirm('¿Quieres agregar el recordatorio de retiro a Google Calendar?')) {
+          addToGoogleCalendar(savedPayload);
+        }
+      }, 500);
+    });
+  }
+}
+
+// ── RETIRO ──
+function openRetiroModal(id) { retiroId = id; retiroForm = { sinProblema: null, fallas: [], descripcion: '' }; showRetiroModal = true; render(); }
+function closeRetiroModal() { showRetiroModal = false; retiroId = null; render(); }
+function toggleFalla(f) {
+  retiroForm.sinProblema = false;
+  const i = retiroForm.fallas.indexOf(f);
+  if (i >= 0) retiroForm.fallas.splice(i, 1); else retiroForm.fallas.push(f);
+  render();
+}
+function toggleSinProblema() {
+  retiroForm.sinProblema = !retiroForm.sinProblema;
+  if (retiroForm.sinProblema) retiroForm.fallas = [];
+  render();
+}
+function handleRetiro() {
+  if (retiroForm.sinProblema === null && retiroForm.fallas.length === 0) return showToast('Indica si hubo algún problema');
+  const payload = { retirado: true, fechaRetiroReal: today(), sinProblema: retiroForm.sinProblema || false, fallas: retiroForm.fallas, descripcionFalla: retiroForm.descripcion };
+  const id = retiroId;
+  showRetiroModal = false; retiroId = null; view = 'lista';
+  update(ref(db, `analizadores/${id}`), payload).then(() => showToast('✅ Equipo marcado como retirado'));
+}
+
+// ── DELETE DEPLOY ──
+function handleDelInstall(id) {
+  if (!confirm('¿Eliminar este instalación?')) return;
+  view = 'lista';
+  remove(ref(db, `analizadores/${id}`)).then(() => showToast('Eliminado'));
+}
+
+// ── SAVE EQUIPO ──
+function handleSaveEq() {
+  if (!equipoForm.serie.trim()) return showToast('Ingresa el número de serie');
+  if (!equipoForm.modelo.trim()) return showToast('Ingresa el modelo / marca');
+  const data = { ...equipoForm, fechaRegistro: today() };
+  if (editEqId) {
+    const id = editEqId;
+    editEqId = null; equipoForm = emptyEF(); view = 'lista';
+    update(ref(db, `equipos/${id}`), data).then(() => showToast('✅ Equipo actualizado'));
+  } else {
+    equipoForm = emptyEF(); view = 'lista';
+    push(equiposRef, data).then(() => showToast('✅ Equipo agregado'));
+  }
+}
+
+// ── DELETE EQUIPO ──
+function handleDelEq(id) {
+  if (records.find(r => r.equipoId === id && !r.retirado)) return showToast('⚠️ Equipo instalado actualmente');
+  if (!confirm('¿Eliminar del inventario?')) return;
+  view = 'lista';
+  remove(ref(db, `equipos/${id}`)).then(() => showToast('Eliminado'));
+}
+
+// ── GOOGLE CALENDAR ──
+function addToGoogleCalendar(r) {
+  const title = encodeURIComponent(`Retiro analizador ${r.serie} - #${r.caso}`);
+  const details = encodeURIComponent(`Equipo: ${r.serie}\nModelo: ${r.modelo||''}\nCaso: #${r.caso}\nLugar: ${r.lugar||''}\nCPT INNOVA`);
+  const location = encodeURIComponent(r.lugar || '');
+  // Format date as YYYYMMDD
+  const date = r.fechaRetiro.replace(/-/g, '');
+  // All day event
+  const nextDay = (() => {
+    const [y,m,d] = r.fechaRetiro.split('-').map(Number);
+    const dt = new Date(y, m-1, d+1);
+    return `${dt.getFullYear()}${String(dt.getMonth()+1).padStart(2,'0')}${String(dt.getDate()).padStart(2,'0')}`;
+  })();
+  const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${date}/${nextDay}&details=${details}&location=${location}`;
+  window.open(url, '_blank');
+}
+
+// ── BADGE HELPERS ──
+function badgeSt(st) {
+  if (st === 'ACTIVO') return `<span class="badge badge-green">Activo</span>`;
+  if (st === 'PROXIMO') return `<span class="badge badge-yellow">Retiro próximo</span>`;
+  return `<span class="badge badge-gray">Retirado</span>`;
+}
+function accentColor(st) { return st === 'ACTIVO' ? 'var(--green)' : st === 'PROXIMO' ? 'var(--yellow)' : 'var(--gray)'; }
+
+// ── MAP ──
+function initMap() {
+  if (mapInstance) {
+    mapInstance.remove();
+    mapInstance = null;
+  }
+  setTimeout(() => {
+    const mapEl = document.getElementById('map');
+    if (!mapEl) return;
+
+    // Center on El Salvador by default
+    const withGPS = records.filter(r => r.lat && r.lng);
+    let center = [13.7942, -88.8965];
+    let zoom = 8;
+    if (withGPS.length > 0) {
+      const lats = withGPS.map(r => parseFloat(r.lat));
+      const lngs = withGPS.map(r => parseFloat(r.lng));
+      center = [(Math.min(...lats)+Math.max(...lats))/2, (Math.min(...lngs)+Math.max(...lngs))/2];
+      zoom = withGPS.length === 1 ? 14 : 10;
+    }
+
+    mapInstance = L.map('map', { zoomControl: true }).setView(center, zoom);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap',
+      maxZoom: 19
+    }).addTo(mapInstance);
+
+    withGPS.forEach(r => {
+      const st = calcSt(r);
+      const color = st === 'ACTIVO' ? '#0057b8' : st === 'PROXIMO' ? '#d97706' : '#94a3b8';
+      const borderColor = st === 'ACTIVO' ? '#003d8f' : st === 'PROXIMO' ? '#b45309' : '#64748b';
+
+      const icon = L.divIcon({
+        className: '',
+        html: `<div style="width:14px;height:14px;border-radius:50%;background:${color};border:2px solid ${borderColor};box-shadow:0 2px 6px rgba(0,0,0,.3)"></div>`,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      });
+
+      const stLabel = st === 'ACTIVO' ? 'Activo' : st === 'PROXIMO' ? 'Retiro próximo' : 'Retirado';
+      const badgeBg = st === 'ACTIVO' ? '#ecfdf5' : st === 'PROXIMO' ? '#fffbeb' : '#f1f5f9';
+      const badgeColor = st === 'ACTIVO' ? '#059669' : st === 'PROXIMO' ? '#d97706' : '#94a3b8';
+
+      const popup = `<div style="font-family:'Plus Jakarta Sans',sans-serif;min-width:160px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:#0a1628">${r.serie}</div>
+        <div style="font-size:12px;color:#4a5568;margin-top:2px">${r.modelo||''}</div>
+        <div style="font-size:12px;color:#4a5568;margin-top:2px">📍 ${r.lugar||''}</div>
+        <div style="font-size:11px;color:#4a5568;margin-top:2px">#${r.caso}</div>
+        <span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-top:6px;background:${badgeBg};color:${badgeColor}">${stLabel}</span>
+      </div>`;
+
+      L.marker([parseFloat(r.lat), parseFloat(r.lng)], { icon })
+        .bindPopup(popup)
+        .addTo(mapInstance);
+    });
+  }, 100);
+}
+
+// ── RENDER ──
+function render() {
+  const el = document.getElementById('app');
+  if (!el) return;
+
+  const counts = {
+    TODOS: records.length,
+    ACTIVO: records.filter(r => calcSt(r) === 'ACTIVO').length,
+    PROXIMO: records.filter(r => calcSt(r) === 'PROXIMO').length,
+    RETIRADO: records.filter(r => r.retirado).length
+  };
+
+  let html = '';
+
+  // HEADER
+  const showBack = view !== 'lista';
+  html += `<header>
+    <div class="header-left">
+      ${showBack ? `<button class="back-btn" onclick="goBack()">←</button>` : ''}
+      <div class="logo-mark">📡</div>
+      <div>
+        <div class="logo-text">CPT INNOVA</div>
+        <div class="logo-sub">Analizadores de Red</div>
+      </div>
+    </div>
+    ${view === 'lista' && tab === 'instalaciones' ? `<button class="btn-small" onclick="newInstall()">+ Nuevo</button>` : ''}
+    ${view === 'lista' && tab === 'inventario' ? `<button class="btn-small" onclick="newEquipo()">+ Equipo</button>` : ''}
+    ${tab === 'mapa' ? `<span style="font-size:12px;color:rgba(255,255,255,.7);font-weight:600">${records.filter(r=>r.lat&&r.lng).length} con GPS</span>` : ''}
+  </header>`;
+
+  // RETIRO MODAL
+  if (showRetiroModal) {
+    const FAULT_TYPES = ['No midió','Falla batería','Daño físico','Error en la medición'];
+    const allOpts = ['Sin problemas', ...FAULT_TYPES];
+    html += `<div style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
+      <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:90vh;overflow-y:auto;padding:20px;font-family:'DM Sans',sans-serif">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div style="font-size:17px;font-weight:700;color:#1a1d27">Registrar retiro</div>
+          <button onclick="closeRetiroModal()" style="background:none;border:none;font-size:24px;color:#9ca3af;cursor:pointer;line-height:1">✕</button>
+        </div>
+        <div style="font-size:13px;color:#6b7280;margin-bottom:14px">¿El equipo presentó algún problema?</div>
+
+        <div onclick="toggleSinProblema()" style="padding:13px 16px;border:2px solid ${retiroForm.sinProblema ? '#3b6cf4' : '#e5e7eb'};border-radius:12px;margin-bottom:8px;cursor:pointer;font-size:15px;font-weight:600;color:${retiroForm.sinProblema ? '#3b6cf4' : '#374151'};background:${retiroForm.sinProblema ? '#eef2ff' : '#fff'};display:flex;align-items:center;gap:10px">
+          <span style="font-size:18px">${retiroForm.sinProblema ? '✅' : '⬜'}</span> Sin problemas
+        </div>
+
+        ${FAULT_TYPES.map(f => `
+        <div onclick="toggleFalla('${f}')" style="padding:13px 16px;border:2px solid ${retiroForm.fallas.includes(f) ? '#ef4444' : '#e5e7eb'};border-radius:12px;margin-bottom:8px;cursor:pointer;font-size:15px;font-weight:600;color:${retiroForm.fallas.includes(f) ? '#ef4444' : '#374151'};background:${retiroForm.fallas.includes(f) ? '#fef2f2' : '#fff'};display:flex;align-items:center;gap:10px">
+          <span style="font-size:18px">${retiroForm.fallas.includes(f) ? '🔴' : '⬜'}</span> ${f}
+        </div>`).join('')}
+
+        <div style="margin-top:8px;margin-bottom:16px">
+          <div style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:6px">DESCRIPCIÓN ADICIONAL (OPCIONAL)</div>
+          <textarea placeholder="Describe el problema..." oninput="setRetiroDesc(this.value)" style="width:100%;padding:12px;border:1.5px solid #e5e7eb;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:14px;outline:none;min-height:70px;resize:vertical">${retiroForm.descripcion}</textarea>
+        </div>
+
+        <button onclick="doRetiro()" style="width:100%;background:#3b6cf4;color:#fff;border:none;border-radius:10px;padding:14px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">Confirmar retiro</button>
+        <button onclick="closeRetiroModal()" style="width:100%;background:#fff;color:#6b7280;border:1px solid #e5e7eb;border-radius:10px;padding:13px;font-family:'DM Sans',sans-serif;font-size:15px;cursor:pointer">Cancelar</button>
+      </div>
+    </div>`;
+  }
+
+  // SELECTOR MODAL
+  if (showSelector) {
+    const filteredEq = equipos.filter(eq =>
+      !selectorSearch || eq.serie.toLowerCase().includes(selectorSearch.toLowerCase()) || (eq.modelo||'').toLowerCase().includes(selectorSearch.toLowerCase())
+    );
+    html += `<div class="modal-overlay" style="align-items:flex-end">
+      <div class="modal" style="max-height:85vh;display:flex;flex-direction:column;border-radius:20px 20px 0 0;margin:0;max-width:100%;width:100%">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <div class="modal-title" style="margin:0">Elegir equipo</div>
+          <button onclick="closeSelector()" style="background:none;border:none;font-size:22px;color:var(--text3);cursor:pointer">✕</button>
+        </div>
+        <div style="position:relative;margin-bottom:12px;flex-shrink:0">
+          <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--text3)">🔍</span>
+          <input style="width:100%;padding:10px 10px 10px 36px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none;box-shadow:var(--shadow)"
+            placeholder="Buscar por serie o modelo..." value="${selectorSearch}" oninput="setSelectorSearch(this.value)" autofocus>
+        </div>
+        <div style="overflow-y:auto;flex:1">
+          ${equipos.length === 0 ? `<div style="text-align:center;color:var(--text3);padding:20px">Sin equipos en inventario</div>` : ''}
+          ${filteredEq.length === 0 && equipos.length > 0 ? `<div style="text-align:center;color:var(--text3);padding:20px">Sin resultados para "${selectorSearch}"</div>` : ''}
+          ${filteredEq.map(eq => {
+            const avail = eqSt(eq) === 'disponible';
+            return `<div class="selector-item ${!avail ? 'disabled' : ''}" onclick="${avail ? `pickEquipo('${eq.id}')` : ''}">
+              <div>
+                <div style="font-weight:700;font-size:15px">${eq.serie}</div>
+                <div style="font-size:12px;color:var(--text3)">${eq.modelo}${!avail ? ' · <span style="color:var(--yellow)">En uso</span>' : ''}</div>
+              </div>
+              ${avail ? `<span style="color:var(--blue);font-size:13px;font-weight:600">Elegir →</span>` : `<span style="color:var(--text3);font-size:12px">En uso</span>`}
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // ── DESPLIEGUES TAB ──
+  if (tab === 'instalaciones') {
+
+    if (view === 'lista') {
+      const filtered = records.filter(r => {
+        if (filterStatus !== 'TODOS' && calcSt(r) !== filterStatus) return false;
+        if (search) { const q = search.toLowerCase(); return (r.serie||'').toLowerCase().includes(q) || (r.caso||'').toLowerCase().includes(q) || (r.lugar||'').toLowerCase().includes(q); }
+        return true;
+      });
+      html += `<div class="content">
+        <div class="stats-bar">
+          ${['TODOS','ACTIVO','PROXIMO','RETIRADO'].map(s => `
+            <div class="stat-chip ${filterStatus===s?'active':''}" onclick="setFilter('${s}')">
+              <span class="stat-num" style="color:${s==='TODOS'?'var(--blue)':s==='ACTIVO'?'var(--green)':s==='PROXIMO'?'var(--yellow)':'var(--gray)'}">${counts[s]}</span>
+              <span class="stat-label">${s==='TODOS'?'Total':s==='ACTIVO'?'Activos':s==='PROXIMO'?'Próximos':'Retirados'}</span>
+            </div>`).join('')}
+        </div>
+        <div class="search-wrap"><span class="search-icon">🔍</span>
+          <input class="search-input" placeholder="Buscar serie, caso, lugar..." value="${search}" oninput="setSearch(this.value)">
+        </div>`;
+      if (filtered.length === 0) {
+        html += `<div class="empty"><div class="empty-icon">📡</div>
+          <div class="empty-text">${records.length === 0 ? 'Sin instalaciones registrados' : 'Sin resultados'}</div>
+          ${records.length === 0 ? `<button class="btn btn-primary" style="max-width:240px;margin:0 auto" onclick="newInstall()">+ Registrar instalación</button>` : ''}
+        </div>`;
+      } else {
+        html += `<div class="list">`;
+        filtered.forEach(r => {
+          const st = calcSt(r);
+          const dias = !r.retirado ? daysUntil(r.fechaRetiro) : null;
+          const dc = dias === null ? '' : dias <= 0 ? 'color:var(--red)' : dias <= 3 ? 'color:var(--yellow)' : 'color:var(--text3)';
+          const dt = dias === null ? '' : dias === 0 ? 'Hoy' : dias < 0 ? `${Math.abs(dias)}d vencido` : `en ${dias}d`;
+          const stripe = st==='ACTIVO'?'':st==='PROXIMO'?' yellow':' gray';
+          html += `<div class="card" onclick="openDetail('${r.id}')">
+            <div class="card-stripe${stripe}"></div>
+            <div class="card-inner">
+              <div class="card-body">
+                <div class="card-top"><div class="card-serie">${r.serie||'—'}</div>${badgeSt(st)}</div>
+                <div class="card-sub">${r.modelo ? r.modelo+' · ' : ''}#${r.caso}</div>
+                <div class="card-lugar">📍 ${r.lugar||'Sin ubicación'}</div>
+                <div class="card-footer">
+                  <span class="card-date">Retiro: ${fmtDate(r.fechaRetiro)}</span>
+                  <span class="days-tag" style="${dc}">${dt}</span>
+                </div>
+              </div>
+            </div>
+          </div>`;
+        });
+        html += `</div>`;
+      }
+      html += `</div>`;
+    }
+
+    else if (view === 'form') {
+      const selEq = form.equipoId ? equipos.find(e => e.id === form.equipoId) : null;
+      html += `<div class="content">
+        <div class="page-title">${editId ? 'Editar instalación' : 'Nuevo instalación'}</div>
+        <div class="form-section">
+          <div class="form-section-title">Equipo</div>
+          <div class="field"><label>Seleccionar equipo *</label>
+            ${selEq ? `<div class="equipo-preview">
+              <div><div style="font-weight:700;font-family:var(--mono)">${selEq.serie}</div><div style="font-size:12px;color:var(--text3)">${selEq.modelo}</div></div>
+              <button class="change-btn" onclick="openSelector()">Cambiar</button>
+            </div>` : `<button class="btn btn-secondary" style="border-color:#c7d5fd;color:var(--blue);background:var(--blue-light)" onclick="openSelector()">📦 Elegir del inventario</button>`}
+          </div>
+        </div>
+        <div class="form-section">
+          <div class="form-section-title">Caso</div>
+          <div class="field"><label>Código de caso / campaña *</label>
+            <input placeholder="Ej: CR1D2025201" value="${form.caso}" oninput="setField('caso',this.value)">
+          </div>
+        </div>
+        <div class="form-section">
+          <div class="form-section-title">Ubicación</div>
+          <div class="loc-toggle">
+            <button class="loc-tab ${locMode==='gps'?'active':''}" onclick="setLocMode('gps')">📍 GPS</button>
+            <button class="loc-tab ${locMode==='manual'?'active':''}" onclick="setLocMode('manual')">✏️ Manual</button>
+          </div>
+          ${locMode === 'gps' ? `
+            <div class="field">
+              <button class="gps-btn" id="gps-btn" onclick="triggerGPS()">📍 Capturar ubicación GPS</button>
+              ${form.lat ? `<div class="gps-tag">🛰 ${form.lat}, ${form.lng}</div>` : ''}
+            </div>
+            <div class="field"><label>Descripción del lugar</label>
+              <input placeholder="Ej: Quezaltepeque / Edificio Central" value="${form.lugar}" oninput="setField('lugar',this.value)">
+            </div>` : `
+            <div class="field"><label>Descripción del lugar *</label>
+              <input placeholder="Ej: Quezaltepeque / Edificio Central" value="${form.lugar}" oninput="setField('lugar',this.value)">
+            </div>
+            <div class="row">
+              <div class="field"><label>Latitud (opcional)</label><input placeholder="13.8333" value="${form.lat||''}" oninput="setField('lat',this.value)"></div>
+              <div class="field"><label>Longitud (opcional)</label><input placeholder="-89.2833" value="${form.lng||''}" oninput="setField('lng',this.value)"></div>
+            </div>`}
+        </div>
+        <div class="form-section">
+          <div class="form-section-title">Fechas</div>
+          <div class="row">
+            <div class="field"><label>Instalaciones</label><input type="date" value="${form.fechaInstalacion}" oninput="setField('fechaInstalacion',this.value)"></div>
+            <div class="field"><label>Retiro *</label><input type="date" value="${form.fechaRetiro}" oninput="setField('fechaRetiro',this.value)"></div>
+          </div>
+        </div>
+        <div class="form-section">
+          <div class="form-section-title">Notas</div>
+          <div class="field"><textarea placeholder="Observaciones, acceso al sitio, contacto..." oninput="setField('notas',this.value)">${form.notas}</textarea></div>
+        </div>
+        <button class="btn btn-primary" onclick="saveInstall()">${editId ? 'Guardar cambios' : 'Registrar instalación'}</button>
+      </div>`;
+    }
+
+    else if (view === 'detalle') {
+      const r = records.find(x => x.id === editId);
+      if (!r) { view = 'lista'; return render(); }
+      const st = calcSt(r);
+      const dias = !r.retirado ? daysUntil(r.fechaRetiro) : null;
+      html += `<div class="content">
+        <div class="detail-hero">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div><div class="detail-serie">${r.serie||'—'}</div><div class="detail-modelo">${r.modelo||''}</div></div>
+            ${badgeSt(st)}
+          </div>
+          ${dias === 0 && !r.retirado ? `<div class="alert-banner alert-yellow" style="margin-top:12px">🔔 Este analizador debe retirarse HOY</div>` : ''}
+          ${dias !== null && dias < 0 ? `<div class="alert-banner alert-red" style="margin-top:12px">⚠️ Vencido: debió retirarse hace ${Math.abs(dias)} día${Math.abs(dias)>1?'s':''}</div>` : ''}
+        </div>
+        <div class="detail-grid">
+          <div class="detail-row"><div class="detail-label">Caso / Campaña</div><div class="detail-value">#${r.caso}</div></div>
+          <div class="detail-row"><div class="detail-label">Lugar</div><div class="detail-value">${r.lugar||'—'}</div></div>
+          ${r.lat ? `<div class="detail-row"><div class="detail-label">GPS</div><div class="detail-value">${r.lat}, ${r.lng}</div></div>` : ''}
+          <div class="detail-row"><div class="detail-label">Instalaciones</div><div class="detail-value">${fmtDate(r.fechaInstalacion)}</div></div>
+          <div class="detail-row"><div class="detail-label">Retiro programado</div><div class="detail-value">${fmtDate(r.fechaRetiro)}${dias!==null?` <span style="font-size:12px;color:${dias<=0?'var(--red)':dias<=3?'var(--yellow)':'var(--text3)'}">(${dias===0?'hoy':dias>0?`en ${dias}d`:`${Math.abs(dias)}d vencido`})</span>`:''}</div></div>
+          ${r.fechaRetiroReal ? `<div class="detail-row"><div class="detail-label">Retirado el</div><div class="detail-value">${fmtDate(r.fechaRetiroReal)}</div></div>` : ''}
+          ${r.notas ? `<div class="detail-row"><div class="detail-label">Notas</div><div class="detail-value">${r.notas}</div></div>` : ''}
+        </div>
+        ${r.lat ? `<a class="map-link" href="https://maps.google.com/?q=${r.lat},${r.lng}" target="_blank">🗺 Ver en Google Maps</a>` : ''}
+        ${!r.retirado ? `
+          <a class="map-link" style="color:#1a73e8;border-color:#c7d5fd;margin-bottom:10px;display:block;text-align:center;text-decoration:none;padding:11px;border-radius:10px;border:1px solid #c7d5fd;font-size:13px;font-weight:600" onclick="addToCalendar('${r.id}')">📅 Agregar retiro a Google Calendar</a>
+          <button class="btn btn-primary" onclick="editInstall('${r.id}')">Editar</button>
+          <button class="btn btn-danger" onclick="openRetiroModal('${r.id}')">Marcar como retirado</button>` : ''}
+        <button class="btn btn-secondary" style="color:var(--red)" onclick="delInstall('${r.id}')">Eliminar registro</button>
+      </div>`;
+    }
+  }
+
+  // ── INVENTARIO TAB ──
+  else if (tab === 'inventario') {
+
+    if (view === 'lista') {
+      const disp = equipos.filter(e => eqSt(e) === 'disponible').length;
+      const desp = equipos.filter(e => eqSt(e) === 'instalado').length;
+      html += `<div class="content">
+        <div class="stats-bar">
+          <div class="stat-chip active"><span class="stat-num" style="color:var(--blue)">${equipos.length}</span><span class="stat-label">Total</span></div>
+          <div class="stat-chip"><span class="stat-num" style="color:var(--green)">${disp}</span><span class="stat-label">Disponibles</span></div>
+          <div class="stat-chip"><span class="stat-num" style="color:var(--yellow)">${desp}</span><span class="stat-label">Instalados</span></div>
+        </div>`;
+      if (equipos.length === 0) {
+        html += `<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">El inventario está vacío</div>
+          <button class="btn btn-primary" style="max-width:240px;margin:0 auto" onclick="newEquipo()">+ Agregar primer equipo</button></div>`;
+      } else {
+        html += `<div class="list">`;
+        equipos.forEach(eq => {
+          const st = eqSt(eq);
+          const c = st === 'disponible' ? 'var(--green)' : 'var(--yellow)';
+          const l = st === 'disponible' ? 'Disponible' : 'Instalado';
+          const dep = records.find(r => r.equipoId === eq.id && !r.retirado);
+          const eqStripe = st==='disponible'?'':' yellow';
+          html += `<div class="card" onclick="openEqDetalle('${eq.id}')">
+            <div class="card-stripe${eqStripe}"></div>
+            <div class="card-inner">
+              <div class="card-body">
+                <div class="card-top">
+                  <div class="card-serie">${eq.serie}</div>
+                  <span class="badge ${st==='disponible'?'badge-green':'badge-yellow'}">${l}</span>
+                </div>
+                <div class="card-sub">${eq.modelo||'Sin modelo'}</div>
+                ${dep ? `<div style="font-size:12px;color:var(--yellow);font-weight:500;margin-top:2px">📡 Caso #${dep.caso}${dep.lugar?' · '+dep.lugar:''}</div>` : ''}
+              </div>
+            </div>
+          </div>`;
+        });
+        html += `</div>`;
+      }
+      html += `</div>`;
+    }
+
+    else if (view === 'equipo_form') {
+      html += `<div class="content">
+        <div class="page-title">${editEqId ? 'Editar equipo' : 'Agregar equipo'}</div>
+        <div class="field"><label>Número de serie *</label>
+          <input placeholder="Ej: 1333S2311" value="${equipoForm.serie}" oninput="setEF('serie',this.value)">
+        </div>
+        <div class="field"><label>Modelo / marca *</label>
+          <input placeholder="Ej: ECAPLUS / DRANETZ" value="${equipoForm.modelo}" oninput="setEF('modelo',this.value)">
+        </div>
+        <div class="field"><label>Notas</label>
+          <textarea placeholder="Observaciones del equipo..." oninput="setEF('notas',this.value)">${equipoForm.notas}</textarea>
+        </div>
+        <button class="btn btn-primary" onclick="saveEquipo()">${editEqId ? 'Guardar cambios' : 'Agregar al inventario'}</button>
+      </div>`;
+    }
+
+    else if (view === 'equipo_detalle') {
+      const eq = equipos.find(x => x.id === editEqId);
+      if (!eq) { view = 'lista'; return render(); }
+      const st = eqSt(eq);
+      const c = st === 'disponible' ? 'var(--green)' : 'var(--yellow)';
+      const l = st === 'disponible' ? 'Disponible' : 'Instalado';
+      const historial = records.filter(r => r.equipoId === eq.id).sort((a,b) => (b.fechaRegistro||'').localeCompare(a.fechaRegistro||''));
+      html += `<div class="content">
+        <div class="detail-hero">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div><div class="detail-serie">${eq.serie}</div><div class="detail-modelo">${eq.modelo||''}</div></div>
+            <span class="badge ${st==='disponible'?'badge-green':'badge-yellow'}">${l}</span>
+          </div>
+        </div>
+        <div class="detail-grid">
+          <div class="detail-row"><div class="detail-label">Modelo / Marca</div><div class="detail-value">${eq.modelo||'—'}</div></div>
+          ${eq.notas ? `<div class="detail-row"><div class="detail-label">Notas</div><div class="detail-value">${eq.notas}</div></div>` : ''}
+          <div class="detail-row"><div class="detail-label">Registrado</div><div class="detail-value">${fmtDate(eq.fechaRegistro)}</div></div>
+          <div class="detail-row"><div class="detail-label">Total instalaciones</div><div class="detail-value">${historial.length}</div></div>
+        </div>
+        ${historial.length > 0 ? `
+          <div class="section-title">Historial de instalaciones</div>
+          <div class="list" style="margin-bottom:16px">
+            ${historial.map(r => {
+              const st2 = calcSt(r);
+              const tieneFallas = r.fallas && r.fallas.length > 0;
+              const sinProblema = r.sinProblema;
+              return `<div class="historial-card">
+                <div class="historial-row">
+                  <div>
+                    <div class="historial-lugar">${r.lugar||'Sin lugar'}</div>
+                    <div class="historial-caso">#${r.caso}</div>
+                  </div>
+                  <div class="historial-fecha">${fmtDate(r.fechaInstalacion)}<br>→ ${fmtDate(r.fechaRetiroReal||r.fechaRetiro)}</div>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+                  ${badgeSt(st2)}
+                  ${r.retirado && sinProblema ? `<span class="badge badge-green">✓ Sin problemas</span>` : ''}
+                  ${r.retirado && tieneFallas ? `<span class="badge badge-red">⚠ Con falla</span>` : ''}
+                </div>
+                ${r.retirado && tieneFallas ? `
+                  <div style="margin-top:8px;padding:8px 10px;background:var(--red-light);border-radius:8px;border:1px solid #fecaca">
+                    <div style="font-size:11px;font-weight:600;color:var(--red);margin-bottom:4px">FALLAS REGISTRADAS</div>
+                    ${r.fallas.map(f => `<div style="font-size:13px;color:var(--red);margin-bottom:2px">• ${f}</div>`).join('')}
+                    ${r.descripcionFalla ? `<div style="font-size:12px;color:var(--text2);margin-top:4px;font-style:italic">"${r.descripcionFalla}"</div>` : ''}
+                  </div>` : ''}
+              </div>`;
+            }).join('')}
+          </div>` : ''}
+        <button class="btn btn-primary" onclick="editEquipo('${eq.id}')">Editar equipo</button>
+        <button class="btn btn-secondary" style="color:var(--red)" onclick="delEquipo('${eq.id}')">Eliminar del inventario</button>
+      </div>`;
+    }
+  }
+
+  // MAP TAB
+  if (tab === 'mapa') {
+    const withGPS = records.filter(r => r.lat && r.lng);
+    const noGPS = records.filter(r => !r.lat || !r.lng);
+    const countActivo = records.filter(r => calcSt(r)==='ACTIVO' && r.lat).length;
+    const countProximo = records.filter(r => calcSt(r)==='PROXIMO' && r.lat).length;
+    const countRetirado = records.filter(r => r.retirado && r.lat).length;
+
+    html += `
+    <div style="padding:12px 16px 0;display:flex;gap:8px;flex-wrap:wrap">
+      <button onclick="toggleMapFilter('ACTIVO')" style="
+        flex:1;min-width:80px;padding:8px 6px;border-radius:10px;border:2px solid ${mapFilters.ACTIVO?'#0057b8':'#dde3ed'};
+        background:${mapFilters.ACTIVO?'#e8f0fb':'#fff'};color:${mapFilters.ACTIVO?'#0057b8':'#94a3b8'};
+        font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;
+        display:flex;flex-direction:column;align-items:center;gap:3px;transition:all .15s">
+        <div style="width:10px;height:10px;border-radius:50%;background:#0057b8;opacity:${mapFilters.ACTIVO?1:.3}"></div>
+        <span>Activos</span>
+        <span style="font-size:16px;font-weight:800;font-family:'JetBrains Mono',monospace">${countActivo}</span>
+      </button>
+      <button onclick="toggleMapFilter('PROXIMO')" style="
+        flex:1;min-width:80px;padding:8px 6px;border-radius:10px;border:2px solid ${mapFilters.PROXIMO?'#d97706':'#dde3ed'};
+        background:${mapFilters.PROXIMO?'#fffbeb':'#fff'};color:${mapFilters.PROXIMO?'#d97706':'#94a3b8'};
+        font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;
+        display:flex;flex-direction:column;align-items:center;gap:3px;transition:all .15s">
+        <div style="width:10px;height:10px;border-radius:50%;background:#d97706;opacity:${mapFilters.PROXIMO?1:.3}"></div>
+        <span>Próximos</span>
+        <span style="font-size:16px;font-weight:800;font-family:'JetBrains Mono',monospace">${countProximo}</span>
+      </button>
+      <button onclick="toggleMapFilter('RETIRADO')" style="
+        flex:1;min-width:80px;padding:8px 6px;border-radius:10px;border:2px solid ${mapFilters.RETIRADO?'#94a3b8':'#dde3ed'};
+        background:${mapFilters.RETIRADO?'#f1f5f9':'#fff'};color:${mapFilters.RETIRADO?'#64748b':'#94a3b8'};
+        font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;
+        display:flex;flex-direction:column;align-items:center;gap:3px;transition:all .15s">
+        <div style="width:10px;height:10px;border-radius:50%;background:#94a3b8;opacity:${mapFilters.RETIRADO?1:.3}"></div>
+        <span>Retirados</span>
+        <span style="font-size:16px;font-weight:800;font-family:'JetBrains Mono',monospace">${countRetirado}</span>
+      </button>
+    </div>
+    <div class="map-container" style="height:calc(100vh - 180px);margin-top:12px">
+      <div id="map" style="height:100%;width:100%"></div>
+    </div>
+    ${noGPS.length > 0 ? `<div class="map-no-gps">⚠ ${noGPS.length} instalación${noGPS.length>1?'es':''} sin GPS</div>` : ''}`;
+  }
+
+  // BOTTOM NAV
+  html += `<nav class="bottom-nav">
+    <button class="nav-btn ${tab==='instalaciones'?'active':''}" onclick="switchTab('instalaciones')">
+      <span class="nav-icon">⚡</span><span class="nav-label">Instalaciones</span>
+    </button>
+    <button class="nav-btn ${tab==='mapa'?'active':''}" onclick="switchTab('mapa')">
+      <span class="nav-icon">🗺️</span><span class="nav-label">Mapa</span>
+    </button>
+    <button class="nav-btn ${tab==='inventario'?'active':''}" onclick="switchTab('inventario')">
+      <span class="nav-icon">📦</span><span class="nav-label">Inventario</span>
+    </button>
+  </nav>`;
+
+  el.innerHTML = html;
+}
+
+// ── GLOBAL HANDLERS ──
+window.goBack = () => { view = 'lista'; editId = null; editEqId = null; form = emptyForm(); equipoForm = emptyEF(); showSelector = false; render(); };
+window.switchTab = t => {
+  tab = t; view = 'lista'; editId = null; editEqId = null; render();
+  if (t === 'mapa') setTimeout(initMap, 150);
+};
+window.setFilter = f => { filterStatus = f; render(); };
+window.setSearch = v => { search = v; render(); };
+window.setField = (k, v) => { form[k] = v; };
+window.setEF = (k, v) => { equipoForm[k] = v; };
+window.setLocMode = m => { locMode = m; render(); };
+window.triggerGPS = getGPS;
+window.setRetiroDesc = v => { retiroForm.descripcion = v; };
+window.toggleFalla = toggleFalla;
+window.toggleSinProblema = toggleSinProblema;
+window.doRetiro = handleRetiro;
+window.closeRetiroModal = closeRetiroModal;
+window.openRetiroModal = openRetiroModal;
+window.newInstall = () => {
+  if (equipos.filter(e => eqSt(e) === 'disponible').length === 0) return showToast('⚠️ No hay equipos disponibles en inventario');
+  form = emptyForm(); editId = null; view = 'form'; render();
+};
+window.saveInstall = handleSave;
+window.openDetail = id => { editId = id; view = 'detalle'; render(); };
+window.editInstall = id => {
+  const r = records.find(x => x.id === id); if (!r) return;
+  form = { equipoId: r.equipoId, serie: r.serie, modelo: r.modelo||'', caso: r.caso, lugar: r.lugar||'', lat: r.lat||null, lng: r.lng||null, fechaInstalacion: r.fechaInstalacion, fechaRetiro: r.fechaRetiro, notas: r.notas||'' };
+  editId = id; view = 'form'; render();
+};
+window.delInstall = handleDelInstall;
+window.addToCalendar = id => { const r = records.find(x => x.id === id); if (r) addToGoogleCalendar(r); };
+window.openSelector = () => { showSelector = true; selectorSearch = ''; render(); };
+window.closeSelector = () => { showSelector = false; selectorSearch = ''; render(); };
+window.setSelectorSearch = v => { selectorSearch = v; render(); };
+window.pickEquipo = id => {
+  const eq = equipos.find(x => x.id === id); if (!eq) return;
+  form.equipoId = id; form.serie = eq.serie; form.modelo = eq.modelo || '';
+  showSelector = false; render();
+};
+window.newEquipo = () => { equipoForm = emptyEF(); editEqId = null; view = 'equipo_form'; render(); };
+window.saveEquipo = handleSaveEq;
+window.openEqDetalle = id => { editEqId = id; view = 'equipo_detalle'; render(); };
+window.editEquipo = id => {
+  const eq = equipos.find(x => x.id === id); if (!eq) return;
+  equipoForm = { serie: eq.serie, modelo: eq.modelo||'', notas: eq.notas||'' };
+  editEqId = id; view = 'equipo_form'; render();
+};
+window.delEquipo = handleDelEq;
+window.toggleMapFilter = st => {
+  mapFilters[st] = !mapFilters[st];
+  render();
+  setTimeout(initMap, 100);
+};
+</script>
+</body>
+</html>
