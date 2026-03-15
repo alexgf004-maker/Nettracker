@@ -882,6 +882,7 @@ function render() {
 
   // MAP TAB
   if (tab === 'mapa') {
+    requestAnimationFrame(() => requestAnimationFrame(initMap));
     const withGPS = records.filter(r => r.lat && r.lng);
     const noGPS = records.filter(r => !r.lat || !r.lng);
     const countActivo = records.filter(r => calcSt(r)==='ACTIVO' && r.lat).length;
@@ -945,7 +946,7 @@ window.goBack = () => { view = 'lista'; editId = null; editEqId = null; form = e
 window.switchTab = t => {
   tab = t; view = 'lista'; editId = null; editEqId = null;
   render();
-  if (t === 'mapa') initMap();
+  if (t === 'mapa') requestAnimationFrame(() => requestAnimationFrame(initMap));
 };
 window.setFilter = f => { filterStatus = f; render(); };
 window.setSearch = v => { search = v; render(); };
@@ -992,7 +993,7 @@ window.delEquipo = handleDelEq;
 window.toggleMapFilter = st => {
   mapFilters[st] = !mapFilters[st];
   render();
-  initMap();
+  requestAnimationFrame(() => requestAnimationFrame(initMap));
 };
 </script>
 </body>
