@@ -8,8 +8,6 @@
   <meta name="theme-color" content="#0057b8">
   <title>CPT INNOVA</title>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
@@ -297,8 +295,6 @@ let showRetiroModal = false;
 let retiroId = null;
 let retiroForm = { sinProblema: null, fallas: [], descripcion: '' };
 let locMode = 'gps';
-let mapInstance = null;
-let mapInitialized = false;
 let selectorSearch = '';
 let form = emptyForm();
 let equipoForm = emptyEF();
@@ -462,72 +458,6 @@ function badgeSt(st) {
 }
 function accentColor(st) { return st === 'ACTIVO' ? 'var(--green)' : st === 'PROXIMO' ? 'var(--yellow)' : 'var(--gray)'; }
 
-// ── MAP ──
-function initMap() {
-  // Destroy previous instance
-  if (mapInstance) {
-    try { mapInstance.remove(); } catch(e) {}
-    mapInstance = null;
-  }
-
-  // Wait for DOM element to exist
-  let attempts = 0;
-  const tryInit = () => {
-    attempts++;
-    if (attempts > 20) return; // give up after 2s
-    const mapEl = document.getElementById('map');
-    if (!mapEl) { setTimeout(tryInit, 100); return; }
-    if (mapEl.offsetWidth === 0) { setTimeout(tryInit, 100); return; }
-
-    try {
-      const activeRecords = records.filter(r => {
-        const st = calcSt(r);
-        return r.lat && r.lng && mapFilters[st];
-      });
-
-      let center = [13.7942, -88.8965];
-      let zoom = 8;
-      if (activeRecords.length > 0) {
-        const lats = activeRecords.map(r => parseFloat(r.lat));
-        const lngs = activeRecords.map(r => parseFloat(r.lng));
-        center = [(Math.min(...lats)+Math.max(...lats))/2, (Math.min(...lngs)+Math.max(...lngs))/2];
-        zoom = activeRecords.length === 1 ? 14 : 10;
-      }
-
-      mapInstance = L.map('map', { zoomControl: true, attributionControl: false }).setView(center, zoom);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(mapInstance);
-
-      records.filter(r => r.lat && r.lng).forEach(r => {
-        const st = calcSt(r);
-        if (!mapFilters[st]) return;
-        const color = st==='ACTIVO' ? '#0057b8' : st==='PROXIMO' ? '#d97706' : '#94a3b8';
-        const border = st==='ACTIVO' ? '#003d8f' : st==='PROXIMO' ? '#b45309' : '#64748b';
-        const stLabel = st==='ACTIVO' ? 'Activo' : st==='PROXIMO' ? 'Retiro próximo' : 'Retirado';
-        const badgeBg = st==='ACTIVO' ? '#ecfdf5' : st==='PROXIMO' ? '#fffbeb' : '#f1f5f9';
-        const badgeClr = st==='ACTIVO' ? '#059669' : st==='PROXIMO' ? '#d97706' : '#94a3b8';
-
-        const icon = L.divIcon({
-          className: '',
-          html: `<div style="width:16px;height:16px;border-radius:50%;background:${color};border:2.5px solid ${border};box-shadow:0 2px 8px rgba(0,0,0,.35)"></div>`,
-          iconSize: [16, 16], iconAnchor: [8, 8]
-        });
-
-        L.marker([parseFloat(r.lat), parseFloat(r.lng)], { icon })
-          .bindPopup(`<div style="font-family:sans-serif;min-width:150px;padding:4px">
-            <div style="font-weight:800;font-size:14px;color:#0a1628">${r.serie}</div>
-            <div style="font-size:12px;color:#64748b;margin-top:2px">${r.modelo||''}</div>
-            <div style="font-size:12px;color:#475569;margin-top:3px">📍 ${r.lugar||''}</div>
-            <div style="font-size:11px;color:#94a3b8;margin-top:2px">#${r.caso}</div>
-            <span style="display:inline-block;margin-top:6px;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;background:${badgeBg};color:${badgeClr}">${stLabel}</span>
-          </div>`)
-          .addTo(mapInstance);
-      });
-    } catch(e) {
-      console.error('Map init error:', e);
-    }
-  };
-  setTimeout(tryInit, 150);
-}
 
 // ── RENDER ──
 function render() {
@@ -882,47 +812,77 @@ function render() {
 
   // MAP TAB
   if (tab === 'mapa') {
-    requestAnimationFrame(() => requestAnimationFrame(initMap));
-    const withGPS = records.filter(r => r.lat && r.lng);
-    const noGPS = records.filter(r => !r.lat || !r.lng);
+    const withGPS = records.filter(r => r.lat && r.lng && mapFilters[calcSt(r)]);
+    const noGPS = records.filter(r => (!r.lat || !r.lng));
     const countActivo = records.filter(r => calcSt(r)==='ACTIVO' && r.lat).length;
     const countProximo = records.filter(r => calcSt(r)==='PROXIMO' && r.lat).length;
     const countRetirado = records.filter(r => r.retirado && r.lat).length;
 
+    // Build Google Maps URL with all markers
+    const markers = withGPS.map(r => {
+      const color = calcSt(r)==='ACTIVO' ? 'blue' : calcSt(r)==='PROXIMO' ? 'yellow' : 'gray';
+      return `markers=color:${color}%7Clabel:${encodeURIComponent(r.serie.slice(-3))}%7C${r.lat},${r.lng}`;
+    }).join('&');
+
+    const gmapsUrl = `https://maps.google.com/maps?${markers}&output=embed`;
+    const firstMarker = withGPS[0];
+    const centerUrl = firstMarker
+      ? `https://maps.google.com/maps?q=${firstMarker.lat},${firstMarker.lng}&z=10&output=embed`
+      : `https://maps.google.com/maps?q=13.7942,-88.8965&z=8&output=embed`;
+
     html += `
-    <div style="padding:12px 16px 0;display:flex;gap:8px;flex-wrap:wrap">
-      <button onclick="toggleMapFilter('ACTIVO')" style="
-        flex:1;min-width:80px;padding:8px 6px;border-radius:10px;border:2px solid ${mapFilters.ACTIVO?'#0057b8':'#dde3ed'};
-        background:${mapFilters.ACTIVO?'#e8f0fb':'#fff'};color:${mapFilters.ACTIVO?'#0057b8':'#94a3b8'};
-        font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;
-        display:flex;flex-direction:column;align-items:center;gap:3px;transition:all .15s">
-        <div style="width:10px;height:10px;border-radius:50%;background:#0057b8;opacity:${mapFilters.ACTIVO?1:.3}"></div>
-        <span>Activos</span>
-        <span style="font-size:16px;font-weight:800;font-family:'JetBrains Mono',monospace">${countActivo}</span>
+    <div style="padding:12px 16px 0;display:flex;gap:8px">
+      <button onclick="toggleMapFilter('ACTIVO')" style="flex:1;padding:8px 4px;border-radius:10px;border:2px solid ${mapFilters.ACTIVO?'#0057b8':'#dde3ed'};background:${mapFilters.ACTIVO?'#e8f0fb':'#fff'};color:${mapFilters.ACTIVO?'#0057b8':'#94a3b8'};font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px">
+        <div style="width:8px;height:8px;border-radius:50%;background:#0057b8;opacity:${mapFilters.ACTIVO?1:.3}"></div>
+        <span>Activos</span><span style="font-size:15px;font-weight:800">${countActivo}</span>
       </button>
-      <button onclick="toggleMapFilter('PROXIMO')" style="
-        flex:1;min-width:80px;padding:8px 6px;border-radius:10px;border:2px solid ${mapFilters.PROXIMO?'#d97706':'#dde3ed'};
-        background:${mapFilters.PROXIMO?'#fffbeb':'#fff'};color:${mapFilters.PROXIMO?'#d97706':'#94a3b8'};
-        font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;
-        display:flex;flex-direction:column;align-items:center;gap:3px;transition:all .15s">
-        <div style="width:10px;height:10px;border-radius:50%;background:#d97706;opacity:${mapFilters.PROXIMO?1:.3}"></div>
-        <span>Próximos</span>
-        <span style="font-size:16px;font-weight:800;font-family:'JetBrains Mono',monospace">${countProximo}</span>
+      <button onclick="toggleMapFilter('PROXIMO')" style="flex:1;padding:8px 4px;border-radius:10px;border:2px solid ${mapFilters.PROXIMO?'#d97706':'#dde3ed'};background:${mapFilters.PROXIMO?'#fffbeb':'#fff'};color:${mapFilters.PROXIMO?'#d97706':'#94a3b8'};font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px">
+        <div style="width:8px;height:8px;border-radius:50%;background:#d97706;opacity:${mapFilters.PROXIMO?1:.3}"></div>
+        <span>Próximos</span><span style="font-size:15px;font-weight:800">${countProximo}</span>
       </button>
-      <button onclick="toggleMapFilter('RETIRADO')" style="
-        flex:1;min-width:80px;padding:8px 6px;border-radius:10px;border:2px solid ${mapFilters.RETIRADO?'#94a3b8':'#dde3ed'};
-        background:${mapFilters.RETIRADO?'#f1f5f9':'#fff'};color:${mapFilters.RETIRADO?'#64748b':'#94a3b8'};
-        font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;
-        display:flex;flex-direction:column;align-items:center;gap:3px;transition:all .15s">
-        <div style="width:10px;height:10px;border-radius:50%;background:#94a3b8;opacity:${mapFilters.RETIRADO?1:.3}"></div>
-        <span>Retirados</span>
-        <span style="font-size:16px;font-weight:800;font-family:'JetBrains Mono',monospace">${countRetirado}</span>
+      <button onclick="toggleMapFilter('RETIRADO')" style="flex:1;padding:8px 4px;border-radius:10px;border:2px solid ${mapFilters.RETIRADO?'#94a3b8':'#dde3ed'};background:${mapFilters.RETIRADO?'#f1f5f9':'#fff'};color:${mapFilters.RETIRADO?'#64748b':'#94a3b8'};font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px">
+        <div style="width:8px;height:8px;border-radius:50%;background:#94a3b8;opacity:${mapFilters.RETIRADO?1:.3}"></div>
+        <span>Retirados</span><span style="font-size:15px;font-weight:800">${countRetirado}</span>
       </button>
     </div>
-    <div class="map-container" style="height:calc(100vh - 180px);margin-top:12px">
-      <div id="map" style="height:calc(100vh - 180px);width:100%;min-height:300px"></div>
+
+    ${withGPS.length === 0 ? `
+    <div style="padding:20px 16px;text-align:center">
+      <div style="font-size:48px;opacity:.3;margin-bottom:12px">🗺️</div>
+      <div style="color:#94a3b8;font-size:14px;font-weight:500">Sin instalaciones con GPS para mostrar</div>
+    </div>` : `
+    <div style="margin:12px 16px;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.1)">
+      <iframe
+        width="100%"
+        height="420"
+        frameborder="0"
+        scrolling="no"
+        marginheight="0"
+        marginwidth="0"
+        src="${centerUrl}"
+        style="border:none;display:block">
+      </iframe>
     </div>
-    ${noGPS.length > 0 ? `<div class="map-no-gps">⚠ ${noGPS.length} instalación${noGPS.length>1?'es':''} sin GPS</div>` : ''}`;
+    <div style="padding:0 16px 12px">
+      <div style="background:#e8f0fb;border:1px solid #0057b833;border-radius:10px;padding:10px 14px;font-size:12px;color:#0057b8;font-weight:600">
+        📍 ${withGPS.length} instalación${withGPS.length>1?'es':''} con GPS activas
+        ${noGPS.length > 0 ? ` · ⚠ ${noGPS.length} sin GPS` : ''}
+      </div>
+      <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto">
+        ${withGPS.map(r => {
+          const st = calcSt(r);
+          const c = st==='ACTIVO'?'#0057b8':st==='PROXIMO'?'#d97706':'#94a3b8';
+          return `<a href="https://maps.google.com/?q=${r.lat},${r.lng}" target="_blank"
+            style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#fff;border:1px solid #dde3ed;border-radius:8px;text-decoration:none">
+            <div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:#0a1628">${r.serie}</div>
+              <div style="font-size:11px;color:#94a3b8;margin-top:1px">${r.lugar||'Sin descripción'}</div>
+            </div>
+            <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${c}18;color:${c}">Ver →</span>
+          </a>`;
+        }).join('')}
+      </div>
+    </div>`}`;
   }
 
   // BOTTOM NAV
@@ -946,7 +906,6 @@ window.goBack = () => { view = 'lista'; editId = null; editEqId = null; form = e
 window.switchTab = t => {
   tab = t; view = 'lista'; editId = null; editEqId = null;
   render();
-  if (t === 'mapa') requestAnimationFrame(() => requestAnimationFrame(initMap));
 };
 window.setFilter = f => { filterStatus = f; render(); };
 window.setSearch = v => { search = v; render(); };
@@ -993,7 +952,6 @@ window.delEquipo = handleDelEq;
 window.toggleMapFilter = st => {
   mapFilters[st] = !mapFilters[st];
   render();
-  requestAnimationFrame(() => requestAnimationFrame(initMap));
 };
 </script>
 </body>
