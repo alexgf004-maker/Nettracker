@@ -247,17 +247,6 @@
 
     .divider { height: 1px; background: var(--border); margin: 16px 0; }
 
-    /* MAP */
-    .map-container { position: relative; height: calc(100vh - 120px); }
-    #map { width: 100%; height: 100%; z-index: 1; }
-    .map-legend { position: absolute; bottom: 16px; left: 16px; background: white; border-radius: 12px; padding: 10px 14px; box-shadow: var(--shadow-md); z-index: 10; font-size: 12px; font-weight: 600; }
-    .map-legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-    .map-legend-item:last-child { margin-bottom: 0; }
-    .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-    .map-no-gps { text-align: center; padding: 12px 16px; background: var(--yellow-light); border: 1px solid #fcd34d; border-radius: 10px; margin: 12px 16px 0; font-size: 13px; color: var(--yellow); font-weight: 600; }
-    .map-popup-serie { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; color: #0a1628; }
-    .map-popup-sub { font-size: 12px; color: #4a5568; margin-top: 2px; }
-    .map-popup-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; margin-top: 6px; }
   </style>
 </head>
 <body>
@@ -486,7 +475,6 @@ function render() {
     </div>
     ${view === 'lista' && tab === 'instalaciones' ? `<button class="btn-small" onclick="newInstall()">+ Nuevo</button>` : ''}
     ${view === 'lista' && tab === 'inventario' ? `<button class="btn-small" onclick="newEquipo()">+ Equipo</button>` : ''}
-    ${tab === 'mapa' ? `<span style="font-size:12px;color:rgba(255,255,255,.7);font-weight:600">${records.filter(r=>r.lat&&r.lng).length} con GPS</span>` : ''}
   </header>`;
 
   // RETIRO MODAL
@@ -810,90 +798,12 @@ function render() {
     }
   }
 
-  // MAP TAB
-  if (tab === 'mapa') {
-    const withGPS = records.filter(r => r.lat && r.lng && mapFilters[calcSt(r)]);
-    const noGPS = records.filter(r => (!r.lat || !r.lng));
-    const countActivo = records.filter(r => calcSt(r)==='ACTIVO' && r.lat).length;
-    const countProximo = records.filter(r => calcSt(r)==='PROXIMO' && r.lat).length;
-    const countRetirado = records.filter(r => r.retirado && r.lat).length;
-
-    // Build Google Maps URL with all markers
-    const markers = withGPS.map(r => {
-      const color = calcSt(r)==='ACTIVO' ? 'blue' : calcSt(r)==='PROXIMO' ? 'yellow' : 'gray';
-      return `markers=color:${color}%7Clabel:${encodeURIComponent(r.serie.slice(-3))}%7C${r.lat},${r.lng}`;
-    }).join('&');
-
-    const gmapsUrl = `https://maps.google.com/maps?${markers}&output=embed`;
-    const firstMarker = withGPS[0];
-    const centerUrl = firstMarker
-      ? `https://maps.google.com/maps?q=${firstMarker.lat},${firstMarker.lng}&z=10&output=embed`
-      : `https://maps.google.com/maps?q=13.7942,-88.8965&z=8&output=embed`;
-
-    html += `
-    <div style="padding:12px 16px 0;display:flex;gap:8px">
-      <button onclick="toggleMapFilter('ACTIVO')" style="flex:1;padding:8px 4px;border-radius:10px;border:2px solid ${mapFilters.ACTIVO?'#0057b8':'#dde3ed'};background:${mapFilters.ACTIVO?'#e8f0fb':'#fff'};color:${mapFilters.ACTIVO?'#0057b8':'#94a3b8'};font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px">
-        <div style="width:8px;height:8px;border-radius:50%;background:#0057b8;opacity:${mapFilters.ACTIVO?1:.3}"></div>
-        <span>Activos</span><span style="font-size:15px;font-weight:800">${countActivo}</span>
-      </button>
-      <button onclick="toggleMapFilter('PROXIMO')" style="flex:1;padding:8px 4px;border-radius:10px;border:2px solid ${mapFilters.PROXIMO?'#d97706':'#dde3ed'};background:${mapFilters.PROXIMO?'#fffbeb':'#fff'};color:${mapFilters.PROXIMO?'#d97706':'#94a3b8'};font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px">
-        <div style="width:8px;height:8px;border-radius:50%;background:#d97706;opacity:${mapFilters.PROXIMO?1:.3}"></div>
-        <span>Próximos</span><span style="font-size:15px;font-weight:800">${countProximo}</span>
-      </button>
-      <button onclick="toggleMapFilter('RETIRADO')" style="flex:1;padding:8px 4px;border-radius:10px;border:2px solid ${mapFilters.RETIRADO?'#94a3b8':'#dde3ed'};background:${mapFilters.RETIRADO?'#f1f5f9':'#fff'};color:${mapFilters.RETIRADO?'#64748b':'#94a3b8'};font-family:'Plus Jakarta Sans',sans-serif;font-size:11px;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px">
-        <div style="width:8px;height:8px;border-radius:50%;background:#94a3b8;opacity:${mapFilters.RETIRADO?1:.3}"></div>
-        <span>Retirados</span><span style="font-size:15px;font-weight:800">${countRetirado}</span>
-      </button>
-    </div>
-
-    ${withGPS.length === 0 ? `
-    <div style="padding:20px 16px;text-align:center">
-      <div style="font-size:48px;opacity:.3;margin-bottom:12px">🗺️</div>
-      <div style="color:#94a3b8;font-size:14px;font-weight:500">Sin instalaciones con GPS para mostrar</div>
-    </div>` : `
-    <div style="margin:12px 16px;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.1)">
-      <iframe
-        width="100%"
-        height="420"
-        frameborder="0"
-        scrolling="no"
-        marginheight="0"
-        marginwidth="0"
-        src="${centerUrl}"
-        style="border:none;display:block">
-      </iframe>
-    </div>
-    <div style="padding:0 16px 12px">
-      <div style="background:#e8f0fb;border:1px solid #0057b833;border-radius:10px;padding:10px 14px;font-size:12px;color:#0057b8;font-weight:600">
-        📍 ${withGPS.length} instalación${withGPS.length>1?'es':''} con GPS activas
-        ${noGPS.length > 0 ? ` · ⚠ ${noGPS.length} sin GPS` : ''}
-      </div>
-      <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto">
-        ${withGPS.map(r => {
-          const st = calcSt(r);
-          const c = st==='ACTIVO'?'#0057b8':st==='PROXIMO'?'#d97706':'#94a3b8';
-          return `<a href="https://maps.google.com/?q=${r.lat},${r.lng}" target="_blank"
-            style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#fff;border:1px solid #dde3ed;border-radius:8px;text-decoration:none">
-            <div>
-              <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:#0a1628">${r.serie}</div>
-              <div style="font-size:11px;color:#94a3b8;margin-top:1px">${r.lugar||'Sin descripción'}</div>
-            </div>
-            <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${c}18;color:${c}">Ver →</span>
-          </a>`;
-        }).join('')}
-      </div>
-    </div>`}`;
-  }
-
-  // BOTTOM NAV
+    // BOTTOM NAV
   html += `<nav class="bottom-nav">
     <button class="nav-btn ${tab==='instalaciones'?'active':''}" onclick="switchTab('instalaciones')">
       <span class="nav-icon">⚡</span><span class="nav-label">Instalaciones</span>
     </button>
-    <button class="nav-btn ${tab==='mapa'?'active':''}" onclick="switchTab('mapa')">
-      <span class="nav-icon">🗺️</span><span class="nav-label">Mapa</span>
-    </button>
-    <button class="nav-btn ${tab==='inventario'?'active':''}" onclick="switchTab('inventario')">
+<button class="nav-btn ${tab==='inventario'?'active':''}" onclick="switchTab('inventario')">
       <span class="nav-icon">📦</span><span class="nav-label">Inventario</span>
     </button>
   </nav>`;
@@ -949,10 +859,7 @@ window.editEquipo = id => {
   editEqId = id; view = 'equipo_form'; render();
 };
 window.delEquipo = handleDelEq;
-window.toggleMapFilter = st => {
-  mapFilters[st] = !mapFilters[st];
-  render();
-};
+
 </script>
 </body>
 </html>
