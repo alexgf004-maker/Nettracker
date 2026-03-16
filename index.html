@@ -286,6 +286,7 @@ let retiroForm = { sinProblema: null, fallas: [], descripcion: '', sede: 'Plante
 let locMode = 'gps';
 let selectorSearch = '';
 let inventarioSearch = '';
+let inventarioFiltro = 'TODOS';
 let form = emptyForm();
 let equipoForm = emptyEF();
 
@@ -306,6 +307,8 @@ function eqSt(eq) {
   if (eq.prestado) return 'prestado';
   return 'disponible';
 }
+function eqEnCampo(eq) { return !!records.find(r => r.equipoId === eq.id && !r.retirado); }
+function eqPrestado(eq) { return !!eq.prestado; }
 
 // ── FIREBASE LISTENERS ──
 // Simple approach: each listener independently updates its array and re-renders
@@ -569,8 +572,8 @@ function render() {
         </div>
         <div style="position:relative;margin-bottom:12px;flex-shrink:0">
           <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--text3)">🔍</span>
-          <input style="width:100%;padding:10px 10px 10px 36px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none;box-shadow:var(--shadow)"
-            placeholder="Buscar por serie o modelo..." value="${selectorSearch}" oninput="setSelectorSearch(this.value)" data-active="true">
+          <input id="sel-search" style="width:100%;padding:10px 10px 10px 36px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none;box-shadow:var(--shadow)"
+            placeholder="Buscar por serie o modelo..." value="${selectorSearch}" oninput="setSelectorSearch(this.value)">
         </div>
         <div style="overflow-y:auto;flex:1">
           ${equipos.length === 0 ? `<div style="text-align:center;color:var(--text3);padding:20px">Sin equipos en inventario</div>` : ''}
@@ -749,25 +752,29 @@ function render() {
       const desp = equipos.filter(e => eqSt(e) === 'instalado').length;
       const enPlantel = equipos.filter(e => eqSt(e) === 'disponible' && (e.sede||'Plantel Central')==='Plantel Central').length;
       const enCucu = equipos.filter(e => eqSt(e) === 'disponible' && e.sede==='Subestación Cucumacayán').length;
-      const prestados = equipos.filter(e => e.prestado && eqSt(e) !== 'instalado').length;
+      const prestados = equipos.filter(e => e.prestado).length;
       const enCampo = equipos.filter(e => eqSt(e) === 'instalado').length;
       html += `<div class="content">
         <div class="stats-bar">
-          <div class="stat-chip active"><span class="stat-num" style="color:var(--primary)">${equipos.length}</span><span class="stat-label">Total</span></div>
-          <div class="stat-chip"><span class="stat-num" style="color:var(--green)">${enPlantel}</span><span class="stat-label">Plantel</span></div>
-          <div class="stat-chip"><span class="stat-num" style="color:#00aaff">${enCucu}</span><span class="stat-label">Cucumacayán</span></div>
-          <div class="stat-chip"><span class="stat-num" style="color:var(--primary)">${prestados}</span><span class="stat-label">Prestados</span></div>
-          <div class="stat-chip"><span class="stat-num" style="color:var(--yellow)">${enCampo}</span><span class="stat-label">En campo</span></div>
+          <div class="stat-chip ${inventarioFiltro==='TODOS'?'active':''}" onclick="setInvFiltro('TODOS')" style="flex-shrink:0"><span class="stat-num" style="color:var(--primary)">${equipos.length}</span><span class="stat-label">Total</span></div>
+          <div class="stat-chip ${inventarioFiltro==='disponible'?'active':''}" onclick="setInvFiltro('disponible')" style="flex-shrink:0"><span class="stat-num" style="color:var(--green)">${enPlantel+enCucu}</span><span class="stat-label">Disponibles</span></div>
+          <div class="stat-chip ${inventarioFiltro==='prestado'?'active':''}" onclick="setInvFiltro('prestado')" style="flex-shrink:0"><span class="stat-num" style="color:var(--primary)">${prestados}</span><span class="stat-label">Prestados</span></div>
+          <div class="stat-chip ${inventarioFiltro==='instalado'?'active':''}" onclick="setInvFiltro('instalado')" style="flex-shrink:0"><span class="stat-num" style="color:var(--yellow)">${enCampo}</span><span class="stat-label">En campo</span></div>
         </div>`;
       html += '<div class="search-wrap" style="margin-bottom:12px"><span class="search-icon">🔍</span><input class="search-input" placeholder="Buscar por serie o modelo..." value="' + inventarioSearch + '" oninput="setInvSearch(this.value)" ' + (inventarioSearch ? 'data-active="true"' : '') + '></div>';
       if (equipos.length === 0) {
         html += '<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">El inventario está vacío</div><button class="btn btn-primary" style="max-width:240px;margin:0 auto" onclick="newEquipo()">+ Agregar primer equipo</button></div>';
       } else {
-        const filteredEq = equipos.filter(eq =>
-          !inventarioSearch ||
-          eq.serie.toLowerCase().includes(inventarioSearch.toLowerCase()) ||
-          (eq.modelo||'').toLowerCase().includes(inventarioSearch.toLowerCase())
-        );
+        const filteredEq = equipos.filter(eq => {
+          if (inventarioFiltro === 'disponible' && eqSt(eq) !== 'disponible') return false;
+          if (inventarioFiltro === 'prestado' && !eqPrestado(eq)) return false;
+          if (inventarioFiltro === 'instalado' && !eqEnCampo(eq)) return false;
+          if (inventarioSearch) {
+            const q = inventarioSearch.toLowerCase();
+            return eq.serie.toLowerCase().includes(q) || (eq.modelo||'').toLowerCase().includes(q);
+          }
+          return true;
+        });
         if (filteredEq.length === 0) {
           html += '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">Sin resultados para "' + inventarioSearch + '"</div></div>';
         } else {
@@ -782,10 +789,15 @@ function render() {
             const sedeIcon = st==='prestado' ? '🔄' : '🏭';
             const eqId = eq.id;
             html += `<div onclick="openEqDetalle('${eqId}')" style="background:var(--white);border:1px solid var(--border);border-top:3px solid ${c};border-radius:12px;padding:12px;cursor:pointer;box-shadow:var(--shadow)">`;
+            const isPrestado = eqPrestado(eq);
+            const isEnCampo = eqEnCampo(eq);
             html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px">';
             html += '<div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text);word-break:break-all;flex:1;margin-right:4px">' + eq.serie + '</div>';
-            html += '<span class="badge ' + badgeClass + '" style="font-size:8px;padding:2px 5px;white-space:nowrap">' + l + '</span>';
-            html += '</div>';
+            html += '<div style="display:flex;flex-direction:column;gap:2px;align-items:flex-end">';
+            if (isPrestado) html += '<span class="badge badge-blue" style="font-size:8px;padding:2px 5px;white-space:nowrap">Prestado</span>';
+            if (isEnCampo) html += '<span class="badge badge-yellow" style="font-size:8px;padding:2px 5px;white-space:nowrap">En campo</span>';
+            if (!isPrestado && !isEnCampo) html += '<span class="badge badge-green" style="font-size:8px;padding:2px 5px;white-space:nowrap">Disponible</span>';
+            html += '</div></div>';
             html += '<div style="font-size:11px;color:var(--text3);margin-bottom:5px">' + (eq.modelo||'Sin modelo') + '</div>';
             if (dep) {
               html += '<div style="font-size:10px;color:var(--yellow);font-weight:600">📡 #' + dep.caso + '</div>';
@@ -887,10 +899,10 @@ function render() {
             }).join('')}
           </div>` : ''}
         <button class="btn btn-primary" onclick="editEquipo('${eq.id}')">Editar equipo</button>
-        ${st === 'disponible' && (eq.sede||'Plantel Central') === 'Subestación Cucumacayán' ? `
+        ${!eq.prestado && (eq.sede||'Plantel Central') === 'Subestación Cucumacayán' ? `
           <button class="btn" style="background:var(--primary-light);color:var(--primary);border:1px solid var(--primary)" onclick="registrarPrestamo('${eq.id}')">🔄 Registrar préstamo a Plantel Central</button>
         ` : ''}
-        ${st === 'prestado' ? `
+        ${eq.prestado ? `
           <button class="btn" style="background:var(--green-light);color:var(--green);border:1px solid var(--green)" onclick="registrarDevolucion('${eq.id}')">✅ Registrar devolución a Cucumacayán</button>
         ` : ''}
         <button class="btn btn-secondary" style="color:var(--red)" onclick="delEquipo('${eq.id}')">Eliminar del inventario</button>
@@ -1016,15 +1028,13 @@ window.addToCalendar = id => { const r = records.find(x => x.id === id); if (r) 
 window.openSelector = () => { showSelector = true; selectorSearch = ''; render(); };
 window.closeSelector = () => { showSelector = false; selectorSearch = ''; render(); };
 window.setSelectorSearch = v => {
-  selectorSearch = v;
-  const inp = document.querySelector('.search-input[oninput*="setSelectorSearch"]');
+  const inp = document.getElementById('sel-search');
   const pos = inp ? inp.selectionStart : null;
-  render();
-  if (pos !== null) {
-    const newInp = document.querySelector('.search-input[oninput*="setSelectorSearch"]');
-    if (newInp) { newInp.focus(); newInp.setSelectionRange(pos, pos); }
-  }
+  selectorSearch = v; render();
+  const ni = document.getElementById('sel-search');
+  if (ni && pos !== null) { ni.focus(); ni.setSelectionRange(pos, pos); }
 };
+window.setInvFiltro = f => { inventarioFiltro = f; render(); };
 window.setInvSearch = v => {
   inventarioSearch = v;
   const inp = document.querySelector('.search-input[oninput*="setInvSearch"]');
