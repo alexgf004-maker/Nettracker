@@ -300,7 +300,11 @@ function today() { return new Date().toISOString().split('T')[0]; }
 function fmtDate(d) { if (!d) return '—'; const [y,m,dd] = d.split('-'); return `${dd}/${m}/${y}`; }
 function daysUntil(d) { const [y,m,dd] = d.split('-').map(Number); const r = new Date(y, m-1, dd); const n = new Date(); n.setHours(0,0,0,0); r.setHours(0,0,0,0); return Math.round((r-n)/86400000); }
 function calcSt(r) { if (r.retirado) return 'RETIRADO'; const d = daysUntil(r.fechaRetiro); return d <= 3 ? 'PROXIMO' : 'ACTIVO'; }
-function eqSt(eq) { return records.find(r => r.equipoId === eq.id && !r.retirado) ? 'instalado' : 'disponible'; }
+function eqSt(eq) {
+  if (records.find(r => r.equipoId === eq.id && !r.retirado)) return 'instalado';
+  if (eq.prestado) return 'prestado';
+  return 'disponible';
+}
 
 // ── FIREBASE LISTENERS ──
 // Simple approach: each listener independently updates its array and re-renders
@@ -425,6 +429,24 @@ function handleSaveEq() {
 }
 
 // ── DELETE EQUIPO ──
+function handlePrestamo(id) {
+  const eq = equipos.find(x => x.id === id);
+  if (!eq) return;
+  const nota = prompt('Nota del préstamo (opcional):') || '';
+  const movimiento = { tipo: 'prestamo', de: eq.sede||'Subestación Cucumacayán', a: 'Plantel Central', fecha: today(), nota };
+  const movimientos = [...(eq.movimientos||[]), movimiento];
+  update(ref(db, `equipos/${id}`), { prestado: true, prestadoFecha: today(), sede: 'Plantel Central', movimientos }).then(() => showToast('🔄 Préstamo registrado'));
+}
+
+function handleDevolucion(id) {
+  const eq = equipos.find(x => x.id === id);
+  if (!eq) return;
+  const nota = prompt('Nota de devolución (opcional):') || '';
+  const movimiento = { tipo: 'devolucion', de: 'Plantel Central', a: 'Subestación Cucumacayán', fecha: today(), nota };
+  const movimientos = [...(eq.movimientos||[]), movimiento];
+  update(ref(db, `equipos/${id}`), { prestado: false, prestadoFecha: null, sede: 'Subestación Cucumacayán', movimientos }).then(() => showToast('✅ Devolución registrada'));
+}
+
 function handleDelEq(id) {
   if (records.find(r => r.equipoId === id && !r.retirado)) return showToast('⚠️ Equipo instalado actualmente');
   if (!confirm('¿Eliminar del inventario?')) return;
@@ -726,12 +748,14 @@ function render() {
       const desp = equipos.filter(e => eqSt(e) === 'instalado').length;
       const enPlantel = equipos.filter(e => eqSt(e) === 'disponible' && (e.sede||'Plantel Central')==='Plantel Central').length;
       const enCucu = equipos.filter(e => eqSt(e) === 'disponible' && e.sede==='Subestación Cucumacayán').length;
-      const enCampo = equipos.filter(e => eqSt(e) !== 'disponible').length;
+      const prestados = equipos.filter(e => e.prestado && eqSt(e) !== 'instalado').length;
+      const enCampo = equipos.filter(e => eqSt(e) === 'instalado').length;
       html += `<div class="content">
         <div class="stats-bar">
           <div class="stat-chip active"><span class="stat-num" style="color:var(--primary)">${equipos.length}</span><span class="stat-label">Total</span></div>
           <div class="stat-chip"><span class="stat-num" style="color:var(--green)">${enPlantel}</span><span class="stat-label">Plantel</span></div>
           <div class="stat-chip"><span class="stat-num" style="color:#00aaff">${enCucu}</span><span class="stat-label">Cucumacayán</span></div>
+          <div class="stat-chip"><span class="stat-num" style="color:var(--primary)">${prestados}</span><span class="stat-label">Prestados</span></div>
           <div class="stat-chip"><span class="stat-num" style="color:var(--yellow)">${enCampo}</span><span class="stat-label">En campo</span></div>
         </div>`;
       if (equipos.length === 0) {
@@ -741,10 +765,10 @@ function render() {
         html += `<div class="list">`;
         equipos.forEach(eq => {
           const st = eqSt(eq);
-          const c = st === 'disponible' ? 'var(--green)' : 'var(--yellow)';
-          const l = st === 'disponible' ? 'Disponible' : 'Instalado';
+          const c = st==='disponible' ? 'var(--green)' : st==='prestado' ? 'var(--primary)' : 'var(--yellow)';
+          const l = st==='disponible' ? 'Disponible' : st==='prestado' ? 'Prestado' : 'En campo';
           const dep = records.find(r => r.equipoId === eq.id && !r.retirado);
-          const eqStripe = st==='disponible'?'':' yellow';
+          const eqStripe = st==='disponible'?'': st==='prestado'?' ':'  yellow';
           html += `<div class="card" onclick="openEqDetalle('${eq.id}')">
             <div class="card-stripe${eqStripe}"></div>
             <div class="card-inner">
@@ -754,7 +778,7 @@ function render() {
                   <span class="badge ${st==='disponible'?'badge-green':'badge-yellow'}">${l}</span>
                 </div>
                 <div class="card-sub">${eq.modelo||'Sin modelo'}</div>
-                ${!dep ? `<div style="font-size:11px;color:var(--primary);font-weight:600;margin-top:3px">🏭 ${eq.sede||'Plantel Central'}</div>` : `<div style="font-size:12px;color:var(--yellow);font-weight:500;margin-top:2px">📡 Caso #${dep.caso}${dep.lugar?' · '+dep.lugar:''}</div>`}
+                ${dep ? `<div style="font-size:12px;color:var(--yellow);font-weight:500;margin-top:2px">📡 Caso #${dep.caso}${dep.lugar?' · '+dep.lugar:''}</div>` : eq.prestado ? `<div style="font-size:11px;color:var(--primary);font-weight:600;margin-top:3px">🔄 Prestado a Plantel Central${eq.prestadoFecha?' desde '+fmtDate(eq.prestadoFecha):''}</div>` : `<div style="font-size:11px;color:var(--green);font-weight:600;margin-top:3px">🏭 ${eq.sede||'Plantel Central'}</div>`}
               </div>
             </div>
           </div>`;
@@ -803,11 +827,26 @@ function render() {
           <div class="detail-row"><div class="detail-label">Modelo / Marca</div><div class="detail-value">${eq.modelo||'—'}</div></div>
           ${eq.notas ? `<div class="detail-row"><div class="detail-label">Notas</div><div class="detail-value">${eq.notas}</div></div>` : ''}
           <div class="detail-row"><div class="detail-label">Sede</div><div class="detail-value">${eq.sede||'Plantel Central'}</div></div>
+          ${eq.prestado ? `<div class="detail-row"><div class="detail-label">Prestado desde</div><div class="detail-value" style="color:var(--primary);font-weight:600">${fmtDate(eq.prestadoFecha)} · En Plantel Central</div></div>` : ''}
           <div class="detail-row"><div class="detail-label">Registrado</div><div class="detail-value">${fmtDate(eq.fechaRegistro)}</div></div>
           <div class="detail-row"><div class="detail-label">Total instalaciones</div><div class="detail-value">${historial.length}</div></div>
         </div>
+        ${eq.movimientos && eq.movimientos.length > 0 ? `
+          <div class="section-title" style="margin-top:4px">Movimientos entre sedes</div>
+          <div class="list" style="margin-bottom:16px">
+            ${eq.movimientos.slice().reverse().map(m => `
+              <div class="historial-card">
+                <div class="historial-row">
+                  <div>
+                    <div class="historial-lugar">${m.de} → ${m.a}</div>
+                    <div class="historial-caso">${m.tipo==='prestamo'?'🔄 Préstamo':'✅ Devolución'}${m.nota?' · '+m.nota:''}</div>
+                  </div>
+                  <div class="historial-fecha">${fmtDate(m.fecha)}</div>
+                </div>
+              </div>`).join('')}
+          </div>` : ''}
         ${historial.length > 0 ? `
-          <div class="section-title">Historial de instalaciones</div>
+          <div class="section-title" style="margin-top:4px">Historial de instalaciones</div>
           <div class="list" style="margin-bottom:16px">
             ${historial.map(r => {
               const st2 = calcSt(r);
@@ -836,6 +875,12 @@ function render() {
             }).join('')}
           </div>` : ''}
         <button class="btn btn-primary" onclick="editEquipo('${eq.id}')">Editar equipo</button>
+        ${st === 'disponible' && (eq.sede||'Plantel Central') === 'Subestación Cucumacayán' ? `
+          <button class="btn" style="background:var(--primary-light);color:var(--primary);border:1px solid var(--primary)" onclick="registrarPrestamo('${eq.id}')">🔄 Registrar préstamo a Plantel Central</button>
+        ` : ''}
+        ${st === 'prestado' ? `
+          <button class="btn" style="background:var(--green-light);color:var(--green);border:1px solid var(--green)" onclick="registrarDevolucion('${eq.id}')">✅ Registrar devolución a Cucumacayán</button>
+        ` : ''}
         <button class="btn btn-secondary" style="color:var(--red)" onclick="delEquipo('${eq.id}')">Eliminar del inventario</button>
       </div>`;
     }
@@ -957,6 +1002,8 @@ window.editEquipo = id => {
 };
 window.delEquipo = handleDelEq;
 window.setRetiroSede = s => { retiroForm.sede = s; render(); };
+window.registrarPrestamo = handlePrestamo;
+window.registrarDevolucion = handleDevolucion;
 
 </script>
 </body>
