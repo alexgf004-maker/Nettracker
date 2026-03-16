@@ -282,17 +282,19 @@ let search = '';
 let showSelector = false;
 let showRetiroModal = false;
 let retiroId = null;
-let retiroForm = { sinProblema: null, fallas: [], descripcion: '' };
+let retiroForm = { sinProblema: null, fallas: [], descripcion: '', sede: 'Plantel Central' };
 let locMode = 'gps';
 let selectorSearch = '';
 let form = emptyForm();
 let equipoForm = emptyEF();
 
+const SEDES = ['Plantel Central', 'Subestación Cucumacayán'];
+
 function emptyForm() {
-  return { equipoId: null, serie: '', modelo: '', caso: '', lugar: '', lat: null, lng: null, fechaInstalacion: today(), fechaRetiro: '', notas: '' };
+  return { equipoId: null, serie: '', modelo: '', caso: '', lugar: '', lat: null, lng: null, fechaInstalacion: today(), fechaRetiro: '', notas: '', sede: 'Plantel Central' };
 }
 function emptyEF() {
-  return { serie: '', modelo: '', notas: '' };
+  return { serie: '', modelo: '', notas: '', sede: 'Plantel Central' };
 }
 function today() { return new Date().toISOString().split('T')[0]; }
 function fmtDate(d) { if (!d) return '—'; const [y,m,dd] = d.split('-'); return `${dd}/${m}/${y}`; }
@@ -371,7 +373,7 @@ function handleSave() {
 }
 
 // ── RETIRO ──
-function openRetiroModal(id) { retiroId = id; retiroForm = { sinProblema: null, fallas: [], descripcion: '' }; showRetiroModal = true; render(); }
+function openRetiroModal(id) { retiroId = id; retiroForm = { sinProblema: null, fallas: [], descripcion: '', sede: 'Plantel Central' }; showRetiroModal = true; render(); }
 function closeRetiroModal() { showRetiroModal = false; retiroId = null; render(); }
 function toggleFalla(f) {
   retiroForm.sinProblema = false;
@@ -388,8 +390,16 @@ function handleRetiro() {
   if (retiroForm.sinProblema === null && retiroForm.fallas.length === 0) return showToast('Indica si hubo algún problema');
   const payload = { retirado: true, fechaRetiroReal: today(), sinProblema: retiroForm.sinProblema || false, fallas: retiroForm.fallas, descripcionFalla: retiroForm.descripcion };
   const id = retiroId;
+  const sedeRetiro = retiroForm.sede;
+  // Find equipoId to update sede
+  const deployRec = records.find(x => x.id === id);
   showRetiroModal = false; retiroId = null; view = 'lista';
-  update(ref(db, `analizadores/${id}`), payload).then(() => showToast('✅ Equipo marcado como retirado'));
+  update(ref(db, `analizadores/${id}`), payload).then(() => {
+    if (deployRec && deployRec.equipoId) {
+      update(ref(db, `equipos/${deployRec.equipoId}`), { sede: sedeRetiro });
+    }
+    showToast('✅ Equipo marcado como retirado');
+  });
 }
 
 // ── DELETE DEPLOY ──
@@ -511,6 +521,12 @@ function render() {
           <textarea placeholder="Describe el problema..." oninput="setRetiroDesc(this.value)" style="width:100%;padding:12px;border:1.5px solid #e5e7eb;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:14px;outline:none;min-height:70px;resize:vertical">${retiroForm.descripcion}</textarea>
         </div>
 
+        <div style="margin-bottom:12px">
+          <div style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:6px">¿A QUÉ SEDE REGRESA EL EQUIPO?</div>
+          <div style="display:flex;gap:8px">
+            ${SEDES.map(s => `<button onclick="setRetiroSede('${s}')" style="flex:1;padding:10px 8px;border-radius:10px;border:2px solid ${retiroForm.sede===s?'#3b6cf4':'#e5e7eb'};background:${retiroForm.sede===s?'#eef2ff':'#fff'};color:${retiroForm.sede===s?'#3b6cf4':'#6b7280'};font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer">${s}</button>`).join('')}
+          </div>
+        </div>
         <button onclick="doRetiro()" style="width:100%;background:#3b6cf4;color:#fff;border:none;border-radius:10px;padding:14px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">Confirmar retiro</button>
         <button onclick="closeRetiroModal()" style="width:100%;background:#fff;color:#6b7280;border:1px solid #e5e7eb;border-radius:10px;padding:13px;font-family:'DM Sans',sans-serif;font-size:15px;cursor:pointer">Cancelar</button>
       </div>
@@ -653,6 +669,14 @@ function render() {
           </div>
         </div>
         <div class="form-section">
+          <div class="form-section-title">Sede de salida</div>
+          <div class="field"><label>¿De qué sede sale el equipo?</label>
+            <select oninput="setField('sede',this.value)" style="background-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 12 12%22%3E%3Cpath fill=%2294a3b8%22 d=%22M6 8L1 3h10z%22/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;appearance:none">
+              ${SEDES.map(s => '<option value="'+s+'" '+(form.sede===s?'selected':'')+'>'+s+'</option>').join('')}
+            </select>
+          </div>
+        </div>
+        <div class="form-section">
           <div class="form-section-title">Notas</div>
           <div class="field"><textarea placeholder="Observaciones, acceso al sitio, contacto..." oninput="setField('notas',this.value)">${form.notas}</textarea></div>
         </div>
@@ -676,6 +700,7 @@ function render() {
         </div>
         <div class="detail-grid">
           <div class="detail-row"><div class="detail-label">Caso / Campaña</div><div class="detail-value">#${r.caso}</div></div>
+          ${r.sede ? `<div class="detail-row"><div class="detail-label">Sede salida</div><div class="detail-value">🏭 ${r.sede}</div></div>` : ''}
           <div class="detail-row"><div class="detail-label">Lugar</div><div class="detail-value">${r.lugar||'—'}</div></div>
           ${r.lat ? `<div class="detail-row"><div class="detail-label">GPS</div><div class="detail-value">${r.lat}, ${r.lng}</div></div>` : ''}
           <div class="detail-row"><div class="detail-label">Instalaciones</div><div class="detail-value">${fmtDate(r.fechaInstalacion)}</div></div>
@@ -699,11 +724,15 @@ function render() {
     if (view === 'lista') {
       const disp = equipos.filter(e => eqSt(e) === 'disponible').length;
       const desp = equipos.filter(e => eqSt(e) === 'instalado').length;
+      const enPlantel = equipos.filter(e => eqSt(e) === 'disponible' && (e.sede||'Plantel Central')==='Plantel Central').length;
+      const enCucu = equipos.filter(e => eqSt(e) === 'disponible' && e.sede==='Subestación Cucumacayán').length;
+      const enCampo = equipos.filter(e => eqSt(e) !== 'disponible').length;
       html += `<div class="content">
         <div class="stats-bar">
-          <div class="stat-chip active"><span class="stat-num" style="color:var(--blue)">${equipos.length}</span><span class="stat-label">Total</span></div>
-          <div class="stat-chip"><span class="stat-num" style="color:var(--green)">${disp}</span><span class="stat-label">Disponibles</span></div>
-          <div class="stat-chip"><span class="stat-num" style="color:var(--yellow)">${desp}</span><span class="stat-label">Instalados</span></div>
+          <div class="stat-chip active"><span class="stat-num" style="color:var(--primary)">${equipos.length}</span><span class="stat-label">Total</span></div>
+          <div class="stat-chip"><span class="stat-num" style="color:var(--green)">${enPlantel}</span><span class="stat-label">Plantel</span></div>
+          <div class="stat-chip"><span class="stat-num" style="color:#00aaff">${enCucu}</span><span class="stat-label">Cucumacayán</span></div>
+          <div class="stat-chip"><span class="stat-num" style="color:var(--yellow)">${enCampo}</span><span class="stat-label">En campo</span></div>
         </div>`;
       if (equipos.length === 0) {
         html += `<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">El inventario está vacío</div>
@@ -725,7 +754,7 @@ function render() {
                   <span class="badge ${st==='disponible'?'badge-green':'badge-yellow'}">${l}</span>
                 </div>
                 <div class="card-sub">${eq.modelo||'Sin modelo'}</div>
-                ${dep ? `<div style="font-size:12px;color:var(--yellow);font-weight:500;margin-top:2px">📡 Caso #${dep.caso}${dep.lugar?' · '+dep.lugar:''}</div>` : ''}
+                ${!dep ? `<div style="font-size:11px;color:var(--primary);font-weight:600;margin-top:3px">🏭 ${eq.sede||'Plantel Central'}</div>` : `<div style="font-size:12px;color:var(--yellow);font-weight:500;margin-top:2px">📡 Caso #${dep.caso}${dep.lugar?' · '+dep.lugar:''}</div>`}
               </div>
             </div>
           </div>`;
@@ -743,6 +772,11 @@ function render() {
         </div>
         <div class="field"><label>Modelo / marca *</label>
           <input placeholder="Ej: ECAPLUS / DRANETZ" value="${equipoForm.modelo}" oninput="setEF('modelo',this.value)">
+        </div>
+        <div class="field"><label>Sede de almacenamiento *</label>
+          <select oninput="setEF('sede',this.value)" style="background-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 12 12%22%3E%3Cpath fill=%2294a3b8%22 d=%22M6 8L1 3h10z%22/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;appearance:none">
+            ${SEDES.map(s => '<option value="'+s+'" '+(equipoForm.sede===s?'selected':'')+'>'+s+'</option>').join('')}
+          </select>
         </div>
         <div class="field"><label>Notas</label>
           <textarea placeholder="Observaciones del equipo..." oninput="setEF('notas',this.value)">${equipoForm.notas}</textarea>
@@ -768,6 +802,7 @@ function render() {
         <div class="detail-grid">
           <div class="detail-row"><div class="detail-label">Modelo / Marca</div><div class="detail-value">${eq.modelo||'—'}</div></div>
           ${eq.notas ? `<div class="detail-row"><div class="detail-label">Notas</div><div class="detail-value">${eq.notas}</div></div>` : ''}
+          <div class="detail-row"><div class="detail-label">Sede</div><div class="detail-value">${eq.sede||'Plantel Central'}</div></div>
           <div class="detail-row"><div class="detail-label">Registrado</div><div class="detail-value">${fmtDate(eq.fechaRegistro)}</div></div>
           <div class="detail-row"><div class="detail-label">Total instalaciones</div><div class="detail-value">${historial.length}</div></div>
         </div>
@@ -917,10 +952,11 @@ window.saveEquipo = handleSaveEq;
 window.openEqDetalle = id => { editEqId = id; view = 'equipo_detalle'; render(); };
 window.editEquipo = id => {
   const eq = equipos.find(x => x.id === id); if (!eq) return;
-  equipoForm = { serie: eq.serie, modelo: eq.modelo||'', notas: eq.notas||'' };
+  equipoForm = { serie: eq.serie, modelo: eq.modelo||'', notas: eq.notas||'', sede: eq.sede||'Plantel Central' };
   editEqId = id; view = 'equipo_form'; render();
 };
 window.delEquipo = handleDelEq;
+window.setRetiroSede = s => { retiroForm.sede = s; render(); };
 
 </script>
 </body>
