@@ -799,6 +799,7 @@ function render() {
   }
 
   
+
   // MAP TAB
   else if (tab === 'mapa') {
     const visibles = records.filter(r => {
@@ -812,9 +813,25 @@ function render() {
     const countActivo = records.filter(r => calcSt(r)==='ACTIVO' && r.lat).length;
     const countProximo = records.filter(r => calcSt(r)==='PROXIMO' && r.lat).length;
 
-    html += '<div class="content">';
-    html += '<div class="stats-bar">';
-    html += '<div class="stat-chip active"><span class="stat-num" style="color:var(--primary)">' + visibles.length + '</span><span class="stat-label">Con GPS</span></div>';
+    // Build iframe HTML with embedded Leaflet map
+    const markers = visibles.map(r => {
+      const st = calcSt(r);
+      const color = st === 'ACTIVO' ? '%230057b8' : '%23d97706';
+      const label = st === 'ACTIVO' ? 'Activo' : 'Retiro próximo';
+      const dias = daysUntil(r.fechaRetiro);
+      const diasTxt = dias === 0 ? 'HOY' : dias > 0 ? 'en ' + dias + 'd' : Math.abs(dias) + 'd vencido';
+      return JSON.stringify({lat: parseFloat(r.lat), lng: parseFloat(r.lng), serie: r.serie, modelo: r.modelo||'', caso: r.caso, lugar: r.lugar||'', label, color: st==='ACTIVO'?'#0057b8':'#d97706', dias: diasTxt});
+    });
+
+    const mapHtml = `<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'/><script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'><\/script><style>*{margin:0;padding:0}body,html,#map{width:100%;height:100%}.leaflet-popup-content{font-family:sans-serif;min-width:140px}.ps{font-weight:800;font-size:14px;color:#0a1628}.pm{font-size:12px;color:#64748b;margin-top:2px}.pb{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;margin-top:5px}<\/style><\/head><body><div id='map'><\/div><script>var markers=${JSON.stringify(markers)};var map=L.map('map');L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:''}).addTo(map);var bounds=[];markers.forEach(function(m){var d=JSON.parse(m);var icon=L.divIcon({className:'',html:'<div style="width:16px;height:16px;border-radius:50%;background:'+d.color+';border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.4)"><\/div>',iconSize:[16,16],iconAnchor:[8,8]});var popup='<div class=ps>'+d.serie+'<\/div><div class=pm>'+d.modelo+'<\/div><div class=pm>📍 '+d.lugar+'<\/div><div class=pm>#'+d.caso+'<\/div><span class=pb style="background:'+(d.color=='#0057b8'?'#e8f0fb':'#fffbeb')+';color:'+d.color+'">'+d.label+'<\/span><br><a href="https://maps.google.com/?q='+d.lat+','+d.lng+'" target=_blank style="font-size:11px;color:#0057b8;margin-top:4px;display:inline-block">Ver en Google Maps →<\/a>';L.marker([d.lat,d.lng],{icon:icon}).bindPopup(popup).addTo(map);bounds.push([d.lat,d.lng]);});if(bounds.length>0){if(bounds.length===1){map.setView(bounds[0],14);}else{map.fitBounds(bounds,{padding:[20,20]});}}else{map.setView([13.7942,-88.8965],8);}<\/script><\/body><\/html>`;
+
+    const encodedHtml = 'data:text/html;charset=utf-8,' + encodeURIComponent(mapHtml);
+
+    html += '<div style="display:flex;flex-direction:column;height:calc(100vh - 60px)">';
+
+    // Stats bar
+    html += '<div style="padding:10px 16px;display:flex;gap:8px;flex-shrink:0">';
+    html += '<div class="stat-chip active"><span class="stat-num" style="color:var(--primary)">' + visibles.length + '</span><span class="stat-label">En mapa</span></div>';
     html += '<div class="stat-chip"><span class="stat-num" style="color:var(--green)">' + countActivo + '</span><span class="stat-label">Activos</span></div>';
     html += '<div class="stat-chip"><span class="stat-num" style="color:var(--yellow)">' + countProximo + '</span><span class="stat-label">Próximos</span></div>';
     html += '</div>';
@@ -822,37 +839,15 @@ function render() {
     if (visibles.length === 0) {
       html += '<div class="empty"><div class="empty-icon">🗺️</div><div class="empty-text">Sin instalaciones activas con GPS</div></div>';
     } else {
-      html += '<div class="list">';
-      visibles.forEach(r => {
-        const st = calcSt(r);
-        const c = st === 'ACTIVO' ? 'var(--primary)' : 'var(--yellow)';
-        const bg = st === 'ACTIVO' ? 'var(--primary-light)' : 'var(--yellow-light)';
-        const label = st === 'ACTIVO' ? 'Activo' : 'Retiro próximo';
-        const badgeClass = st === 'ACTIVO' ? 'badge-blue' : 'badge-yellow';
-        const dias = daysUntil(r.fechaRetiro);
-        const diasText = dias === 0 ? 'Hoy' : dias > 0 ? 'en ' + dias + 'd' : Math.abs(dias) + 'd vencido';
-        html += '<a href="https://maps.google.com/?q=' + r.lat + ',' + r.lng + '" target="_blank" style="display:block;text-decoration:none">';
-        html += '<div class="card" style="border-top:3px solid ' + c + '">';
-        html += '<div class="card-inner"><div class="card-body">';
-        html += '<div class="card-top"><div class="card-serie">' + r.serie + '</div><span class="badge ' + badgeClass + '">' + label + '</span></div>';
-        html += '<div class="card-sub">' + (r.modelo || '') + ' · #' + r.caso + '</div>';
-        html += '<div class="card-lugar">📍 ' + (r.lugar || 'Sin descripción') + '</div>';
-        html += '<div style="margin-top:6px;padding:6px 10px;background:' + bg + ';border-radius:8px;font-size:11px;font-weight:700;color:' + c + ';display:flex;justify-content:space-between">';
-        html += '<span>🛰 ' + r.lat + ', ' + r.lng + '</span>';
-        html += '<span>Retiro: ' + diasText + ' · Ver en Maps →</span>';
-        html += '</div>';
-        html += '</div></div></div></a>';
-      });
-      html += '</div>';
+      html += '<iframe src="' + encodedHtml + '" style="flex:1;border:none;width:100%"></iframe>';
     }
 
     if (sinGPS.length > 0) {
-      html += '<div style="margin-top:12px;padding:10px 14px;background:var(--yellow-light);border:1px solid #fcd34d;border-radius:10px;font-size:12px;color:var(--yellow);font-weight:600">⚠ ' + sinGPS.length + ' instalación' + (sinGPS.length > 1 ? 'es activas no tienen' : ' activa no tiene') + ' GPS registrado</div>';
+      html += '<div style="padding:8px 16px;background:var(--yellow-light);font-size:12px;color:var(--yellow);font-weight:600;flex-shrink:0">⚠ ' + sinGPS.length + ' instalación' + (sinGPS.length > 1 ? 'es' : '') + ' sin GPS</div>';
     }
 
     html += '</div>';
   }
-
 
   // BOTTOM NAV
   html += `<nav class="bottom-nav">
