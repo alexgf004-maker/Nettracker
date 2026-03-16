@@ -575,7 +575,7 @@ function render() {
           ${equipos.length === 0 ? `<div style="text-align:center;color:var(--text3);padding:20px">Sin equipos en inventario</div>` : ''}
           ${filteredEq.length === 0 && equipos.length > 0 ? `<div style="text-align:center;color:var(--text3);padding:20px">Sin resultados para "${selectorSearch}"</div>` : ''}
           ${filteredEq.map(eq => {
-            const avail = eqSt(eq) === 'disponible';
+            const avail = eqSt(eq) === 'disponible' || eqSt(eq) === 'prestado';
             return `<div class="selector-item ${!avail ? 'disabled' : ''}" onclick="${avail ? `pickEquipo('${eq.id}')` : ''}">
               <div>
                 <div style="font-weight:700;font-size:15px">${eq.serie}</div>
@@ -972,7 +972,7 @@ window.doRetiro = handleRetiro;
 window.closeRetiroModal = closeRetiroModal;
 window.openRetiroModal = openRetiroModal;
 window.newInstall = () => {
-  if (equipos.filter(e => eqSt(e) === 'disponible').length === 0) return showToast('⚠️ No hay equipos disponibles en inventario');
+  if (equipos.filter(e => eqSt(e) === 'disponible' || eqSt(e) === 'prestado').length === 0) return showToast('⚠️ No hay equipos disponibles en inventario');
   form = emptyForm(); editId = null; view = 'form'; render();
 };
 window.saveInstall = handleSave;
