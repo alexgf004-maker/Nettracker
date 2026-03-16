@@ -780,7 +780,8 @@ function render() {
             const dep = records.find(r => r.equipoId === eq.id && !r.retirado);
             const sedeText = st==='prestado' ? 'Plantel Central' : (eq.sede||'Plantel Central')==='Plantel Central' ? 'Plantel' : 'Cucumacayán';
             const sedeIcon = st==='prestado' ? '🔄' : '🏭';
-            html += '<div onclick="openEqDetalle('' + eq.id + '')" style="background:var(--white);border:1px solid var(--border);border-top:3px solid ' + c + ';border-radius:12px;padding:12px;cursor:pointer;box-shadow:var(--shadow)">';
+            const eqId = eq.id;
+            html += `<div onclick="openEqDetalle('${eqId}')" style="background:var(--white);border:1px solid var(--border);border-top:3px solid ${c};border-radius:12px;padding:12px;cursor:pointer;box-shadow:var(--shadow)">`;
             html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px">';
             html += '<div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text);word-break:break-all;flex:1;margin-right:4px">' + eq.serie + '</div>';
             html += '<span class="badge ' + badgeClass + '" style="font-size:8px;padding:2px 5px;white-space:nowrap">' + l + '</span>';
