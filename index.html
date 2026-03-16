@@ -285,6 +285,7 @@ let retiroId = null;
 let retiroForm = { sinProblema: null, fallas: [], descripcion: '', sede: 'Plantel Central' };
 let locMode = 'gps';
 let selectorSearch = '';
+let inventarioSearch = '';
 let form = emptyForm();
 let equipoForm = emptyEF();
 
@@ -607,7 +608,7 @@ function render() {
             </div>`).join('')}
         </div>
         <div class="search-wrap"><span class="search-icon">🔍</span>
-          <input class="search-input" placeholder="Buscar serie, caso, lugar..." value="${search}" oninput="setSearch(this.value)">
+          <input class="search-input" placeholder="Buscar serie, caso, lugar..." value="${search}" oninput="setSearch(this.value)" autofocus>
         </div>`;
       if (filtered.length === 0) {
         html += `<div class="empty"><div class="empty-icon">📡</div>
@@ -758,37 +759,47 @@ function render() {
           <div class="stat-chip"><span class="stat-num" style="color:var(--primary)">${prestados}</span><span class="stat-label">Prestados</span></div>
           <div class="stat-chip"><span class="stat-num" style="color:var(--yellow)">${enCampo}</span><span class="stat-label">En campo</span></div>
         </div>`;
+      html += '<div class="search-wrap" style="margin-bottom:12px"><span class="search-icon">🔍</span><input class="search-input" placeholder="Buscar por serie o modelo..." value="' + inventarioSearch + '" oninput="setInvSearch(this.value)"></div>';
       if (equipos.length === 0) {
-        html += `<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">El inventario está vacío</div>
-          <button class="btn btn-primary" style="max-width:240px;margin:0 auto" onclick="newEquipo()">+ Agregar primer equipo</button></div>`;
+        html += '<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">El inventario está vacío</div><button class="btn btn-primary" style="max-width:240px;margin:0 auto" onclick="newEquipo()">+ Agregar primer equipo</button></div>';
       } else {
-        html += `<div class="list">`;
-        equipos.forEach(eq => {
-          const st = eqSt(eq);
-          const c = st==='disponible' ? 'var(--green)' : st==='prestado' ? 'var(--primary)' : 'var(--yellow)';
-          const l = st==='disponible' ? 'Disponible' : st==='prestado' ? 'Prestado' : 'En campo';
-          const dep = records.find(r => r.equipoId === eq.id && !r.retirado);
-          const eqStripe = st==='disponible'?'': st==='prestado'?' ':'  yellow';
-          html += `<div class="card" onclick="openEqDetalle('${eq.id}')">
-            <div class="card-stripe${eqStripe}"></div>
-            <div class="card-inner">
-              <div class="card-body">
-                <div class="card-top">
-                  <div class="card-serie">${eq.serie}</div>
-                  <span class="badge ${st==='disponible'?'badge-green':'badge-yellow'}">${l}</span>
-                </div>
-                <div class="card-sub">${eq.modelo||'Sin modelo'}</div>
-                ${dep ? `<div style="font-size:12px;color:var(--yellow);font-weight:500;margin-top:2px">📡 Caso #${dep.caso}${dep.lugar?' · '+dep.lugar:''}</div>` : eq.prestado ? `<div style="font-size:11px;color:var(--primary);font-weight:600;margin-top:3px">🔄 Prestado a Plantel Central${eq.prestadoFecha?' desde '+fmtDate(eq.prestadoFecha):''}</div>` : `<div style="font-size:11px;color:var(--green);font-weight:600;margin-top:3px">🏭 ${eq.sede||'Plantel Central'}</div>`}
-              </div>
-            </div>
-          </div>`;
-        });
-        html += `</div>`;
+        const filteredEq = equipos.filter(eq =>
+          !inventarioSearch ||
+          eq.serie.toLowerCase().includes(inventarioSearch.toLowerCase()) ||
+          (eq.modelo||'').toLowerCase().includes(inventarioSearch.toLowerCase())
+        );
+        if (filteredEq.length === 0) {
+          html += '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">Sin resultados para "' + inventarioSearch + '"</div></div>';
+        } else {
+          html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+          filteredEq.forEach(eq => {
+            const st = eqSt(eq);
+            const c = st==='disponible' ? 'var(--green)' : st==='prestado' ? 'var(--primary)' : 'var(--yellow)';
+            const l = st==='disponible' ? 'Disponible' : st==='prestado' ? 'Prestado' : 'En campo';
+            const badgeClass = st==='disponible' ? 'badge-green' : st==='prestado' ? 'badge-blue' : 'badge-yellow';
+            const dep = records.find(r => r.equipoId === eq.id && !r.retirado);
+            const sedeText = st==='prestado' ? 'Plantel Central' : (eq.sede||'Plantel Central')==='Plantel Central' ? 'Plantel' : 'Cucumacayán';
+            const sedeIcon = st==='prestado' ? '🔄' : '🏭';
+            html += '<div onclick="openEqDetalle('' + eq.id + '')" style="background:var(--white);border:1px solid var(--border);border-top:3px solid ' + c + ';border-radius:12px;padding:12px;cursor:pointer;box-shadow:var(--shadow)">';
+            html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px">';
+            html += '<div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text);word-break:break-all;flex:1;margin-right:4px">' + eq.serie + '</div>';
+            html += '<span class="badge ' + badgeClass + '" style="font-size:8px;padding:2px 5px;white-space:nowrap">' + l + '</span>';
+            html += '</div>';
+            html += '<div style="font-size:11px;color:var(--text3);margin-bottom:5px">' + (eq.modelo||'Sin modelo') + '</div>';
+            if (dep) {
+              html += '<div style="font-size:10px;color:var(--yellow);font-weight:600">📡 #' + dep.caso + '</div>';
+            } else {
+              html += '<div style="font-size:10px;color:' + c + ';font-weight:600">' + sedeIcon + ' ' + sedeText + '</div>';
+            }
+            html += '</div>';
+          });
+          html += '</div>';
+        }
       }
-      html += `</div>`;
+      html += '</div>';
     }
 
-    else if (view === 'equipo_form') {
+        else if (view === 'equipo_form') {
       html += `<div class="content">
         <div class="page-title">${editEqId ? 'Editar equipo' : 'Agregar equipo'}</div>
         <div class="field"><label>Número de serie *</label>
@@ -987,6 +998,7 @@ window.addToCalendar = id => { const r = records.find(x => x.id === id); if (r) 
 window.openSelector = () => { showSelector = true; selectorSearch = ''; render(); };
 window.closeSelector = () => { showSelector = false; selectorSearch = ''; render(); };
 window.setSelectorSearch = v => { selectorSearch = v; render(); };
+window.setInvSearch = v => { inventarioSearch = v; render(); };
 window.pickEquipo = id => {
   const eq = equipos.find(x => x.id === id); if (!eq) return;
   form.equipoId = id; form.serie = eq.serie; form.modelo = eq.modelo || '';
