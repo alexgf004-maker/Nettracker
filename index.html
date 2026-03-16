@@ -570,7 +570,7 @@ function render() {
         <div style="position:relative;margin-bottom:12px;flex-shrink:0">
           <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--text3)">🔍</span>
           <input style="width:100%;padding:10px 10px 10px 36px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none;box-shadow:var(--shadow)"
-            placeholder="Buscar por serie o modelo..." value="${selectorSearch}" oninput="setSelectorSearch(this.value)" autofocus>
+            placeholder="Buscar por serie o modelo..." value="${selectorSearch}" oninput="setSelectorSearch(this.value)" data-active="true">
         </div>
         <div style="overflow-y:auto;flex:1">
           ${equipos.length === 0 ? `<div style="text-align:center;color:var(--text3);padding:20px">Sin equipos en inventario</div>` : ''}
@@ -608,7 +608,7 @@ function render() {
             </div>`).join('')}
         </div>
         <div class="search-wrap"><span class="search-icon">🔍</span>
-          <input class="search-input" placeholder="Buscar serie, caso, lugar..." value="${search}" oninput="setSearch(this.value)" autofocus>
+          <input class="search-input" placeholder="Buscar serie, caso, lugar..." value="${search}" oninput="setSearch(this.value)" ${search?'data-active="true"':''}>
         </div>`;
       if (filtered.length === 0) {
         html += `<div class="empty"><div class="empty-icon">📡</div>
@@ -759,7 +759,7 @@ function render() {
           <div class="stat-chip"><span class="stat-num" style="color:var(--primary)">${prestados}</span><span class="stat-label">Prestados</span></div>
           <div class="stat-chip"><span class="stat-num" style="color:var(--yellow)">${enCampo}</span><span class="stat-label">En campo</span></div>
         </div>`;
-      html += '<div class="search-wrap" style="margin-bottom:12px"><span class="search-icon">🔍</span><input class="search-input" placeholder="Buscar por serie o modelo..." value="' + inventarioSearch + '" oninput="setInvSearch(this.value)"></div>';
+      html += '<div class="search-wrap" style="margin-bottom:12px"><span class="search-icon">🔍</span><input class="search-input" placeholder="Buscar por serie o modelo..." value="' + inventarioSearch + '" oninput="setInvSearch(this.value)" ' + (inventarioSearch ? 'data-active="true"' : '') + '></div>';
       if (equipos.length === 0) {
         html += '<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">El inventario está vacío</div><button class="btn btn-primary" style="max-width:240px;margin:0 auto" onclick="newEquipo()">+ Agregar primer equipo</button></div>';
       } else {
@@ -963,6 +963,14 @@ function render() {
   </nav>`;
 
   el.innerHTML = html;
+
+  // Restore focus to search input if one was active
+  const activeSearch = el.querySelector('input.search-input[data-active="true"]');
+  if (activeSearch) {
+    activeSearch.focus();
+    const len = activeSearch.value.length;
+    activeSearch.setSelectionRange(len, len);
+  }
 }
 
 // ── GLOBAL HANDLERS ──
@@ -972,7 +980,16 @@ window.switchTab = t => {
   render();
 };
 window.setFilter = f => { filterStatus = f; render(); };
-window.setSearch = v => { search = v; render(); };
+window.setSearch = v => {
+  search = v;
+  const inp = document.querySelector('.search-input[oninput*="setSearch"]');
+  const pos = inp ? inp.selectionStart : null;
+  render();
+  if (pos !== null) {
+    const newInp = document.querySelector('.search-input[oninput*="setSearch"]');
+    if (newInp) { newInp.focus(); newInp.setSelectionRange(pos, pos); }
+  }
+};
 window.setField = (k, v) => { form[k] = v; };
 window.setEF = (k, v) => { equipoForm[k] = v; };
 window.setLocMode = m => { locMode = m; render(); };
@@ -998,8 +1015,26 @@ window.delInstall = handleDelInstall;
 window.addToCalendar = id => { const r = records.find(x => x.id === id); if (r) addToGoogleCalendar(r); };
 window.openSelector = () => { showSelector = true; selectorSearch = ''; render(); };
 window.closeSelector = () => { showSelector = false; selectorSearch = ''; render(); };
-window.setSelectorSearch = v => { selectorSearch = v; render(); };
-window.setInvSearch = v => { inventarioSearch = v; render(); };
+window.setSelectorSearch = v => {
+  selectorSearch = v;
+  const inp = document.querySelector('.search-input[oninput*="setSelectorSearch"]');
+  const pos = inp ? inp.selectionStart : null;
+  render();
+  if (pos !== null) {
+    const newInp = document.querySelector('.search-input[oninput*="setSelectorSearch"]');
+    if (newInp) { newInp.focus(); newInp.setSelectionRange(pos, pos); }
+  }
+};
+window.setInvSearch = v => {
+  inventarioSearch = v;
+  const inp = document.querySelector('.search-input[oninput*="setInvSearch"]');
+  const pos = inp ? inp.selectionStart : null;
+  render();
+  if (pos !== null) {
+    const newInp = document.querySelector('.search-input[oninput*="setInvSearch"]');
+    if (newInp) { newInp.focus(); newInp.setSelectionRange(pos, pos); }
+  }
+};
 window.pickEquipo = id => {
   const eq = equipos.find(x => x.id === id); if (!eq) return;
   form.equipoId = id; form.serie = eq.serie; form.modelo = eq.modelo || '';
