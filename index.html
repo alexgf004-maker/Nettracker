@@ -288,6 +288,9 @@ let filterStatus = 'TODOS';
 let search = '';
 let showSelector = false;
 let showDescargaModal = false;
+let modoSeleccionLote = false;
+let seleccionLote = [];
+let tipoLote = 'prestamo';
 let descargaId = null;
 let descargaForm = { tecnico: 'David García', notas: '' };
 let showRetiroModal = false;
@@ -474,6 +477,125 @@ function handleDevolucion(id) {
   const movimiento = { tipo: 'devolucion', de: 'Plantel Central', a: 'Subestación Cucumacayán', fecha: today(), nota };
   const movimientos = [...(eq.movimientos||[]), movimiento];
   update(ref(db, `equipos/${id}`), { prestado: false, prestadoFecha: null, sede: 'Subestación Cucumacayán', movimientos }).then(() => showToast('✅ Devolución registrada'));
+}
+
+function generateLotePDF(equiposLote, tipo) {
+  const esTipo = tipo === 'prestamo' ? 'PRÉSTAMO' : 'DEVOLUCIÓN';
+  const fecha = new Date().toLocaleDateString('es-SV');
+
+  const filas = equiposLote.map(item => {
+    const mov = item.movimiento;
+    return `<tr>
+      <td style="padding:10px 14px;font-family:'Courier New',monospace;font-weight:700;font-size:13px;color:#0a1628;border-bottom:1px solid #e2e8f0">${item.eq.serie}</td>
+      <td style="padding:10px 14px;font-size:13px;color:#4a5568;border-bottom:1px solid #e2e8f0">${item.eq.modelo||'—'}</td>
+      <td style="padding:10px 14px;font-size:13px;color:#4a5568;border-bottom:1px solid #e2e8f0;text-align:center">${mov ? fmtDate(mov.fecha) : '—'}</td>
+      <td style="padding:10px 14px;font-size:13px;color:#4a5568;border-bottom:1px solid #e2e8f0">${mov ? (mov.de||'') : '—'} → ${mov ? (mov.a||'') : '—'}</td>
+    </tr>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; color: #0a1628; background: #fff; padding: 40px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; border-bottom: 3px solid #0057b8; padding-bottom: 20px; }
+  .logo-area { display: flex; align-items: center; gap: 14px; }
+  .logo-box { width: 56px; height: 56px; background: linear-gradient(135deg, #003d8f, #0077cc); border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+  .company-name { font-size: 22px; font-weight: 800; color: #0057b8; }
+  .company-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .memo-title { text-align: right; }
+  .memo-label { font-size: 11px; font-weight: 700; color: #94a3b8; letter-spacing: 2px; text-transform: uppercase; }
+  .memo-type { font-size: 24px; font-weight: 800; color: #0057b8; margin-top: 4px; }
+  .memo-date { font-size: 12px; color: #64748b; margin-top: 4px; }
+  .section { margin-bottom: 28px; }
+  .section-title { font-size: 10px; font-weight: 700; color: #0057b8; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid #e8f0fb; }
+  table { width: 100%; border-collapse: collapse; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  thead { background: #0057b8; }
+  thead th { padding: 12px 14px; text-align: left; font-size: 11px; font-weight: 700; color: #fff; letter-spacing: 1px; text-transform: uppercase; }
+  thead th:last-child { text-align: center; }
+  tbody tr:nth-child(even) { background: #f8fafc; }
+  .transfer-row { display: flex; align-items: center; gap: 16px; margin: 16px 0; }
+  .transfer-box { flex: 1; background: #e8f0fb; border: 2px solid #0057b8; border-radius: 10px; padding: 12px 16px; text-align: center; }
+  .transfer-box.dest { background: #ecfdf5; border-color: #059669; }
+  .transfer-label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px; }
+  .transfer-name { font-size: 15px; font-weight: 800; }
+  .arrow { font-size: 26px; color: #0057b8; }
+  .firma-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; margin-top: 8px; }
+  .firma-box { text-align: center; }
+  .firma-line { border-top: 1.5px solid #0a1628; margin-top: 60px; padding-top: 8px; }
+  .firma-label { font-size: 11px; color: #64748b; }
+  .firma-name { font-size: 13px; font-weight: 700; margin-top: 2px; }
+  .footer { margin-top: 40px; padding-top: 14px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 10px; color: #94a3b8; }
+  .badge-count { display: inline-block; background: #e8f0fb; color: #0057b8; border-radius: 20px; padding: 3px 12px; font-size: 12px; font-weight: 700; margin-left: 8px; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo-area">
+      <div class="logo-box">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+          <rect x="3" y="2" width="18" height="20" rx="2" stroke="white" stroke-width="1.8" fill="none"/>
+          <path d="M8 7h8M8 10h5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M12 14l-2 4h4l-2 4" stroke="#7dd3fc" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div>
+        <div class="company-name">CPT INNOVA</div>
+        <div class="company-sub">Analizadores de Red · Calidad de Energía</div>
+      </div>
+    </div>
+    <div class="memo-title">
+      <div class="memo-label">Memorándum de</div>
+      <div class="memo-type">${esTipo} DE LOTE</div>
+      <div class="memo-date">Generado el ${fecha}</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Equipos incluidos <span class="badge-count">${equiposLote.length} equipos</span></div>
+    <table>
+      <thead>
+        <tr>
+          <th>N° de Serie</th>
+          <th>Modelo</th>
+          <th style="text-align:center">Fecha</th>
+          <th>Movimiento</th>
+        </tr>
+      </thead>
+      <tbody>${filas}</tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Firmas de conformidad</div>
+    <div class="firma-grid">
+      <div class="firma-box">
+        <div class="firma-line">
+          <div class="firma-label">Entrega</div>
+          <div class="firma-name">Subestación Cucumacayán</div>
+        </div>
+      </div>
+      <div class="firma-box">
+        <div class="firma-line">
+          <div class="firma-label">Recibe</div>
+          <div class="firma-name">Plantel Central</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Documento generado por CPT INNOVA · Sistema de Gestión de Analizadores de Red · ${fecha}
+  </div>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  setTimeout(() => win.print(), 500);
 }
 
 function generateMemoPDF(eq, movimiento) {
@@ -675,7 +797,8 @@ function render() {
       </div>
     </div>
     ${view === 'lista' && tab === 'instalaciones' ? `<button class="btn-small" onclick="newInstall()">+ Nuevo</button>` : ''}
-    ${view === 'lista' && tab === 'inventario' ? `<button class="btn-small" onclick="newEquipo()">+ Equipo</button>` : ''}
+    ${view === 'lista' && tab === 'inventario' && !modoSeleccionLote ? `<button class="btn-small" onclick="newEquipo()">+ Equipo</button>` : ''}
+    ${view === 'lista' && tab === 'inventario' && modoSeleccionLote ? `<button class="btn-small" style="background:rgba(255,255,255,.3)" onclick="cancelarLote()">✕ Cancelar</button>` : ''}
   </header>`;
 
   // RETIRO MODAL
@@ -964,6 +1087,15 @@ function render() {
           <div class="stat-chip ${inventarioFiltro==='prestado'?'active':''}" onclick="setInvFiltro('prestado')" style="flex-shrink:0"><span class="stat-num" style="color:var(--primary)">${prestados}</span><span class="stat-label">Prestados</span></div>
           <div class="stat-chip ${inventarioFiltro==='instalado'?'active':''}" onclick="setInvFiltro('instalado')" style="flex-shrink:0"><span class="stat-num" style="color:var(--yellow)">${enCampo}</span><span class="stat-label">En campo</span></div>
         </div>`;
+      // Lote action bar
+      if (modoSeleccionLote) {
+        html += '<div style="background:var(--primary);border-radius:12px;padding:12px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">';
+        html += '<div style="color:#fff;font-size:13px;font-weight:700">' + seleccionLote.length + ' equipo' + (seleccionLote.length !== 1 ? 's' : '') + ' seleccionado' + (seleccionLote.length !== 1 ? 's' : '') + '</div>';
+        html += '<button onclick="generarLotePDF()" ' + (seleccionLote.length === 0 ? 'disabled' : '') + ' style="background:#fff;color:var(--primary);border:none;border-radius:8px;padding:8px 14px;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;opacity:' + (seleccionLote.length === 0 ? '.5' : '1') + '">📄 Generar memo</button>';
+        html += '</div>';
+      } else {
+        html += '<button onclick="activarModoLote()" style="width:100%;margin-bottom:12px;padding:10px;border:1.5px dashed var(--primary);border-radius:10px;background:var(--primary-light);color:var(--primary);font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer">📄 Generar memo de lote de préstamo</button>';
+      }
       html += '<div class="search-wrap" style="margin-bottom:12px"><span class="search-icon">🔍</span><input class="search-input" placeholder="Buscar por serie o modelo..." value="' + inventarioSearch + '" oninput="setInvSearch(this.value)" ' + (inventarioSearch ? 'data-active="true"' : '') + '></div>';
       if (equipos.length === 0) {
         html += '<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">El inventario está vacío</div><button class="btn btn-primary" style="max-width:240px;margin:0 auto" onclick="newEquipo()">+ Agregar primer equipo</button></div>';
@@ -997,7 +1129,13 @@ function render() {
               const c = isEnCampo ? 'var(--yellow)' : isPrestado ? 'var(--primary)' : 'var(--green)';
               const dep = records.find(r => r.equipoId === eq.id && !r.retirado);
               const eqId = eq.id;
-              html += '<div onclick="openEqDetalle(\'' + eqId + '\')" style="background:var(--white);border:1px solid var(--border);border-top:3px solid ' + c + ';border-radius:12px;padding:12px;cursor:pointer;box-shadow:var(--shadow)">';
+              const isSelected = seleccionLote.includes(eqId);
+              const isPrestadoEq = eqPrestado(eq);
+              const clickable = modoSeleccionLote ? (isPrestadoEq ? `toggleLote('${eqId}')` : '') : `openEqDetalle('${eqId}')`;
+              const cardOpacity = modoSeleccionLote && !isPrestadoEq ? '0.4' : '1';
+              const cardBorder = isSelected ? '2px solid var(--primary)' : '1px solid var(--border)';
+              html += '<div onclick="' + clickable + '" style="background:' + (isSelected?'var(--primary-light)':'var(--white)') + ';border-top:3px solid ' + c + ';border:' + cardBorder + ';border-top:3px solid ' + c + ';border-radius:12px;padding:12px;cursor:' + (modoSeleccionLote&&!isPrestadoEq?'default':'pointer') + ';box-shadow:var(--shadow);opacity:' + cardOpacity + ';position:relative">';
+              if (isSelected) html += '<div style="position:absolute;top:8px;right:8px;width:20px;height:20px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-weight:700">✓</div>';
               html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px">';
               html += '<div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text);word-break:break-all;flex:1;margin-right:4px">' + eq.serie + '</div>';
               html += '<div style="display:flex;flex-direction:column;gap:2px;align-items:flex-end">';
@@ -1274,6 +1412,26 @@ window.setDescargaTecnico = t => { descargaForm.tecnico = t; render(); };
 window.setDescargaNotas = v => { descargaForm.notas = v; };
 window.registrarPrestamo = handlePrestamo;
 window.registrarDevolucion = handleDevolucion;
+window.activarModoLote = () => { modoSeleccionLote = true; seleccionLote = []; tipoLote = 'prestamo'; render(); };
+window.cancelarLote = () => { modoSeleccionLote = false; seleccionLote = []; render(); };
+window.toggleLote = id => {
+  const idx = seleccionLote.indexOf(id);
+  if (idx >= 0) seleccionLote.splice(idx, 1); else seleccionLote.push(id);
+  render();
+};
+window.generarLotePDF = () => {
+  if (seleccionLote.length === 0) return showToast('Selecciona al menos un equipo');
+  const items = seleccionLote.map(id => {
+    const eq = equipos.find(x => x.id === id);
+    if (!eq) return null;
+    const movs = (eq.movimientos||[]).filter(m => m.tipo === tipoLote);
+    const mov = movs.length > 0 ? movs[movs.length-1] : null;
+    return { eq, movimiento: mov };
+  }).filter(Boolean);
+  generateLotePDF(items, tipoLote);
+  modoSeleccionLote = false; seleccionLote = [];
+  render();
+};
 window.generarMemo = (eqId, movIdx) => {
   const eq = equipos.find(x => x.id === eqId);
   if (!eq || !eq.movimientos) return;
