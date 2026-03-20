@@ -285,14 +285,10 @@ let view = 'lista';
 let editId = null;
 let editEqId = null;
 let filterStatus = 'TODOS';
-let instTab = 'cpt_mt'; // cpt_mt | cpt_bt | campos
 let search = '';
 let showSelector = false;
 let showDescargaModal = false;
 let showPrestamoModal = false;
-let showCondicionModal = false;
-let condicionEqId = null;
-let condicionForm = { condicion: 'bueno', nota: '' };
 let prestamoId = null;
 let prestamoForm = { de: 'CPT BT', a: 'CPT MT', nota: '', tipo: 'prestamo' };
 let modoSeleccionLote = false;
@@ -313,21 +309,16 @@ let equipoForm = emptyEF();
 const SEDES = ['Plantel Central', 'Subestación Cucumacayán'];
 const TECNICOS = ['David García', 'Bryan Francia', 'Francisco Chulo'];
 const AREAS = ['CPT DELSUR', 'CPT MT', 'CPT BT'];
-const CONDICIONES = [
-  { key: 'bueno', label: 'Bueno', icon: '🟢', color: 'var(--green)', bg: 'var(--green-light)' },
-  { key: 'detalles', label: 'Con detalles', icon: '🟡', color: 'var(--yellow)', bg: 'var(--yellow-light)' },
-  { key: 'fuera', label: 'Fuera de servicio', icon: '🔴', color: 'var(--red)', bg: 'var(--red-light)' },
-];
 function areaToSede(area) {
   if (area === 'CPT BT') return 'Subestación Cucumacayán';
   return 'Plantel Central';
 }
 
 function emptyForm() {
-  return { equipoId: null, serie: '', modelo: '', caso: '', lugar: '', lat: null, lng: null, fechaInstalacion: today(), fechaRetiro: '', notas: '', sede: 'Plantel Central', areaInstalacion: 'CPT MT' };
+  return { equipoId: null, serie: '', modelo: '', caso: '', lugar: '', lat: null, lng: null, fechaInstalacion: today(), fechaRetiro: '', notas: '', sede: 'Plantel Central' };
 }
 function emptyEF() {
-  return { serie: '', modelo: '', notas: '', sede: 'Plantel Central', condicion: 'bueno' };
+  return { serie: '', modelo: '', notas: '', sede: 'Plantel Central' };
 }
 function today() { return new Date().toISOString().split('T')[0]; }
 function fmtDate(d) { if (!d) return '—'; const [y,m,dd] = d.split('-'); return `${dd}/${m}/${y}`; }
@@ -430,31 +421,12 @@ function handleRetiro() {
   const payload = { retirado: true, fechaRetiroReal: today(), sinProblema: retiroForm.sinProblema || false, fallas: retiroForm.fallas, descripcionFalla: retiroForm.descripcion };
   const id = retiroId;
   const sedeRetiro = retiroForm.sede;
+  // Find equipoId to update sede
   const deployRec = records.find(x => x.id === id);
   showRetiroModal = false; retiroId = null; view = 'lista';
   update(ref(db, `analizadores/${id}`), payload).then(() => {
     if (deployRec && deployRec.equipoId) {
-      const eq = equipos.find(x => x.id === deployRec.equipoId);
-      const fallas = retiroForm.fallas;
-      const GRAVES = ['Equipo no funciona', 'Daño total'];
-      let nuevaCondicion = null;
-      if (retiroForm.sinProblema) {
-        nuevaCondicion = 'bueno';
-      } else if (fallas.some(f => GRAVES.includes(f))) {
-        nuevaCondicion = 'fuera';
-      } else if (fallas.length > 0) {
-        nuevaCondicion = 'detalles';
-      }
-      const eqUpdates = { sede: sedeRetiro };
-      if (nuevaCondicion && eq) {
-        const condAnterior = eq.condicion || 'bueno';
-        if (condAnterior !== nuevaCondicion) {
-          const cambio = { fecha: today(), condicionAnterior: condAnterior, condicionNueva: nuevaCondicion, nota: 'Actualizado automáticamente al retirar' + (retiroForm.descripcion ? ': ' + retiroForm.descripcion : '') };
-          eqUpdates.condicion = nuevaCondicion;
-          eqUpdates.historialCondicion = [...(eq.historialCondicion || []), cambio];
-        }
-      }
-      update(ref(db, `equipos/${deployRec.equipoId}`), eqUpdates);
+      update(ref(db, `equipos/${deployRec.equipoId}`), { sede: sedeRetiro });
     }
     showToast('✅ Equipo marcado como retirado');
   });
@@ -597,7 +569,6 @@ function generateLotePDF(equiposLote, tipo) {
         <div class="company-name">CPT INNOVA</div>
         <div class="company-sub">Analizadores de Red · Calidad de Energía</div>
       </div>
-
     </div>
     <div class="memo-title">
       <div class="memo-label">Memorándum de</div>
@@ -711,7 +682,6 @@ function generateMemoPDF(eq, movimiento) {
         <div class="company-name">CPT INNOVA</div>
         <div class="company-sub">Analizadores de Red · Calidad de Energía</div>
       </div>
-
     </div>
     <div class="memo-title">
       <div class="memo-label">Memorándum de</div>
@@ -782,24 +752,6 @@ function generateMemoPDF(eq, movimiento) {
   win.document.write(html);
   win.document.close();
   setTimeout(() => win.print(), 500);
-}
-
-function openCondicionModal(id) {
-  const eq = equipos.find(x => x.id === id);
-  if (!eq) return;
-  condicionEqId = id;
-  condicionForm = { condicion: eq.condicion || 'bueno', nota: '' };
-  showCondicionModal = true;
-  render();
-}
-function confirmCondicion() {
-  const eq = equipos.find(x => x.id === condicionEqId);
-  if (!eq) return;
-  const cambio = { fecha: today(), condicionAnterior: eq.condicion || 'bueno', condicionNueva: condicionForm.condicion, nota: condicionForm.nota };
-  const historialCondicion = [...(eq.historialCondicion || []), cambio];
-  const id = condicionEqId;
-  showCondicionModal = false; condicionEqId = null;
-  update(ref(db, `equipos/${id}`), { condicion: condicionForm.condicion, historialCondicion }).then(() => showToast('✅ Condición actualizada'));
 }
 
 function handleDelEq(id) {
@@ -876,7 +828,6 @@ function render() {
   // RETIRO MODAL
   if (showRetiroModal) {
     const FAULT_TYPES = ['No midió','Falla batería','Daño físico','Error en la medición'];
-    const FAULT_GRAVES = ['Equipo no funciona','Daño total'];
     const allOpts = ['Sin problemas', ...FAULT_TYPES];
     html += `<div style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
       <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:90vh;overflow-y:auto;padding:20px;font-family:'DM Sans',sans-serif">
@@ -893,11 +844,6 @@ function render() {
         ${FAULT_TYPES.map(f => `
         <div onclick="toggleFalla('${f}')" style="padding:13px 16px;border:2px solid ${retiroForm.fallas.includes(f) ? '#ef4444' : '#e5e7eb'};border-radius:12px;margin-bottom:8px;cursor:pointer;font-size:15px;font-weight:600;color:${retiroForm.fallas.includes(f) ? '#ef4444' : '#374151'};background:${retiroForm.fallas.includes(f) ? '#fef2f2' : '#fff'};display:flex;align-items:center;gap:10px">
           <span style="font-size:18px">${retiroForm.fallas.includes(f) ? '🔴' : '⬜'}</span> ${f}
-        </div>`).join('')}
-        <div style="font-size:11px;font-weight:700;color:var(--red);letter-spacing:1px;text-transform:uppercase;margin:12px 0 8px;padding-top:8px;border-top:1px solid #fecaca">⚠ Fallas graves — marcan equipo como Fuera de servicio</div>
-        ${FAULT_GRAVES.map(f => `
-        <div onclick="toggleFalla('${f}')" style="padding:13px 16px;border:2px solid ${retiroForm.fallas.includes(f) ? '#991b1b' : '#e5e7eb'};border-radius:12px;margin-bottom:8px;cursor:pointer;font-size:15px;font-weight:600;color:${retiroForm.fallas.includes(f) ? '#991b1b' : '#374151'};background:${retiroForm.fallas.includes(f) ? '#fee2e2' : '#fff'};display:flex;align-items:center;gap:10px">
-          <span style="font-size:18px">${retiroForm.fallas.includes(f) ? '💀' : '⬜'}</span> ${f}
         </div>`).join('')}
 
         <div style="margin-top:8px;margin-bottom:16px">
@@ -936,29 +882,6 @@ function render() {
         </div>
         <button onclick="doDescarga()" style="width:100%;background:var(--primary);color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">💾 Confirmar descarga</button>
         <button onclick="closeDescargaModal()" style="width:100%;background:#fff;color:var(--text3);border:1px solid var(--border);border-radius:10px;padding:13px;font-family:var(--font);font-size:15px;cursor:pointer">Cancelar</button>
-      </div>
-    </div>`;
-  }
-
-  // CONDICION MODAL
-  if (showCondicionModal) {
-    html += `<div style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
-      <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;padding:20px;font-family:var(--font)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-          <div style="font-size:17px;font-weight:700;color:var(--text)">Actualizar condición</div>
-          <button onclick="closeCondicionModal()" style="background:none;border:none;font-size:24px;color:var(--text3);cursor:pointer">✕</button>
-        </div>
-        ${CONDICIONES.map(c => `
-          <div onclick="setCondicionField('condicion','${c.key}')" style="padding:13px 16px;border:2px solid ${condicionForm.condicion===c.key?c.color:'var(--border)'};border-radius:12px;margin-bottom:8px;cursor:pointer;background:${condicionForm.condicion===c.key?c.bg:'#fff'};display:flex;align-items:center;gap:12px">
-            <span style="font-size:20px">${c.icon}</span>
-            <span style="font-size:15px;font-weight:700;color:${condicionForm.condicion===c.key?c.color:'var(--text2)'}">${c.label}</span>
-          </div>`).join('')}
-        <div style="margin:12px 0">
-          <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px">NOTA DEL CAMBIO (OPCIONAL)</div>
-          <textarea placeholder="Ej: Se reparó el conector de alimentación..." oninput="setCondicionNota(this.value)" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none;min-height:60px">${condicionForm.nota}</textarea>
-        </div>
-        <button onclick="doCondicion()" style="width:100%;background:var(--primary);color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">Guardar condición</button>
-        <button onclick="closeCondicionModal()" style="width:100%;background:#fff;color:var(--text3);border:1px solid var(--border);border-radius:10px;padding:13px;font-family:var(--font);font-size:15px;cursor:pointer">Cancelar</button>
       </div>
     </div>`;
   }
@@ -1016,7 +939,7 @@ function render() {
           ${equipos.length === 0 ? `<div style="text-align:center;color:var(--text3);padding:20px">Sin equipos en inventario</div>` : ''}
           ${filteredEq.length === 0 && equipos.length > 0 ? `<div style="text-align:center;color:var(--text3);padding:20px">Sin resultados para "${selectorSearch}"</div>` : ''}
           ${filteredEq.map(eq => {
-            const avail = (eqSt(eq) === 'disponible' || eqSt(eq) === 'prestado') && (eq.condicion || 'bueno') !== 'fuera';
+            const avail = eqSt(eq) === 'disponible' || eqSt(eq) === 'prestado';
             return `<div class="selector-item ${!avail ? 'disabled' : ''}" onclick="${avail ? `pickEquipo('${eq.id}')` : ''}">
               <div>
                 <div style="font-weight:700;font-size:15px">${eq.serie}</div>
@@ -1034,30 +957,11 @@ function render() {
   if (tab === 'instalaciones') {
 
     if (view === 'lista') {
-      const filtered = recordsFiltrados.filter(r => {
+      const filtered = records.filter(r => {
         if (filterStatus !== 'TODOS' && calcSt(r) !== filterStatus) return false;
         if (search) { const q = search.toLowerCase(); return (r.serie||'').toLowerCase().includes(q) || (r.caso||'').toLowerCase().includes(q) || (r.lugar||'').toLowerCase().includes(q); }
         return true;
       });
-      // Sub-tabs
-      html += `<div style="display:flex;background:var(--white);border-bottom:1px solid var(--border);padding:0 16px">
-        ${[
-          {key:'cpt_mt', label:'⚡ CPT MT'},
-          {key:'cpt_bt', label:'⚡ CPT BT'},
-          {key:'campos', label:'🏗 Campos y Serv.'}
-        ].map(t => `<button onclick="setInstTab('${t.key}')" style="flex:1;padding:12px 4px;border:none;background:none;font-family:var(--font);font-size:12px;font-weight:700;color:${instTab===t.key?'var(--primary)':'var(--text3)'};cursor:pointer;border-bottom:2px solid ${instTab===t.key?'var(--primary)':'transparent'};transition:all .15s">${t.label}</button>`).join('')}
-      </div>`;
-
-      // Filter by instTab
-      const instTabFilter = instTab === 'cpt_mt' ? 'CPT MT' : instTab === 'cpt_bt' ? 'CPT BT' : 'Campos y Servicios';
-      const recordsFiltrados = records.filter(r => (r.areaInstalacion || 'CPT MT') === instTabFilter);
-      const countsFiltrados = {
-        TODOS: recordsFiltrados.length,
-        ACTIVO: recordsFiltrados.filter(r => calcSt(r) === 'ACTIVO').length,
-        PROXIMO: recordsFiltrados.filter(r => calcSt(r) === 'PROXIMO').length,
-        RETIRADO: recordsFiltrados.filter(r => r.retirado).length
-      };
-
       html += `<div class="content">
         <div class="stats-bar">
           ${['TODOS','ACTIVO','PROXIMO','RETIRADO'].map(s => `
@@ -1089,7 +993,6 @@ function render() {
                 <div class="card-top"><div class="card-serie">${r.serie||'—'}</div>${badgeSt(st)}</div>
                 <div class="card-sub">${r.modelo ? r.modelo+' · ' : ''}#${r.caso}</div>
                 <div class="card-lugar">📍 ${r.lugar||'Sin ubicación'}</div>
-              <div style="font-size:10px;color:var(--text3);font-weight:600;margin-bottom:4px">${r.areaInstalacion||'CPT MT'}</div>
                 <div class="card-footer">
                   <span class="card-date">Retiro: ${fmtDate(r.fechaRetiro)}</span>
                   <span class="days-tag" style="${dc}">${dt}</span>
@@ -1152,17 +1055,6 @@ function render() {
           </div>
         </div>
         <div class="form-section">
-          <div class="form-section-title">Área que instala</div>
-          <div class="field">
-            <div style="display:flex;gap:8px">
-              ${['CPT MT','CPT BT','Campos y Servicios'].map(a => {
-                const sel = form.areaInstalacion === a;
-                return '<div onclick="setField(\'areaInstalacion\',\''+a+'\')" style="flex:1;padding:9px 4px;border-radius:10px;border:2px solid '+(sel?'var(--primary)':'var(--border)')+';background:'+(sel?'var(--primary-light)':'#fff')+';text-align:center;cursor:pointer;font-size:11px;font-weight:700;color:'+(sel?'var(--primary)':'var(--text3)')+'">'+a+'</div>';
-              }).join('')}
-            </div>
-          </div>
-        </div>
-        <div class="form-section">
           <div class="form-section-title">Sede de salida</div>
           <div class="field"><label>¿De qué sede sale el equipo?</label>
             <select oninput="setField('sede',this.value)" style="background-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 12 12%22%3E%3Cpath fill=%2294a3b8%22 d=%22M6 8L1 3h10z%22/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;appearance:none">
@@ -1194,7 +1086,6 @@ function render() {
         </div>
         <div class="detail-grid">
           <div class="detail-row"><div class="detail-label">Caso / Campaña</div><div class="detail-value">#${r.caso}</div></div>
-          <div class="detail-row"><div class="detail-label">Área</div><div class="detail-value">${r.areaInstalacion||'CPT MT'}</div></div>
           ${r.sede ? `<div class="detail-row"><div class="detail-label">Sede salida</div><div class="detail-value">🏭 ${r.sede}</div></div>` : ''}
           <div class="detail-row"><div class="detail-label">Lugar</div><div class="detail-value">${r.lugar||'—'}</div></div>
           ${r.lat ? `<div class="detail-row"><div class="detail-label">GPS</div><div class="detail-value">${r.lat}, ${r.lng}</div></div>` : ''}
@@ -1312,19 +1203,13 @@ function render() {
               html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px">';
               html += '<div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text);word-break:break-all;flex:1;margin-right:4px">' + eq.serie + '</div>';
               html += '<div style="display:flex;flex-direction:column;gap:2px;align-items:flex-end">';
-              if ((eq.condicion||'bueno') === 'fuera') {
-                html += '<span class="badge badge-red" style="font-size:8px;padding:2px 5px;white-space:nowrap">🔴 Fuera servicio</span>';
-              } else {
-                if (isPrestado) html += '<span class="badge badge-blue" style="font-size:8px;padding:2px 5px;white-space:nowrap">Prestado</span>';
-                if (isEnCampo) html += '<span class="badge badge-yellow" style="font-size:8px;padding:2px 5px;white-space:nowrap">En campo</span>';
-                if (!isPrestado && !isEnCampo) html += '<span class="badge badge-green" style="font-size:8px;padding:2px 5px;white-space:nowrap">Disponible</span>';
-              }
+              if (isPrestado) html += '<span class="badge badge-blue" style="font-size:8px;padding:2px 5px;white-space:nowrap">Prestado</span>';
+              if (isEnCampo) html += '<span class="badge badge-yellow" style="font-size:8px;padding:2px 5px;white-space:nowrap">En campo</span>';
+              if (!isPrestado && !isEnCampo) html += '<span class="badge badge-green" style="font-size:8px;padding:2px 5px;white-space:nowrap">Disponible</span>';
               html += '</div></div>';
               html += '<div style="font-size:11px;color:var(--text3);margin-bottom:5px">' + (eq.modelo||'Sin modelo') + '</div>';
               if (dep) html += '<div style="font-size:10px;color:var(--yellow);font-weight:600">📡 #' + dep.caso + '</div>';
               else if (isPrestado) html += '<div style="font-size:10px;color:var(--primary);font-weight:600">🔄 Prestado</div>';
-              const cond = CONDICIONES.find(x => x.key === (eq.condicion||'bueno'));
-              if (cond && cond.key !== 'bueno' && cond.key !== 'fuera') html += '<div style="font-size:10px;color:'+cond.color+';margin-top:2px">'+cond.icon+' '+cond.label+'</div>';
               html += '</div>';
             });
             html += '</div></div>';
@@ -1357,14 +1242,6 @@ function render() {
             ${SEDES.map(s => '<option value="'+s+'" '+(equipoForm.sede===s?'selected':'')+'>'+s+'</option>').join('')}
           </select>
         </div>
-        <div class="field"><label>Condición del equipo *</label>
-          <div style="display:flex;gap:8px">
-            ${CONDICIONES.map(c => {
-              const sel = equipoForm.condicion === c.key;
-              return '<div onclick="setEF(\'condicion\',\''+c.key+'\')" style="flex:1;padding:10px 6px;border-radius:10px;border:2px solid '+(sel?c.color:'var(--border)')+';background:'+(sel?c.bg:'#fff')+';text-align:center;cursor:pointer"><div style="font-size:18px">'+c.icon+'</div><div style="font-size:10px;font-weight:700;color:'+(sel?c.color:'var(--text3)')+'">'+c.label+'</div></div>';
-            }).join('')}
-          </div>
-        </div>
         <div class="field"><label>Notas</label>
           <textarea placeholder="Observaciones del equipo..." oninput="setEF('notas',this.value)">${equipoForm.notas}</textarea>
         </div>
@@ -1383,13 +1260,7 @@ function render() {
         <div class="detail-hero">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div><div class="detail-serie">${eq.serie}</div><div class="detail-modelo">${eq.modelo||''}</div></div>
-            <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
-              ${(eq.condicion||'bueno') === 'fuera'
-                ? '<span class="badge badge-red">🔴 Fuera de servicio</span>'
-                : '<span class="badge ' + (st==='disponible'?'badge-green':st==='prestado'?'badge-blue':'badge-yellow') + '">' + l + '</span>' +
-                  ((eq.condicion||'bueno') === 'detalles' ? '<span class="badge badge-yellow">🟡 Con detalles</span>' : '')
-              }
-            </div>
+            <span class="badge ${st==='disponible'?'badge-green':'badge-yellow'}">${l}</span>
           </div>
         </div>
         <div class="detail-grid">
@@ -1400,15 +1271,6 @@ function render() {
           <div class="detail-row"><div class="detail-label">Registrado</div><div class="detail-value">${fmtDate(eq.fechaRegistro)}</div></div>
           <div class="detail-row"><div class="detail-label">Total instalaciones</div><div class="detail-value">${historial.length}</div></div>
         </div>
-        ${eq.historialCondicion && eq.historialCondicion.length > 0 ? `
-          <div class="section-title" style="margin-top:4px">Historial de condición</div>
-          <div class="list" style="margin-bottom:16px">
-            ${eq.historialCondicion.slice().reverse().map(h => {
-              const cOld = CONDICIONES.find(c => c.key === h.condicionAnterior);
-              const cNew = CONDICIONES.find(c => c.key === h.condicionNueva);
-              return '<div class="historial-card"><div class="historial-row"><div><div class="historial-lugar">'+(cOld?cOld.icon+' '+cOld.label:'—')+' → '+(cNew?cNew.icon+' '+cNew.label:'—')+'</div>'+(h.nota?'<div class="historial-caso">'+h.nota+'</div>':'')+'</div><div class="historial-fecha">'+fmtDate(h.fecha)+'</div></div></div>';
-            }).join('')}
-          </div>` : ''}
         ${eq.movimientos && eq.movimientos.length > 0 ? `
           <div class="section-title" style="margin-top:4px">Movimientos entre sedes</div>
           <div class="list" style="margin-bottom:16px">
@@ -1455,8 +1317,7 @@ function render() {
             }).join('')}
           </div>` : ''}
         <button class="btn btn-primary" onclick="editEquipo('${eq.id}')">Editar equipo</button>
-        <button class="btn" style="background:${(() => { const c = CONDICIONES.find(x => x.key===(eq.condicion||'bueno')); return c?c.bg:'var(--green-light)'; })()};color:${(() => { const c = CONDICIONES.find(x => x.key===(eq.condicion||'bueno')); return c?c.color:'var(--green)'; })()};border:1px solid ${(() => { const c = CONDICIONES.find(x => x.key===(eq.condicion||'bueno')); return c?c.color:'var(--green)'; })()}" onclick="openCondicionModal('${eq.id}')">⚙️ Actualizar condición</button>
-        ${!eq.prestado && (eq.condicion||'bueno') !== 'fuera' ? `
+        ${!eq.prestado ? `
           <button class="btn" style="background:var(--primary-light);color:var(--primary);border:1px solid var(--primary)" onclick="registrarPrestamo('${eq.id}')">🔄 Registrar préstamo</button>
         ` : ''}
         ${eq.prestado ? `
@@ -1546,11 +1407,9 @@ function render() {
 window.goBack = () => { view = 'lista'; editId = null; editEqId = null; form = emptyForm(); equipoForm = emptyEF(); showSelector = false; render(); };
 window.switchTab = t => {
   tab = t; view = 'lista'; editId = null; editEqId = null;
-  if (t === 'instalaciones') filterStatus = 'TODOS';
   render();
 };
 window.setFilter = f => { filterStatus = f; render(); };
-window.setInstTab = t => { instTab = t; filterStatus = 'TODOS'; render(); };
 window.setSearch = v => {
   search = v;
   const inp = document.querySelector('.search-input[oninput*="setSearch"]');
@@ -1572,10 +1431,8 @@ window.doRetiro = handleRetiro;
 window.closeRetiroModal = closeRetiroModal;
 window.openRetiroModal = openRetiroModal;
 window.newInstall = () => {
-  if (equipos.filter(e => (eqSt(e) === 'disponible' || eqSt(e) === 'prestado') && (e.condicion||'bueno') !== 'fuera').length === 0) return showToast('⚠️ No hay equipos disponibles en inventario');
-  form = emptyForm();
-  form.areaInstalacion = instTab === 'cpt_mt' ? 'CPT MT' : instTab === 'cpt_bt' ? 'CPT BT' : 'Campos y Servicios';
-  editId = null; view = 'form'; render();
+  if (equipos.filter(e => eqSt(e) === 'disponible' || eqSt(e) === 'prestado').length === 0) return showToast('⚠️ No hay equipos disponibles en inventario');
+  form = emptyForm(); editId = null; view = 'form'; render();
 };
 window.saveInstall = handleSave;
 window.openDetail = id => { editId = id; view = 'detalle'; render(); };
@@ -1616,7 +1473,7 @@ window.saveEquipo = handleSaveEq;
 window.openEqDetalle = id => { editEqId = id; view = 'equipo_detalle'; render(); };
 window.editEquipo = id => {
   const eq = equipos.find(x => x.id === id); if (!eq) return;
-  equipoForm = { serie: eq.serie, modelo: eq.modelo||'', notas: eq.notas||'', sede: eq.sede||'Plantel Central', condicion: eq.condicion||'bueno' };
+  equipoForm = { serie: eq.serie, modelo: eq.modelo||'', notas: eq.notas||'', sede: eq.sede||'Plantel Central' };
   editEqId = id; view = 'equipo_form'; render();
 };
 window.delEquipo = handleDelEq;
@@ -1628,11 +1485,6 @@ window.setDescargaTecnico = t => { descargaForm.tecnico = t; render(); };
 window.setDescargaNotas = v => { descargaForm.notas = v; };
 window.registrarPrestamo = handlePrestamo;
 window.registrarDevolucion = handleDevolucion;
-window.closeCondicionModal = () => { showCondicionModal = false; condicionEqId = null; render(); };
-window.setCondicionField = (k, v) => { condicionForm[k] = v; render(); };
-window.setCondicionNota = v => { condicionForm.nota = v; };
-window.doCondicion = confirmCondicion;
-window.openCondicionModal = openCondicionModal;
 window.closePrestamoModal = () => { showPrestamoModal = false; prestamoId = null; render(); };
 window.setPrestamoField = (k, v) => { prestamoForm[k] = v; render(); };
 window.setPrestamoNota = v => { prestamoForm.nota = v; };
