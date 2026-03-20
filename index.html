@@ -847,6 +847,16 @@ function render() {
     RETIRADO: records.filter(r => r.retirado).length
   };
 
+  // Pre-compute filtered records by instTab for instalaciones
+  const instTabFilter = instTab === 'cpt_mt' ? 'CPT MT' : instTab === 'cpt_bt' ? 'CPT BT' : 'Campos y Servicios';
+  const recordsFiltrados = records.filter(r => (r.areaInstalacion || 'CPT MT') === instTabFilter);
+  const countsFiltrados = {
+    TODOS: recordsFiltrados.length,
+    ACTIVO: recordsFiltrados.filter(r => calcSt(r) === 'ACTIVO').length,
+    PROXIMO: recordsFiltrados.filter(r => calcSt(r) === 'PROXIMO').length,
+    RETIRADO: recordsFiltrados.filter(r => r.retirado).length
+  };
+
   let html = '';
 
   // HEADER
@@ -1047,16 +1057,6 @@ function render() {
         html += "<button onclick=\"setInstTab('"+t.key+"')\" style=\"flex:1;padding:12px 4px;border:none;background:none;font-family:var(--font);font-size:12px;font-weight:700;color:"+(active?'var(--primary)':'var(--text3)')+";cursor:pointer;border-bottom:2px solid "+(active?'var(--primary)':'transparent')+";transition:all .15s\">"+t.label+"</button>";
       });
       html += '</div>';
-
-      // Filter by instTab
-      const instTabFilter = instTab === 'cpt_mt' ? 'CPT MT' : instTab === 'cpt_bt' ? 'CPT BT' : 'Campos y Servicios';
-      const recordsFiltrados = records.filter(r => (r.areaInstalacion || 'CPT MT') === instTabFilter);
-      const countsFiltrados = {
-        TODOS: recordsFiltrados.length,
-        ACTIVO: recordsFiltrados.filter(r => calcSt(r) === 'ACTIVO').length,
-        PROXIMO: recordsFiltrados.filter(r => calcSt(r) === 'PROXIMO').length,
-        RETIRADO: recordsFiltrados.filter(r => r.retirado).length
-      };
 
       html += `<div class="content">
         <div class="stats-bar">
