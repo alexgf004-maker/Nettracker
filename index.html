@@ -285,6 +285,7 @@ let view = 'lista';
 let editId = null;
 let editEqId = null;
 let filterStatus = 'TODOS';
+let instTab = 'cpt_mt'; // cpt_mt | cpt_bt | campos
 let search = '';
 let showSelector = false;
 let showDescargaModal = false;
@@ -323,7 +324,7 @@ function areaToSede(area) {
 }
 
 function emptyForm() {
-  return { equipoId: null, serie: '', modelo: '', caso: '', lugar: '', lat: null, lng: null, fechaInstalacion: today(), fechaRetiro: '', notas: '', sede: 'Plantel Central' };
+  return { equipoId: null, serie: '', modelo: '', caso: '', lugar: '', lat: null, lng: null, fechaInstalacion: today(), fechaRetiro: '', notas: '', sede: 'Plantel Central', areaInstalacion: 'CPT MT' };
 }
 function emptyEF() {
   return { serie: '', modelo: '', notas: '', sede: 'Plantel Central', condicion: 'bueno' };
@@ -1033,11 +1034,30 @@ function render() {
   if (tab === 'instalaciones') {
 
     if (view === 'lista') {
-      const filtered = records.filter(r => {
+      const filtered = recordsFiltrados.filter(r => {
         if (filterStatus !== 'TODOS' && calcSt(r) !== filterStatus) return false;
         if (search) { const q = search.toLowerCase(); return (r.serie||'').toLowerCase().includes(q) || (r.caso||'').toLowerCase().includes(q) || (r.lugar||'').toLowerCase().includes(q); }
         return true;
       });
+      // Sub-tabs
+      html += `<div style="display:flex;background:var(--white);border-bottom:1px solid var(--border);padding:0 16px">
+        ${[
+          {key:'cpt_mt', label:'⚡ CPT MT'},
+          {key:'cpt_bt', label:'⚡ CPT BT'},
+          {key:'campos', label:'🏗 Campos y Serv.'}
+        ].map(t => `<button onclick="setInstTab('${t.key}')" style="flex:1;padding:12px 4px;border:none;background:none;font-family:var(--font);font-size:12px;font-weight:700;color:${instTab===t.key?'var(--primary)':'var(--text3)'};cursor:pointer;border-bottom:2px solid ${instTab===t.key?'var(--primary)':'transparent'};transition:all .15s">${t.label}</button>`).join('')}
+      </div>`;
+
+      // Filter by instTab
+      const instTabFilter = instTab === 'cpt_mt' ? 'CPT MT' : instTab === 'cpt_bt' ? 'CPT BT' : 'Campos y Servicios';
+      const recordsFiltrados = records.filter(r => (r.areaInstalacion || 'CPT MT') === instTabFilter);
+      const countsFiltrados = {
+        TODOS: recordsFiltrados.length,
+        ACTIVO: recordsFiltrados.filter(r => calcSt(r) === 'ACTIVO').length,
+        PROXIMO: recordsFiltrados.filter(r => calcSt(r) === 'PROXIMO').length,
+        RETIRADO: recordsFiltrados.filter(r => r.retirado).length
+      };
+
       html += `<div class="content">
         <div class="stats-bar">
           ${['TODOS','ACTIVO','PROXIMO','RETIRADO'].map(s => `
@@ -1069,6 +1089,7 @@ function render() {
                 <div class="card-top"><div class="card-serie">${r.serie||'—'}</div>${badgeSt(st)}</div>
                 <div class="card-sub">${r.modelo ? r.modelo+' · ' : ''}#${r.caso}</div>
                 <div class="card-lugar">📍 ${r.lugar||'Sin ubicación'}</div>
+              <div style="font-size:10px;color:var(--text3);font-weight:600;margin-bottom:4px">${r.areaInstalacion||'CPT MT'}</div>
                 <div class="card-footer">
                   <span class="card-date">Retiro: ${fmtDate(r.fechaRetiro)}</span>
                   <span class="days-tag" style="${dc}">${dt}</span>
@@ -1131,6 +1152,17 @@ function render() {
           </div>
         </div>
         <div class="form-section">
+          <div class="form-section-title">Área que instala</div>
+          <div class="field">
+            <div style="display:flex;gap:8px">
+              ${['CPT MT','CPT BT','Campos y Servicios'].map(a => {
+                const sel = form.areaInstalacion === a;
+                return '<div onclick="setField(\'areaInstalacion\',\''+a+'\')" style="flex:1;padding:9px 4px;border-radius:10px;border:2px solid '+(sel?'var(--primary)':'var(--border)')+';background:'+(sel?'var(--primary-light)':'#fff')+';text-align:center;cursor:pointer;font-size:11px;font-weight:700;color:'+(sel?'var(--primary)':'var(--text3)')+'">'+a+'</div>';
+              }).join('')}
+            </div>
+          </div>
+        </div>
+        <div class="form-section">
           <div class="form-section-title">Sede de salida</div>
           <div class="field"><label>¿De qué sede sale el equipo?</label>
             <select oninput="setField('sede',this.value)" style="background-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 12 12%22%3E%3Cpath fill=%2294a3b8%22 d=%22M6 8L1 3h10z%22/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;appearance:none">
@@ -1162,6 +1194,7 @@ function render() {
         </div>
         <div class="detail-grid">
           <div class="detail-row"><div class="detail-label">Caso / Campaña</div><div class="detail-value">#${r.caso}</div></div>
+          <div class="detail-row"><div class="detail-label">Área</div><div class="detail-value">${r.areaInstalacion||'CPT MT'}</div></div>
           ${r.sede ? `<div class="detail-row"><div class="detail-label">Sede salida</div><div class="detail-value">🏭 ${r.sede}</div></div>` : ''}
           <div class="detail-row"><div class="detail-label">Lugar</div><div class="detail-value">${r.lugar||'—'}</div></div>
           ${r.lat ? `<div class="detail-row"><div class="detail-label">GPS</div><div class="detail-value">${r.lat}, ${r.lng}</div></div>` : ''}
@@ -1513,9 +1546,11 @@ function render() {
 window.goBack = () => { view = 'lista'; editId = null; editEqId = null; form = emptyForm(); equipoForm = emptyEF(); showSelector = false; render(); };
 window.switchTab = t => {
   tab = t; view = 'lista'; editId = null; editEqId = null;
+  if (t === 'instalaciones') filterStatus = 'TODOS';
   render();
 };
 window.setFilter = f => { filterStatus = f; render(); };
+window.setInstTab = t => { instTab = t; filterStatus = 'TODOS'; render(); };
 window.setSearch = v => {
   search = v;
   const inp = document.querySelector('.search-input[oninput*="setSearch"]');
@@ -1537,8 +1572,10 @@ window.doRetiro = handleRetiro;
 window.closeRetiroModal = closeRetiroModal;
 window.openRetiroModal = openRetiroModal;
 window.newInstall = () => {
-  if (equipos.filter(e => eqSt(e) === 'disponible' || eqSt(e) === 'prestado').length === 0) return showToast('⚠️ No hay equipos disponibles en inventario');
-  form = emptyForm(); editId = null; view = 'form'; render();
+  if (equipos.filter(e => (eqSt(e) === 'disponible' || eqSt(e) === 'prestado') && (e.condicion||'bueno') !== 'fuera').length === 0) return showToast('⚠️ No hay equipos disponibles en inventario');
+  form = emptyForm();
+  form.areaInstalacion = instTab === 'cpt_mt' ? 'CPT MT' : instTab === 'cpt_bt' ? 'CPT BT' : 'Campos y Servicios';
+  editId = null; view = 'form'; render();
 };
 window.saveInstall = handleSave;
 window.openDetail = id => { editId = id; view = 'detalle'; render(); };
