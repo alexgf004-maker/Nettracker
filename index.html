@@ -288,6 +288,9 @@ let filterStatus = 'TODOS';
 let search = '';
 let showSelector = false;
 let showDescargaModal = false;
+let showPrestamoModal = false;
+let prestamoId = null;
+let prestamoForm = { de: 'CPT BT', a: 'CPT MT', nota: '', tipo: 'prestamo' };
 let modoSeleccionLote = false;
 let seleccionLote = [];
 let tipoLote = 'prestamo';
@@ -305,6 +308,11 @@ let equipoForm = emptyEF();
 
 const SEDES = ['Plantel Central', 'Subestación Cucumacayán'];
 const TECNICOS = ['David García', 'Bryan Francia', 'Francisco Chulo'];
+const AREAS = ['CPT DELSUR', 'CPT MT', 'CPT BT'];
+function areaToSede(area) {
+  if (area === 'CPT BT') return 'Subestación Cucumacayán';
+  return 'Plantel Central';
+}
 
 function emptyForm() {
   return { equipoId: null, serie: '', modelo: '', caso: '', lugar: '', lat: null, lng: null, fechaInstalacion: today(), fechaRetiro: '', notas: '', sede: 'Plantel Central' };
@@ -464,19 +472,35 @@ function handleSaveEq() {
 function handlePrestamo(id) {
   const eq = equipos.find(x => x.id === id);
   if (!eq) return;
-  const nota = prompt('Nota del préstamo (opcional):') || '';
-  const movimiento = { tipo: 'prestamo', de: eq.sede||'Subestación Cucumacayán', a: 'Plantel Central', fecha: today(), nota };
-  const movimientos = [...(eq.movimientos||[]), movimiento];
-  update(ref(db, `equipos/${id}`), { prestado: true, prestadoFecha: today(), sede: 'Plantel Central', movimientos }).then(() => showToast('🔄 Préstamo registrado'));
+  prestamoId = id;
+  prestamoForm = { de: 'CPT BT', a: 'CPT MT', nota: '', tipo: 'prestamo' };
+  showPrestamoModal = true;
+  render();
 }
 
 function handleDevolucion(id) {
   const eq = equipos.find(x => x.id === id);
   if (!eq) return;
-  const nota = prompt('Nota de devolución (opcional):') || '';
-  const movimiento = { tipo: 'devolucion', de: 'Plantel Central', a: 'Subestación Cucumacayán', fecha: today(), nota };
+  prestamoId = id;
+  prestamoForm = { de: 'CPT MT', a: 'CPT BT', nota: '', tipo: 'devolucion' };
+  showPrestamoModal = true;
+  render();
+}
+
+function confirmMovimiento() {
+  const eq = equipos.find(x => x.id === prestamoId);
+  if (!eq) return;
+  const esPrestamo = prestamoForm.tipo === 'prestamo';
+  const sedeDest = areaToSede(prestamoForm.a);
+  const movimiento = { tipo: prestamoForm.tipo, de: prestamoForm.de, a: prestamoForm.a, fecha: today(), nota: prestamoForm.nota };
   const movimientos = [...(eq.movimientos||[]), movimiento];
-  update(ref(db, `equipos/${id}`), { prestado: false, prestadoFecha: null, sede: 'Subestación Cucumacayán', movimientos }).then(() => showToast('✅ Devolución registrada'));
+  const updateData = esPrestamo
+    ? { prestado: true, prestadoFecha: today(), sede: sedeDest, movimientos }
+    : { prestado: false, prestadoFecha: null, sede: sedeDest, movimientos };
+  showPrestamoModal = false; prestamoId = null;
+  update(ref(db, `equipos/${eq.id}`), updateData).then(() =>
+    showToast(esPrestamo ? '🔄 Préstamo registrado' : '✅ Devolución registrada')
+  );
 }
 
 function generateLotePDF(equiposLote, tipo) {
@@ -574,13 +598,13 @@ function generateLotePDF(equiposLote, tipo) {
       <div class="firma-box">
         <div class="firma-line">
           <div class="firma-label">Entrega</div>
-          <div class="firma-name">${tipo === 'prestamo' ? 'Subestación Cucumacayán' : 'Plantel Central'}</div>
+          <div class="firma-name">${equiposLote[0]?.movimiento?.de || (tipo === 'prestamo' ? 'CPT BT' : 'CPT MT')}</div>
         </div>
       </div>
       <div class="firma-box">
         <div class="firma-line">
           <div class="firma-label">Recibe</div>
-          <div class="firma-name">${tipo === 'prestamo' ? 'Plantel Central' : 'Subestación Cucumacayán'}</div>
+          <div class="firma-name">${equiposLote[0]?.movimiento?.a || (tipo === 'prestamo' ? 'CPT MT' : 'CPT BT')}</div>
         </div>
       </div>
     </div>
@@ -858,6 +882,39 @@ function render() {
         </div>
         <button onclick="doDescarga()" style="width:100%;background:var(--primary);color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">💾 Confirmar descarga</button>
         <button onclick="closeDescargaModal()" style="width:100%;background:#fff;color:var(--text3);border:1px solid var(--border);border-radius:10px;padding:13px;font-family:var(--font);font-size:15px;cursor:pointer">Cancelar</button>
+      </div>
+    </div>`;
+  }
+
+  // PRESTAMO/DEVOLUCION MODAL
+  if (showPrestamoModal) {
+    const esPrestamo = prestamoForm.tipo === 'prestamo';
+    html += `<div style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
+      <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:85vh;overflow-y:auto;padding:20px;font-family:var(--font)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div style="font-size:17px;font-weight:700;color:var(--text)">${esPrestamo ? '🔄 Registrar préstamo' : '✅ Registrar devolución'}</div>
+          <button onclick="closePrestamoModal()" style="background:none;border:none;font-size:24px;color:var(--text3);cursor:pointer">✕</button>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:16px">
+          <div style="flex:1">
+            <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">De (entrega)</div>
+            ${AREAS.map(a => `<div onclick="setPrestamoField('de','${a}')" style="padding:11px 14px;border:2px solid ${prestamoForm.de===a?'var(--primary)':'var(--border)'};border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:14px;font-weight:600;color:${prestamoForm.de===a?'var(--primary)':'var(--text2)'};background:${prestamoForm.de===a?'var(--primary-light)':'#fff'}">${a}</div>`).join('')}
+          </div>
+          <div style="display:flex;align-items:center;font-size:22px;color:var(--primary);padding-top:30px">→</div>
+          <div style="flex:1">
+            <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Para (recibe)</div>
+            ${AREAS.map(a => `<div onclick="setPrestamoField('a','${a}')" style="padding:11px 14px;border:2px solid ${prestamoForm.a===a?'var(--green)':'var(--border)'};border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:14px;font-weight:600;color:${prestamoForm.a===a?'var(--green)':'var(--text2)'};background:${prestamoForm.a===a?'var(--green-light)':'#fff'}">${a}</div>`).join('')}
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--text3);text-align:center;margin-bottom:14px">
+          Sede destino: <strong style="color:var(--primary)">${areaToSede(prestamoForm.a)}</strong>
+        </div>
+        <div style="margin-bottom:16px">
+          <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px">NOTA (OPCIONAL)</div>
+          <textarea placeholder="Observaciones del movimiento..." oninput="setPrestamoNota(this.value)" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none;min-height:60px">${prestamoForm.nota}</textarea>
+        </div>
+        <button onclick="doMovimiento()" style="width:100%;background:var(--primary);color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">${esPrestamo ? '🔄 Confirmar préstamo' : '✅ Confirmar devolución'}</button>
+        <button onclick="closePrestamoModal()" style="width:100%;background:#fff;color:var(--text3);border:1px solid var(--border);border-radius:10px;padding:13px;font-family:var(--font);font-size:15px;cursor:pointer">Cancelar</button>
       </div>
     </div>`;
   }
@@ -1428,6 +1485,10 @@ window.setDescargaTecnico = t => { descargaForm.tecnico = t; render(); };
 window.setDescargaNotas = v => { descargaForm.notas = v; };
 window.registrarPrestamo = handlePrestamo;
 window.registrarDevolucion = handleDevolucion;
+window.closePrestamoModal = () => { showPrestamoModal = false; prestamoId = null; render(); };
+window.setPrestamoField = (k, v) => { prestamoForm[k] = v; render(); };
+window.setPrestamoNota = v => { prestamoForm.nota = v; };
+window.doMovimiento = confirmMovimiento;
 window.activarModoLote = tipo => {
   modoSeleccionLote = true;
   seleccionLote = [];
