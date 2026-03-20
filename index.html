@@ -289,6 +289,9 @@ let search = '';
 let showSelector = false;
 let showDescargaModal = false;
 let showPrestamoModal = false;
+let showCondicionModal = false;
+let condicionEqId = null;
+let condicionForm = { condicion: 'bueno', nota: '' };
 let prestamoId = null;
 let prestamoForm = { de: 'CPT BT', a: 'CPT MT', nota: '', tipo: 'prestamo' };
 let modoSeleccionLote = false;
@@ -309,6 +312,11 @@ let equipoForm = emptyEF();
 const SEDES = ['Plantel Central', 'Subestación Cucumacayán'];
 const TECNICOS = ['David García', 'Bryan Francia', 'Francisco Chulo'];
 const AREAS = ['CPT DELSUR', 'CPT MT', 'CPT BT'];
+const CONDICIONES = [
+  { key: 'bueno', label: 'Bueno', icon: '🟢', color: 'var(--green)', bg: 'var(--green-light)' },
+  { key: 'detalles', label: 'Con detalles', icon: '🟡', color: 'var(--yellow)', bg: 'var(--yellow-light)' },
+  { key: 'fuera', label: 'Fuera de servicio', icon: '🔴', color: 'var(--red)', bg: 'var(--red-light)' },
+];
 function areaToSede(area) {
   if (area === 'CPT BT') return 'Subestación Cucumacayán';
   return 'Plantel Central';
@@ -318,7 +326,7 @@ function emptyForm() {
   return { equipoId: null, serie: '', modelo: '', caso: '', lugar: '', lat: null, lng: null, fechaInstalacion: today(), fechaRetiro: '', notas: '', sede: 'Plantel Central' };
 }
 function emptyEF() {
-  return { serie: '', modelo: '', notas: '', sede: 'Plantel Central' };
+  return { serie: '', modelo: '', notas: '', sede: 'Plantel Central', condicion: 'bueno' };
 }
 function today() { return new Date().toISOString().split('T')[0]; }
 function fmtDate(d) { if (!d) return '—'; const [y,m,dd] = d.split('-'); return `${dd}/${m}/${y}`; }
@@ -754,6 +762,24 @@ function generateMemoPDF(eq, movimiento) {
   setTimeout(() => win.print(), 500);
 }
 
+function openCondicionModal(id) {
+  const eq = equipos.find(x => x.id === id);
+  if (!eq) return;
+  condicionEqId = id;
+  condicionForm = { condicion: eq.condicion || 'bueno', nota: '' };
+  showCondicionModal = true;
+  render();
+}
+function confirmCondicion() {
+  const eq = equipos.find(x => x.id === condicionEqId);
+  if (!eq) return;
+  const cambio = { fecha: today(), condicionAnterior: eq.condicion || 'bueno', condicionNueva: condicionForm.condicion, nota: condicionForm.nota };
+  const historialCondicion = [...(eq.historialCondicion || []), cambio];
+  const id = condicionEqId;
+  showCondicionModal = false; condicionEqId = null;
+  update(ref(db, `equipos/${id}`), { condicion: condicionForm.condicion, historialCondicion }).then(() => showToast('✅ Condición actualizada'));
+}
+
 function handleDelEq(id) {
   if (records.find(r => r.equipoId === id && !r.retirado)) return showToast('⚠️ Equipo instalado actualmente');
   if (!confirm('¿Eliminar del inventario?')) return;
@@ -886,6 +912,29 @@ function render() {
     </div>`;
   }
 
+  // CONDICION MODAL
+  if (showCondicionModal) {
+    html += `<div style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
+      <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;padding:20px;font-family:var(--font)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div style="font-size:17px;font-weight:700;color:var(--text)">Actualizar condición</div>
+          <button onclick="closeCondicionModal()" style="background:none;border:none;font-size:24px;color:var(--text3);cursor:pointer">✕</button>
+        </div>
+        ${CONDICIONES.map(c => `
+          <div onclick="setCondicionField('condicion','${c.key}')" style="padding:13px 16px;border:2px solid ${condicionForm.condicion===c.key?c.color:'var(--border)'};border-radius:12px;margin-bottom:8px;cursor:pointer;background:${condicionForm.condicion===c.key?c.bg:'#fff'};display:flex;align-items:center;gap:12px">
+            <span style="font-size:20px">${c.icon}</span>
+            <span style="font-size:15px;font-weight:700;color:${condicionForm.condicion===c.key?c.color:'var(--text2)'}">${c.label}</span>
+          </div>`).join('')}
+        <div style="margin:12px 0">
+          <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px">NOTA DEL CAMBIO (OPCIONAL)</div>
+          <textarea placeholder="Ej: Se reparó el conector de alimentación..." oninput="setCondicionNota(this.value)" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none;min-height:60px">${condicionForm.nota}</textarea>
+        </div>
+        <button onclick="doCondicion()" style="width:100%;background:var(--primary);color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">Guardar condición</button>
+        <button onclick="closeCondicionModal()" style="width:100%;background:#fff;color:var(--text3);border:1px solid var(--border);border-radius:10px;padding:13px;font-family:var(--font);font-size:15px;cursor:pointer">Cancelar</button>
+      </div>
+    </div>`;
+  }
+
   // PRESTAMO/DEVOLUCION MODAL
   if (showPrestamoModal) {
     const esPrestamo = prestamoForm.tipo === 'prestamo';
@@ -939,7 +988,7 @@ function render() {
           ${equipos.length === 0 ? `<div style="text-align:center;color:var(--text3);padding:20px">Sin equipos en inventario</div>` : ''}
           ${filteredEq.length === 0 && equipos.length > 0 ? `<div style="text-align:center;color:var(--text3);padding:20px">Sin resultados para "${selectorSearch}"</div>` : ''}
           ${filteredEq.map(eq => {
-            const avail = eqSt(eq) === 'disponible' || eqSt(eq) === 'prestado';
+            const avail = (eqSt(eq) === 'disponible' || eqSt(eq) === 'prestado') && (eq.condicion || 'bueno') !== 'fuera';
             return `<div class="selector-item ${!avail ? 'disabled' : ''}" onclick="${avail ? `pickEquipo('${eq.id}')` : ''}">
               <div>
                 <div style="font-weight:700;font-size:15px">${eq.serie}</div>
@@ -1210,6 +1259,8 @@ function render() {
               html += '<div style="font-size:11px;color:var(--text3);margin-bottom:5px">' + (eq.modelo||'Sin modelo') + '</div>';
               if (dep) html += '<div style="font-size:10px;color:var(--yellow);font-weight:600">📡 #' + dep.caso + '</div>';
               else if (isPrestado) html += '<div style="font-size:10px;color:var(--primary);font-weight:600">🔄 Prestado</div>';
+              const cond = CONDICIONES.find(x => x.key === (eq.condicion||'bueno'));
+              if (cond && cond.key !== 'bueno') html += '<div style="font-size:10px;font-weight:700;color:'+cond.color+';margin-top:3px">'+cond.icon+' '+cond.label+'</div>';
               html += '</div>';
             });
             html += '</div></div>';
@@ -1242,6 +1293,14 @@ function render() {
             ${SEDES.map(s => '<option value="'+s+'" '+(equipoForm.sede===s?'selected':'')+'>'+s+'</option>').join('')}
           </select>
         </div>
+        <div class="field"><label>Condición del equipo *</label>
+          <div style="display:flex;gap:8px">
+            ${CONDICIONES.map(c => {
+              const sel = equipoForm.condicion === c.key;
+              return '<div onclick="setEF(\'condicion\',\''+c.key+'\')" style="flex:1;padding:10px 6px;border-radius:10px;border:2px solid '+(sel?c.color:'var(--border)')+';background:'+(sel?c.bg:'#fff')+';text-align:center;cursor:pointer"><div style="font-size:18px">'+c.icon+'</div><div style="font-size:10px;font-weight:700;color:'+(sel?c.color:'var(--text3)')+'">'+c.label+'</div></div>';
+            }).join('')}
+          </div>
+        </div>
         <div class="field"><label>Notas</label>
           <textarea placeholder="Observaciones del equipo..." oninput="setEF('notas',this.value)">${equipoForm.notas}</textarea>
         </div>
@@ -1260,7 +1319,10 @@ function render() {
         <div class="detail-hero">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div><div class="detail-serie">${eq.serie}</div><div class="detail-modelo">${eq.modelo||''}</div></div>
-            <span class="badge ${st==='disponible'?'badge-green':'badge-yellow'}">${l}</span>
+            <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+              <span class="badge ${st==='disponible'?'badge-green':'badge-yellow'}">${l}</span>
+              ${(() => { const cond = CONDICIONES.find(c => c.key === (eq.condicion||'bueno')); return cond ? '<span class="badge" style="background:'+cond.bg+';color:'+cond.color+'">'+cond.icon+' '+cond.label+'</span>' : ''; })()}
+            </div>
           </div>
         </div>
         <div class="detail-grid">
@@ -1271,6 +1333,15 @@ function render() {
           <div class="detail-row"><div class="detail-label">Registrado</div><div class="detail-value">${fmtDate(eq.fechaRegistro)}</div></div>
           <div class="detail-row"><div class="detail-label">Total instalaciones</div><div class="detail-value">${historial.length}</div></div>
         </div>
+        ${eq.historialCondicion && eq.historialCondicion.length > 0 ? `
+          <div class="section-title" style="margin-top:4px">Historial de condición</div>
+          <div class="list" style="margin-bottom:16px">
+            ${eq.historialCondicion.slice().reverse().map(h => {
+              const cOld = CONDICIONES.find(c => c.key === h.condicionAnterior);
+              const cNew = CONDICIONES.find(c => c.key === h.condicionNueva);
+              return '<div class="historial-card"><div class="historial-row"><div><div class="historial-lugar">'+(cOld?cOld.icon+' '+cOld.label:'—')+' → '+(cNew?cNew.icon+' '+cNew.label:'—')+'</div>'+(h.nota?'<div class="historial-caso">'+h.nota+'</div>':'')+'</div><div class="historial-fecha">'+fmtDate(h.fecha)+'</div></div></div>';
+            }).join('')}
+          </div>` : ''}
         ${eq.movimientos && eq.movimientos.length > 0 ? `
           <div class="section-title" style="margin-top:4px">Movimientos entre sedes</div>
           <div class="list" style="margin-bottom:16px">
@@ -1317,7 +1388,8 @@ function render() {
             }).join('')}
           </div>` : ''}
         <button class="btn btn-primary" onclick="editEquipo('${eq.id}')">Editar equipo</button>
-        ${!eq.prestado ? `
+        <button class="btn" style="background:${(() => { const c = CONDICIONES.find(x => x.key===(eq.condicion||'bueno')); return c?c.bg:'var(--green-light)'; })()};color:${(() => { const c = CONDICIONES.find(x => x.key===(eq.condicion||'bueno')); return c?c.color:'var(--green)'; })()};border:1px solid ${(() => { const c = CONDICIONES.find(x => x.key===(eq.condicion||'bueno')); return c?c.color:'var(--green)'; })()}" onclick="openCondicionModal('${eq.id}')">⚙️ Actualizar condición</button>
+        ${!eq.prestado && (eq.condicion||'bueno') !== 'fuera' ? `
           <button class="btn" style="background:var(--primary-light);color:var(--primary);border:1px solid var(--primary)" onclick="registrarPrestamo('${eq.id}')">🔄 Registrar préstamo</button>
         ` : ''}
         ${eq.prestado ? `
@@ -1473,7 +1545,7 @@ window.saveEquipo = handleSaveEq;
 window.openEqDetalle = id => { editEqId = id; view = 'equipo_detalle'; render(); };
 window.editEquipo = id => {
   const eq = equipos.find(x => x.id === id); if (!eq) return;
-  equipoForm = { serie: eq.serie, modelo: eq.modelo||'', notas: eq.notas||'', sede: eq.sede||'Plantel Central' };
+  equipoForm = { serie: eq.serie, modelo: eq.modelo||'', notas: eq.notas||'', sede: eq.sede||'Plantel Central', condicion: eq.condicion||'bueno' };
   editEqId = id; view = 'equipo_form'; render();
 };
 window.delEquipo = handleDelEq;
@@ -1485,6 +1557,11 @@ window.setDescargaTecnico = t => { descargaForm.tecnico = t; render(); };
 window.setDescargaNotas = v => { descargaForm.notas = v; };
 window.registrarPrestamo = handlePrestamo;
 window.registrarDevolucion = handleDevolucion;
+window.closeCondicionModal = () => { showCondicionModal = false; condicionEqId = null; render(); };
+window.setCondicionField = (k, v) => { condicionForm[k] = v; render(); };
+window.setCondicionNota = v => { condicionForm.nota = v; };
+window.doCondicion = confirmCondicion;
+window.openCondicionModal = openCondicionModal;
 window.closePrestamoModal = () => { showPrestamoModal = false; prestamoId = null; render(); };
 window.setPrestamoField = (k, v) => { prestamoForm[k] = v; render(); };
 window.setPrestamoNota = v => { prestamoForm.nota = v; };
@@ -1535,4 +1612,3 @@ window.generarMemo = (eqId, movIdx) => {
 </script>
 </body>
 </html>
-
