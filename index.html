@@ -1252,9 +1252,14 @@ function render() {
               html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px">';
               html += '<div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text);word-break:break-all;flex:1;margin-right:4px">' + eq.serie + '</div>';
               html += '<div style="display:flex;flex-direction:column;gap:2px;align-items:flex-end">';
-              if (isPrestado) html += '<span class="badge badge-blue" style="font-size:8px;padding:2px 5px;white-space:nowrap">Prestado</span>';
-              if (isEnCampo) html += '<span class="badge badge-yellow" style="font-size:8px;padding:2px 5px;white-space:nowrap">En campo</span>';
-              if (!isPrestado && !isEnCampo) html += '<span class="badge badge-green" style="font-size:8px;padding:2px 5px;white-space:nowrap">Disponible</span>';
+              if ((eq.condicion||'bueno') === 'fuera') {
+                html += '<span class="badge badge-red" style="font-size:8px;padding:2px 5px;white-space:nowrap">🔴 Fuera servicio</span>';
+              } else {
+                if (isPrestado) html += '<span class="badge badge-blue" style="font-size:8px;padding:2px 5px;white-space:nowrap">Prestado</span>';
+                if (isEnCampo) html += '<span class="badge badge-yellow" style="font-size:8px;padding:2px 5px;white-space:nowrap">En campo</span>';
+                if (!isPrestado && !isEnCampo) html += '<span class="badge badge-green" style="font-size:8px;padding:2px 5px;white-space:nowrap">Disponible</span>';
+                if ((eq.condicion||'bueno') === 'detalles') html += '<span class="badge badge-yellow" style="font-size:8px;padding:2px 5px;white-space:nowrap">🟡 Con detalles</span>';
+              }
               html += '</div></div>';
               html += '<div style="font-size:11px;color:var(--text3);margin-bottom:5px">' + (eq.modelo||'Sin modelo') + '</div>';
               if (dep) html += '<div style="font-size:10px;color:var(--yellow);font-weight:600">📡 #' + dep.caso + '</div>';
@@ -1320,8 +1325,11 @@ function render() {
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div><div class="detail-serie">${eq.serie}</div><div class="detail-modelo">${eq.modelo||''}</div></div>
             <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
-              <span class="badge ${st==='disponible'?'badge-green':'badge-yellow'}">${l}</span>
-              ${(() => { const cond = CONDICIONES.find(c => c.key === (eq.condicion||'bueno')); return cond ? '<span class="badge" style="background:'+cond.bg+';color:'+cond.color+'">'+cond.icon+' '+cond.label+'</span>' : ''; })()}
+              ${(eq.condicion||'bueno') === 'fuera'
+                ? '<span class="badge badge-red">🔴 Fuera de servicio</span>'
+                : '<span class="badge ' + (st==='disponible'?'badge-green':st==='prestado'?'badge-blue':'badge-yellow') + '">' + l + '</span>' +
+                  ((eq.condicion||'bueno') === 'detalles' ? '<span class="badge badge-yellow">🟡 Con detalles</span>' : '')
+              }
             </div>
           </div>
         </div>
