@@ -585,7 +585,7 @@ function generateLotePDF(equiposLote, tipo) {
           <th>N° de Serie</th>
           <th>Modelo</th>
           <th style="text-align:center">Fecha</th>
-          <th>Movimiento</th>
+          <th>Área entrega → Área recibe</th>
         </tr>
       </thead>
       <tbody>${filas}</tbody>
@@ -708,12 +708,12 @@ function generateMemoPDF(eq, movimiento) {
     <div class="section-title">Movimiento</div>
     <div class="transfer-row">
       <div class="transfer-box">
-        <div class="transfer-label">Sale de</div>
+        <div class="transfer-label">Área que entrega</div>
         <div class="transfer-name">${de}</div>
       </div>
       <div class="arrow">→</div>
       <div class="transfer-box dest">
-        <div class="transfer-label">Va a</div>
+        <div class="transfer-label">Área que recibe</div>
         <div class="transfer-name">${a}</div>
       </div>
     </div>
@@ -1317,8 +1317,8 @@ function render() {
             }).join('')}
           </div>` : ''}
         <button class="btn btn-primary" onclick="editEquipo('${eq.id}')">Editar equipo</button>
-        ${!eq.prestado && (eq.sede||'Plantel Central') === 'Subestación Cucumacayán' ? `
-          <button class="btn" style="background:var(--primary-light);color:var(--primary);border:1px solid var(--primary)" onclick="registrarPrestamo('${eq.id}')">🔄 Registrar préstamo a Plantel Central</button>
+        ${!eq.prestado ? `
+          <button class="btn" style="background:var(--primary-light);color:var(--primary);border:1px solid var(--primary)" onclick="registrarPrestamo('${eq.id}')">🔄 Registrar préstamo</button>
         ` : ''}
         ${eq.prestado ? `
           <button class="btn" style="background:var(--green-light);color:var(--green);border:1px solid var(--green)" onclick="registrarDevolucion('${eq.id}')">✅ Registrar devolución a Cucumacayán</button>
