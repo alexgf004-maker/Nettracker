@@ -495,7 +495,11 @@ function handleDelInstall(id) {
 function handleSaveEq() {
   if (!equipoForm.serie.trim()) return showToast('Ingresa el número de serie');
   if (!equipoForm.modelo.trim()) return showToast('Ingresa el modelo / marca');
-  const data = { ...equipoForm, fechaRegistro: today() };
+  // Check for duplicate serie
+  const serieTrim = equipoForm.serie.trim().toUpperCase();
+  const duplicate = equipos.find(e => e.serie.trim().toUpperCase() === serieTrim && e.id !== editEqId);
+  if (duplicate) return showToast('⚠️ Ya existe un equipo con ese número de serie');
+  const data = { ...equipoForm, serie: serieTrim, fechaRegistro: today() };
   if (editEqId) {
     const id = editEqId;
     editEqId = null; equipoForm = emptyEF(); view = 'lista';
