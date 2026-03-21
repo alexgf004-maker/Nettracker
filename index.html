@@ -822,20 +822,34 @@ function procesarExcel(file) {
       if (rows.length === 0) return showToast('⚠️ El archivo está vacío');
 
       cargaData = rows.map(row => {
-        const serie = (row['Equipo'] || '').toString().trim();
-        const caso = (row['Número SIGET'] || '').toString().trim();
-        const lugar = (row['Nombre del Usuario'] || '').toString().trim();
-        const rawFechaInst = row['Fecha instalación'];
-        const fechaInst = rawFechaInst ? (typeof rawFechaInst === 'object' && rawFechaInst instanceof Date
-          ? rawFechaInst.toLocaleDateString('es-SV')
-          : rawFechaInst.toString().trim()) : '';
-        const rawFechaRetiro = row['Fecha retiro'];
-        const fechaRetiro = rawFechaRetiro ? (typeof rawFechaRetiro === 'object' && rawFechaRetiro instanceof Date
-          ? rawFechaRetiro.toLocaleDateString('es-SV')
-          : rawFechaRetiro.toString().trim()) : '';
-        const notas = (row['Transformador'] || '').toString().trim();
-        const lat = (row['Latitud'] || '').toString().trim();
-        const lng = (row['Longitud'] || '').toString().trim();
+        // Flexible column finder - handles accents, case, spaces
+        const findCol = (keys) => {
+          const rowKeys = Object.keys(row);
+          for (const k of keys) {
+            const found = rowKeys.find(rk => rk.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'') === k.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''));
+            if (found && row[found] !== undefined && row[found] !== '') return row[found];
+          }
+          return '';
+        };
+        const fmtDate = v => {
+          if (!v) return '';
+          if (typeof v === 'object' && v instanceof Date) return v.toLocaleDateString('es-SV');
+          const s = v.toString().trim();
+          // Handle Excel serial number dates
+          if (/^\d{5}$/.test(s)) {
+            const d = new Date(Math.round((parseInt(s) - 25569) * 86400 * 1000));
+            return d.toLocaleDateString('es-SV');
+          }
+          return s;
+        };
+        const serie = findCol(['Equipo']).toString().trim();
+        const caso = findCol(['Numero SIGET', 'Número SIGET', 'No SIGET', 'SIGET']).toString().trim();
+        const lugar = findCol(['Nombre del Usuario', 'Nombre de Usuario', 'Nombre Usuario', 'Usuario']).toString().trim();
+        const fechaInst = fmtDate(findCol(['Fecha instalacion', 'Fecha instalación', 'Fecha Instalacion', 'Fecha Instalación', 'FechaInstalacion']));
+        const fechaRetiro = fmtDate(findCol(['Fecha retiro', 'Fecha Retiro', 'FechaRetiro']));
+        const notas = findCol(['Transformador', 'Transf', 'Transformador']).toString().trim();
+        const lat = findCol(['Latitud', 'Lat']).toString().trim();
+        const lng = findCol(['Longitud', 'Lng', 'Long']).toString().trim();
 
         // Validate
         const eq = equipos.find(e => e.serie === serie);
