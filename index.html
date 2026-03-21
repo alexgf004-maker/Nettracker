@@ -301,6 +301,8 @@ let modoSeleccionLote = false;
 let cargaData = []; // preview rows from excel
 let cargaView = 'upload'; // upload | preview
 let cargaAreaOrigen = 'CPT BT';
+let showImportModal = false;
+let importData = [];
 let seleccionLote = [];
 let tipoLote = 'prestamo';
 let descargaId = null;
@@ -332,7 +334,7 @@ function emptyForm() {
   return { equipoId: null, serie: '', modelo: '', caso: '', lugar: '', lat: null, lng: null, fechaInstalacion: today(), fechaRetiro: '', notas: '', sede: 'Plantel Central', areaInstalacion: 'CPT MT' };
 }
 function emptyEF() {
-  return { serie: '', modelo: '', notas: '', sede: 'Plantel Central', condicion: 'bueno' };
+  return { serie: '', modelo: '', notas: '', sede: 'Plantel Central', condicion: 'bueno', vineta: '' };
 }
 function today() { return new Date().toISOString().split('T')[0]; }
 function fmtDate(d) { if (!d) return '—'; const [y,m,dd] = d.split('-'); return `${dd}/${m}/${y}`; }
@@ -552,6 +554,7 @@ function generateLotePDF(equiposLote, tipo) {
   const filas = equiposLote.map(item => {
     const mov = item.movimiento;
     return `<tr>
+      <td style="padding:10px 14px;font-size:12px;color:#64748b;border-bottom:1px solid #e2e8f0;font-family:'Courier New',monospace">${item.eq.vineta||'—'}</td>
       <td style="padding:10px 14px;font-family:'Courier New',monospace;font-weight:700;font-size:13px;color:#0a1628;border-bottom:1px solid #e2e8f0">${item.eq.serie}</td>
       <td style="padding:10px 14px;font-size:13px;color:#4a5568;border-bottom:1px solid #e2e8f0">${item.eq.modelo||'—'}</td>
       <td style="padding:10px 14px;font-size:13px;color:#4a5568;border-bottom:1px solid #e2e8f0;text-align:center">${mov ? fmtDate(mov.fecha) : '—'}</td>
@@ -625,6 +628,7 @@ function generateLotePDF(equiposLote, tipo) {
     <table>
       <thead>
         <tr>
+          <th>Viñeta</th>
           <th>N° de Serie</th>
           <th>Modelo</th>
           <th style="text-align:center">Fecha</th>
@@ -671,6 +675,7 @@ function generateMemoPDF(eq, movimiento) {
   const a = movimiento.a || '';
   const fecha = fmtDate(movimiento.fecha);
   const nota = movimiento.nota || '';
+  const vineta = eq.vineta || '';
 
   const html = `<!DOCTYPE html>
 <html lang="es">
@@ -745,6 +750,10 @@ function generateMemoPDF(eq, movimiento) {
         <div class="info-label">Modelo / Marca</div>
         <div class="info-value normal">${eq.modelo||'—'}</div>
       </div>
+      ${vineta ? `<div class="info-item">
+        <div class="info-label">Viñeta</div>
+        <div class="info-value">${vineta}</div>
+      </div>` : ''}
     </div>
   </div>
 
@@ -925,6 +934,7 @@ function confirmarCargaMasiva() {
 function generarMemoCargaMasiva(filas) {
   const fecha = new Date().toLocaleDateString('es-SV');
   const rows = filas.map(r => `<tr>
+    <td style="padding:9px 12px;font-size:11px;color:#64748b;border-bottom:1px solid #e2e8f0;font-family:'Courier New',monospace">${r.vineta||'—'}</td>
     <td style="padding:9px 12px;font-family:'Courier New',monospace;font-weight:700;font-size:12px;border-bottom:1px solid #e2e8f0">${r.serie}</td>
     <td style="padding:9px 12px;font-size:12px;border-bottom:1px solid #e2e8f0">${r.caso}</td>
     <td style="padding:9px 12px;font-size:12px;border-bottom:1px solid #e2e8f0">${r.lugar}</td>
@@ -978,7 +988,7 @@ function generarMemoCargaMasiva(filas) {
     <div class="section-title">Equipos asignados <span class="badge">${filas.length} equipos</span></div>
     <table>
       <thead><tr>
-        <th>Serie</th><th>N° SIGET</th><th>Usuario / Lugar</th>
+        <th>Viñeta</th><th>Serie</th><th>N° SIGET</th><th>Usuario / Lugar</th>
         <th style="text-align:center">F. Instalación</th>
         <th style="text-align:center">F. Retiro</th>
         <th>Transformador</th>
@@ -1000,6 +1010,60 @@ function generarMemoCargaMasiva(filas) {
   win.document.write(html);
   win.document.close();
   setTimeout(() => win.print(), 500);
+}
+
+function procesarExcelInventario(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { raw: true });
+      if (rows.length === 0) return showToast('⚠️ El archivo está vacío');
+
+      importData = rows.map(row => {
+        const findCol = keys => {
+          const rk = Object.keys(row);
+          for (const k of keys) {
+            const f = rk.find(r => r.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'') === k.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''));
+            if (f !== undefined && row[f] !== undefined && row[f] !== '') return row[f];
+          }
+          return '';
+        };
+        const serie = findCol(['NO_SERIE','no_serie','serie','Serie','NO SERIE']).toString().trim().toUpperCase();
+        const modelo = [findCol(['MODELO','modelo','Modelo']),findCol(['MARCA','marca','Marca'])].filter(Boolean).join(' ').trim();
+        const vineta = findCol(['VIÑETA','VINETA','vineta','viñeta','Viñeta']).toString().trim();
+        const estadoRaw = findCol(['ESTADO','estado','Estado']).toString().trim().toUpperCase();
+        const condicion = estadoRaw === 'NO DISPONIBLE' ? 'detalles' : 'bueno';
+        const ubicRaw = findCol(['UBICACION','UBICACIÓN','ubicacion','ubicación']).toString().trim().toUpperCase();
+        const sede = ubicRaw.includes('CUCUMACAYAN') || ubicRaw.includes('CUCUMACAYÁN') ? 'Subestación Cucumacayán' : 'Plantel Central';
+        const notas = findCol(['OBSERVACION','OBSERVACIÓN','observacion','observación']).toString().trim();
+
+        const existe = equipos.find(eq => eq.serie.trim().toUpperCase() === serie);
+        const status = !serie ? 'error' : existe ? 'duplicado' : 'ok';
+        const problema = !serie ? 'Sin número de serie' : existe ? 'Ya existe en inventario' : '';
+
+        return { serie, modelo, vineta, condicion, sede, notas, status, problema };
+      }).filter(r => r.serie); // remove empty rows
+
+      showImportModal = true;
+      render();
+    } catch(err) {
+      showToast('❌ Error: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function confirmarImportInventario() {
+  const nuevos = importData.filter(r => r.status === 'ok');
+  if (nuevos.length === 0) return showToast('No hay equipos nuevos para importar');
+  nuevos.forEach(r => {
+    push(equiposRef, { serie: r.serie, modelo: r.modelo, vineta: r.vineta, condicion: r.condicion, sede: r.sede, notas: r.notas, fechaRegistro: today() });
+  });
+  showToast('✅ ' + nuevos.length + ' equipos importados');
+  showImportModal = false; importData = [];
+  render();
 }
 
 function handleDelEq(id) {
@@ -1149,6 +1213,43 @@ function render() {
         </div>
         <button onclick="doDescarga()" style="width:100%;background:var(--primary);color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">💾 Confirmar descarga</button>
         <button onclick="closeDescargaModal()" style="width:100%;background:#fff;color:var(--text3);border:1px solid var(--border);border-radius:10px;padding:13px;font-family:var(--font);font-size:15px;cursor:pointer">Cancelar</button>
+      </div>
+    </div>`;
+  }
+
+  // IMPORT INVENTARIO MODAL
+  if (showImportModal) {
+    const nuevos = importData.filter(r => r.status === 'ok').length;
+    const dupes = importData.filter(r => r.status === 'duplicado').length;
+    const errores = importData.filter(r => r.status === 'error').length;
+    html += `<div style="position:fixed;inset:0;background:#00000088;z-index:200;display:flex;align-items:flex-end">
+      <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:85vh;display:flex;flex-direction:column;padding:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-shrink:0">
+          <div style="font-size:17px;font-weight:700;color:var(--text)">Importar inventario</div>
+          <button onclick="closeImportModal()" style="background:none;border:none;font-size:24px;color:var(--text3);cursor:pointer">✕</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-shrink:0">
+          <div style="flex:1;background:var(--green-light);border:1px solid var(--green);border-radius:10px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--green)">${nuevos}</div><div style="font-size:10px;color:var(--green);font-weight:600">NUEVOS</div></div>
+          <div style="flex:1;background:var(--yellow-light);border:1px solid var(--yellow);border-radius:10px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--yellow)">${dupes}</div><div style="font-size:10px;color:var(--yellow);font-weight:600">DUPLICADOS</div></div>
+          <div style="flex:1;background:var(--border2);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--text3)">${errores}</div><div style="font-size:10px;color:var(--text3);font-weight:600">ERRORES</div></div>
+        </div>
+        <div style="overflow-y:auto;flex:1;margin-bottom:12px">
+          ${importData.map(r => {
+            const bg = r.status==='ok'?'var(--white)':r.status==='duplicado'?'var(--yellow-light)':'var(--red-light)';
+            const border = r.status==='ok'?'var(--green)':r.status==='duplicado'?'var(--yellow)':'var(--red)';
+            const icon = r.status==='ok'?'✅':r.status==='duplicado'?'⚠️':'❌';
+            return '<div style="background:'+bg+';border:1px solid '+border+';border-left:4px solid '+border+';border-radius:10px;padding:10px;margin-bottom:6px">'+
+              '<div style="display:flex;justify-content:space-between"><div style="font-family:var(--mono);font-size:13px;font-weight:700">'+r.serie+'</div><span>'+icon+'</span></div>'+
+              '<div style="font-size:11px;color:var(--text2)">'+r.modelo+(r.vineta?' · 🏷 '+r.vineta:'')+'</div>'+
+              '<div style="font-size:11px;color:var(--text3)">'+r.sede+'</div>'+
+              (r.problema?'<div style="font-size:11px;font-weight:600;color:'+border+';margin-top:3px">'+r.problema+'</div>':'')+
+              '</div>';
+          }).join('')}
+        </div>
+        <div style="flex-shrink:0">
+          ${nuevos > 0 ? `<button onclick="confirmarImport()" style="width:100%;background:var(--primary);color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">✅ Importar ${nuevos} equipos nuevos</button>` : ''}
+          <button onclick="closeImportModal()" style="width:100%;background:var(--white);color:var(--text3);border:1px solid var(--border);border-radius:10px;padding:13px;font-family:var(--font);font-size:14px;cursor:pointer">Cancelar</button>
+        </div>
       </div>
     </div>`;
   }
@@ -1525,7 +1626,8 @@ function render() {
                 if (!isPrestado && !isEnCampo) html += '<span class="badge badge-green" style="font-size:8px;padding:2px 5px;white-space:nowrap">Disponible</span>';
               }
               html += '</div></div>';
-              html += '<div style="font-size:11px;color:var(--text3);margin-bottom:5px">' + (eq.modelo||'Sin modelo') + '</div>';
+              html += '<div style="font-size:11px;color:var(--text3);margin-bottom:3px">' + (eq.modelo||'Sin modelo') + '</div>';
+              if (eq.vineta) html += '<div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:3px">🏷 ' + eq.vineta + '</div>';
               if (dep) html += '<div style="font-size:10px;color:var(--yellow);font-weight:600">📡 #' + dep.caso + '</div>';
               else if (isPrestado) html += '<div style="font-size:10px;color:var(--primary);font-weight:600">🔄 Prestado</div>';
               const cond = CONDICIONES.find(x => x.key === (eq.condicion||'bueno'));
@@ -1543,7 +1645,9 @@ function render() {
         html += '<div style="display:flex;gap:8px">';
         html += "<button onclick=\"activarModoLote('prestamo')\" style=\"flex:1;padding:9px;border:1px solid var(--border);border-radius:10px;background:var(--white);color:var(--text2);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer\">🔄 Lote préstamo</button>";
         html += "<button onclick=\"activarModoLote('devolucion')\" style=\"flex:1;padding:9px;border:1px solid var(--border);border-radius:10px;background:var(--white);color:var(--text2);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer\">✅ Lote devolución</button>";
-        html += '</div></div>';
+        html += '</div>';
+        html += '<div style="margin-top:8px"><label style="display:flex;align-items:center;justify-content:center;gap:8px;padding:9px;border:1px solid var(--border);border-radius:10px;background:var(--white);color:var(--text2);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;width:100%">📥 Importar equipos desde Excel<input type="file" accept=".xlsx,.xls" onchange="handleImportEquipos(event)" style="display:none"></label></div>';
+        html += '</div>';
       }
       html += '</div>';
     }
@@ -1553,6 +1657,9 @@ function render() {
         <div class="page-title">${editEqId ? 'Editar equipo' : 'Agregar equipo'}</div>
         <div class="field"><label>Número de serie *</label>
           <input placeholder="Ej: 1333S2311" value="${equipoForm.serie}" oninput="setEF('serie',this.value)">
+        </div>
+        <div class="field"><label>Viñeta (N° inventario)</label>
+          <input placeholder="Ej: 11063" value="${equipoForm.vineta||''}" oninput="setEF('vineta',this.value)">
         </div>
         <div class="field"><label>Modelo / marca *</label>
           <input placeholder="Ej: ECAPLUS / DRANETZ" value="${equipoForm.modelo}" oninput="setEF('modelo',this.value)">
@@ -1598,6 +1705,7 @@ function render() {
           </div>
         </div>
         <div class="detail-grid">
+          ${eq.vineta ? `<div class="detail-row"><div class="detail-label">Viñeta</div><div class="detail-value" style="font-family:var(--mono);font-weight:700">${eq.vineta}</div></div>` : ''}
           <div class="detail-row"><div class="detail-label">Modelo / Marca</div><div class="detail-value">${eq.modelo||'—'}</div></div>
           ${eq.notas ? `<div class="detail-row"><div class="detail-label">Notas</div><div class="detail-value">${eq.notas}</div></div>` : ''}
           <div class="detail-row"><div class="detail-label">Sede</div><div class="detail-value">${eq.sede||'Plantel Central'}</div></div>
@@ -1851,6 +1959,9 @@ window.handleFileUpload = e => { const f = e.target.files[0]; if (f) procesarExc
 window.confirmarCarga = confirmarCargaMasiva;
 window.cancelarCarga = () => { cargaData = []; cargaView = 'upload'; render(); };
 window.setCargaOrigen = a => { cargaAreaOrigen = a; render(); };
+window.handleImportEquipos = e => { const f = e.target.files[0]; if (f) procesarExcelInventario(f); };
+window.confirmarImport = confirmarImportInventario;
+window.closeImportModal = () => { showImportModal = false; importData = []; render(); };
 window.setSearch = v => {
   search = v;
   const inp = document.querySelector('.search-input[oninput*="setSearch"]');
@@ -1916,7 +2027,7 @@ window.saveEquipo = handleSaveEq;
 window.openEqDetalle = id => { editEqId = id; view = 'equipo_detalle'; render(); };
 window.editEquipo = id => {
   const eq = equipos.find(x => x.id === id); if (!eq) return;
-  equipoForm = { serie: eq.serie, modelo: eq.modelo||'', notas: eq.notas||'', sede: eq.sede||'Plantel Central', condicion: eq.condicion||'bueno' };
+  equipoForm = { serie: eq.serie, modelo: eq.modelo||'', notas: eq.notas||'', sede: eq.sede||'Plantel Central', condicion: eq.condicion||'bueno', vineta: eq.vineta||'' };
   editEqId = id; view = 'equipo_form'; render();
 };
 window.delEquipo = handleDelEq;
