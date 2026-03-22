@@ -563,7 +563,7 @@ function confirmMovimiento() {
   if (!eq) return;
   const esPrestamo = prestamoForm.tipo === 'prestamo';
   const sedeDest = areaToSede(prestamoForm.a);
-  const movimiento = { tipo: prestamoForm.tipo, de: prestamoForm.de, a: prestamoForm.a, fecha: today(), nota: prestamoForm.nota };
+  const movimiento = { tipo: prestamoForm.tipo, de: prestamoForm.de, a: prestamoForm.a, fecha: today(), nota: prestamoForm.nota, registradoPor: sesionUsuario?.nombre || 'Desconocido' };
   const movimientos = [...(eq.movimientos||[]), movimiento];
   const updateData = esPrestamo
     ? { prestado: true, prestadoFecha: today(), sede: sedeDest, movimientos }
@@ -673,6 +673,7 @@ function generateLotePDF(equiposLote, tipo) {
         <div class="firma-line">
           <div class="firma-label">Entrega</div>
           <div class="firma-name">${equiposLote[0]?.movimiento?.de || (tipo === 'prestamo' ? 'CPT BT' : 'CPT MT')}</div>
+          ${equiposLote[0]?.movimiento?.registradoPor ? `<div style="font-size:11px;color:#64748b;margin-top:3px">${equiposLote[0].movimiento.registradoPor}</div>` : ''}
         </div>
       </div>
       <div class="firma-box">
@@ -811,6 +812,7 @@ function generateMemoPDF(eq, movimiento) {
         <div class="firma-line">
           <div class="firma-label">Entrega</div>
           <div class="firma-name">${de}</div>
+          ${movimiento.registradoPor ? `<div style="font-size:11px;color:#64748b;margin-top:3px">${movimiento.registradoPor}</div>` : ''}
         </div>
       </div>
       <div class="firma-box">
@@ -1037,7 +1039,11 @@ function generarMemoCargaMasiva(filas) {
   <div style="margin-bottom:24px">
     <div class="section-title">Firmas de conformidad</div>
     <div class="firma-grid">
-      <div class="firma-line"><div class="firma-label">Entrega</div><div class="firma-name">${cargaAreaOrigen} · ${areaToSede(cargaAreaOrigen)}</div></div>
+      <div class="firma-line">
+        <div class="firma-label">Entrega</div>
+        <div class="firma-name">${cargaAreaOrigen} · ${areaToSede(cargaAreaOrigen)}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:3px">${sesionUsuario?.nombre||''}</div>
+      </div>
       <div class="firma-line"><div class="firma-label">Recibe</div><div class="firma-name">Campos y Servicios</div></div>
     </div>
   </div>
@@ -1829,7 +1835,7 @@ function render() {
             ${eq.historialCondicion.slice().reverse().map(h => {
               const cOld = CONDICIONES.find(c => c.key === h.condicionAnterior);
               const cNew = CONDICIONES.find(c => c.key === h.condicionNueva);
-              return '<div class="historial-card"><div class="historial-row"><div><div class="historial-lugar">'+(cOld?cOld.icon+' '+cOld.label:'—')+' → '+(cNew?cNew.icon+' '+cNew.label:'—')+'</div>'+(h.nota?'<div class="historial-caso">'+h.nota+'</div>':'')+'</div><div class="historial-fecha">'+fmtDate(h.fecha)+'</div></div></div>';
+              return '<div class="historial-card"><div class="historial-row"><div><div class="historial-lugar">'+(cOld?cOld.icon+' '+cOld.label:'—')+' → '+(cNew?cNew.icon+' '+cNew.label:'—')+'</div>'+(h.nota?'<div class="historial-caso">'+h.nota+'</div>':'')+(h.registradoPor?'<div style="font-size:10px;color:var(--text3);margin-top:2px">👤 '+h.registradoPor+'</div>':'')+'</div><div class="historial-fecha">'+fmtDate(h.fecha)+'</div></div></div>';
             }).join('')}
           </div>` : ''}
         ${eq.movimientos && eq.movimientos.length > 0 ? `
