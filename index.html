@@ -2008,9 +2008,11 @@ function render() {
 
   // MAP TAB
   else if (tab === 'mapa') {
+    const areaColor = a => a === 'CPT BT' ? '#16a34a' : a === 'Campos y Servicios' ? '#ea580c' : '#0057b8';
     const visibles = records.filter(r => {
       const st = calcSt(r);
-      return (st === 'ACTIVO' || st === 'PROXIMO') && r.lat && r.lng;
+      const areaOk = mapaFiltro === 'TODOS' || (r.areaInstalacion||'CPT MT') === mapaFiltro;
+      return (st === 'ACTIVO' || st === 'PROXIMO') && r.lat && r.lng && areaOk;
     });
     const sinGPS = records.filter(r => {
       const st = calcSt(r);
@@ -2022,11 +2024,13 @@ function render() {
     // Build iframe HTML with embedded Leaflet map
     const markers = visibles.map(r => {
       const st = calcSt(r);
-      const color = st === 'ACTIVO' ? '%230057b8' : '%23d97706';
-      const label = st === 'ACTIVO' ? 'Activo' : 'Retiro próximo';
+      const area = r.areaInstalacion || 'CPT MT';
+      const color = areaColor(area);
+      const proximo = st === 'PROXIMO';
+      const label = proximo ? 'Retiro próximo' : 'Activo';
       const dias = daysUntil(r.fechaRetiro);
       const diasTxt = dias === 0 ? 'HOY' : dias > 0 ? 'en ' + dias + 'd' : Math.abs(dias) + 'd vencido';
-      return JSON.stringify({lat: parseFloat(r.lat), lng: parseFloat(r.lng), serie: r.serie, modelo: r.modelo||'', caso: r.caso, lugar: r.lugar||'', label, color: st==='ACTIVO'?'#0057b8':'#d97706', dias: diasTxt});
+      return JSON.stringify({lat: parseFloat(r.lat), lng: parseFloat(r.lng), serie: r.serie, modelo: r.modelo||'', caso: r.caso, lugar: r.lugar||'', label, color, proximo, dias: diasTxt, area});
     });
 
     const mapHtml = `<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'/>\x3cscript src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'><\/script><style>*{margin:0;padding:0}body,html,#map{width:100%;height:100%}.leaflet-popup-content{font-family:sans-serif;min-width:140px}.ps{font-weight:800;font-size:14px;color:#0a1628}.pm{font-size:12px;color:#64748b;margin-top:2px}.pb{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;margin-top:5px}<\/style><\/head><body><div id='map'><\/div>\x3cscript>var markers=${JSON.stringify(markers)};var map=L.map('map');L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:''}).addTo(map);var bounds=[];markers.forEach(function(m){var d=JSON.parse(m);var border=d.proximo?'3px solid #ef4444':'3px solid white';var dot=d.proximo?'<div style="position:absolute;top:-4px;right:-4px;width:7px;height:7px;border-radius:50%;background:#ef4444;border:1px solid white"><\/div>':'';var icon=L.divIcon({className:'',html:'<div style="position:relative;width:16px;height:16px;border-radius:50%;background:'+d.color+';border:'+border+';box-shadow:0 2px 8px rgba(0,0,0,.4)">'+(d.proximo?'<div style="position:absolute;top:-5px;right:-5px;width:8px;height:8px;border-radius:50%;background:#ef4444;border:1px solid white"><\/div>':'')+'<\/div>',iconSize:[16,16],iconAnchor:[8,8]});var popup='<div class=ps>'+d.serie+'<\/div><div class=pm>'+d.modelo+'<\/div><div class=pm>📍 '+d.lugar+'<\/div><div class=pm>#'+d.caso+' · '+(d.area||'CPT MT')+'<\/div><span class=pb style="background:'+(d.color=='#0057b8'?'#e8f0fb':'#fffbeb')+';color:'+d.color+'">'+d.label+'<\/span><br><a href="https://maps.google.com/?q='+d.lat+','+d.lng+'" target=_blank style="font-size:11px;color:#0057b8;margin-top:4px;display:inline-block">Ver en Google Maps →<\/a>';L.marker([d.lat,d.lng],{icon:icon}).bindPopup(popup).addTo(map);bounds.push([d.lat,d.lng]);});if(bounds.length>0){if(bounds.length===1){map.setView(bounds[0],14);}else{map.fitBounds(bounds,{padding:[20,20]});}}else{map.setView([13.7942,-88.8965],8);}<\/script><\/body><\/html>`;
