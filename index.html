@@ -333,11 +333,13 @@ const ADMIN = 'David García';
 const isAdmin = () => sesionUsuario?.nombre === ADMIN;
 
 const USUARIOS = [
-  { nombre: 'David García', pin: '2442' },
-  { nombre: 'Bryan Francia', pin: '8250' },
-  { nombre: 'Francisco Chulo', pin: '0177' },
-  { nombre: 'Vicente Ramos', pin: '1190' },
+  { nombre: 'David García', pin: '2442', area: 'CPT MT' },
+  { nombre: 'Bryan Francia', pin: '8250', area: 'CPT MT' },
+  { nombre: 'Francisco Chulo', pin: '0177', area: 'CPT BT' },
+  { nombre: 'Vicente Ramos', pin: '1190', area: 'CPT BT' },
 ];
+const userArea = () => { const u = USUARIOS.find(x => x.nombre === sesionUsuario?.nombre); return u?.area || 'CPT MT'; };
+const userInstTab = () => userArea() === 'CPT BT' ? 'cpt_bt' : 'cpt_mt';
 const CONDICIONES = [
   { key: 'bueno', label: 'Bueno', icon: '🟢', color: 'var(--green)', bg: 'var(--green-light)' },
   { key: 'detalles', label: 'Con detalles', icon: '🟡', color: 'var(--yellow)', bg: 'var(--yellow-light)' },
@@ -377,7 +379,11 @@ function eqPrestado(eq) { return !!eq.prestado; }
 // ── LOAD SESSION ──
 try {
   const saved = localStorage.getItem('cpt_session');
-  if (saved) sesionUsuario = JSON.parse(saved);
+  if (saved) {
+    sesionUsuario = JSON.parse(saved);
+    const u = USUARIOS.find(x => x.nombre === sesionUsuario?.nombre);
+    if (u) instTab = u.area === 'CPT BT' ? 'cpt_bt' : 'cpt_mt';
+  }
 } catch(e) {}
 
 onValue(installsRef, snap => {
@@ -1145,6 +1151,7 @@ function doLogin() {
   }
   sesionUsuario = { nombre: user.nombre };
   loginForm = { nombre: '', pin: '', error: '' };
+  instTab = user.area === 'CPT BT' ? 'cpt_bt' : 'cpt_mt';
   try { localStorage.setItem('cpt_session', JSON.stringify(sesionUsuario)); } catch(e) {}
   render();
 }
@@ -1217,7 +1224,7 @@ function render() {
 
   // Auto-show alerta if not dismissed and has upcoming retiros
   if (sesionUsuario && !alertaDismissed && !showAlertaRetiros) {
-    const proximos = records.filter(r => !r.retirado && daysUntil(r.fechaRetiro) <= 3 && daysUntil(r.fechaRetiro) >= 0);
+    const proximos = records.filter(r => !r.retirado && daysUntil(r.fechaRetiro) <= 3 && daysUntil(r.fechaRetiro) >= 0 && r.areaInstalacion === userArea());
     if (proximos.length > 0) { showAlertaRetiros = true; alertaDismissed = true; }
   }
 
@@ -1533,11 +1540,11 @@ function render() {
         <div style="background:linear-gradient(135deg,var(--primary-dark),var(--primary));border-radius:14px;padding:14px 16px;margin-bottom:12px;color:#fff">
           <div style="font-size:11px;color:rgba(255,255,255,.7);margin-bottom:6px;font-weight:600">📅 ${new Date().toLocaleDateString("es-SV",{weekday:"long",day:"numeric",month:"long"}).replace(/^./,c=>c.toUpperCase())}</div>
           <div style="display:flex;gap:16px">
-            <div><div style="font-size:22px;font-weight:800">${filtered.filter(r=>calcSt(r)==='ACTIVO').length}</div><div style="font-size:10px;color:rgba(255,255,255,.7)">Activos</div></div>
-            ${filtered.filter(r=>!r.retirado&&r.fechaRetiro===today()).length>0?'<div><div style="font-size:22px;font-weight:800;color:#ffd700">'+filtered.filter(r=>!r.retirado&&r.fechaRetiro===today()).length+'</div><div style="font-size:10px;color:rgba(255,255,255,.7)">Vencen hoy</div></div>':''}
-            ${filtered.filter(r=>!r.retirado&&daysUntil(r.fechaRetiro)<=7&&daysUntil(r.fechaRetiro)>0).length>0?'<div><div style="font-size:22px;font-weight:800;color:#7dd3fc">'+filtered.filter(r=>!r.retirado&&daysUntil(r.fechaRetiro)<=7&&daysUntil(r.fechaRetiro)>0).length+'</div><div style="font-size:10px;color:rgba(255,255,255,.7)">Esta semana</div></div>':''}
+            <div><div style="font-size:22px;font-weight:800">${filtered.filter(r=>calcSt(r)==='ACTIVO'&&r.areaInstalacion===userArea()).length}</div><div style="font-size:10px;color:rgba(255,255,255,.7)">Activos ${userArea()}</div></div>
+            ${filtered.filter(r=>!r.retirado&&r.fechaRetiro===today()&&r.areaInstalacion===userArea()).length>0?'<div><div style="font-size:22px;font-weight:800;color:#ffd700">'+filtered.filter(r=>!r.retirado&&r.fechaRetiro===today()&&r.areaInstalacion===userArea()).length+'</div><div style="font-size:10px;color:rgba(255,255,255,.7)">Vencen hoy</div></div>':''}
+            ${filtered.filter(r=>!r.retirado&&daysUntil(r.fechaRetiro)<=7&&daysUntil(r.fechaRetiro)>0&&r.areaInstalacion===userArea()).length>0?'<div><div style="font-size:22px;font-weight:800;color:#7dd3fc">'+filtered.filter(r=>!r.retirado&&daysUntil(r.fechaRetiro)<=7&&daysUntil(r.fechaRetiro)>0&&r.areaInstalacion===userArea()).length+'</div><div style="font-size:10px;color:rgba(255,255,255,.7)">Esta semana</div></div>':''}
           </div>
-          ${filtered.filter(r=>!r.retirado&&r.fechaRetiro===today()).length>0?'<div style="margin-top:8px;font-size:11px;color:#ffd700;font-weight:600">⚠️ Hay retiros programados para hoy</div>':''}
+          ${filtered.filter(r=>!r.retirado&&r.fechaRetiro===today()&&r.areaInstalacion===userArea()).length>0?'<div style="margin-top:8px;font-size:11px;color:#ffd700;font-weight:600">⚠️ Hay retiros de '+userArea()+' programados para hoy</div>':''}
         </div>
         <div class="search-wrap"><span class="search-icon">🔍</span>
           <input class="search-input" placeholder="Buscar serie, caso, lugar..." value="${search}" oninput="setSearch(this.value)" ${search?'data-active="true"':''}>
@@ -2153,7 +2160,7 @@ function render() {
 
   // ALERTA RETIROS MODAL
   if (showAlertaRetiros) {
-    const proximos = records.filter(r => !r.retirado && daysUntil(r.fechaRetiro) <= 3 && daysUntil(r.fechaRetiro) >= 0)
+    const proximos = records.filter(r => !r.retirado && daysUntil(r.fechaRetiro) <= 3 && daysUntil(r.fechaRetiro) >= 0 && r.areaInstalacion === userArea())
       .sort((a,b) => daysUntil(a.fechaRetiro) - daysUntil(b.fechaRetiro));
     html += '<div style="position:fixed;inset:0;background:#00000088;z-index:300;display:flex;align-items:center;justify-content:center;padding:24px">';
     html += '<div style="background:#fff;border-radius:20px;width:100%;max-width:380px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">';
