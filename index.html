@@ -300,6 +300,7 @@ let prestamoForm = { de: 'CPT BT', a: 'CPT MT', nota: '', tipo: 'prestamo' };
 let modoSeleccionLote = false;
 let cargaData = []; // preview rows from excel
 let cargaView = 'upload'; // upload | preview
+let historialCargas = [];
 let cargaAreaOrigen = 'CPT BT';
 let showImportModal = false;
 let importData = [];
@@ -361,6 +362,13 @@ onValue(installsRef, snap => {
     records.push({ id: child.key, ...child.val() });
   });
   records.sort((a, b) => (b.fechaRegistro || '').localeCompare(a.fechaRegistro || ''));
+  render();
+});
+
+onValue(historialCargasRef, snap => {
+  historialCargas = [];
+  snap.forEach(c => historialCargas.push({ id: c.key, ...c.val() }));
+  historialCargas.sort((a, b) => (b.fecha||'').localeCompare(a.fecha||''));
   render();
 });
 
@@ -875,7 +883,7 @@ function procesarExcel(file) {
         else if (!caso) { status = 'warning'; problema = 'Sin número SIGET'; }
         else if (!fechaRetiro) { status = 'warning'; problema = 'Sin fecha de retiro'; }
 
-        return { serie, caso, lugar, fechaInst, fechaRetiro, notas, lat, lng, status, problema, equipoId: eq?.id, modelo: eq?.modelo||'' };
+        return { serie, caso, lugar, fechaInst, fechaRetiro, notas, lat, lng, status, problema, equipoId: eq?.id, modelo: eq?.modelo||'', vineta: eq?.vineta||'' };
       });
 
       cargaView = 'preview';
@@ -923,6 +931,16 @@ function confirmarCargaMasiva() {
     update(ref(db, 'equipos/' + r.equipoId), { prestado: true, prestadoFecha: today(), sede: 'Subestación Cucumacayán', movimientos });
     count++;
   });
+
+  // Save to historial
+  const registroCarga = {
+    fecha: today(),
+    hora: new Date().toLocaleTimeString('es-SV', {hour:'2-digit', minute:'2-digit'}),
+    areaOrigen: cargaAreaOrigen,
+    total: count,
+    equipos: validos.map(r => ({ serie: r.serie, modelo: r.modelo, vineta: r.vineta||'', caso: r.caso, lugar: r.lugar, fechaInst: r.fechaInst, fechaRetiro: r.fechaRetiro, notas: r.notas }))
+  };
+  push(historialCargasRef, registroCarga);
 
   showToast('✅ ' + count + ' instalaciones registradas');
   generarMemoCargaMasiva(validos);
@@ -1917,6 +1935,34 @@ function render() {
     }
 
     html += '</div>';
+
+    // Historial de cargas
+    if (historialCargas.length > 0) {
+      html += '<div style="margin-top:24px">';
+      html += '<div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">Historial de cargas masivas</div>';
+      historialCargas.forEach(c => {
+        html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px;box-shadow:var(--shadow)">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">';
+        html += '<div>';
+        html += '<div style="font-size:14px;font-weight:700;color:var(--text)">' + fmtDate(c.fecha) + ' · ' + (c.hora||'') + '</div>';
+        html += '<div style="font-size:12px;color:var(--text3);margin-top:2px">' + (c.areaOrigen||'CPT BT') + ' → Campos y Servicios</div>';
+        html += '</div>';
+        html += '<span class="badge badge-blue" style="font-size:11px">' + c.total + ' equipos</span>';
+        html += '</div>';
+        // Equipment list preview
+        html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">';
+        (c.equipos||[]).slice(0,6).forEach(e => {
+          html += '<span style="font-size:10px;font-family:var(--mono);background:var(--primary-light);color:var(--primary);padding:2px 7px;border-radius:6px">' + e.serie + '</span>';
+        });
+        if ((c.equipos||[]).length > 6) html += '<span style="font-size:10px;color:var(--text3);padding:2px 4px">+' + ((c.equipos||[]).length-6) + ' más</span>';
+        html += '</div>';
+        html += "<button onclick=\"regenerarMemo('"+c.id+"')\" style=\"width:100%;padding:9px;border:1px solid var(--primary);border-radius:8px;background:var(--primary-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer\">📄 Regenerar memo</button>";
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+
+    html += '</div>';
   }
 
   // BOTTOM NAV
@@ -1958,6 +2004,21 @@ window.setInstTab = t => { instTab = t; filterStatus = 'TODOS'; render(); };
 window.handleFileUpload = e => { const f = e.target.files[0]; if (f) procesarExcel(f); };
 window.confirmarCarga = confirmarCargaMasiva;
 window.cancelarCarga = () => { cargaData = []; cargaView = 'upload'; render(); };
+window.regenerarMemo = id => {
+  const c = historialCargas.find(x => x.id === id);
+  if (!c) return showToast('No se encontró el registro');
+  // Rebuild filas format expected by generarMemoCargaMasiva
+  const filas = (c.equipos||[]).map(e => ({
+    serie: e.serie, modelo: e.modelo, vineta: e.vineta||'',
+    caso: e.caso, lugar: e.lugar,
+    fechaInst: e.fechaInst, fechaRetiro: e.fechaRetiro, notas: e.notas
+  }));
+  // Temporarily set cargaAreaOrigen to saved value
+  const prevArea = cargaAreaOrigen;
+  cargaAreaOrigen = c.areaOrigen || 'CPT BT';
+  generarMemoCargaMasiva(filas);
+  cargaAreaOrigen = prevArea;
+};
 window.setCargaOrigen = a => { cargaAreaOrigen = a; render(); };
 window.handleImportEquipos = e => { const f = e.target.files[0]; if (f) procesarExcelInventario(f); };
 window.confirmarImport = confirmarImportInventario;
