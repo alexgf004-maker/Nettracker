@@ -1224,7 +1224,7 @@ function render() {
 
   // Auto-show alerta if not dismissed and has upcoming retiros
   if (sesionUsuario && !alertaDismissed && !showAlertaRetiros) {
-    const proximos = records.filter(r => !r.retirado && daysUntil(r.fechaRetiro) <= 3 && daysUntil(r.fechaRetiro) >= 0 && r.areaInstalacion === userArea());
+    const ua = userArea(); const proximos = records.filter(r => !r.retirado && daysUntil(r.fechaRetiro) <= 3 && daysUntil(r.fechaRetiro) >= 0 && (r.areaInstalacion||'CPT MT') === ua);
     if (proximos.length > 0) { showAlertaRetiros = true; alertaDismissed = true; }
   }
 
@@ -1539,12 +1539,19 @@ function render() {
         </div>
         <div style="background:linear-gradient(135deg,var(--primary-dark),var(--primary));border-radius:14px;padding:14px 16px;margin-bottom:12px;color:#fff">
           <div style="font-size:11px;color:rgba(255,255,255,.7);margin-bottom:6px;font-weight:600">📅 ${new Date().toLocaleDateString("es-SV",{weekday:"long",day:"numeric",month:"long"}).replace(/^./,c=>c.toUpperCase())}</div>
-          <div style="display:flex;gap:16px">
-            <div><div style="font-size:22px;font-weight:800">${filtered.filter(r=>calcSt(r)==='ACTIVO'&&r.areaInstalacion===userArea()).length}</div><div style="font-size:10px;color:rgba(255,255,255,.7)">Activos ${userArea()}</div></div>
-            ${filtered.filter(r=>!r.retirado&&r.fechaRetiro===today()&&r.areaInstalacion===userArea()).length>0?'<div><div style="font-size:22px;font-weight:800;color:#ffd700">'+filtered.filter(r=>!r.retirado&&r.fechaRetiro===today()&&r.areaInstalacion===userArea()).length+'</div><div style="font-size:10px;color:rgba(255,255,255,.7)">Vencen hoy</div></div>':''}
-            ${filtered.filter(r=>!r.retirado&&daysUntil(r.fechaRetiro)<=7&&daysUntil(r.fechaRetiro)>0&&r.areaInstalacion===userArea()).length>0?'<div><div style="font-size:22px;font-weight:800;color:#7dd3fc">'+filtered.filter(r=>!r.retirado&&daysUntil(r.fechaRetiro)<=7&&daysUntil(r.fechaRetiro)>0&&r.areaInstalacion===userArea()).length+'</div><div style="font-size:10px;color:rgba(255,255,255,.7)">Esta semana</div></div>':''}
-          </div>
-          ${filtered.filter(r=>!r.retirado&&r.fechaRetiro===today()&&r.areaInstalacion===userArea()).length>0?'<div style="margin-top:8px;font-size:11px;color:#ffd700;font-weight:600">⚠️ Hay retiros de '+userArea()+' programados para hoy</div>':''}
+          ${(()=>{
+            const ua = userArea();
+            const miArea = records.filter(r => (r.areaInstalacion||'CPT MT') === ua);
+            const nActivos = miArea.filter(r=>calcSt(r)==='ACTIVO').length;
+            const nHoy = miArea.filter(r=>!r.retirado&&r.fechaRetiro===today()).length;
+            const nSemana = miArea.filter(r=>!r.retirado&&daysUntil(r.fechaRetiro)<=7&&daysUntil(r.fechaRetiro)>0).length;
+            return '<div style="display:flex;gap:16px">'
+              +'<div><div style="font-size:22px;font-weight:800">'+nActivos+'</div><div style="font-size:10px;color:rgba(255,255,255,.7)">Activos '+ua+'</div></div>'
+              +(nHoy>0?'<div><div style="font-size:22px;font-weight:800;color:#ffd700">'+nHoy+'</div><div style="font-size:10px;color:rgba(255,255,255,.7)">Vencen hoy</div></div>':'')
+              +(nSemana>0?'<div><div style="font-size:22px;font-weight:800;color:#7dd3fc">'+nSemana+'</div><div style="font-size:10px;color:rgba(255,255,255,.7)">Esta semana</div></div>':'')
+              +'</div>'
+              +(nHoy>0?'<div style="margin-top:8px;font-size:11px;color:#ffd700;font-weight:600">⚠️ Hay retiros de '+ua+' programados para hoy</div>':'');
+          })()}
         </div>
         <div class="search-wrap"><span class="search-icon">🔍</span>
           <input class="search-input" placeholder="Buscar serie, caso, lugar..." value="${search}" oninput="setSearch(this.value)" ${search?'data-active="true"':''}>
@@ -2160,7 +2167,7 @@ function render() {
 
   // ALERTA RETIROS MODAL
   if (showAlertaRetiros) {
-    const proximos = records.filter(r => !r.retirado && daysUntil(r.fechaRetiro) <= 3 && daysUntil(r.fechaRetiro) >= 0 && r.areaInstalacion === userArea())
+    const ua = userArea(); const proximos = records.filter(r => !r.retirado && daysUntil(r.fechaRetiro) <= 3 && daysUntil(r.fechaRetiro) >= 0 && (r.areaInstalacion||'CPT MT') === ua)
       .sort((a,b) => daysUntil(a.fechaRetiro) - daysUntil(b.fechaRetiro));
     html += '<div style="position:fixed;inset:0;background:#00000088;z-index:300;display:flex;align-items:center;justify-content:center;padding:24px">';
     html += '<div style="background:#fff;border-radius:20px;width:100%;max-width:380px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">';
