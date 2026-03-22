@@ -1029,7 +1029,7 @@ function confirmarCargaMasiva() {
 function generarMemoCargaMasiva(filas) {
   const esMT = cargaAreaOrigen === 'CPT MT' || cargaAreaOrigen === 'CPT DELSUR';
   const fecha = new Date().toLocaleDateString('es-SV');
-  const td = (v, mono) => '<td style="padding:7px 10px;font-size:11px;border-bottom:1px solid #e2e8f0;'+(mono?'font-family:\'Courier New\',monospace;font-weight:700':'')+'">'+(v||'—')+'</td>';
+  const td = (v, mono) => '<td style="padding:4px 6px;font-size:9px;border-bottom:1px solid #e2e8f0;'+(mono?'font-family:\'Courier New\',monospace;font-weight:700':'')+'">'+(v||'—')+'</td>';
   const rows = filas.map(r => '<tr>'
     +td(r.caso, true)
     +td(r.serie, true)
@@ -1052,13 +1052,13 @@ function generarMemoCargaMasiva(filas) {
     .company-sub{font-size:10px;color:#94a3b8;margin-top:2px}
     .memo-type{font-size:22px;font-weight:800;color:#0057b8;text-align:right}
     .memo-label{font-size:10px;color:#94a3b8;letter-spacing:2px;text-transform:uppercase;text-align:right}
-    .section-title{font-size:10px;font-weight:700;color:#0057b8;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #e8f0fb}
-    table{width:100%;border-collapse:collapse;margin-bottom:24px}
+    .section-title{font-size:9px;font-weight:700;color:#0057b8;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #e8f0fb}
+    table{width:100%;border-collapse:collapse;margin-bottom:12px}
     thead{background:#0057b8}
-    thead th{padding:10px 12px;text-align:left;font-size:10px;font-weight:700;color:#fff;letter-spacing:1px;text-transform:uppercase}
+    thead th{padding:5px 6px;text-align:left;font-size:8px;font-weight:700;color:#fff;letter-spacing:.5px;text-transform:uppercase}
     .badge{display:inline-block;background:#e8f0fb;color:#0057b8;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700}
     .firma-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:8px}
-    .firma-line{border-top:1.5px solid #0a1628;margin-top:56px;padding-top:8px;text-align:center}
+    .firma-line{border-top:1.5px solid #0a1628;margin-top:28px;padding-top:6px;text-align:center}
     .firma-label{font-size:10px;color:#64748b}
     .firma-name{font-size:13px;font-weight:700;margin-top:2px}
     .footer{margin-top:32px;padding-top:12px;border-top:1px solid #e2e8f0;text-align:center;font-size:10px;color:#94a3b8}
