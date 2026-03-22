@@ -1703,6 +1703,25 @@ function render() {
           <div class="form-section-title">Notas</div>
           <div class="field"><textarea placeholder="Observaciones, acceso al sitio, contacto..." oninput="setField('notas',this.value)">${form.notas}</textarea></div>
         </div>
+        ${form.areaInstalacion !== 'Campos y Servicios' ? (() => {
+          let eHtml = '<div class="form-section"><div class="form-section-title">Lecturas de energía (instalación)</div>';
+          eHtml += '<div style="display:flex;gap:6px;margin-bottom:10px">';
+          [['ninguna','Sin lectura'],['una','Una lectura'],['tres','P / R / V']].forEach(([t,l]) => {
+            const sel = form.energiaTipoInst === t;
+            eHtml += '<div onclick="setField(\'energiaTipoInst\',\''+t+'\')" style="flex:1;padding:8px 4px;border-radius:8px;border:2px solid '+(sel?'var(--primary)':'var(--border)')+';background:'+(sel?'var(--primary-light)':'#fff')+';text-align:center;cursor:pointer;font-size:11px;font-weight:700;color:'+(sel?'var(--primary)':'var(--text3)')+'">'+l+'</div>';
+          });
+          eHtml += '</div>';
+          if (form.energiaTipoInst==='una') eHtml += '<div class="field"><input type="number" placeholder="Energía (kWh)" value="'+form.energiaInstUna+'" oninput="setField(\'energiaInstUna\',this.value)"></div>';
+          if (form.energiaTipoInst==='tres') {
+            eHtml += '<div style="display:flex;gap:8px">';
+            [['Punta','energiaInstPunta'],['Resto','energiaInstResto'],['Valle','energiaInstValle']].forEach(([l,k]) => {
+              eHtml += '<div style="flex:1"><div style="font-size:10px;font-weight:600;color:var(--text3);margin-bottom:4px">'+l.toUpperCase()+'</div><input type="number" placeholder="kWh" value="'+(form[k]||'')+'" oninput="setField(\''+k+'\',this.value)" style="width:100%;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:13px;box-sizing:border-box"></div>';
+            });
+            eHtml += '</div>';
+          }
+          eHtml += '</div>';
+          return eHtml;
+        })() : ''}
         <button class="btn btn-primary" onclick="saveInstall()">${editId ? 'Guardar cambios' : 'Registrar instalación'}</button>
       </div>`;
     }
