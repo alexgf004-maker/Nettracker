@@ -1247,12 +1247,13 @@ function render() {
 </div>
       <div>
         <div class="logo-text">CPT INNOVA</div>
-        <div class="logo-sub">Analizadores de Red</div>
+        <div class="logo-sub" onclick="cerrarSesion()" style="cursor:pointer">👤 ${sesionUsuario?.nombre||''}  ↩</div>
       </div>
     </div>
     ${view === 'lista' && tab === 'instalaciones' ? `<button class="btn-small" onclick="newInstall()">+ Nuevo</button>` : ''}
     ${view === 'lista' && tab === 'inventario' && !modoSeleccionLote ? `<button class="btn-small" onclick="newEquipo()">+ Equipo</button>` : ''}
     ${view === 'lista' && tab === 'inventario' && modoSeleccionLote ? `<button class="btn-small" style="background:rgba(255,255,255,.3)" onclick="cancelarLote()">✕ Cancelar</button>` : ''}
+    ${view === 'lista' && tab !== 'instalaciones' && tab !== 'inventario' ? `<button class="btn-small" onclick="cerrarSesion()">👤 ${sesionUsuario?.nombre?.split(' ')[0]||''}</button>` : ''}
   </header>`;
 
   // RETIRO MODAL
