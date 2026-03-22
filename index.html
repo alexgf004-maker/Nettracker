@@ -1854,10 +1854,12 @@ function render() {
         if (filteredEq.length === 0) {
           html += '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">Sin resultados</div></div>';
         } else {
+          const SEDES_CONOCIDAS = ['Plantel Central', 'Subestación Cucumacayán'];
           const grupos = [
-            { label: '🏭 Plantel Central', color: 'var(--primary)', items: filteredEq.filter(e => !eqEnCampo(e) && (e.sede||'Plantel Central')==='Plantel Central') },
-            { label: '⚡ Subestación Cucumacayán', color: '#00aaff', items: filteredEq.filter(e => !eqEnCampo(e) && e.sede==='Subestación Cucumacayán') },
+            { label: '🏭 Plantel Central', color: 'var(--primary)', items: filteredEq.filter(e => !eqEnCampo(e) && (e.sede||'Plantel Central').trim()==='Plantel Central') },
+            { label: '⚡ Subestación Cucumacayán', color: '#00aaff', items: filteredEq.filter(e => !eqEnCampo(e) && (e.sede||'').trim()==='Subestación Cucumacayán') },
             { label: '📡 En campo', color: 'var(--yellow)', items: filteredEq.filter(e => eqEnCampo(e)) },
+            { label: '📦 Otra sede', color: 'var(--text3)', items: filteredEq.filter(e => !eqEnCampo(e) && e.sede && !SEDES_CONOCIDAS.includes(e.sede.trim())) },
           ];
           grupos.forEach(grupo => {
             if (grupo.items.length === 0) return;
