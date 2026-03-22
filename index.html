@@ -326,6 +326,9 @@ let equipoForm = emptyEF();
 const SEDES = ['Plantel Central', 'Subestación Cucumacayán'];
 const TECNICOS = ['David García', 'Bryan Francia', 'Francisco Chulo'];
 const AREAS = ['CPT DELSUR', 'CPT MT', 'CPT BT'];
+const ADMIN = 'David García';
+const isAdmin = () => sesionUsuario?.nombre === ADMIN;
+
 const USUARIOS = [
   { nombre: 'David García', pin: '2442' },
   { nombre: 'Bryan Francia', pin: '8250' },
@@ -514,6 +517,7 @@ function handleDescarga() {
 
 // ── DELETE DEPLOY ──
 function handleDelInstall(id) {
+  if (!isAdmin()) return showToast('⚠️ Solo el administrador puede eliminar registros');
   if (!confirm('¿Eliminar este instalación?')) return;
   view = 'lista';
   remove(ref(db, `analizadores/${id}`)).then(() => showToast('Eliminado'));
@@ -1135,6 +1139,7 @@ function cerrarSesion() {
 }
 
 function handleDelEq(id) {
+  if (!isAdmin()) return showToast('⚠️ Solo el administrador puede eliminar equipos');
   if (records.find(r => r.equipoId === id && !r.retirado)) return showToast('⚠️ Equipo instalado actualmente');
   if (!confirm('¿Eliminar del inventario?')) return;
   view = 'lista';
@@ -1645,14 +1650,14 @@ function render() {
           </div>` : ''}
         ${!r.retirado ? `
           <div style="display:flex;gap:8px;margin-bottom:10px">
-            <button onclick="editInstall('${r.id}')" style="flex:1;padding:11px;background:var(--white);border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:13px;font-weight:700;color:var(--text2);cursor:pointer">✏️ Editar</button>
+            ${isAdmin() ? `<button onclick="editInstall('${r.id}')" style="flex:1;padding:11px;background:var(--white);border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:13px;font-weight:700;color:var(--text2);cursor:pointer">✏️ Editar</button>` : ''}
             <button onclick="openDescargaModal('${r.id}')" style="flex:1;padding:11px;background:var(--accent-light);border:1.5px solid var(--accent);border-radius:10px;font-family:var(--font);font-size:13px;font-weight:700;color:var(--primary);cursor:pointer">💾 Descarga</button>
           </div>
           <button class="btn btn-danger" onclick="openRetiroModal('${r.id}')">Marcar como retirado</button>
         ` : ''}
-        <div style="text-align:center;margin-top:4px">
+        ${isAdmin() ? `<div style="text-align:center;margin-top:4px">
           <button onclick="delInstall('${r.id}')" style="background:none;border:none;font-family:var(--font);font-size:12px;color:var(--text3);cursor:pointer;padding:6px 12px;text-decoration:underline">Eliminar registro</button>
-        </div>
+        </div>` : ''}
       </div>`;
     }
   }
@@ -1885,7 +1890,7 @@ function render() {
               </div>`;
             }).join('')}
           </div>` : ''}
-        <button class="btn btn-primary" onclick="editEquipo('${eq.id}')">Editar equipo</button>
+        ${isAdmin() ? `<button class="btn btn-primary" onclick="editEquipo('${eq.id}')">Editar equipo</button>` : ''}
         <button class="btn" style="background:${(() => { const c = CONDICIONES.find(x => x.key===(eq.condicion||'bueno')); return c?c.bg:'var(--green-light)'; })()};color:${(() => { const c = CONDICIONES.find(x => x.key===(eq.condicion||'bueno')); return c?c.color:'var(--green)'; })()};border:1px solid ${(() => { const c = CONDICIONES.find(x => x.key===(eq.condicion||'bueno')); return c?c.color:'var(--green)'; })()}" onclick="openCondicionModal('${eq.id}')">⚙️ Actualizar condición</button>
         ${!eq.prestado && (eq.condicion||'bueno') !== 'fuera' ? `
           <button class="btn" style="background:var(--primary-light);color:var(--primary);border:1px solid var(--primary)" onclick="registrarPrestamo('${eq.id}')">🔄 Registrar préstamo</button>
@@ -1893,7 +1898,7 @@ function render() {
         ${eq.prestado ? `
           <button class="btn" style="background:var(--green-light);color:var(--green);border:1px solid var(--green)" onclick="registrarDevolucion('${eq.id}')">✅ Registrar devolución a Cucumacayán</button>
         ` : ''}
-        <button class="btn btn-secondary" style="color:var(--red)" onclick="delEquipo('${eq.id}')">Eliminar del inventario</button>
+        ${isAdmin() ? `<button class="btn btn-secondary" style="color:var(--red)" onclick="delEquipo('${eq.id}')">Eliminar del inventario</button>` : ''}
       </div>`;
     }
   }
@@ -2158,6 +2163,7 @@ window.newInstall = () => {
 window.saveInstall = handleSave;
 window.openDetail = id => { editId = id; view = 'detalle'; render(); };
 window.editInstall = id => {
+  if (!isAdmin()) return showToast('⚠️ Solo el administrador puede editar instalaciones');
   const r = records.find(x => x.id === id); if (!r) return;
   form = { equipoId: r.equipoId, serie: r.serie, modelo: r.modelo||'', caso: r.caso, lugar: r.lugar||'', lat: r.lat||null, lng: r.lng||null, fechaInstalacion: r.fechaInstalacion, fechaRetiro: r.fechaRetiro, notas: r.notas||'' };
   editId = id; view = 'form'; render();
@@ -2193,6 +2199,7 @@ window.newEquipo = () => { equipoForm = emptyEF(); editEqId = null; view = 'equi
 window.saveEquipo = handleSaveEq;
 window.openEqDetalle = id => { editEqId = id; view = 'equipo_detalle'; render(); };
 window.editEquipo = id => {
+  if (!isAdmin()) return showToast('⚠️ Solo el administrador puede editar equipos');
   const eq = equipos.find(x => x.id === id); if (!eq) return;
   equipoForm = { serie: eq.serie, modelo: eq.modelo||'', notas: eq.notas||'', sede: eq.sede||'Plantel Central', condicion: eq.condicion||'bueno', vineta: eq.vineta||'' };
   editEqId = id; view = 'equipo_form'; render();
