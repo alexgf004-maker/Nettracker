@@ -444,7 +444,12 @@ function handleSave() {
   if (!form.fechaRetiro) return showToast('Ingresa la fecha de retiro');
   if (!form.lugar.trim()) return showToast('Ingresa la ubicación del equipo');
   const usuario = sesionUsuario?.nombre || 'Desconocido';
-  const payload = { ...form, retirado: false, fechaRegistro: today(), creadoPor: usuario };
+  const energiaInst = form.energiaTipoInst === 'una'
+    ? { tipo: 'una', una: form.energiaInstUna }
+    : form.energiaTipoInst === 'tres'
+    ? { tipo: 'tres', punta: form.energiaInstPunta, resto: form.energiaInstResto, valle: form.energiaInstValle }
+    : { tipo: 'ninguna' };
+  const payload = { ...form, energiaInstalacion: energiaInst, retirado: false, fechaRegistro: today(), creadoPor: usuario };
   if (editId) {
     const id = editId;
     editId = null; view = 'lista'; form = emptyForm();
@@ -479,7 +484,12 @@ function toggleSinProblema() {
 }
 function handleRetiro() {
   if (retiroForm.sinProblema === null && retiroForm.fallas.length === 0) return showToast('Indica si hubo algún problema');
-  const payload = { retirado: true, fechaRetiroReal: today(), sinProblema: retiroForm.sinProblema || false, fallas: retiroForm.fallas, descripcionFalla: retiroForm.descripcion, retiradoPor: sesionUsuario?.nombre || 'Desconocido' };
+  const energiaRet = retiroForm.energiaTipo === 'una'
+    ? { tipo: 'una', una: retiroForm.energiaUna }
+    : retiroForm.energiaTipo === 'tres'
+    ? { tipo: 'tres', punta: retiroForm.energiaPunta, resto: retiroForm.energiaResto, valle: retiroForm.energiaValle }
+    : { tipo: 'ninguna' };
+  const payload = { retirado: true, fechaRetiroReal: today(), sinProblema: retiroForm.sinProblema || false, fallas: retiroForm.fallas, descripcionFalla: retiroForm.descripcion, retiradoPor: sesionUsuario?.nombre || 'Desconocido', energiaRetiro: energiaRet };
   const id = retiroId;
   const sedeRetiro = retiroForm.sede;
   const deployRec = records.find(x => x.id === id);
@@ -1351,6 +1361,28 @@ function render() {
         </div>
 
         <div style="margin-bottom:12px">
+          ${(()=>{
+            const recR = records.find(x => x.id === retiroId);
+            if (!recR || (recR.areaInstalacion||'CPT MT') === 'Campos y Servicios') return '';
+            let eHtml = '<div style="margin-bottom:16px"><div style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:8px">LECTURAS DE ENERGÍA (RETIRO)</div>';
+            eHtml += '<div style="display:flex;gap:6px;margin-bottom:10px">';
+            ['ninguna','una','tres'].forEach(t => {
+              const sel = retiroForm.energiaTipo === t;
+              const lbl = t==='ninguna'?'Sin lectura':t==='una'?'Una lectura':'P / R / V';
+              eHtml += '<div onclick="setRetiroEnergia(\''+t+'\')" style="flex:1;padding:8px 4px;border-radius:8px;border:2px solid '+(sel?'#3b6cf4':'#e5e7eb')+';background:'+(sel?'#eef2ff':'#fff')+';text-align:center;cursor:pointer;font-size:11px;font-weight:700;color:'+(sel?'#3b6cf4':'#6b7280')+'">'+lbl+'</div>';
+            });
+            eHtml += '</div>';
+            if (retiroForm.energiaTipo==='una') eHtml += '<input type="number" placeholder="Energía (kWh)" value="'+retiroForm.energiaUna+'" oninput="setRetiroEnergiaVal(\'una\',this.value)" style="width:100%;padding:10px;border:1.5px solid #e5e7eb;border-radius:8px;font-family:var(--font);font-size:14px;margin-bottom:8px;box-sizing:border-box">';
+            if (retiroForm.energiaTipo==='tres') {
+              eHtml += '<div style="display:flex;gap:8px;margin-bottom:8px">';
+              [['Punta','punta'],['Resto','resto'],['Valle','valle']].forEach(([l,k]) => {
+                eHtml += '<div style="flex:1"><div style="font-size:10px;font-weight:600;color:#6b7280;margin-bottom:4px">'+l.toUpperCase()+'</div><input type="number" placeholder="kWh" value="'+(retiroForm['energia'+l]||'')+'" oninput="setRetiroEnergiaVal(\''+k+'\',this.value)" style="width:100%;padding:8px;border:1.5px solid #e5e7eb;border-radius:8px;font-family:var(--font);font-size:13px;box-sizing:border-box"></div>';
+              });
+              eHtml += '</div>';
+            }
+            eHtml += '</div>';
+            return eHtml;
+          })()}
           <div style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:6px">¿A QUÉ SEDE REGRESA EL EQUIPO?</div>
           <div style="display:flex;gap:8px">
             ${SEDES.map(s => `<button onclick="setRetiroSede('${s}')" style="flex:1;padding:10px 8px;border-radius:10px;border:2px solid ${retiroForm.sede===s?'#3b6cf4':'#e5e7eb'};background:${retiroForm.sede===s?'#eef2ff':'#fff'};color:${retiroForm.sede===s?'#3b6cf4':'#6b7280'};font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer">${s}</button>`).join('')}
@@ -1699,6 +1731,8 @@ function render() {
           <div class="detail-row"><div class="detail-label">Retiro programado</div><div class="detail-value">${fmtDate(r.fechaRetiro)}${dias!==null?` <span style="font-size:12px;color:${dias<=0?'var(--red)':dias<=3?'var(--yellow)':'var(--text3)'}">(${dias===0?'hoy':dias>0?`en ${dias}d`:`${Math.abs(dias)}d vencido`})</span>`:''}</div></div>
           ${r.fechaRetiroReal ? `<div class="detail-row"><div class="detail-label">Retirado el</div><div class="detail-value">${fmtDate(r.fechaRetiroReal)}</div></div>` : ''}
           ${r.notas ? `<div class="detail-row"><div class="detail-label">Notas</div><div class="detail-value">${r.notas}</div></div>` : ''}
+          ${r.energiaInstalacion && r.energiaInstalacion.tipo !== 'ninguna' ? `<div class="detail-row"><div class="detail-label">Energía instalación</div><div class="detail-value" style="font-family:var(--mono)">${r.energiaInstalacion.tipo==='una' ? r.energiaInstalacion.una+' kWh' : 'P:'+r.energiaInstalacion.punta+' R:'+r.energiaInstalacion.resto+' V:'+r.energiaInstalacion.valle+' kWh'}</div></div>` : ''}
+          ${r.energiaRetiro && r.energiaRetiro.tipo !== 'ninguna' ? `<div class="detail-row"><div class="detail-label">Energía retiro</div><div class="detail-value" style="font-family:var(--mono)">${r.energiaRetiro.tipo==='una' ? r.energiaRetiro.una+' kWh' : 'P:'+r.energiaRetiro.punta+' R:'+r.energiaRetiro.resto+' V:'+r.energiaRetiro.valle+' kWh'}</div></div>` : ''}
           ${r.creadoPor ? `<div class="detail-row"><div class="detail-label">Registrado por</div><div class="detail-value" style="color:var(--text3);font-size:13px">${r.creadoPor}</div></div>` : ''}
           ${r.editadoPor ? `<div class="detail-row"><div class="detail-label">Editado por</div><div class="detail-value" style="color:var(--text3);font-size:13px">${r.editadoPor} · ${fmtDate(r.fechaEdicion)}</div></div>` : ''}
         </div>
@@ -2361,6 +2395,8 @@ window.editEquipo = id => {
 };
 window.delEquipo = handleDelEq;
 window.setRetiroSede = s => { retiroForm.sede = s; render(); };
+window.setRetiroEnergia = t => { retiroForm.energiaTipo = t; render(); };
+window.setRetiroEnergiaVal = (k, v) => { if(k==='una') retiroForm.energiaUna=v; else if(k==='punta') retiroForm.energiaPunta=v; else if(k==='resto') retiroForm.energiaResto=v; else if(k==='valle') retiroForm.energiaValle=v; };
 window.openDescargaModal = openDescargaModal;
 window.closeDescargaModal = closeDescargaModal;
 window.doDescarga = handleDescarga;
