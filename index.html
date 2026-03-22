@@ -288,6 +288,9 @@ let sesionUsuario = null; // { nombre, pin }
 let loginForm = { nombre: '', pin: '', error: '' };
 
 let tab = 'instalaciones';
+let showAlertaRetiros = false;
+let mapaFiltro = 'TODOS'; // TODOS | CPT MT | CPT BT | Campos y Servicios
+let alertaDismissed = false;
 let view = 'lista';
 let editId = null;
 let editEqId = null;
@@ -305,6 +308,7 @@ let prestamoForm = { de: 'CPT BT', a: 'CPT MT', nota: '', tipo: 'prestamo' };
 let modoSeleccionLote = false;
 let cargaData = []; // preview rows from excel
 let cargaView = 'upload'; // upload | preview
+let cargaSubView = 'subir'; // subir | historial
 let historialCargas = [];
 let cargaAreaOrigen = 'CPT BT';
 let showImportModal = false;
@@ -331,11 +335,13 @@ const ADMIN = 'David García';
 const isAdmin = () => sesionUsuario?.nombre === ADMIN;
 
 const USUARIOS = [
-  { nombre: 'David García', pin: '2442' },
-  { nombre: 'Bryan Francia', pin: '8250' },
-  { nombre: 'Francisco Chulo', pin: '0177' },
-  { nombre: 'Vicente Ramos', pin: '1190' },
+  { nombre: 'David García', pin: '2442', area: 'CPT MT' },
+  { nombre: 'Bryan Francia', pin: '8250', area: 'CPT MT' },
+  { nombre: 'Francisco Chulo', pin: '0177', area: 'CPT BT' },
+  { nombre: 'Vicente Ramos', pin: '1190', area: 'CPT BT' },
 ];
+const userArea = () => { const u = USUARIOS.find(x => x.nombre === sesionUsuario?.nombre); return u?.area || 'CPT MT'; };
+const userInstTab = () => userArea() === 'CPT BT' ? 'cpt_bt' : 'cpt_mt';
 const CONDICIONES = [
   { key: 'bueno', label: 'Bueno', icon: '🟢', color: 'var(--green)', bg: 'var(--green-light)' },
   { key: 'detalles', label: 'Con detalles', icon: '🟡', color: 'var(--yellow)', bg: 'var(--yellow-light)' },
@@ -348,7 +354,7 @@ function areaToSede(area) {
 }
 
 function emptyForm() {
-  return { equipoId: null, serie: '', modelo: '', caso: '', lugar: '', lat: null, lng: null, fechaInstalacion: today(), fechaRetiro: '', notas: '', sede: 'Plantel Central', areaInstalacion: 'CPT MT' };
+  return { equipoId: null, serie: '', modelo: '', caso: '', lugar: '', lat: null, lng: null, fechaInstalacion: today(), fechaRetiro: '', notas: '', sede: 'Plantel Central', areaInstalacion: 'CPT MT', energiaTipoInst: 'ninguna', energiaInstUna: '', energiaInstPunta: '', energiaInstResto: '', energiaInstValle: '' };
 }
 function emptyEF() {
   return { serie: '', modelo: '', notas: '', sede: 'Plantel Central', condicion: 'bueno', vineta: '' };
@@ -375,7 +381,11 @@ function eqPrestado(eq) { return !!eq.prestado; }
 // ── LOAD SESSION ──
 try {
   const saved = localStorage.getItem('cpt_session');
-  if (saved) sesionUsuario = JSON.parse(saved);
+  if (saved) {
+    sesionUsuario = JSON.parse(saved);
+    const u = USUARIOS.find(x => x.nombre === sesionUsuario?.nombre);
+    if (u) instTab = u.area === 'CPT BT' ? 'cpt_bt' : 'cpt_mt';
+  }
 } catch(e) {}
 
 onValue(installsRef, snap => {
@@ -390,7 +400,7 @@ onValue(installsRef, snap => {
 onValue(historialCargasRef, snap => {
   historialCargas = [];
   snap.forEach(c => historialCargas.push({ id: c.key, ...c.val() }));
-  historialCargas.sort((a, b) => (b.fecha||'').localeCompare(a.fecha||''));
+  historialCargas.sort((a, b) => ((b.fecha||'')+' '+(b.hora||'')).localeCompare((a.fecha||'')+' '+(a.hora||'')));
   render();
 });
 
@@ -435,7 +445,12 @@ function handleSave() {
   if (!form.fechaRetiro) return showToast('Ingresa la fecha de retiro');
   if (!form.lugar.trim()) return showToast('Ingresa la ubicación del equipo');
   const usuario = sesionUsuario?.nombre || 'Desconocido';
-  const payload = { ...form, retirado: false, fechaRegistro: today(), creadoPor: usuario };
+  const energiaInst = form.energiaTipoInst === 'una'
+    ? { tipo: 'una', una: form.energiaInstUna }
+    : form.energiaTipoInst === 'tres'
+    ? { tipo: 'tres', punta: form.energiaInstPunta, resto: form.energiaInstResto, valle: form.energiaInstValle }
+    : { tipo: 'ninguna' };
+  const payload = { ...form, energiaInstalacion: energiaInst, retirado: false, fechaRegistro: today(), creadoPor: usuario };
   if (editId) {
     const id = editId;
     editId = null; view = 'lista'; form = emptyForm();
@@ -455,7 +470,7 @@ function handleSave() {
 }
 
 // ── RETIRO ──
-function openRetiroModal(id) { retiroId = id; retiroForm = { sinProblema: null, fallas: [], descripcion: '', sede: 'Plantel Central' }; showRetiroModal = true; render(); }
+function openRetiroModal(id) { retiroId = id; retiroForm = { sinProblema: null, fallas: [], descripcion: '', sede: 'Plantel Central', energiaTipo: 'ninguna', energiaUna: '', energiaPunta: '', energiaResto: '', energiaValle: '' }; showRetiroModal = true; render(); }
 function closeRetiroModal() { showRetiroModal = false; retiroId = null; render(); }
 function toggleFalla(f) {
   retiroForm.sinProblema = false;
@@ -470,7 +485,12 @@ function toggleSinProblema() {
 }
 function handleRetiro() {
   if (retiroForm.sinProblema === null && retiroForm.fallas.length === 0) return showToast('Indica si hubo algún problema');
-  const payload = { retirado: true, fechaRetiroReal: today(), sinProblema: retiroForm.sinProblema || false, fallas: retiroForm.fallas, descripcionFalla: retiroForm.descripcion, retiradoPor: sesionUsuario?.nombre || 'Desconocido' };
+  const energiaRet = retiroForm.energiaTipo === 'una'
+    ? { tipo: 'una', una: retiroForm.energiaUna }
+    : retiroForm.energiaTipo === 'tres'
+    ? { tipo: 'tres', punta: retiroForm.energiaPunta, resto: retiroForm.energiaResto, valle: retiroForm.energiaValle }
+    : { tipo: 'ninguna' };
+  const payload = { retirado: true, fechaRetiroReal: today(), sinProblema: retiroForm.sinProblema || false, fallas: retiroForm.fallas, descripcionFalla: retiroForm.descripcion, retiradoPor: sesionUsuario?.nombre || 'Desconocido', energiaRetiro: energiaRet };
   const id = retiroId;
   const sedeRetiro = retiroForm.sede;
   const deployRec = records.find(x => x.id === id);
@@ -642,8 +662,8 @@ function generateLotePDF(equiposLote, tipo) {
   .firma-name { font-size: 13px; font-weight: 700; margin-top: 2px; }
   .footer { margin-top: 40px; padding-top: 14px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 10px; color: #94a3b8; }
   .badge-count { display: inline-block; background: #e8f0fb; color: #0057b8; border-radius: 20px; padding: 3px 12px; font-size: 12px; font-weight: 700; margin-left: 8px; }
-</style>
-  </head>
+<\/style>
+  <\/head>
 <body>
   <div class="header">
     <div class="logo-area">
@@ -760,8 +780,8 @@ function generateMemoPDF(eq, movimiento) {
   .firma-label { font-size: 11px; color: #64748b; }
   .firma-name { font-size: 13px; font-weight: 700; color: #0a1628; margin-top: 2px; }
   .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 10px; color: #94a3b8; }
-</style>
-  </head>
+<\/style>
+  <\/head>
 <body>
   <div class="header">
     <div class="logo-area">
@@ -853,15 +873,6 @@ function generateMemoPDF(eq, movimiento) {
   win.document.write(html);
   win.document.close();
   setTimeout(() => win.print(), 500);
-  // Enviar por correo
-  const tipoM = movimiento.tipo === 'prestamo' ? 'PRÉSTAMO' : 'DEVOLUCIÓN';
-  const asuntoI = encodeURIComponent('Memorándum de ' + tipoM + ' - ' + eq.serie + ' - ' + new Date().toLocaleDateString('es-SV'));
-  const cuerpoI = encodeURIComponent('Para: '+(movimiento.a||'')+'\nAsunto: '+tipoM+' de equipo analizador de red\nFecha: '+new Date().toLocaleDateString('es-SV')+'\n\nSerie: '+eq.serie+'\nViñeta: '+(eq.vineta||'—')+'\nModelo: '+(eq.modelo||'—')+'\n\nMovimiento: '+(movimiento.de||'')+' → '+(movimiento.a||'')+(movimiento.nota?'\nNota: '+movimiento.nota:'')+'\n\nDocumento generado por CPT INNOVA - Sistema de Gestión de Analizadores de Red');
-  setTimeout(() => {
-    if (confirm('¿Deseas enviar este memo por correo?')) {
-      window.location.href = 'mailto:?subject=' + asuntoI + '&body=' + cuerpoI;
-    }
-  }, 1000);
 }
 
 function openCondicionModal(id) {
@@ -888,7 +899,16 @@ function procesarExcel(file) {
     try {
       const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, { raw: false });
+      // Find header row - look for row containing 'Número SIGET' or 'Numero SIGET'
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+      let headerRow = 0;
+      for (let r = range.s.r; r <= Math.min(range.s.r + 5, range.e.r); r++) {
+        const cell = ws[XLSX.utils.encode_cell({r, c: 0})];
+        if (cell && cell.v && cell.v.toString().toLowerCase().includes('siget')) { headerRow = r; break; }
+        const cell2 = ws[XLSX.utils.encode_cell({r, c: 1})];
+        if (cell2 && cell2.v && cell2.v.toString().toLowerCase().includes('equipo')) { headerRow = r; break; }
+      }
+      const rows = XLSX.utils.sheet_to_json(ws, { raw: false, range: headerRow });
       if (rows.length === 0) return showToast('⚠️ El archivo está vacío');
 
       cargaData = rows.map(row => {
@@ -917,9 +937,15 @@ function procesarExcel(file) {
         const lugar = findCol(['Nombre del Usuario', 'Nombre de Usuario', 'Nombre Usuario', 'Usuario']).toString().trim();
         const fechaInst = fmtDate(findCol(['Fecha instalacion', 'Fecha instalación', 'Fecha Instalacion', 'Fecha Instalación', 'FechaInstalacion']));
         const fechaRetiro = fmtDate(findCol(['Fecha retiro', 'Fecha Retiro', 'FechaRetiro']));
-        const notas = findCol(['Transformador', 'Transf', 'Transformador']).toString().trim();
+        const notas = findCol(['Transformador', 'Transf']).toString().trim();
         const lat = findCol(['Latitud', 'Lat']).toString().trim();
         const lng = findCol(['Longitud', 'Lng', 'Long']).toString().trim();
+        const idUsuario = findCol(['Id del Usuario','ID del Usuario','ID Usuario','IdCliente','id_usuario']).toString().trim();
+        const direccion = findCol(['Direccion','Dirección','DIRECCION','Direccion 4','Dirección 4']).toString().trim();
+        const accesorios = findCol(['Accesorios','ACCESORIOS','Accesorio']).toString().trim();
+        const multiplicador = findCol(['Multiplicador','MULTIPLICADOR','Mult']).toString().trim();
+        const corrientes = findCol(['Corrientes','CORRIENTES','Corriente']).toString().trim();
+        const conexion = findCol(['Conexion','Conexión','CONEXION','Tipo conexion','Tipo conexión']).toString().trim();
 
         // Validate
         const eq = equipos.find(e => e.serie === serie);
@@ -932,7 +958,7 @@ function procesarExcel(file) {
         else if (!caso) { status = 'warning'; problema = 'Sin número SIGET'; }
         else if (!fechaRetiro) { status = 'warning'; problema = 'Sin fecha de retiro'; }
 
-        return { serie, caso, lugar, fechaInst, fechaRetiro, notas, lat, lng, status, problema, equipoId: eq?.id, modelo: eq?.modelo||'', vineta: eq?.vineta||'' };
+        return { serie, caso, lugar, fechaInst, fechaRetiro, notas, lat, lng, status, problema, equipoId: eq?.id, modelo: eq?.modelo||'', vineta: eq?.vineta||'', idUsuario, direccion, accesorios, multiplicador, corrientes, conexion };
       });
 
       cargaView = 'preview';
@@ -976,7 +1002,7 @@ function confirmarCargaMasiva() {
 
     // Register prestamo movement (avoid duplicate if already prestado today to same area)
     const existeMov = (eq.movimientos||[]).some(m => m.tipo==='prestamo' && m.a==='Campos y Servicios' && m.fecha===today() && m.nota && m.nota.includes(r.caso));
-    if (existeMov) { count--; return; }
+    if (existeMov) { return; } // skip duplicate, don't decrement
     const mov = { tipo: 'prestamo', de: cargaAreaOrigen, a: 'Campos y Servicios', fecha: today(), nota: 'Asignación carga masiva - Caso #' + r.caso };
     const movimientos = [...(eq.movimientos||[]), mov];
     update(ref(db, 'equipos/' + r.equipoId), { prestado: true, prestadoFecha: today(), sede: 'Subestación Cucumacayán', movimientos });
@@ -988,52 +1014,57 @@ function confirmarCargaMasiva() {
     fecha: today(),
     hora: new Date().toLocaleTimeString('es-SV', {hour:'2-digit', minute:'2-digit'}),
     areaOrigen: cargaAreaOrigen,
-    total: count,
+    total: validos.length,
     realizadoPor: sesionUsuario?.nombre || 'Desconocido',
-    equipos: validos.map(r => ({ serie: r.serie, modelo: r.modelo, vineta: r.vineta||'', caso: r.caso, lugar: r.lugar, fechaInst: r.fechaInst, fechaRetiro: r.fechaRetiro, notas: r.notas }))
+    equipos: validos.map(r => ({ s: r.serie, v: r.vineta||'', c: r.caso, l: r.lugar, fi: r.fechaInst, fr: r.fechaRetiro, n: r.notas||'', iu: r.idUsuario||'', d: r.direccion||'', ac: r.accesorios||'', m: r.multiplicador||'', co: r.corrientes||'', cx: r.conexion||'' }))
   };
-  if (count > 0) push(historialCargasRef, registroCarga);
+  // Always save to historial if there were valid rows to process
+  if (validos.length > 0) push(historialCargasRef, registroCarga);
 
   showToast('✅ ' + count + ' instalaciones registradas');
   generarMemoCargaMasiva(validos);
   cargaData = []; cargaView = 'upload';
-  instTab = 'campos';
+  tab = 'carga'; cargaSubView = 'historial'; // Show historial after confirmar
   render();
 }
 
 function generarMemoCargaMasiva(filas) {
+  const esMT = cargaAreaOrigen === 'CPT MT' || cargaAreaOrigen === 'CPT DELSUR';
   const fecha = new Date().toLocaleDateString('es-SV');
-  const rows = filas.map(r => `<tr>
-    <td style="padding:9px 12px;font-size:11px;color:#64748b;border-bottom:1px solid #e2e8f0;font-family:'Courier New',monospace">${r.vineta||'—'}</td>
-    <td style="padding:9px 12px;font-family:'Courier New',monospace;font-weight:700;font-size:12px;border-bottom:1px solid #e2e8f0">${r.serie}</td>
-    <td style="padding:9px 12px;font-size:12px;border-bottom:1px solid #e2e8f0">${r.caso}</td>
-    <td style="padding:9px 12px;font-size:12px;border-bottom:1px solid #e2e8f0">${r.lugar}</td>
-    <td style="padding:9px 12px;font-size:12px;border-bottom:1px solid #e2e8f0;text-align:center">${r.fechaInst}</td>
-    <td style="padding:9px 12px;font-size:12px;border-bottom:1px solid #e2e8f0;text-align:center">${r.fechaRetiro}</td>
-    <td style="padding:9px 12px;font-size:11px;color:#64748b;border-bottom:1px solid #e2e8f0">${r.notas}</td>
-  </tr>`).join('');
+  const td = (v, mono) => '<td style="padding:4px 6px;font-size:9px;border-bottom:1px solid #e2e8f0;'+(mono?'font-family:\'Courier New\',monospace;font-weight:700':'')+'">'+(v||'—')+'</td>';
+  const rows = filas.map(r => '<tr>'
+    +td(r.caso, true)
+    +td(r.serie, true)
+    +td(r.vineta||'—', true)
+    +td(r.idUsuario||'—', false)
+    +td(r.lugar, false)
+    +td(r.direccion||'—', false)
+    +(esMT ? td(r.multiplicador||'—',false)+td(r.corrientes||'—',false)+td(r.conexion||'—',false) : td(r.notas||'—',false))
+    +'<td style="padding:4px 6px;font-size:9px;border-bottom:1px solid #e2e8f0;text-align:center">'+(r.fechaInst||'—')+'</td>'
+    +td(r.accesorios||'—', false)
+    +'</tr>').join('');
 
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:Arial,sans-serif;color:#0a1628;padding:36px;font-size:13px}
-    .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;border-bottom:3px solid #0057b8;padding-bottom:18px}
-    .logo-box{width:52px;height:52px;background:linear-gradient(135deg,#003d8f,#0077cc);border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-    .company-name{font-size:20px;font-weight:800;color:#0057b8}
+    body{font-family:Arial,sans-serif;color:#0a1628;padding:16px;font-size:10px}
+    .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;border-bottom:2px solid #0057b8;padding-bottom:8px}
+    .logo-box{width:36px;height:36px;background:linear-gradient(135deg,#003d8f,#0077cc);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .company-name{font-size:14px;font-weight:800;color:#0057b8}
     .company-sub{font-size:10px;color:#94a3b8;margin-top:2px}
-    .memo-type{font-size:22px;font-weight:800;color:#0057b8;text-align:right}
+    .memo-type{font-size:14px;font-weight:800;color:#0057b8;text-align:right}
     .memo-label{font-size:10px;color:#94a3b8;letter-spacing:2px;text-transform:uppercase;text-align:right}
-    .section-title{font-size:10px;font-weight:700;color:#0057b8;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #e8f0fb}
-    table{width:100%;border-collapse:collapse;margin-bottom:24px}
+    .section-title{font-size:9px;font-weight:700;color:#0057b8;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #e8f0fb}
+    table{width:100%;border-collapse:collapse;margin-bottom:12px}
     thead{background:#0057b8}
-    thead th{padding:10px 12px;text-align:left;font-size:10px;font-weight:700;color:#fff;letter-spacing:1px;text-transform:uppercase}
+    thead th{padding:5px 6px;text-align:left;font-size:8px;font-weight:700;color:#fff;letter-spacing:.5px;text-transform:uppercase}
     .badge{display:inline-block;background:#e8f0fb;color:#0057b8;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700}
     .firma-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:8px}
-    .firma-line{border-top:1.5px solid #0a1628;margin-top:56px;padding-top:8px;text-align:center}
+    .firma-line{border-top:1.5px solid #0a1628;margin-top:28px;padding-top:6px;text-align:center}
     .firma-label{font-size:10px;color:#64748b}
     .firma-name{font-size:13px;font-weight:700;margin-top:2px}
-    .footer{margin-top:32px;padding-top:12px;border-top:1px solid #e2e8f0;text-align:center;font-size:10px;color:#94a3b8}
-  </style></head><body>
+    .footer{margin-top:10px;padding-top:6px;border-top:1px solid #e2e8f0;text-align:center;font-size:8px;color:#94a3b8}
+  @media print{body{padding:8px}@page{margin:8mm 6mm}}<\/style><\/head><body>
   <div class="header">
     <div style="display:flex;align-items:center;gap:12px">
       <div class="logo-box">
@@ -1058,10 +1089,15 @@ function generarMemoCargaMasiva(filas) {
     <div class="section-title">Equipos asignados <span class="badge">${filas.length} equipos</span></div>
     <table>
       <thead><tr>
-        <th>Viñeta</th><th>Serie</th><th>N° SIGET</th><th>Usuario / Lugar</th>
+        <th>N° SIGET</th>
+        <th>Equipo</th>
+        <th>Viñeta</th>
+        <th>ID Usuario</th>
+        <th>Nombre del Usuario</th>
+        <th>Dirección</th>
+        ${esMT ? '<th>Multiplicador</th><th>Corrientes</th><th>Conexión</th>' : '<th>Transformador</th>'}
         <th style="text-align:center">F. Instalación</th>
-        <th style="text-align:center">F. Retiro</th>
-        <th>Transformador</th>
+        <th>Accesorios</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
@@ -1084,17 +1120,6 @@ function generarMemoCargaMasiva(filas) {
   win.document.write(html);
   win.document.close();
   setTimeout(() => win.print(), 500);
-  // Enviar por correo
-  const asunto = encodeURIComponent('Memorándum de Asignación de Equipos - ' + cargaAreaOrigen + ' - ' + new Date().toLocaleDateString('es-SV'));
-  const colW = [16,12,10,35];
-  const pad = (s,w) => (s||'').substring(0,w).padEnd(w);
-  const sep = '-'.repeat(colW[0]+colW[1]+colW[2]+35);
-  const encabezado = 'Para: Campos y Servicios\nAsunto: Asignación de '+filas.length+' analizadores de redes ECAMEC\nFecha: '+new Date().toLocaleDateString('es-SV')+'\n\nMediante la presente se notifica asignación de '+filas.length+' analizadores de redes ECAMEC, los cuales serán usados para las siguientes mediciones.\n\n'+pad('N° SIGET',colW[0])+pad('Serie',colW[1])+pad('Viñeta',colW[2])+'Usuario\n'+sep+'\n'+filas.map(r=>pad(r.caso||'',colW[0])+pad(r.serie||'',colW[1])+pad(r.vineta||'',colW[2])+(r.lugar||'')).join('\n')+'\n\nDocumento generado por CPT INNOVA - Sistema de Gestión de Analizadores de Red';
-  setTimeout(() => {
-    if (confirm('¿Deseas enviar este memo por correo?')) {
-      window.location.href = 'mailto:?subject=' + asunto + '&body=' + encodeURIComponent(encabezado);
-    }
-  }, 1000);
 }
 
 function procesarExcelInventario(file) {
@@ -1163,6 +1188,7 @@ function doLogin() {
   }
   sesionUsuario = { nombre: user.nombre };
   loginForm = { nombre: '', pin: '', error: '' };
+  instTab = user.area === 'CPT BT' ? 'cpt_bt' : 'cpt_mt';
   try { localStorage.setItem('cpt_session', JSON.stringify(sesionUsuario)); } catch(e) {}
   render();
 }
@@ -1232,6 +1258,12 @@ function accentColor(st) { return st === 'ACTIVO' ? 'var(--green)' : st === 'PRO
 function render() {
   const el = document.getElementById('app');
   if (!el) return;
+
+  // Auto-show alerta if not dismissed and has upcoming retiros
+  if (sesionUsuario && !alertaDismissed && !showAlertaRetiros) {
+    const ua = userArea(); const proximos = records.filter(r => !r.retirado && daysUntil(r.fechaRetiro) <= 3 && daysUntil(r.fechaRetiro) >= 0 && (r.areaInstalacion||'CPT MT') === ua);
+    if (proximos.length > 0) { showAlertaRetiros = true; alertaDismissed = true; }
+  }
 
   // ── LOGIN SCREEN ──
   if (!sesionUsuario) {
@@ -1355,6 +1387,28 @@ function render() {
         </div>
 
         <div style="margin-bottom:12px">
+          ${(()=>{
+            const recR = records.find(x => x.id === retiroId);
+            if (!recR || (recR.areaInstalacion||'CPT MT') === 'Campos y Servicios') return '';
+            let eHtml = '<div style="margin-bottom:16px"><div style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:8px">LECTURAS DE ENERGÍA (RETIRO)</div>';
+            eHtml += '<div style="display:flex;gap:6px;margin-bottom:10px">';
+            ['ninguna','una','tres'].forEach(t => {
+              const sel = retiroForm.energiaTipo === t;
+              const lbl = t==='ninguna'?'Sin lectura':t==='una'?'Una lectura':'P / R / V';
+              eHtml += '<div onclick="setRetiroEnergia(\''+t+'\')" style="flex:1;padding:8px 4px;border-radius:8px;border:2px solid '+(sel?'#3b6cf4':'#e5e7eb')+';background:'+(sel?'#eef2ff':'#fff')+';text-align:center;cursor:pointer;font-size:11px;font-weight:700;color:'+(sel?'#3b6cf4':'#6b7280')+'">'+lbl+'</div>';
+            });
+            eHtml += '</div>';
+            if (retiroForm.energiaTipo==='una') eHtml += '<input type="number" placeholder="Energía (kWh)" value="'+retiroForm.energiaUna+'" oninput="setRetiroEnergiaVal(\'una\',this.value)" style="width:100%;padding:10px;border:1.5px solid #e5e7eb;border-radius:8px;font-family:var(--font);font-size:14px;margin-bottom:8px;box-sizing:border-box">';
+            if (retiroForm.energiaTipo==='tres') {
+              eHtml += '<div style="display:flex;gap:8px;margin-bottom:8px">';
+              [['Punta','punta'],['Resto','resto'],['Valle','valle']].forEach(([l,k]) => {
+                eHtml += '<div style="flex:1"><div style="font-size:10px;font-weight:600;color:#6b7280;margin-bottom:4px">'+l.toUpperCase()+'</div><input type="number" placeholder="kWh" value="'+(retiroForm['energia'+l]||'')+'" oninput="setRetiroEnergiaVal(\''+k+'\',this.value)" style="width:100%;padding:8px;border:1.5px solid #e5e7eb;border-radius:8px;font-family:var(--font);font-size:13px;box-sizing:border-box"></div>';
+              });
+              eHtml += '</div>';
+            }
+            eHtml += '</div>';
+            return eHtml;
+          })()}
           <div style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:6px">¿A QUÉ SEDE REGRESA EL EQUIPO?</div>
           <div style="display:flex;gap:8px">
             ${SEDES.map(s => `<button onclick="setRetiroSede('${s}')" style="flex:1;padding:10px 8px;border-radius:10px;border:2px solid ${retiroForm.sede===s?'#3b6cf4':'#e5e7eb'};background:${retiroForm.sede===s?'#eef2ff':'#fff'};color:${retiroForm.sede===s?'#3b6cf4':'#6b7280'};font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer">${s}</button>`).join('')}
@@ -1542,6 +1596,22 @@ function render() {
               <span class="stat-label">${s==='TODOS'?'Total':s==='ACTIVO'?'Activos':s==='PROXIMO'?'Próximos':'Retirados'}</span>
             </div>`).join('')}
         </div>
+        <div style="background:linear-gradient(135deg,var(--primary-dark),var(--primary));border-radius:14px;padding:14px 16px;margin-bottom:12px;color:#fff">
+          <div style="font-size:11px;color:rgba(255,255,255,.7);margin-bottom:6px;font-weight:600">📅 ${new Date().toLocaleDateString("es-SV",{weekday:"long",day:"numeric",month:"long"}).replace(/^./,c=>c.toUpperCase())}</div>
+          ${(()=>{
+            const ua = userArea();
+            const miArea = records.filter(r => (r.areaInstalacion||'CPT MT') === ua);
+            const nActivos = miArea.filter(r=>calcSt(r)==='ACTIVO').length;
+            const nHoy = miArea.filter(r=>!r.retirado&&r.fechaRetiro===today()).length;
+            const nSemana = miArea.filter(r=>!r.retirado&&daysUntil(r.fechaRetiro)<=7&&daysUntil(r.fechaRetiro)>0).length;
+            return '<div style="display:flex;gap:16px">'
+              +'<div><div style="font-size:22px;font-weight:800">'+nActivos+'</div><div style="font-size:10px;color:rgba(255,255,255,.7)">Activos '+ua+'</div></div>'
+              +(nHoy>0?'<div><div style="font-size:22px;font-weight:800;color:#ffd700">'+nHoy+'</div><div style="font-size:10px;color:rgba(255,255,255,.7)">Vencen hoy</div></div>':'')
+              +(nSemana>0?'<div><div style="font-size:22px;font-weight:800;color:#7dd3fc">'+nSemana+'</div><div style="font-size:10px;color:rgba(255,255,255,.7)">Esta semana</div></div>':'')
+              +'</div>'
+              +(nHoy>0?'<div style="margin-top:8px;font-size:11px;color:#ffd700;font-weight:600">⚠️ Hay retiros de '+ua+' programados para hoy</div>':'');
+          })()}
+        </div>
         <div class="search-wrap"><span class="search-icon">🔍</span>
           <input class="search-input" placeholder="Buscar serie, caso, lugar..." value="${search}" oninput="setSearch(this.value)" ${search?'data-active="true"':''}>
         </div>`;
@@ -1560,22 +1630,24 @@ function render() {
           const dc = dias === null ? '' : dias <= 0 ? 'color:var(--red)' : dias <= 3 ? 'color:var(--yellow)' : 'color:var(--text3)';
           const dt = diasInst !== null ? `en ${diasInst}d` : dias === null ? '' : dias === 0 ? 'Hoy' : dias < 0 ? `${Math.abs(dias)}d vencido` : `en ${dias}d`;
           const stripe = stCard==='ACTIVO'?'':stCard==='PROXIMO'?' yellow':stCard==='PROGRAMADO'?' purple':' gray';
-          html += `<div class="card" onclick="openDetail('${r.id}')">
-            <div class="card-stripe${stripe}"></div>
-            <div class="card-inner">
-              <div class="card-body">
-                <div class="card-top"><div class="card-serie">${r.serie||'—'}</div>${badgeSt(stCard)}</div>
-                <div class="card-sub">${r.modelo ? r.modelo+' · ' : ''}#${r.caso}</div>
-                <div class="card-lugar">📍 ${r.lugar||'Sin ubicación'}</div>
-              <div style="font-size:10px;color:var(--text3);font-weight:600;margin-bottom:4px">${r.areaInstalacion||'CPT MT'}</div>
-                <div class="card-footer">
-                  <span class="card-date">Retiro: ${fmtDate(r.fechaRetiro)}</span>
-                  <span class="days-tag" style="${dc}">${dt}</span>
-                </div>
-              </div>
+          html += `<div onclick="openDetail('${r.id}')" style="background:var(--white);border:1px solid var(--border);border-left:3px solid ${stCard==='ACTIVO'?'var(--green)':stCard==='PROXIMO'?'var(--yellow)':stCard==='PROGRAMADO'?'#7c3aed':'var(--border2)'};border-radius:12px;padding:10px 14px;cursor:pointer;box-shadow:var(--shadow);margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+              <div style="font-family:var(--mono);font-size:14px;font-weight:800;color:var(--text)">${r.serie||'—'}</div>
+              ${badgeSt(stCard)}
+            </div>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:4px">#${r.caso}${r.modelo?' · '+r.modelo:''}</div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div style="font-size:12px;color:var(--text2)">📍 ${r.lugar||'Sin ubicación'}</div>
+              <span style="font-size:10px;color:var(--text3)">${r.areaInstalacion||'CPT MT'}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px;padding-top:5px;border-top:1px solid var(--border2)">
+              <span style="font-size:11px;color:var(--text3)">↩ ${fmtDate(r.fechaRetiro)}</span>
+              <span style="font-size:11px;font-weight:700;${dc}">${dt}</span>
             </div>
           </div>`;
         });
+        // Legend
+        
         html += `</div>`;
       }
       html += `</div>`;
@@ -1652,6 +1724,25 @@ function render() {
           <div class="form-section-title">Notas</div>
           <div class="field"><textarea placeholder="Observaciones, acceso al sitio, contacto..." oninput="setField('notas',this.value)">${form.notas}</textarea></div>
         </div>
+        ${form.areaInstalacion !== 'Campos y Servicios' ? (() => {
+          let eHtml = '<div class="form-section"><div class="form-section-title">Lecturas de energía (instalación)</div>';
+          eHtml += '<div style="display:flex;gap:6px;margin-bottom:10px">';
+          [['ninguna','Sin lectura'],['una','Una lectura'],['tres','P / R / V']].forEach(([t,l]) => {
+            const sel = form.energiaTipoInst === t;
+            eHtml += '<div onclick="setField(\'energiaTipoInst\',\''+t+'\')" style="flex:1;padding:8px 4px;border-radius:8px;border:2px solid '+(sel?'var(--primary)':'var(--border)')+';background:'+(sel?'var(--primary-light)':'#fff')+';text-align:center;cursor:pointer;font-size:11px;font-weight:700;color:'+(sel?'var(--primary)':'var(--text3)')+'">'+l+'</div>';
+          });
+          eHtml += '</div>';
+          if (form.energiaTipoInst==='una') eHtml += '<div class="field"><input type="number" placeholder="Energía (kWh)" value="'+form.energiaInstUna+'" oninput="setField(\'energiaInstUna\',this.value)"></div>';
+          if (form.energiaTipoInst==='tres') {
+            eHtml += '<div style="display:flex;gap:8px">';
+            [['Punta','energiaInstPunta'],['Resto','energiaInstResto'],['Valle','energiaInstValle']].forEach(([l,k]) => {
+              eHtml += '<div style="flex:1"><div style="font-size:10px;font-weight:600;color:var(--text3);margin-bottom:4px">'+l.toUpperCase()+'</div><input type="number" placeholder="kWh" value="'+(form[k]||'')+'" oninput="setField(\''+k+'\',this.value)" style="width:100%;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:13px;box-sizing:border-box"></div>';
+            });
+            eHtml += '</div>';
+          }
+          eHtml += '</div>';
+          return eHtml;
+        })() : ''}
         <button class="btn btn-primary" onclick="saveInstall()">${editId ? 'Guardar cambios' : 'Registrar instalación'}</button>
       </div>`;
     }
@@ -1680,6 +1771,8 @@ function render() {
           <div class="detail-row"><div class="detail-label">Retiro programado</div><div class="detail-value">${fmtDate(r.fechaRetiro)}${dias!==null?` <span style="font-size:12px;color:${dias<=0?'var(--red)':dias<=3?'var(--yellow)':'var(--text3)'}">(${dias===0?'hoy':dias>0?`en ${dias}d`:`${Math.abs(dias)}d vencido`})</span>`:''}</div></div>
           ${r.fechaRetiroReal ? `<div class="detail-row"><div class="detail-label">Retirado el</div><div class="detail-value">${fmtDate(r.fechaRetiroReal)}</div></div>` : ''}
           ${r.notas ? `<div class="detail-row"><div class="detail-label">Notas</div><div class="detail-value">${r.notas}</div></div>` : ''}
+          ${r.energiaInstalacion && r.energiaInstalacion.tipo !== 'ninguna' ? `<div class="detail-row"><div class="detail-label">Energía instalación</div><div class="detail-value" style="font-family:var(--mono)">${r.energiaInstalacion.tipo==='una' ? r.energiaInstalacion.una+' kWh' : 'P:'+r.energiaInstalacion.punta+' R:'+r.energiaInstalacion.resto+' V:'+r.energiaInstalacion.valle+' kWh'}</div></div>` : ''}
+          ${r.energiaRetiro && r.energiaRetiro.tipo !== 'ninguna' ? `<div class="detail-row"><div class="detail-label">Energía retiro</div><div class="detail-value" style="font-family:var(--mono)">${r.energiaRetiro.tipo==='una' ? r.energiaRetiro.una+' kWh' : 'P:'+r.energiaRetiro.punta+' R:'+r.energiaRetiro.resto+' V:'+r.energiaRetiro.valle+' kWh'}</div></div>` : ''}
           ${r.creadoPor ? `<div class="detail-row"><div class="detail-label">Registrado por</div><div class="detail-value" style="color:var(--text3);font-size:13px">${r.creadoPor}</div></div>` : ''}
           ${r.editadoPor ? `<div class="detail-row"><div class="detail-label">Editado por</div><div class="detail-value" style="color:var(--text3);font-size:13px">${r.editadoPor} · ${fmtDate(r.fechaEdicion)}</div></div>` : ''}
         </div>
@@ -1770,7 +1863,7 @@ function render() {
             if (grupo.items.length === 0) return;
             html += '<div style="margin-bottom:16px">';
             html += '<div style="font-size:11px;font-weight:700;color:'+grupo.color+';letter-spacing:.5px;margin-bottom:8px;padding:6px 10px;background:'+grupo.color+'18;border-radius:8px;border-left:3px solid '+grupo.color+'">' + grupo.label + ' <span style="font-weight:400;color:var(--text3)">(' + grupo.items.length + ')</span></div>';
-            html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+            if (vistaInventario === 'grid') html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
             grupo.items.forEach(eq => {
               const isPrestado = eqPrestado(eq);
               const isEnCampo = eqEnCampo(eq);
@@ -1834,8 +1927,8 @@ function render() {
               if (vistaInventario === 'grid') html += '</div>';
               } // end else grid
             });
-            if (vistaInventario === 'grid') html += '</div>';
-            html += '</div>';
+            if (vistaInventario === 'grid') html += '<\/div>';
+            html += '<\/div>';
           });
         }
       }
@@ -1918,10 +2011,12 @@ function render() {
         ${eq.historialCondicion && eq.historialCondicion.length > 0 ? `
           <div class="section-title" style="margin-top:4px">Historial de condición</div>
           <div class="list" style="margin-bottom:16px">
-            ${eq.historialCondicion.slice().reverse().map(h => {
+            ${eq.historialCondicion.slice().reverse().map((h, hIdx) => {
               const cOld = CONDICIONES.find(c => c.key === h.condicionAnterior);
               const cNew = CONDICIONES.find(c => c.key === h.condicionNueva);
-              return '<div class="historial-card"><div class="historial-row"><div><div class="historial-lugar">'+(cOld?cOld.icon+' '+cOld.label:'—')+' → '+(cNew?cNew.icon+' '+cNew.label:'—')+'</div>'+(h.nota?'<div class="historial-caso">'+h.nota+'</div>':'')+(h.registradoPor?'<div style="font-size:10px;color:var(--text3);margin-top:2px">👤 '+h.registradoPor+'</div>':'')+'</div><div class="historial-fecha">'+fmtDate(h.fecha)+'</div></div></div>';
+              const realIdx = historialCondicion.length - 1 - hIdx;
+              const delBtn = isAdmin() ? '<button onclick="eliminarCondicion(\''+eq.id+'\','+realIdx+')" style="background:none;border:none;font-size:11px;color:var(--red);cursor:pointer;padding:2px 4px;margin-top:4px;font-family:var(--font)">🗑 Eliminar</button>' : '';
+              return '<div class="historial-card"><div class="historial-row"><div><div class="historial-lugar">'+(cOld?cOld.icon+' '+cOld.label:'—')+' → '+(cNew?cNew.icon+' '+cNew.label:'—')+'</div>'+(h.nota?'<div class="historial-caso">'+h.nota+'</div>':'')+(h.registradoPor?'<div style="font-size:10px;color:var(--text3);margin-top:2px">👤 '+h.registradoPor+'</div>':'')+'</div><div class="historial-fecha">'+fmtDate(h.fecha)+'</div></div>'+delBtn+'</div>';
             }).join('')}
           </div>` : ''}
         ${eq.movimientos && eq.movimientos.length > 0 ? `
@@ -1989,9 +2084,11 @@ function render() {
 
   // MAP TAB
   else if (tab === 'mapa') {
+    const areaColor = a => a === 'CPT BT' ? '#16a34a' : a === 'Campos y Servicios' ? '#ea580c' : '#0057b8';
     const visibles = records.filter(r => {
       const st = calcSt(r);
-      return (st === 'ACTIVO' || st === 'PROXIMO') && r.lat && r.lng;
+      const areaOk = mapaFiltro === 'TODOS' || (r.areaInstalacion||'CPT MT') === mapaFiltro;
+      return (st === 'ACTIVO' || st === 'PROXIMO') && r.lat && r.lng && areaOk;
     });
     const sinGPS = records.filter(r => {
       const st = calcSt(r);
@@ -2003,14 +2100,16 @@ function render() {
     // Build iframe HTML with embedded Leaflet map
     const markers = visibles.map(r => {
       const st = calcSt(r);
-      const color = st === 'ACTIVO' ? '%230057b8' : '%23d97706';
-      const label = st === 'ACTIVO' ? 'Activo' : 'Retiro próximo';
+      const area = r.areaInstalacion || 'CPT MT';
+      const color = areaColor(area);
+      const proximo = st === 'PROXIMO';
+      const label = proximo ? 'Retiro próximo' : 'Activo';
       const dias = daysUntil(r.fechaRetiro);
       const diasTxt = dias === 0 ? 'HOY' : dias > 0 ? 'en ' + dias + 'd' : Math.abs(dias) + 'd vencido';
-      return JSON.stringify({lat: parseFloat(r.lat), lng: parseFloat(r.lng), serie: r.serie, modelo: r.modelo||'', caso: r.caso, lugar: r.lugar||'', label, color: st==='ACTIVO'?'#0057b8':'#d97706', dias: diasTxt});
+      return JSON.stringify({lat: parseFloat(r.lat), lng: parseFloat(r.lng), serie: r.serie, modelo: r.modelo||'', caso: r.caso, lugar: r.lugar||'', label, color, proximo, dias: diasTxt, area});
     });
 
-    const mapHtml = `<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'/><script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'><\/script><style>*{margin:0;padding:0}body,html,#map{width:100%;height:100%}.leaflet-popup-content{font-family:sans-serif;min-width:140px}.ps{font-weight:800;font-size:14px;color:#0a1628}.pm{font-size:12px;color:#64748b;margin-top:2px}.pb{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;margin-top:5px}<\/style><\/head><body><div id='map'><\/div><script>var markers=${JSON.stringify(markers)};var map=L.map('map');L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:''}).addTo(map);var bounds=[];markers.forEach(function(m){var d=JSON.parse(m);var icon=L.divIcon({className:'',html:'<div style="width:16px;height:16px;border-radius:50%;background:'+d.color+';border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.4)"><\/div>',iconSize:[16,16],iconAnchor:[8,8]});var popup='<div class=ps>'+d.serie+'<\/div><div class=pm>'+d.modelo+'<\/div><div class=pm>📍 '+d.lugar+'<\/div><div class=pm>#'+d.caso+'<\/div><span class=pb style="background:'+(d.color=='#0057b8'?'#e8f0fb':'#fffbeb')+';color:'+d.color+'">'+d.label+'<\/span><br><a href="https://maps.google.com/?q='+d.lat+','+d.lng+'" target=_blank style="font-size:11px;color:#0057b8;margin-top:4px;display:inline-block">Ver en Google Maps →<\/a>';L.marker([d.lat,d.lng],{icon:icon}).bindPopup(popup).addTo(map);bounds.push([d.lat,d.lng]);});if(bounds.length>0){if(bounds.length===1){map.setView(bounds[0],14);}else{map.fitBounds(bounds,{padding:[20,20]});}}else{map.setView([13.7942,-88.8965],8);}<\/script><\/body><\/html>`;
+    const mapHtml = `<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'/>\x3cscript src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'><\/script><style>*{margin:0;padding:0}body,html,#map{width:100%;height:100%}.leaflet-popup-content{font-family:sans-serif;min-width:140px}.ps{font-weight:800;font-size:14px;color:#0a1628}.pm{font-size:12px;color:#64748b;margin-top:2px}.pb{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;margin-top:5px}<\/style><\/head><body><div id='map'><\/div>\x3cscript>var markers=${JSON.stringify(markers)};var map=L.map('map');L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:''}).addTo(map);var bounds=[];markers.forEach(function(m){var d=JSON.parse(m);var border=d.proximo?'3px solid #ef4444':'3px solid white';var dot=d.proximo?'<div style="position:absolute;top:-4px;right:-4px;width:7px;height:7px;border-radius:50%;background:#ef4444;border:1px solid white"><\/div>':'';var icon=L.divIcon({className:'',html:'<div style="position:relative;width:16px;height:16px;border-radius:50%;background:'+d.color+';border:'+border+';box-shadow:0 2px 8px rgba(0,0,0,.4)">'+(d.proximo?'<div style="position:absolute;top:-5px;right:-5px;width:8px;height:8px;border-radius:50%;background:#ef4444;border:1px solid white"><\/div>':'')+'<\/div>',iconSize:[16,16],iconAnchor:[8,8]});var popup='<div class=ps>'+d.serie+'<\/div><div class=pm>'+d.modelo+'<\/div><div class=pm>📍 '+d.lugar+'<\/div><div class=pm>#'+d.caso+' · '+(d.area||'CPT MT')+'<\/div><span class=pb style="background:'+(d.color=='#0057b8'?'#e8f0fb':'#fffbeb')+';color:'+d.color+'">'+d.label+'<\/span><br><a href="https://maps.google.com/?q='+d.lat+','+d.lng+'" target=_blank style="font-size:11px;color:#0057b8;margin-top:4px;display:inline-block">Ver en Google Maps →<\/a>';L.marker([d.lat,d.lng],{icon:icon}).bindPopup(popup).addTo(map);bounds.push([d.lat,d.lng]);});if(bounds.length>0){if(bounds.length===1){map.setView(bounds[0],14);}else{map.fitBounds(bounds,{padding:[20,20]});}}else{map.setView([13.7942,-88.8965],8);}<\/script><\/body><\/html>`;
 
     const encodedHtml = 'data:text/html;charset=utf-8,' + encodeURIComponent(mapHtml);
 
@@ -2023,6 +2122,14 @@ function render() {
     html += '<div class="stat-chip"><span class="stat-num" style="color:var(--yellow)">' + countProximo + '</span><span class="stat-label">Próximos</span></div>';
     html += '</div>';
 
+    // Filter chips
+    html += '<div style="display:flex;gap:6px;padding:0 16px 10px;overflow-x:auto;flex-shrink:0">';
+    [{key:'TODOS',label:'Todos',color:'var(--primary)'},{key:'CPT MT',label:'⚡ CPT MT',color:'#0057b8'},{key:'CPT BT',label:'⚡ CPT BT',color:'#16a34a'},{key:'Campos y Servicios',label:'🏗 Campos',color:'#ea580c'}].forEach(function(f){
+      var active = mapaFiltro === f.key;
+      html += '<div onclick="setMapaFiltro(\'' + f.key + '\')" style="flex-shrink:0;padding:5px 12px;border-radius:20px;border:2px solid '+(active?f.color:'var(--border)')+';background:'+(active?f.color:'#fff')+';color:'+(active?'#fff':'var(--text3)')+';font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">'+f.label+'</div>';
+    });
+    html += '</div>';
+
     if (visibles.length === 0) {
       html += '<div class="empty"><div class="empty-icon">🗺️</div><div class="empty-text">Sin instalaciones activas con GPS</div></div>';
     } else {
@@ -2033,13 +2140,42 @@ function render() {
       html += '<div style="padding:8px 16px;background:var(--yellow-light);font-size:12px;color:var(--yellow);font-weight:600;flex-shrink:0">⚠ ' + sinGPS.length + ' instalación' + (sinGPS.length > 1 ? 'es' : '') + ' sin GPS</div>';
     }
 
+    // Legend
+    html += '<div style="display:flex;gap:10px;padding:8px 16px;background:#fff;border-top:1px solid var(--border);flex-shrink:0;flex-wrap:wrap">';
+    html += '<span style="font-size:10px;color:var(--text3);display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:#0057b8;display:inline-block"></span>CPT MT</span>';
+    html += '<span style="font-size:10px;color:var(--text3);display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:#16a34a;display:inline-block"></span>CPT BT</span>';
+    html += '<span style="font-size:10px;color:var(--text3);display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:#ea580c;display:inline-block"></span>Campos y Serv.</span>';
+    html += '<span style="font-size:10px;color:var(--text3);display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid #ef4444;display:inline-block"></span>Retiro próximo</span>';
+    html += '</div>';
     html += '</div>';
   }
 
   // ── CARGA MASIVA TAB ──
   else if (tab === 'carga') {
     html += '<div class="content">';
-    html += '<div class="page-title">📥 Carga masiva</div>';
+    // Toggle between subir and historial
+    html += '<div style="display:flex;gap:8px;margin-bottom:16px">';
+    html += '<button onclick="setCargaSubView(\'subir\')" style="flex:1;padding:10px;border-radius:10px;border:2px solid '+(cargaSubView==='subir'?'var(--primary)':'var(--border)')+';background:'+(cargaSubView==='subir'?'var(--primary-light)':'#fff')+';color:'+(cargaSubView==='subir'?'var(--primary)':'var(--text3)')+';font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer">📥 Subir archivo</button>';
+    html += '<button onclick="setCargaSubView(\'historial\')" style="flex:1;padding:10px;border-radius:10px;border:2px solid '+(cargaSubView==='historial'?'var(--primary)':'var(--border)')+';background:'+(cargaSubView==='historial'?'var(--primary-light)':'#fff')+';color:'+(cargaSubView==='historial'?'var(--primary)':'var(--text3)')+';font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer">📋 Historial '+(historialCargas.length>0?'('+historialCargas.length+')':'')+'</button>';
+    html += '</div>';
+
+    if (cargaSubView === 'historial') {
+      if (historialCargas.length === 0) {
+        html += '<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Sin registros aún</div></div>';
+      } else {
+        historialCargas.forEach((c, i) => {
+          html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px">';
+          html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+          html += '<div style="font-size:13px;font-weight:700;color:var(--text)">' + fmtDate(c.fecha) + ' · ' + (c.hora||'') + '</div>';
+          html += '<span style="background:var(--primary-light);color:var(--primary);font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px">' + c.total + ' eq.</span>';
+          html += '</div>';
+          html += '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">' + (c.areaOrigen||'CPT BT') + ' → Campos y Serv.' + (c.realizadoPor ? ' · 👤 ' + c.realizadoPor : '') + '</div>';
+          html += "<button onclick=\"regenerarMemo('"+c.id+"')\" style=\"width:100%;padding:9px;border:1px solid var(--primary);border-radius:8px;background:var(--primary-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer\">📄 Regenerar memo</button>";
+          html += '</div>';
+        });
+      }
+    } else {
+    html += '<div class="page-title">📤 Despachos a C&S</div>';
     html += '<div style="font-size:13px;color:var(--text3);margin-bottom:20px">Importa instalaciones para <strong style="color:var(--primary)">Campos y Servicios</strong> desde un archivo Excel.</div>';
 
     if (cargaView === 'upload') {
@@ -2122,8 +2258,42 @@ function render() {
     }
 
     html += '</div>';
-    html += '<div style="height:20px"></div>';
+
+        html += '<div style="height:20px"></div>';
+    html += '</div>'; // close upload view else
+    } // close carga subview if/else
+    html += '</div>'; // close content
+  }
+
+  // ALERTA RETIROS MODAL
+  if (showAlertaRetiros) {
+    const ua = userArea(); const proximos = records.filter(r => !r.retirado && daysUntil(r.fechaRetiro) <= 3 && daysUntil(r.fechaRetiro) >= 0 && (r.areaInstalacion||'CPT MT') === ua)
+      .sort((a,b) => daysUntil(a.fechaRetiro) - daysUntil(b.fechaRetiro));
+    html += '<div style="position:fixed;inset:0;background:#00000088;z-index:300;display:flex;align-items:center;justify-content:center;padding:24px">';
+    html += '<div style="background:#fff;border-radius:20px;width:100%;max-width:380px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">';
+    html += '<div style="background:linear-gradient(135deg,#ff6b35,#f7c948);padding:20px 20px 16px">';
+    html += '<div style="font-size:22px;margin-bottom:4px">🔔</div>';
+    html += '<div style="font-size:17px;font-weight:800;color:#fff">Retiros próximos</div>';
+    html += '<div style="font-size:12px;color:rgba(255,255,255,.8);margin-top:2px">' + proximos.length + ' instalacion' + (proximos.length>1?'es':'') + ' requieren atención</div>';
     html += '</div>';
+    html += '<div style="padding:16px;max-height:280px;overflow-y:auto">';
+    proximos.forEach(r => {
+      const d = daysUntil(r.fechaRetiro);
+      const color = d === 0 ? 'var(--red)' : d === 1 ? 'var(--yellow)' : 'var(--text2)';
+      const label = d === 0 ? '⚠️ Hoy' : d === 1 ? '⚠️ Mañana' : 'en ' + d + 'd';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border2)">';
+      html += '<div>';
+      html += '<div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--text)">' + (r.serie||'—') + '</div>';
+      html += '<div style="font-size:11px;color:var(--text3)">' + (r.lugar||'Sin ubicación') + ' · ' + (r.areaInstalacion||'CPT MT') + '</div>';
+      html += '</div>';
+      html += '<span style="font-size:12px;font-weight:700;color:' + color + ';flex-shrink:0;margin-left:8px">' + label + '</span>';
+      html += '</div>';
+    });
+    html += '</div>';
+    html += '<div style="padding:16px;display:flex;gap:8px">';
+    html += '<button onclick="cerrarAlerta()" style="flex:1;padding:12px;border:1px solid var(--border);border-radius:10px;background:#fff;font-family:var(--font);font-size:14px;font-weight:600;color:var(--text2);cursor:pointer">Cerrar</button>';
+    html += '<button onclick="verRetiros()" style="flex:1;padding:12px;border:none;border-radius:10px;background:var(--primary);font-family:var(--font);font-size:14px;font-weight:700;color:#fff;cursor:pointer">Ver retiros</button>';
+    html += '</div></div></div>';
   }
 
   // BOTTOM NAV
@@ -2138,7 +2308,7 @@ function render() {
       <span class="nav-icon">📦</span><span class="nav-label">Inventario</span>
     </button>
     <button class="nav-btn ${tab==='carga'?'active':''}" onclick="switchTab('carga')">
-      <span class="nav-icon">📥</span><span class="nav-label">Carga</span>
+      <span class="nav-icon">📥</span><span class="nav-label">Despachos</span>
     </button>
   </nav>`;
 
@@ -2165,14 +2335,18 @@ window.setInstTab = t => { instTab = t; filterStatus = 'TODOS'; render(); };
 window.handleFileUpload = e => { const f = e.target.files[0]; if (f) procesarExcel(f); };
 window.confirmarCarga = confirmarCargaMasiva;
 window.cancelarCarga = () => { cargaData = []; cargaView = 'upload'; render(); };
+window.setCargaSubView = v => { cargaSubView = v; render(); };
 window.regenerarMemo = id => {
   const c = historialCargas.find(x => x.id === id);
   if (!c) return showToast('No se encontró el registro');
   // Rebuild filas format expected by generarMemoCargaMasiva
   const filas = (c.equipos||[]).map(e => ({
-    serie: e.serie, modelo: e.modelo, vineta: e.vineta||'',
-    caso: e.caso, lugar: e.lugar,
-    fechaInst: e.fechaInst, fechaRetiro: e.fechaRetiro, notas: e.notas
+    serie: e.s||e.serie||'', modelo: e.modelo||'', vineta: e.v||e.vineta||'',
+    caso: e.c||e.caso||'', lugar: e.l||e.lugar||'',
+    fechaInst: e.fi||e.fechaInst||'', fechaRetiro: e.fr||e.fechaRetiro||'', notas: e.n||e.notas||'',
+    idUsuario: e.iu||e.idUsuario||'', direccion: e.d||e.direccion||'',
+    accesorios: e.ac||e.accesorios||'', multiplicador: e.m||e.multiplicador||'',
+    corrientes: e.co||e.corrientes||'', conexion: e.cx||e.conexion||''
   }));
   // Temporarily set cargaAreaOrigen to saved value
   const prevArea = cargaAreaOrigen;
@@ -2181,6 +2355,9 @@ window.regenerarMemo = id => {
   cargaAreaOrigen = prevArea;
 };
 window.setCargaOrigen = a => { cargaAreaOrigen = a; render(); };
+window.cerrarAlerta = () => { showAlertaRetiros = false; render(); };
+window.setMapaFiltro = f => { mapaFiltro = f; render(); };
+window.verRetiros = () => { showAlertaRetiros = false; tab = 'instalaciones'; filterStatus = 'PROXIMO'; render(); };
 window.selectLoginUser = n => { loginForm.nombre = n; loginForm.pin = ''; loginForm.error = ''; render(); };
 window.setLoginPin = v => { loginForm.pin = v; loginForm.error = ''; };
 window.doLogin = doLogin;
@@ -2198,7 +2375,7 @@ window.setSearch = v => {
     if (newInp) { newInp.focus(); newInp.setSelectionRange(pos, pos); }
   }
 };
-window.setField = (k, v) => { form[k] = v; };
+window.setField = (k, v) => { form[k] = v; if (k === 'energiaTipoInst' || k === 'areaInstalacion' || k === 'locMode') render(); };
 window.setEF = (k, v) => { equipoForm[k] = v; };
 window.setLocMode = m => { locMode = m; render(); };
 window.triggerGPS = getGPS;
@@ -2261,6 +2438,8 @@ window.editEquipo = id => {
 };
 window.delEquipo = handleDelEq;
 window.setRetiroSede = s => { retiroForm.sede = s; render(); };
+window.setRetiroEnergia = t => { retiroForm.energiaTipo = t; render(); };
+window.setRetiroEnergiaVal = (k, v) => { if(k==='una') retiroForm.energiaUna=v; else if(k==='punta') retiroForm.energiaPunta=v; else if(k==='resto') retiroForm.energiaResto=v; else if(k==='valle') retiroForm.energiaValle=v; };
 window.openDescargaModal = openDescargaModal;
 window.closeDescargaModal = closeDescargaModal;
 window.doDescarga = handleDescarga;
@@ -2268,6 +2447,17 @@ window.setDescargaTecnico = t => { descargaForm.tecnico = t; render(); };
 window.setDescargaNotas = v => { descargaForm.notas = v; };
 window.registrarPrestamo = handlePrestamo;
 window.eliminarMovimiento = eliminarMovimientoFn;
+window.eliminarCondicion = (eqId, idx) => {
+  if (!isAdmin()) return showToast('⚠️ Solo el administrador puede eliminar esto');
+  const eq = equipos.find(x => x.id === eqId);
+  if (!eq || !eq.historialCondicion) return;
+  if (!confirm('¿Eliminar este registro de condición?')) return;
+  const hist = eq.historialCondicion.filter((_, i) => i !== idx);
+  // Restore condicion to last remaining entry or 'bueno'
+  const lastCond = hist.length > 0 ? hist[hist.length-1].condicionNueva : 'bueno';
+  update(ref(db, 'equipos/' + eqId), { historialCondicion: hist, condicion: lastCond })
+    .then(() => showToast('🗑 Registro eliminado'));
+};
 window.registrarDevolucion = handleDevolucion;
 window.closeCondicionModal = () => { showCondicionModal = false; condicionEqId = null; render(); };
 window.setCondicionField = (k, v) => { condicionForm[k] = v; render(); };
