@@ -353,7 +353,7 @@ function areaToSede(area) {
 }
 
 function emptyForm() {
-  return { equipoId: null, serie: '', modelo: '', caso: '', lugar: '', lat: null, lng: null, fechaInstalacion: today(), fechaRetiro: '', notas: '', sede: 'Plantel Central', areaInstalacion: 'CPT MT' };
+  return { equipoId: null, serie: '', modelo: '', caso: '', lugar: '', lat: null, lng: null, fechaInstalacion: today(), fechaRetiro: '', notas: '', sede: 'Plantel Central', areaInstalacion: 'CPT MT', energiaTipoInst: 'ninguna', energiaInstUna: '', energiaInstPunta: '', energiaInstResto: '', energiaInstValle: '' };
 }
 function emptyEF() {
   return { serie: '', modelo: '', notas: '', sede: 'Plantel Central', condicion: 'bueno', vineta: '' };
@@ -469,7 +469,7 @@ function handleSave() {
 }
 
 // ── RETIRO ──
-function openRetiroModal(id) { retiroId = id; retiroForm = { sinProblema: null, fallas: [], descripcion: '', sede: 'Plantel Central' }; showRetiroModal = true; render(); }
+function openRetiroModal(id) { retiroId = id; retiroForm = { sinProblema: null, fallas: [], descripcion: '', sede: 'Plantel Central', energiaTipo: 'ninguna', energiaUna: '', energiaPunta: '', energiaResto: '', energiaValle: '' }; showRetiroModal = true; render(); }
 function closeRetiroModal() { showRetiroModal = false; retiroId = null; render(); }
 function toggleFalla(f) {
   retiroForm.sinProblema = false;
@@ -2351,7 +2351,7 @@ window.setSearch = v => {
     if (newInp) { newInp.focus(); newInp.setSelectionRange(pos, pos); }
   }
 };
-window.setField = (k, v) => { form[k] = v; };
+window.setField = (k, v) => { form[k] = v; if (k === 'energiaTipoInst' || k === 'areaInstalacion' || k === 'locMode') render(); };
 window.setEF = (k, v) => { equipoForm[k] = v; };
 window.setLocMode = m => { locMode = m; render(); };
 window.triggerGPS = getGPS;
