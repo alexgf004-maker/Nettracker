@@ -1001,7 +1001,7 @@ function confirmarCargaMasiva() {
 
     // Register prestamo movement (avoid duplicate if already prestado today to same area)
     const existeMov = (eq.movimientos||[]).some(m => m.tipo==='prestamo' && m.a==='Campos y Servicios' && m.fecha===today() && m.nota && m.nota.includes(r.caso));
-    if (existeMov) { count--; return; }
+    if (existeMov) { return; } // skip duplicate, don't decrement
     const mov = { tipo: 'prestamo', de: cargaAreaOrigen, a: 'Campos y Servicios', fecha: today(), nota: 'Asignación carga masiva - Caso #' + r.caso };
     const movimientos = [...(eq.movimientos||[]), mov];
     update(ref(db, 'equipos/' + r.equipoId), { prestado: true, prestadoFecha: today(), sede: 'Subestación Cucumacayán', movimientos });
@@ -1022,7 +1022,7 @@ function confirmarCargaMasiva() {
   showToast('✅ ' + count + ' instalaciones registradas');
   generarMemoCargaMasiva(validos);
   cargaData = []; cargaView = 'upload';
-  instTab = 'campos';
+  tab = 'carga'; // Stay on carga tab to see historial
   render();
 }
 
