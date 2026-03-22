@@ -927,9 +927,15 @@ function procesarExcel(file) {
         const lugar = findCol(['Nombre del Usuario', 'Nombre de Usuario', 'Nombre Usuario', 'Usuario']).toString().trim();
         const fechaInst = fmtDate(findCol(['Fecha instalacion', 'Fecha instalación', 'Fecha Instalacion', 'Fecha Instalación', 'FechaInstalacion']));
         const fechaRetiro = fmtDate(findCol(['Fecha retiro', 'Fecha Retiro', 'FechaRetiro']));
-        const notas = findCol(['Transformador', 'Transf', 'Transformador']).toString().trim();
+        const notas = findCol(['Transformador', 'Transf']).toString().trim();
         const lat = findCol(['Latitud', 'Lat']).toString().trim();
         const lng = findCol(['Longitud', 'Lng', 'Long']).toString().trim();
+        const idUsuario = findCol(['Id del Usuario','ID del Usuario','ID Usuario','IdCliente','id_usuario']).toString().trim();
+        const direccion = findCol(['Direccion','Dirección','DIRECCION','Direccion 4','Dirección 4']).toString().trim();
+        const accesorios = findCol(['Accesorios','ACCESORIOS','Accesorio']).toString().trim();
+        const multiplicador = findCol(['Multiplicador','MULTIPLICADOR','Mult']).toString().trim();
+        const corrientes = findCol(['Corrientes','CORRIENTES','Corriente']).toString().trim();
+        const conexion = findCol(['Conexion','Conexión','CONEXION','Tipo conexion','Tipo conexión']).toString().trim();
 
         // Validate
         const eq = equipos.find(e => e.serie === serie);
@@ -942,7 +948,7 @@ function procesarExcel(file) {
         else if (!caso) { status = 'warning'; problema = 'Sin número SIGET'; }
         else if (!fechaRetiro) { status = 'warning'; problema = 'Sin fecha de retiro'; }
 
-        return { serie, caso, lugar, fechaInst, fechaRetiro, notas, lat, lng, status, problema, equipoId: eq?.id, modelo: eq?.modelo||'', vineta: eq?.vineta||'' };
+        return { serie, caso, lugar, fechaInst, fechaRetiro, notas, lat, lng, status, problema, equipoId: eq?.id, modelo: eq?.modelo||'', vineta: eq?.vineta||'', idUsuario, direccion, accesorios, multiplicador, corrientes, conexion };
       });
 
       cargaView = 'preview';
@@ -1000,7 +1006,7 @@ function confirmarCargaMasiva() {
     areaOrigen: cargaAreaOrigen,
     total: count,
     realizadoPor: sesionUsuario?.nombre || 'Desconocido',
-    equipos: validos.map(r => ({ serie: r.serie, modelo: r.modelo, vineta: r.vineta||'', caso: r.caso, lugar: r.lugar, fechaInst: r.fechaInst, fechaRetiro: r.fechaRetiro, notas: r.notas }))
+    equipos: validos.map(r => ({ serie: r.serie, modelo: r.modelo, vineta: r.vineta||'', caso: r.caso, lugar: r.lugar, fechaInst: r.fechaInst, fechaRetiro: r.fechaRetiro, notas: r.notas, idUsuario: r.idUsuario||'', direccion: r.direccion||'', accesorios: r.accesorios||'', multiplicador: r.multiplicador||'', corrientes: r.corrientes||'', conexion: r.conexion||'' }))
   };
   if (count > 0) push(historialCargasRef, registroCarga);
 
@@ -1012,16 +1018,20 @@ function confirmarCargaMasiva() {
 }
 
 function generarMemoCargaMasiva(filas) {
+  const esMT = cargaAreaOrigen === 'CPT MT' || cargaAreaOrigen === 'CPT DELSUR';
   const fecha = new Date().toLocaleDateString('es-SV');
-  const rows = filas.map(r => `<tr>
-    <td style="padding:9px 12px;font-size:11px;color:#64748b;border-bottom:1px solid #e2e8f0;font-family:'Courier New',monospace">${r.vineta||'—'}</td>
-    <td style="padding:9px 12px;font-family:'Courier New',monospace;font-weight:700;font-size:12px;border-bottom:1px solid #e2e8f0">${r.serie}</td>
-    <td style="padding:9px 12px;font-size:12px;border-bottom:1px solid #e2e8f0">${r.caso}</td>
-    <td style="padding:9px 12px;font-size:12px;border-bottom:1px solid #e2e8f0">${r.lugar}</td>
-    <td style="padding:9px 12px;font-size:12px;border-bottom:1px solid #e2e8f0;text-align:center">${r.fechaInst}</td>
-    <td style="padding:9px 12px;font-size:12px;border-bottom:1px solid #e2e8f0;text-align:center">${r.fechaRetiro}</td>
-    <td style="padding:9px 12px;font-size:11px;color:#64748b;border-bottom:1px solid #e2e8f0">${r.notas}</td>
-  </tr>`).join('');
+  const td = (v, mono) => '<td style="padding:7px 10px;font-size:11px;border-bottom:1px solid #e2e8f0;'+(mono?'font-family:\'Courier New\',monospace;font-weight:700':'')+'">'+(v||'—')+'</td>';
+  const rows = filas.map(r => '<tr>'
+    +td(r.caso, true)
+    +td(r.serie, true)
+    +td(r.vineta||'—', true)
+    +td(r.idUsuario||'—', false)
+    +td(r.lugar, false)
+    +td(r.direccion||'—', false)
+    +(esMT ? td(r.multiplicador||'—',false)+td(r.corrientes||'—',false)+td(r.conexion||'—',false) : td(r.notas||'—',false))
+    +'<td style="padding:7px 10px;font-size:11px;border-bottom:1px solid #e2e8f0;text-align:center">'+(r.fechaInst||'—')+'</td>'
+    +td(r.accesorios||'—', false)
+    +'</tr>').join('');
 
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
   <style>
@@ -1068,10 +1078,15 @@ function generarMemoCargaMasiva(filas) {
     <div class="section-title">Equipos asignados <span class="badge">${filas.length} equipos</span></div>
     <table>
       <thead><tr>
-        <th>Viñeta</th><th>Serie</th><th>N° SIGET</th><th>Usuario / Lugar</th>
+        <th>N° SIGET</th>
+        <th>Equipo</th>
+        <th>Viñeta</th>
+        <th>ID Usuario</th>
+        <th>Nombre del Usuario</th>
+        <th>Dirección</th>
+        ${esMT ? '<th>Multiplicador</th><th>Corrientes</th><th>Conexión</th>' : '<th>Transformador</th>'}
         <th style="text-align:center">F. Instalación</th>
-        <th style="text-align:center">F. Retiro</th>
-        <th>Transformador</th>
+        <th>Accesorios</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
