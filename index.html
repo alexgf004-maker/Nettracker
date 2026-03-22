@@ -400,7 +400,7 @@ onValue(installsRef, snap => {
 onValue(historialCargasRef, snap => {
   historialCargas = [];
   snap.forEach(c => historialCargas.push({ id: c.key, ...c.val() }));
-  historialCargas.sort((a, b) => (b.fecha||'').localeCompare(a.fecha||''));
+  historialCargas.sort((a, b) => ((b.fecha||'')+' '+(b.hora||'')).localeCompare((a.fecha||'')+' '+(a.hora||'')));
   render();
 });
 
