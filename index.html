@@ -1016,7 +1016,7 @@ function confirmarCargaMasiva() {
     areaOrigen: cargaAreaOrigen,
     total: validos.length,
     realizadoPor: sesionUsuario?.nombre || 'Desconocido',
-    equipos: validos.map(r => ({ serie: r.serie, modelo: r.modelo, vineta: r.vineta||'', caso: r.caso, lugar: r.lugar, fechaInst: r.fechaInst, fechaRetiro: r.fechaRetiro, notas: r.notas, idUsuario: r.idUsuario||'', direccion: r.direccion||'', accesorios: r.accesorios||'', multiplicador: r.multiplicador||'', corrientes: r.corrientes||'', conexion: r.conexion||'' }))
+    equipos: validos.map(r => ({ s: r.serie, v: r.vineta||'', c: r.caso, l: r.lugar, fi: r.fechaInst, fr: r.fechaRetiro, n: r.notas||'', iu: r.idUsuario||'', d: r.direccion||'', ac: r.accesorios||'', m: r.multiplicador||'', co: r.corrientes||'', cx: r.conexion||'' }))
   };
   // Always save to historial if there were valid rows to process
   if (validos.length > 0) push(historialCargasRef, registroCarga);
@@ -2175,7 +2175,7 @@ function render() {
         });
       }
     } else {
-    html += '<div class="page-title">📥 Carga masiva</div>';
+    html += '<div class="page-title">📤 Despachos a C&S</div>';
     html += '<div style="font-size:13px;color:var(--text3);margin-bottom:20px">Importa instalaciones para <strong style="color:var(--primary)">Campos y Servicios</strong> desde un archivo Excel.</div>';
 
     if (cargaView === 'upload') {
@@ -2308,7 +2308,7 @@ function render() {
       <span class="nav-icon">📦</span><span class="nav-label">Inventario</span>
     </button>
     <button class="nav-btn ${tab==='carga'?'active':''}" onclick="switchTab('carga')">
-      <span class="nav-icon">📥</span><span class="nav-label">Carga</span>
+      <span class="nav-icon">📥</span><span class="nav-label">Despachos</span>
     </button>
   </nav>`;
 
@@ -2341,9 +2341,12 @@ window.regenerarMemo = id => {
   if (!c) return showToast('No se encontró el registro');
   // Rebuild filas format expected by generarMemoCargaMasiva
   const filas = (c.equipos||[]).map(e => ({
-    serie: e.serie, modelo: e.modelo, vineta: e.vineta||'',
-    caso: e.caso, lugar: e.lugar,
-    fechaInst: e.fechaInst, fechaRetiro: e.fechaRetiro, notas: e.notas
+    serie: e.s||e.serie||'', modelo: e.modelo||'', vineta: e.v||e.vineta||'',
+    caso: e.c||e.caso||'', lugar: e.l||e.lugar||'',
+    fechaInst: e.fi||e.fechaInst||'', fechaRetiro: e.fr||e.fechaRetiro||'', notas: e.n||e.notas||'',
+    idUsuario: e.iu||e.idUsuario||'', direccion: e.d||e.direccion||'',
+    accesorios: e.ac||e.accesorios||'', multiplicador: e.m||e.multiplicador||'',
+    corrientes: e.co||e.corrientes||'', conexion: e.cx||e.conexion||''
   }));
   // Temporarily set cargaAreaOrigen to saved value
   const prevArea = cargaAreaOrigen;
