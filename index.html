@@ -2235,24 +2235,17 @@ function render() {
 
     html += '</div>';
 
-    // Historial de cargas
-    if (historialCargas.length > 0) {
-      html += '<div style="margin-top:24px;background:var(--white);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)">';
-      html += '<div style="padding:12px 16px;background:var(--primary);color:#fff;display:flex;justify-content:space-between;align-items:center">';
-      html += '<div style="font-size:13px;font-weight:700">📋 Historial de cargas</div>';
-      html += '<span style="font-size:11px;opacity:.8">' + historialCargas.length + ' registros</span>';
-      html += '</div>';
+    // Historial de cargas - only show on upload view
+    if (cargaView === 'upload' && historialCargas.length > 0) {
+      html += '<div style="margin-top:20px">';
+      html += '<div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">📋 Historial de cargas</div>';
       historialCargas.forEach((c, i) => {
-        const bg = i % 2 === 0 ? '#fff' : 'var(--bg)';
-        html += '<div style="padding:10px 16px;background:' + bg + ';border-bottom:1px solid var(--border2)">';
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
-        html += '<div style="font-size:13px;font-weight:700;color:var(--text)">' + fmtDate(c.fecha) + ' — ' + (c.hora||'') + '</div>';
-        html += '<span style="background:var(--primary-light);color:var(--primary);font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px">' + c.total + ' eq.</span>';
+        html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px">';
+        html += '<div style="flex:1;min-width:0">';
+        html += '<div style="font-size:12px;font-weight:700;color:var(--text)">' + fmtDate(c.fecha) + ' · ' + (c.hora||'') + ' · <span style="color:var(--primary)">' + c.total + ' equipos</span></div>';
+        html += '<div style="font-size:11px;color:var(--text3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (c.areaOrigen||'CPT BT') + (c.realizadoPor ? ' · 👤 ' + c.realizadoPor : '') + '</div>';
         html += '</div>';
-        html += '<div style="display:flex;justify-content:space-between;align-items:center">';
-        html += '<div style="font-size:11px;color:var(--text3)">' + (c.areaOrigen||'CPT BT') + ' → Campos y Serv.' + (c.realizadoPor ? ' · 👤 ' + c.realizadoPor : '') + '</div>';
-        html += "<button onclick=\"regenerarMemo('"+c.id+"')\" style=\"background:none;border:none;color:var(--primary);font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer;padding:0\">📄 Ver memo</button>";
-        html += '</div>';
+        html += "<button onclick=\"regenerarMemo('"+c.id+"')\" style=\"flex-shrink:0;padding:7px 12px;border:1px solid var(--primary);border-radius:8px;background:var(--primary-light);color:var(--primary);font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer\">📄 Memo</button>";
         html += '</div>';
       });
       html += '</div>';
