@@ -278,6 +278,7 @@ const fbApp = initializeApp(firebaseConfig);
 const db = getDatabase(fbApp);
 const installsRef = ref(db, 'analizadores');
 const equiposRef = ref(db, 'equipos');
+const historialCargasRef = ref(db, 'historialCargas');
 
 // ── STATE ──
 let records = [];
@@ -668,8 +669,8 @@ function generateLotePDF(equiposLote, tipo) {
   <div class="footer">
     Documento generado por CPT INNOVA · Sistema de Gestión de Analizadores de Red · ${fecha}
   </div>
-</body>
-</html>`;
+<\/body>
+<\/html>`;
 
   const win = window.open('', '_blank');
   win.document.write(html);
@@ -806,8 +807,8 @@ function generateMemoPDF(eq, movimiento) {
   <div class="footer">
     Documento generado por CPT INNOVA · Sistema de Gestión de Analizadores de Red · ${new Date().toLocaleDateString('es-SV')}
   </div>
-</body>
-</html>`;
+<\/body>
+<\/html>`;
 
   const win = window.open('', '_blank');
   win.document.write(html);
@@ -1022,7 +1023,7 @@ function generarMemoCargaMasiva(filas) {
     </div>
   </div>
   <div class="footer">Documento generado por CPT INNOVA · Sistema de Gestión de Analizadores de Red · ${fecha}</div>
-  </body></html>`;
+  <\/body><\/html>`;
 
   const win = window.open('', '_blank');
   win.document.write(html);
