@@ -642,8 +642,8 @@ function generateLotePDF(equiposLote, tipo) {
   .firma-name { font-size: 13px; font-weight: 700; margin-top: 2px; }
   .footer { margin-top: 40px; padding-top: 14px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 10px; color: #94a3b8; }
   .badge-count { display: inline-block; background: #e8f0fb; color: #0057b8; border-radius: 20px; padding: 3px 12px; font-size: 12px; font-weight: 700; margin-left: 8px; }
-</style>
-  </head>
+<\/style>
+  <\/head>
 <body>
   <div class="header">
     <div class="logo-area">
@@ -760,8 +760,8 @@ function generateMemoPDF(eq, movimiento) {
   .firma-label { font-size: 11px; color: #64748b; }
   .firma-name { font-size: 13px; font-weight: 700; color: #0a1628; margin-top: 2px; }
   .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 10px; color: #94a3b8; }
-</style>
-  </head>
+<\/style>
+  <\/head>
 <body>
   <div class="header">
     <div class="logo-area">
@@ -1024,7 +1024,7 @@ function generarMemoCargaMasiva(filas) {
     .firma-label{font-size:10px;color:#64748b}
     .firma-name{font-size:13px;font-weight:700;margin-top:2px}
     .footer{margin-top:32px;padding-top:12px;border-top:1px solid #e2e8f0;text-align:center;font-size:10px;color:#94a3b8}
-  </style></head><body>
+  <\/style><\/head><body>
   <div class="header">
     <div style="display:flex;align-items:center;gap:12px">
       <div class="logo-box">
@@ -1540,19 +1540,19 @@ function render() {
           const dc = dias === null ? '' : dias <= 0 ? 'color:var(--red)' : dias <= 3 ? 'color:var(--yellow)' : 'color:var(--text3)';
           const dt = diasInst !== null ? `en ${diasInst}d` : dias === null ? '' : dias === 0 ? 'Hoy' : dias < 0 ? `${Math.abs(dias)}d vencido` : `en ${dias}d`;
           const stripe = stCard==='ACTIVO'?'':stCard==='PROXIMO'?' yellow':stCard==='PROGRAMADO'?' purple':' gray';
-          html += `<div class="card" onclick="openDetail('${r.id}')">
-            <div class="card-stripe${stripe}"></div>
-            <div class="card-inner">
-              <div class="card-body">
-                <div class="card-top"><div class="card-serie">${r.serie||'—'}</div>${badgeSt(stCard)}</div>
-                <div class="card-sub">${r.modelo ? r.modelo+' · ' : ''}#${r.caso}</div>
-                <div class="card-lugar">📍 ${r.lugar||'Sin ubicación'}</div>
-              <div style="font-size:10px;color:var(--text3);font-weight:600;margin-bottom:4px">${r.areaInstalacion||'CPT MT'}</div>
-                <div class="card-footer">
-                  <span class="card-date">Retiro: ${fmtDate(r.fechaRetiro)}</span>
-                  <span class="days-tag" style="${dc}">${dt}</span>
-                </div>
-              </div>
+          html += `<div onclick="openDetail('${r.id}')" style="background:var(--white);border:1px solid var(--border);border-left:3px solid ${stCard==='ACTIVO'?'var(--green)':stCard==='PROXIMO'?'var(--yellow)':stCard==='PROGRAMADO'?'#7c3aed':'var(--border2)'};border-radius:12px;padding:10px 14px;cursor:pointer;box-shadow:var(--shadow);margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+              <div style="font-family:var(--mono);font-size:14px;font-weight:800;color:var(--text)">${r.serie||'—'}</div>
+              ${badgeSt(stCard)}
+            </div>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:4px">#${r.caso}${r.modelo?' · '+r.modelo:''}</div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div style="font-size:12px;color:var(--text2)">📍 ${r.lugar||'Sin ubicación'}</div>
+              <span style="font-size:10px;color:var(--text3)">${r.areaInstalacion||'CPT MT'}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px;padding-top:5px;border-top:1px solid var(--border2)">
+              <span style="font-size:11px;color:var(--text3)">↩ ${fmtDate(r.fechaRetiro)}</span>
+              <span style="font-size:11px;font-weight:700;${dc}">${dt}</span>
             </div>
           </div>`;
         });
@@ -1750,7 +1750,7 @@ function render() {
             if (grupo.items.length === 0) return;
             html += '<div style="margin-bottom:16px">';
             html += '<div style="font-size:11px;font-weight:700;color:'+grupo.color+';letter-spacing:.5px;margin-bottom:8px;padding:6px 10px;background:'+grupo.color+'18;border-radius:8px;border-left:3px solid '+grupo.color+'">' + grupo.label + ' <span style="font-weight:400;color:var(--text3)">(' + grupo.items.length + ')</span></div>';
-            html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+            if (vistaInventario === 'grid') html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
             grupo.items.forEach(eq => {
               const isPrestado = eqPrestado(eq);
               const isEnCampo = eqEnCampo(eq);
@@ -1814,8 +1814,8 @@ function render() {
               if (vistaInventario === 'grid') html += '</div>';
               } // end else grid
             });
-            if (vistaInventario === 'grid') html += '</div>';
-            html += '</div>';
+            if (vistaInventario === 'grid') html += '<\/div>';
+            html += '<\/div>';
           });
         }
       }
@@ -1990,7 +1990,7 @@ function render() {
       return JSON.stringify({lat: parseFloat(r.lat), lng: parseFloat(r.lng), serie: r.serie, modelo: r.modelo||'', caso: r.caso, lugar: r.lugar||'', label, color: st==='ACTIVO'?'#0057b8':'#d97706', dias: diasTxt});
     });
 
-    const mapHtml = `<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'/><script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'><\/script><style>*{margin:0;padding:0}body,html,#map{width:100%;height:100%}.leaflet-popup-content{font-family:sans-serif;min-width:140px}.ps{font-weight:800;font-size:14px;color:#0a1628}.pm{font-size:12px;color:#64748b;margin-top:2px}.pb{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;margin-top:5px}<\/style><\/head><body><div id='map'><\/div><script>var markers=${JSON.stringify(markers)};var map=L.map('map');L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:''}).addTo(map);var bounds=[];markers.forEach(function(m){var d=JSON.parse(m);var icon=L.divIcon({className:'',html:'<div style="width:16px;height:16px;border-radius:50%;background:'+d.color+';border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.4)"><\/div>',iconSize:[16,16],iconAnchor:[8,8]});var popup='<div class=ps>'+d.serie+'<\/div><div class=pm>'+d.modelo+'<\/div><div class=pm>📍 '+d.lugar+'<\/div><div class=pm>#'+d.caso+'<\/div><span class=pb style="background:'+(d.color=='#0057b8'?'#e8f0fb':'#fffbeb')+';color:'+d.color+'">'+d.label+'<\/span><br><a href="https://maps.google.com/?q='+d.lat+','+d.lng+'" target=_blank style="font-size:11px;color:#0057b8;margin-top:4px;display:inline-block">Ver en Google Maps →<\/a>';L.marker([d.lat,d.lng],{icon:icon}).bindPopup(popup).addTo(map);bounds.push([d.lat,d.lng]);});if(bounds.length>0){if(bounds.length===1){map.setView(bounds[0],14);}else{map.fitBounds(bounds,{padding:[20,20]});}}else{map.setView([13.7942,-88.8965],8);}<\/script><\/body><\/html>`;
+    const mapHtml = `<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'/><'+'script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'><\/script><style>*{margin:0;padding:0}body,html,#map{width:100%;height:100%}.leaflet-popup-content{font-family:sans-serif;min-width:140px}.ps{font-weight:800;font-size:14px;color:#0a1628}.pm{font-size:12px;color:#64748b;margin-top:2px}.pb{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;margin-top:5px}<\/style><\/head><body><div id='map'><\/div><'+'script>var markers=${JSON.stringify(markers)};var map=L.map('map');L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:''}).addTo(map);var bounds=[];markers.forEach(function(m){var d=JSON.parse(m);var icon=L.divIcon({className:'',html:'<div style="width:16px;height:16px;border-radius:50%;background:'+d.color+';border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.4)"><\/div>',iconSize:[16,16],iconAnchor:[8,8]});var popup='<div class=ps>'+d.serie+'<\/div><div class=pm>'+d.modelo+'<\/div><div class=pm>📍 '+d.lugar+'<\/div><div class=pm>#'+d.caso+'<\/div><span class=pb style="background:'+(d.color=='#0057b8'?'#e8f0fb':'#fffbeb')+';color:'+d.color+'">'+d.label+'<\/span><br><a href="https://maps.google.com/?q='+d.lat+','+d.lng+'" target=_blank style="font-size:11px;color:#0057b8;margin-top:4px;display:inline-block">Ver en Google Maps →<\/a>';L.marker([d.lat,d.lng],{icon:icon}).bindPopup(popup).addTo(map);bounds.push([d.lat,d.lng]);});if(bounds.length>0){if(bounds.length===1){map.setView(bounds[0],14);}else{map.fitBounds(bounds,{padding:[20,20]});}}else{map.setView([13.7942,-88.8965],8);}<\/script><\/body><\/html>`;
 
     const encodedHtml = 'data:text/html;charset=utf-8,' + encodeURIComponent(mapHtml);
 
