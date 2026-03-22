@@ -1854,9 +1854,11 @@ function render() {
         if (filteredEq.length === 0) {
           html += '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">Sin resultados</div></div>';
         } else {
+          const grupoSedes = ['Plantel Central','Subestación Cucumacayán'];
           const grupos = [
             { label: '🏭 Plantel Central', color: 'var(--primary)', items: filteredEq.filter(e => !eqEnCampo(e) && (e.sede||'Plantel Central')==='Plantel Central') },
             { label: '⚡ Subestación Cucumacayán', color: '#00aaff', items: filteredEq.filter(e => !eqEnCampo(e) && e.sede==='Subestación Cucumacayán') },
+            { label: '📦 Otros', color: 'var(--text3)', items: filteredEq.filter(e => !eqEnCampo(e) && e.sede !== 'Plantel Central' && e.sede !== 'Subestación Cucumacayán') },
             { label: '📡 En campo', color: 'var(--yellow)', items: filteredEq.filter(e => eqEnCampo(e)) },
           ];
           grupos.forEach(grupo => {
