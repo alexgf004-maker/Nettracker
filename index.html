@@ -1530,6 +1530,15 @@ function render() {
               <span class="stat-label">${s==='TODOS'?'Total':s==='ACTIVO'?'Activos':s==='PROXIMO'?'Próximos':'Retirados'}</span>
             </div>`).join('')}
         </div>
+        <div style="background:linear-gradient(135deg,var(--primary-dark),var(--primary));border-radius:14px;padding:14px 16px;margin-bottom:12px;color:#fff">
+          <div style="font-size:11px;color:rgba(255,255,255,.7);margin-bottom:6px;font-weight:600">📅 ${new Date().toLocaleDateString("es-SV",{weekday:"long",day:"numeric",month:"long"}).replace(/^./,c=>c.toUpperCase())}</div>
+          <div style="display:flex;gap:16px">
+            <div><div style="font-size:22px;font-weight:800">${filtered.filter(r=>calcSt(r)==='ACTIVO').length}</div><div style="font-size:10px;color:rgba(255,255,255,.7)">Activos</div></div>
+            ${filtered.filter(r=>!r.retirado&&r.fechaRetiro===today()).length>0?'<div><div style="font-size:22px;font-weight:800;color:#ffd700">'+filtered.filter(r=>!r.retirado&&r.fechaRetiro===today()).length+'</div><div style="font-size:10px;color:rgba(255,255,255,.7)">Vencen hoy</div></div>':''}
+            ${filtered.filter(r=>!r.retirado&&daysUntil(r.fechaRetiro)<=7&&daysUntil(r.fechaRetiro)>0).length>0?'<div><div style="font-size:22px;font-weight:800;color:#7dd3fc">'+filtered.filter(r=>!r.retirado&&daysUntil(r.fechaRetiro)<=7&&daysUntil(r.fechaRetiro)>0).length+'</div><div style="font-size:10px;color:rgba(255,255,255,.7)">Esta semana</div></div>':''}
+          </div>
+          ${filtered.filter(r=>!r.retirado&&r.fechaRetiro===today()).length>0?'<div style="margin-top:8px;font-size:11px;color:#ffd700;font-weight:600">⚠️ Hay retiros programados para hoy</div>':''}
+        </div>
         <div class="search-wrap"><span class="search-icon">🔍</span>
           <input class="search-input" placeholder="Buscar serie, caso, lugar..." value="${search}" oninput="setSearch(this.value)" ${search?'data-active="true"':''}>
         </div>`;
