@@ -1540,19 +1540,19 @@ function render() {
           const dc = dias === null ? '' : dias <= 0 ? 'color:var(--red)' : dias <= 3 ? 'color:var(--yellow)' : 'color:var(--text3)';
           const dt = diasInst !== null ? `en ${diasInst}d` : dias === null ? '' : dias === 0 ? 'Hoy' : dias < 0 ? `${Math.abs(dias)}d vencido` : `en ${dias}d`;
           const stripe = stCard==='ACTIVO'?'':stCard==='PROXIMO'?' yellow':stCard==='PROGRAMADO'?' purple':' gray';
-          html += `<div class="card" onclick="openDetail('${r.id}')">
-            <div class="card-stripe${stripe}"></div>
-            <div class="card-inner">
-              <div class="card-body">
-                <div class="card-top"><div class="card-serie">${r.serie||'—'}</div>${badgeSt(stCard)}</div>
-                <div class="card-sub">${r.modelo ? r.modelo+' · ' : ''}#${r.caso}</div>
-                <div class="card-lugar">📍 ${r.lugar||'Sin ubicación'}</div>
-              <div style="font-size:10px;color:var(--text3);font-weight:600;margin-bottom:4px">${r.areaInstalacion||'CPT MT'}</div>
-                <div class="card-footer">
-                  <span class="card-date">Retiro: ${fmtDate(r.fechaRetiro)}</span>
-                  <span class="days-tag" style="${dc}">${dt}</span>
-                </div>
-              </div>
+          htmlhtml += `<div onclick="openDetail('${r.id}')" style="background:var(--white);border:1px solid var(--border);border-left:3px solid ${stCard==='ACTIVO'?'var(--green)':stCard==='PROXIMO'?'var(--yellow)':stCard==='PROGRAMADO'?'#7c3aed':'var(--border)'};border-radius:12px;padding:10px 14px;cursor:pointer;box-shadow:var(--shadow)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+              <div style="font-family:var(--mono);font-size:14px;font-weight:800;color:var(--text)">${r.serie||'—'}</div>
+              ${badgeSt(stCard)}
+            </div>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:4px">#${r.caso}${r.modelo?' · '+r.modelo:''}</div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div style="font-size:12px;color:var(--text2)">📍 ${r.lugar||'Sin ubicación'}</div>
+              <span style="font-size:10px;color:var(--text3)">${r.areaInstalacion||'CPT MT'}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px;padding-top:5px;border-top:1px solid var(--border2)">
+              <span style="font-size:11px;color:var(--text3);font-family:var(--mono)">↩ ${fmtDate(r.fechaRetiro)}</span>
+              <span style="font-size:11px;font-weight:700;font-family:var(--mono);${dc}">${dt}</span>
             </div>
           </div>`;
         });
