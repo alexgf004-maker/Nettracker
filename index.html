@@ -1621,12 +1621,7 @@ function render() {
           </div>`;
         });
         // Legend
-        html += '<div style="display:flex;gap:12px;padding:8px 16px;background:#fff;border-top:1px solid var(--border);flex-shrink:0;flex-wrap:wrap">';
-        html += '<span style="font-size:10px;color:var(--text3);display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:#0057b8;display:inline-block"></span>CPT MT</span>';
-        html += '<span style="font-size:10px;color:var(--text3);display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:#16a34a;display:inline-block"></span>CPT BT</span>';
-        html += '<span style="font-size:10px;color:var(--text3);display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:#ea580c;display:inline-block"></span>Campos y Serv.</span>';
-        html += '<span style="font-size:10px;color:var(--text3);display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid #ef4444;display:inline-block"></span>Retiro próximo</span>';
-        html += '</div>';
+        
         html += `</div>`;
       }
       html += `</div>`;
@@ -1990,10 +1985,12 @@ function render() {
         ${eq.historialCondicion && eq.historialCondicion.length > 0 ? `
           <div class="section-title" style="margin-top:4px">Historial de condición</div>
           <div class="list" style="margin-bottom:16px">
-            ${eq.historialCondicion.slice().reverse().map(h => {
+            ${eq.historialCondicion.slice().reverse().map((h, hIdx) => {
               const cOld = CONDICIONES.find(c => c.key === h.condicionAnterior);
               const cNew = CONDICIONES.find(c => c.key === h.condicionNueva);
-              return '<div class="historial-card"><div class="historial-row"><div><div class="historial-lugar">'+(cOld?cOld.icon+' '+cOld.label:'—')+' → '+(cNew?cNew.icon+' '+cNew.label:'—')+'</div>'+(h.nota?'<div class="historial-caso">'+h.nota+'</div>':'')+(h.registradoPor?'<div style="font-size:10px;color:var(--text3);margin-top:2px">👤 '+h.registradoPor+'</div>':'')+'</div><div class="historial-fecha">'+fmtDate(h.fecha)+'</div></div></div>';
+              const realIdx = historialCondicion.length - 1 - hIdx;
+              const delBtn = isAdmin() ? '<button onclick="eliminarCondicion(\''+eq.id+'\','+realIdx+')" style="background:none;border:none;font-size:11px;color:var(--red);cursor:pointer;padding:2px 4px;margin-top:4px;font-family:var(--font)">🗑 Eliminar</button>' : '';
+              return '<div class="historial-card"><div class="historial-row"><div><div class="historial-lugar">'+(cOld?cOld.icon+' '+cOld.label:'—')+' → '+(cNew?cNew.icon+' '+cNew.label:'—')+'</div>'+(h.nota?'<div class="historial-caso">'+h.nota+'</div>':'')+(h.registradoPor?'<div style="font-size:10px;color:var(--text3);margin-top:2px">👤 '+h.registradoPor+'</div>':'')+'</div><div class="historial-fecha">'+fmtDate(h.fecha)+'</div></div>'+delBtn+'</div>';
             }).join('')}
           </div>` : ''}
         ${eq.movimientos && eq.movimientos.length > 0 ? `
@@ -2423,6 +2420,17 @@ window.setDescargaTecnico = t => { descargaForm.tecnico = t; render(); };
 window.setDescargaNotas = v => { descargaForm.notas = v; };
 window.registrarPrestamo = handlePrestamo;
 window.eliminarMovimiento = eliminarMovimientoFn;
+window.eliminarCondicion = (eqId, idx) => {
+  if (!isAdmin()) return showToast('⚠️ Solo el administrador puede eliminar esto');
+  const eq = equipos.find(x => x.id === eqId);
+  if (!eq || !eq.historialCondicion) return;
+  if (!confirm('¿Eliminar este registro de condición?')) return;
+  const hist = eq.historialCondicion.filter((_, i) => i !== idx);
+  // Restore condicion to last remaining entry or 'bueno'
+  const lastCond = hist.length > 0 ? hist[hist.length-1].condicionNueva : 'bueno';
+  update(ref(db, 'equipos/' + eqId), { historialCondicion: hist, condicion: lastCond })
+    .then(() => showToast('🗑 Registro eliminado'));
+};
 window.registrarDevolucion = handleDevolucion;
 window.closeCondicionModal = () => { showCondicionModal = false; condicionEqId = null; render(); };
 window.setCondicionField = (k, v) => { condicionForm[k] = v; render(); };
