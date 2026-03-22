@@ -1854,12 +1854,10 @@ function render() {
         if (filteredEq.length === 0) {
           html += '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">Sin resultados</div></div>';
         } else {
-          const SEDES_CONOCIDAS = ['Plantel Central', 'Subestación Cucumacayán'];
           const grupos = [
-            { label: '🏭 Plantel Central', color: 'var(--primary)', items: filteredEq.filter(e => !eqEnCampo(e) && (e.sede||'Plantel Central').trim()==='Plantel Central') },
-            { label: '⚡ Subestación Cucumacayán', color: '#00aaff', items: filteredEq.filter(e => !eqEnCampo(e) && (e.sede||'').trim()==='Subestación Cucumacayán') },
+            { label: '🏭 Plantel Central', color: 'var(--primary)', items: filteredEq.filter(e => !eqEnCampo(e) && (e.sede||'Plantel Central')==='Plantel Central') },
+            { label: '⚡ Subestación Cucumacayán', color: '#00aaff', items: filteredEq.filter(e => !eqEnCampo(e) && e.sede==='Subestación Cucumacayán') },
             { label: '📡 En campo', color: 'var(--yellow)', items: filteredEq.filter(e => eqEnCampo(e)) },
-            { label: '📦 Otra sede', color: 'var(--text3)', items: filteredEq.filter(e => !eqEnCampo(e) && e.sede && !SEDES_CONOCIDAS.includes(e.sede.trim())) },
           ];
           grupos.forEach(grupo => {
             if (grupo.items.length === 0) return;
@@ -1897,11 +1895,9 @@ function render() {
                 else if (isPrestado) { const movs2=eq.movimientos||[]; const lm=movs2[movs2.length-1]; html += '<div style="font-size:10px;color:var(--primary);font-weight:600">' + (lm&&lm.a==='Campos y Servicios'?'🏗 Con Campos y Servicios':'🔄 Prestado') + '</div>'; }
                 html += '</div>';
                 html += '<div style="display:flex;flex-direction:column;gap:2px;align-items:flex-end;flex-shrink:0">';
-                if ((eq.condicion||'bueno')==='fuera') {
-                  html += '<span class="badge badge-red" style="font-size:8px;padding:2px 5px">🔴 Fuera</span>';
-                  html += '<button onclick="event.stopPropagation();openEqDetalle(\'' + eqId + '\')" style="font-size:9px;padding:2px 7px;border-radius:6px;border:1px solid var(--border);background:var(--white);color:var(--primary);cursor:pointer;font-family:var(--font);font-weight:700;margin-top:2px">Ver ›</button>';
-                } else { if (isPrestado) html += '<span class="badge badge-blue" style="font-size:8px;padding:2px 5px">Prest.</span>'; if (isEnCampo) html += '<span class="badge badge-yellow" style="font-size:8px;padding:2px 5px">Campo</span>'; if (!isPrestado&&!isEnCampo) html += '<span class="badge badge-green" style="font-size:8px;padding:2px 5px">Disp.</span>'; if ((eq.condicion||'bueno')==='detalles') html += '<span style="font-size:10px">🟡</span>'; }
-                html += '</div></div></div>';
+                if ((eq.condicion||'bueno')==='fuera') html += '<span class="badge badge-red" style="font-size:8px;padding:2px 5px">🔴 Fuera</span>';
+                else { if (isPrestado) html += '<span class="badge badge-blue" style="font-size:8px;padding:2px 5px">Prest.</span>'; if (isEnCampo) html += '<span class="badge badge-yellow" style="font-size:8px;padding:2px 5px">Campo</span>'; if (!isPrestado&&!isEnCampo) html += '<span class="badge badge-green" style="font-size:8px;padding:2px 5px">Disp.</span>'; if ((eq.condicion||'bueno')==='detalles') html += '<span style="font-size:10px">🟡</span>'; }
+                html += '</div></div>';
               } else {
               html += '<div onclick="' + clickable + '" style="background:' + (isSelected?'var(--primary-light)':'var(--white)') + ';border-top:3px solid ' + c + ';border:' + cardBorder + ';border-top:3px solid ' + c + ';border-radius:12px;padding:12px;cursor:' + (modoSeleccionLote&&!elegible?'default':'pointer') + ';box-shadow:var(--shadow);opacity:' + cardOpacity + ';position:relative">';
               if (isSelected) html += '<div style="position:absolute;top:8px;right:8px;width:20px;height:20px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-weight:700">✓</div>';
