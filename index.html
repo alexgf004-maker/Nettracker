@@ -1819,7 +1819,8 @@ function render() {
           ${eq.notas ? `<div class="detail-row"><div class="detail-label">Notas</div><div class="detail-value">${eq.notas}</div></div>` : ''}
           <div class="detail-row"><div class="detail-label">Sede</div><div class="detail-value">${eq.sede||'Plantel Central'}</div></div>
           ${eq.prestado ? `<div class="detail-row"><div class="detail-label">Prestado desde</div><div class="detail-value" style="color:var(--primary);font-weight:600">${fmtDate(eq.prestadoFecha)} · En Plantel Central</div></div>` : ''}
-          <div class="detail-row"><div class="detail-label">Registrado</div><div class="detail-value">${fmtDate(eq.fechaRegistro)}</div></div>
+          <div class="detail-row"><div class="detail-label">Registrado</div><div class="detail-value">${fmtDate(eq.fechaRegistro)}${eq.creadoPor ? ' · <span style="color:var(--text3);font-size:12px">'+eq.creadoPor+'</span>' : ''}</div></div>
+          ${eq.editadoPor ? `<div class="detail-row"><div class="detail-label">Editado por</div><div class="detail-value" style="color:var(--text3);font-size:13px">${eq.editadoPor} · ${fmtDate(eq.fechaEdicion)}</div></div>` : ''}
           <div class="detail-row"><div class="detail-label">Total instalaciones</div><div class="detail-value">${historial.length}</div></div>
         </div>
         ${eq.historialCondicion && eq.historialCondicion.length > 0 ? `
@@ -1867,6 +1868,7 @@ function render() {
                   ${badgeSt(st2)}
                   ${r.retirado && sinProblema ? `<span class="badge badge-green">✓ Sin problemas</span>` : ''}
                   ${r.retirado && tieneFallas ? `<span class="badge badge-red">⚠ Con falla</span>` : ''}
+                  ${r.retiradoPor ? `<div style="font-size:10px;color:var(--text3);margin-top:4px">👤 Retirado por: ${r.retiradoPor}</div>` : ''}
                 </div>
                 ${r.retirado && tieneFallas ? `
                   <div style="margin-top:8px;padding:8px 10px;background:var(--red-light);border-radius:8px;border:1px solid #fecaca">
