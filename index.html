@@ -340,7 +340,7 @@ function emptyEF() {
 }
 function today() { return new Date().toISOString().split('T')[0]; }
 function fmtDate(d) { if (!d) return '—'; const [y,m,dd] = d.split('-'); return `${dd}/${m}/${y}`; }
-function daysUntil(d) { const [y,m,dd] = d.split('-').map(Number); const r = new Date(y, m-1, dd); const n = new Date(); n.setHours(0,0,0,0); r.setHours(0,0,0,0); return Math.round((r-n)/86400000); }
+function daysUntil(d) { if (!d || typeof d !== 'string') return 999; const [y,m,dd] = d.split('-').map(Number); if (!y||!m||!dd) return 999; const r = new Date(y, m-1, dd); const n = new Date(); n.setHours(0,0,0,0); r.setHours(0,0,0,0); return Math.round((r-n)/86400000); }
 function calcSt(r) {
   if (r.retirado) return 'RETIRADO';
   if (r.fechaInstalacion && daysUntil(r.fechaInstalacion) > 0) return 'PROGRAMADO';
