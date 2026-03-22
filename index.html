@@ -429,11 +429,12 @@ function handleSave() {
   if (!form.caso.trim()) return showToast('Ingresa el código de caso / campaña');
   if (!form.fechaRetiro) return showToast('Ingresa la fecha de retiro');
   if (!form.lugar.trim()) return showToast('Ingresa la ubicación del equipo');
-  const payload = { ...form, retirado: false, fechaRegistro: today() };
+  const usuario = sesionUsuario?.nombre || 'Desconocido';
+  const payload = { ...form, retirado: false, fechaRegistro: today(), creadoPor: usuario };
   if (editId) {
     const id = editId;
     editId = null; view = 'lista'; form = emptyForm();
-    update(ref(db, `analizadores/${id}`), payload).then(() => showToast('✅ Actualizado'));
+    update(ref(db, `analizadores/${id}`), { ...payload, editadoPor: usuario, fechaEdicion: today() }).then(() => showToast('✅ Actualizado'));
   } else {
     const savedPayload = {...payload};
     view = 'lista'; form = emptyForm();
@@ -464,7 +465,7 @@ function toggleSinProblema() {
 }
 function handleRetiro() {
   if (retiroForm.sinProblema === null && retiroForm.fallas.length === 0) return showToast('Indica si hubo algún problema');
-  const payload = { retirado: true, fechaRetiroReal: today(), sinProblema: retiroForm.sinProblema || false, fallas: retiroForm.fallas, descripcionFalla: retiroForm.descripcion };
+  const payload = { retirado: true, fechaRetiroReal: today(), sinProblema: retiroForm.sinProblema || false, fallas: retiroForm.fallas, descripcionFalla: retiroForm.descripcion, retiradoPor: sesionUsuario?.nombre || 'Desconocido' };
   const id = retiroId;
   const sedeRetiro = retiroForm.sede;
   const deployRec = records.find(x => x.id === id);
@@ -504,7 +505,7 @@ function handleDescarga() {
   if (!descargaForm.tecnico) return showToast('Selecciona un técnico');
   const rec = records.find(x => x.id === descargaId);
   if (!rec) return;
-  const nueva = { fecha: today(), tecnico: descargaForm.tecnico, notas: descargaForm.notas };
+  const nueva = { fecha: today(), tecnico: descargaForm.tecnico, notas: descargaForm.notas, registradoPor: sesionUsuario?.nombre || 'Desconocido' };
   const descargas = [...(rec.descargas || []), nueva];
   const id = descargaId;
   showDescargaModal = false; descargaId = null;
@@ -526,11 +527,12 @@ function handleSaveEq() {
   const serieTrim = equipoForm.serie.trim().toUpperCase();
   const duplicate = equipos.find(e => e.serie.trim().toUpperCase() === serieTrim && e.id !== editEqId);
   if (duplicate) return showToast('⚠️ Ya existe un equipo con ese número de serie');
-  const data = { ...equipoForm, serie: serieTrim, fechaRegistro: today() };
+  const usuario = sesionUsuario?.nombre || 'Desconocido';
+  const data = { ...equipoForm, serie: serieTrim, fechaRegistro: today(), creadoPor: usuario };
   if (editEqId) {
     const id = editEqId;
     editEqId = null; equipoForm = emptyEF(); view = 'lista';
-    update(ref(db, `equipos/${id}`), data).then(() => showToast('✅ Equipo actualizado'));
+    update(ref(db, `equipos/${id}`), { ...data, editadoPor: usuario, fechaEdicion: today() }).then(() => showToast('✅ Equipo actualizado'));
   } else {
     equipoForm = emptyEF(); view = 'lista';
     push(equiposRef, data).then(() => showToast('✅ Equipo agregado'));
@@ -843,7 +845,7 @@ function openCondicionModal(id) {
 function confirmCondicion() {
   const eq = equipos.find(x => x.id === condicionEqId);
   if (!eq) return;
-  const cambio = { fecha: today(), condicionAnterior: eq.condicion || 'bueno', condicionNueva: condicionForm.condicion, nota: condicionForm.nota };
+  const cambio = { fecha: today(), condicionAnterior: eq.condicion || 'bueno', condicionNueva: condicionForm.condicion, nota: condicionForm.nota, registradoPor: sesionUsuario?.nombre || 'Desconocido' };
   const historialCondicion = [...(eq.historialCondicion || []), cambio];
   const id = condicionEqId;
   showCondicionModal = false; condicionEqId = null;
@@ -955,6 +957,7 @@ function confirmarCargaMasiva() {
     hora: new Date().toLocaleTimeString('es-SV', {hour:'2-digit', minute:'2-digit'}),
     areaOrigen: cargaAreaOrigen,
     total: count,
+    realizadoPor: sesionUsuario?.nombre || 'Desconocido',
     equipos: validos.map(r => ({ serie: r.serie, modelo: r.modelo, vineta: r.vineta||'', caso: r.caso, lugar: r.lugar, fechaInst: r.fechaInst, fechaRetiro: r.fechaRetiro, notas: r.notas }))
   };
   if (count > 0) push(historialCargasRef, registroCarga);
@@ -1610,6 +1613,8 @@ function render() {
           <div class="detail-row"><div class="detail-label">Retiro programado</div><div class="detail-value">${fmtDate(r.fechaRetiro)}${dias!==null?` <span style="font-size:12px;color:${dias<=0?'var(--red)':dias<=3?'var(--yellow)':'var(--text3)'}">(${dias===0?'hoy':dias>0?`en ${dias}d`:`${Math.abs(dias)}d vencido`})</span>`:''}</div></div>
           ${r.fechaRetiroReal ? `<div class="detail-row"><div class="detail-label">Retirado el</div><div class="detail-value">${fmtDate(r.fechaRetiroReal)}</div></div>` : ''}
           ${r.notas ? `<div class="detail-row"><div class="detail-label">Notas</div><div class="detail-value">${r.notas}</div></div>` : ''}
+          ${r.creadoPor ? `<div class="detail-row"><div class="detail-label">Registrado por</div><div class="detail-value" style="color:var(--text3);font-size:13px">${r.creadoPor}</div></div>` : ''}
+          ${r.editadoPor ? `<div class="detail-row"><div class="detail-label">Editado por</div><div class="detail-value" style="color:var(--text3);font-size:13px">${r.editadoPor} · ${fmtDate(r.fechaEdicion)}</div></div>` : ''}
         </div>
         ${r.descargas && r.descargas.length > 0 ? `
           <div class="section-title" style="margin-top:4px">Descargas parciales (${r.descargas.length})</div>
@@ -1620,6 +1625,7 @@ function render() {
                   <div>
                     <div class="historial-lugar">💾 ${d.tecnico}</div>
                     <div class="historial-caso">${d.notas||'Sin observaciones'}</div>
+                    ${d.registradoPor && d.registradoPor !== d.tecnico ? `<div style="font-size:10px;color:var(--text3);margin-top:2px">Registrado por: ${d.registradoPor}</div>` : ''}
                   </div>
                   <div class="historial-fecha">${fmtDate(d.fecha)}</div>
                 </div>
@@ -1833,6 +1839,7 @@ function render() {
                   <div>
                     <div class="historial-lugar">${m.de} → ${m.a}</div>
                     <div class="historial-caso">${m.tipo==='prestamo'?'🔄 Préstamo':'✅ Devolución'}${m.nota?' · '+m.nota:''}</div>
+                    ${m.registradoPor ? `<div style="font-size:10px;color:var(--text3);margin-top:2px">👤 ${m.registradoPor}</div>` : ''}
                   </div>
                   <div class="historial-fecha">${fmtDate(m.fecha)}</div>
                 </div>
@@ -2030,6 +2037,7 @@ function render() {
         html += '<div>';
         html += '<div style="font-size:14px;font-weight:700;color:var(--text)">' + fmtDate(c.fecha) + ' · ' + (c.hora||'') + '</div>';
         html += '<div style="font-size:12px;color:var(--text3);margin-top:2px">' + (c.areaOrigen||'CPT BT') + ' → Campos y Servicios</div>';
+        if (c.realizadoPor) html += '<div style="font-size:11px;color:var(--primary);font-weight:600;margin-top:2px">👤 ' + c.realizadoPor + '</div>';
         html += '</div>';
         html += '<span class="badge badge-blue" style="font-size:11px">' + c.total + ' equipos</span>';
         html += '</div>';
