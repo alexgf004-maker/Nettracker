@@ -1817,7 +1817,7 @@ function render() {
               if (vistaInventario === 'grid') html += '</div>';
               } // end else grid
             });
-            html += '</div>'; // close grid or list wrapper
+            if (vistaInventario === 'grid') html += '</div>'; // close grid wrapper
             html += '</div>'; // close grupo
           });
         }
