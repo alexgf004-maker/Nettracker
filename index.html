@@ -2014,7 +2014,7 @@ function render() {
             ${eq.historialCondicion.slice().reverse().map((h, hIdx) => {
               const cOld = CONDICIONES.find(c => c.key === h.condicionAnterior);
               const cNew = CONDICIONES.find(c => c.key === h.condicionNueva);
-              const realIdx = historialCondicion.length - 1 - hIdx;
+              const realIdx = eq.historialCondicion.length - 1 - hIdx;
               const delBtn = isAdmin() ? '<button onclick="eliminarCondicion(\''+eq.id+'\','+realIdx+')" style="background:none;border:none;font-size:11px;color:var(--red);cursor:pointer;padding:2px 4px;margin-top:4px;font-family:var(--font)">🗑 Eliminar</button>' : '';
               return '<div class="historial-card"><div class="historial-row"><div><div class="historial-lugar">'+(cOld?cOld.icon+' '+cOld.label:'—')+' → '+(cNew?cNew.icon+' '+cNew.label:'—')+'</div>'+(h.nota?'<div class="historial-caso">'+h.nota+'</div>':'')+(h.registradoPor?'<div style="font-size:10px;color:var(--text3);margin-top:2px">👤 '+h.registradoPor+'</div>':'')+'</div><div class="historial-fecha">'+fmtDate(h.fecha)+'</div></div>'+delBtn+'</div>';
             }).join('')}
