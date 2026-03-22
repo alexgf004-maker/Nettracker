@@ -941,7 +941,7 @@ function confirmarCargaMasiva() {
     total: count,
     equipos: validos.map(r => ({ serie: r.serie, modelo: r.modelo, vineta: r.vineta||'', caso: r.caso, lugar: r.lugar, fechaInst: r.fechaInst, fechaRetiro: r.fechaRetiro, notas: r.notas }))
   };
-  push(historialCargasRef, registroCarga);
+  if (count > 0) push(historialCargasRef, registroCarga);
 
   showToast('✅ ' + count + ' instalaciones registradas');
   generarMemoCargaMasiva(validos);
@@ -1963,6 +1963,7 @@ function render() {
       html += '</div>';
     }
 
+    html += '<div style="height:20px"></div>';
     html += '</div>';
   }
 
