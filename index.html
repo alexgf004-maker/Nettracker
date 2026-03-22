@@ -1881,7 +1881,7 @@ function render() {
                   elegible = last && last.tipo === 'devolucion';
                 }
               }
-              const clickable = modoSeleccionLote & (elegible ? `toggleLoteCard('${eqId}')` : '') : `openEqDetalle('${eqId}')`;
+              const clickable = modoSeleccionLote ? (elegible ? `toggleLoteCard('${eqId}')` : '') : `openEqDetalle('${eqId}')`;
               const cardOpacity = modoSeleccionLote && !elegible ? '0.35' : '1';
               const cardBorder = isSelected ? '2px solid var(--primary)' : '1px solid var(--border)';
               if (vistaInventario === 'lista') {
