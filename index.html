@@ -1014,11 +1014,12 @@ function confirmarCargaMasiva() {
     fecha: today(),
     hora: new Date().toLocaleTimeString('es-SV', {hour:'2-digit', minute:'2-digit'}),
     areaOrigen: cargaAreaOrigen,
-    total: count,
+    total: validos.length,
     realizadoPor: sesionUsuario?.nombre || 'Desconocido',
     equipos: validos.map(r => ({ serie: r.serie, modelo: r.modelo, vineta: r.vineta||'', caso: r.caso, lugar: r.lugar, fechaInst: r.fechaInst, fechaRetiro: r.fechaRetiro, notas: r.notas, idUsuario: r.idUsuario||'', direccion: r.direccion||'', accesorios: r.accesorios||'', multiplicador: r.multiplicador||'', corrientes: r.corrientes||'', conexion: r.conexion||'' }))
   };
-  if (count > 0) push(historialCargasRef, registroCarga);
+  // Always save to historial if there were valid rows to process
+  if (validos.length > 0) push(historialCargasRef, registroCarga);
 
   showToast('✅ ' + count + ' instalaciones registradas');
   generarMemoCargaMasiva(validos);
