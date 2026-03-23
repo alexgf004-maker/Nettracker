@@ -401,7 +401,6 @@ onValue(historialCargasRef, snap => {
   historialCargas = [];
   snap.forEach(c => historialCargas.push({ id: c.key, ...c.val() }));
   historialCargas.sort((a, b) => ((b.fecha||'')+' '+(b.hora||'')).localeCompare((a.fecha||'')+' '+(a.hora||'')));
-  console.log('historialCargas loaded:', historialCargas.length, historialCargas.map(c => c.fecha+' '+c.hora));
   render();
 });
 
@@ -1017,9 +1016,8 @@ function confirmarCargaMasiva() {
     areaOrigen: cargaAreaOrigen,
     total: validos.length,
     realizadoPor: sesionUsuario?.nombre || 'Desconocido',
-    equipos: validos.map(r => ({ s: r.serie, v: r.vineta||'', c: r.caso, l: r.lugar, fi: r.fechaInst, fr: r.fechaRetiro, n: r.notas||'', iu: r.idUsuario||'', d: r.direccion||'', ac: r.accesorios||'', m: r.multiplicador||'', co: r.corrientes||'', cx: r.conexion||'' }))
+    series: validos.map(r => r.caso).join(',')
   };
-  // Always save to historial if there were valid rows to process
   if (validos.length > 0) push(historialCargasRef, registroCarga);
 
   showToast('✅ ' + count + ' instalaciones registradas');
@@ -2342,16 +2340,20 @@ window.setCargaSubView = v => { cargaSubView = v; render(); };
 window.regenerarMemo = id => {
   const c = historialCargas.find(x => x.id === id);
   if (!c) return showToast('No se encontró el registro');
-  // Rebuild filas format expected by generarMemoCargaMasiva
-  const filas = (c.equipos||[]).map(e => ({
-    serie: e.s||e.serie||'', modelo: e.modelo||'', vineta: e.v||e.vineta||'',
-    caso: e.c||e.caso||'', lugar: e.l||e.lugar||'',
-    fechaInst: e.fi||e.fechaInst||'', fechaRetiro: e.fr||e.fechaRetiro||'', notas: e.n||e.notas||'',
-    idUsuario: e.iu||e.idUsuario||'', direccion: e.d||e.direccion||'',
-    accesorios: e.ac||e.accesorios||'', multiplicador: e.m||e.multiplicador||'',
-    corrientes: e.co||e.corrientes||'', conexion: e.cx||e.conexion||''
-  }));
-  // Temporarily set cargaAreaOrigen to saved value
+  // Find records registered on the same date and area
+  const filas = records
+    .filter(r => r.fechaRegistro === c.fecha && r.areaInstalacion === 'Campos y Servicios')
+    .map(r => {
+      const eq = equipos.find(e => e.id === r.equipoId) || {};
+      return {
+        serie: r.serie||'', modelo: r.modelo||'', vineta: eq.vineta||'',
+        caso: r.caso||'', lugar: r.lugar||'',
+        fechaInst: r.fechaInstalacion ? r.fechaInstalacion.split('-').reverse().join('/') : '',
+        fechaRetiro: r.fechaRetiro ? r.fechaRetiro.split('-').reverse().join('/') : '',
+        notas: r.notas||'', idUsuario: '', direccion: '', accesorios: '', multiplicador: '', corrientes: '', conexion: ''
+      };
+    });
+  if (filas.length === 0) return showToast('No se encontraron instalaciones para esta fecha');
   const prevArea = cargaAreaOrigen;
   cargaAreaOrigen = c.areaOrigen || 'CPT BT';
   generarMemoCargaMasiva(filas);
