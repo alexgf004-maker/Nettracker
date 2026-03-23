@@ -878,6 +878,29 @@ function generateMemoPDF(eq, movimiento) {
   win.document.write(html);
   win.document.close();
   setTimeout(() => win.print(), 500);
+
+  // Email
+  const tipoM = movimiento.tipo === 'prestamo' ? 'PRESTAMO' : 'DEVOLUCION';
+  const asuntoM = encodeURIComponent('Memorandum de ' + tipoM + ' - ' + eq.serie + ' - ' + new Date().toLocaleDateString('es-SV'));
+  const lineasM = [
+    'Para: ' + (movimiento.a||''),
+    'Asunto: ' + tipoM + ' de equipo analizador de red',
+    'Fecha: ' + new Date().toLocaleDateString('es-SV'),
+    '',
+    'Serie: ' + eq.serie,
+    eq.vineta ? 'Vineta: ' + eq.vineta : '',
+    'Modelo: ' + (eq.modelo||''),
+    '',
+    'Movimiento: ' + (movimiento.de||'') + ' -> ' + (movimiento.a||''),
+    movimiento.nota ? 'Nota: ' + movimiento.nota : '',
+    '',
+    'Documento generado por CPT INNOVA - Sistema de Gestion de Analizadores de Red'
+  ].filter(l => l !== null && l !== undefined).join('\n');
+  setTimeout(() => {
+    if (confirm('Deseas enviar este memo por correo?')) {
+      window.location.href = 'mailto:?subject=' + asuntoM + '&body=' + encodeURIComponent(lineasM);
+    }
+  }, 1000);
 }
 
 function openCondicionModal(id) {
