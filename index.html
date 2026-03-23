@@ -51,64 +51,6 @@
 
     body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; max-width: 480px; margin: 0 auto; }
 
-    /* ── PC LAYOUT ── */
-    @media (min-width: 768px) {
-      body { max-width: 100%; margin: 0; }
-      #app { display: flex; min-height: 100vh; }
-
-      /* Sidebar */
-      .pc-sidebar {
-        width: 220px; flex-shrink: 0;
-        background: linear-gradient(180deg, var(--primary-dark) 0%, var(--primary) 100%);
-        position: fixed; top: 0; left: 0; bottom: 0;
-        display: flex; flex-direction: column;
-        z-index: 60; box-shadow: 4px 0 20px rgba(0,87,184,.2);
-      }
-      .pc-sidebar-logo {
-        padding: 20px 18px 16px;
-        border-bottom: 1px solid rgba(255,255,255,.15);
-      }
-      .pc-sidebar-nav {
-        flex: 1; padding: 12px 10px; display: flex; flex-direction: column; gap: 4px;
-      }
-      .pc-nav-btn {
-        display: flex; align-items: center; gap: 10px;
-        padding: 11px 14px; border-radius: 10px;
-        border: none; background: none; cursor: pointer;
-        font-family: var(--font); font-size: 13px; font-weight: 600;
-        color: rgba(255,255,255,.7); text-align: left; width: 100%;
-        transition: all .15s;
-      }
-      .pc-nav-btn:hover { background: rgba(255,255,255,.1); color: #fff; }
-      .pc-nav-btn.active { background: rgba(255,255,255,.2); color: #fff; }
-      .pc-nav-icon { font-size: 18px; }
-      .pc-sidebar-user {
-        padding: 14px 18px;
-        border-top: 1px solid rgba(255,255,255,.15);
-        font-size: 12px; color: rgba(255,255,255,.7);
-        cursor: pointer;
-      }
-
-      /* Main content area */
-      .pc-main {
-        margin-left: 220px; flex: 1;
-        display: flex; flex-direction: column;
-        min-height: 100vh;
-      }
-      .pc-topbar {
-        background: var(--white); border-bottom: 1px solid var(--border);
-        padding: 12px 24px; display: flex; align-items: center;
-        justify-content: space-between; position: sticky; top: 0; z-index: 50;
-        box-shadow: var(--shadow);
-      }
-      .pc-content { padding: 24px; max-width: 960px; }
-
-      /* Hide mobile elements */
-      header { display: none !important; }
-      .bottom-nav { display: none !important; }
-      .content { padding: 0 !important; }
-    }
-
     /* HEADER */
     header {
       background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 60%, #0077cc 100%);
@@ -286,7 +228,39 @@
     .section-title { font-size: 10px; font-weight: 700; color: var(--text3); letter-spacing: 1px; margin-bottom: 10px; text-transform: uppercase; }
 
     /* SELECTOR */
-    .selector-item { background: var(--white); border: 1.5px solid var(--border
+    .selector-item { background: var(--white); border: 1.5px solid var(--border); border-radius: var(--radius-sm); padding: 14px; cursor: pointer; transition: all .15s; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .selector-item:active { border-color: var(--primary); background: var(--primary-light); }
+    .selector-item.disabled { opacity: .4; pointer-events: none; }
+
+    /* FAULT OPTIONS */
+    .fault-option { padding: 13px 16px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 8px; cursor: pointer; font-size: 15px; font-weight: 600; color: var(--text2); background: var(--white); transition: all .15s; display: flex; align-items: center; gap: 10px; }
+    .fault-option.selected { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
+
+    /* TOAST */
+    .toast {
+      position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+      background: var(--primary-dark); color: #fff;
+      padding: 12px 20px; border-radius: 12px; font-size: 14px;
+      z-index: 400; box-shadow: var(--shadow-blue);
+      max-width: 90%; text-align: center; font-weight: 600;
+      animation: toastIn .25s ease;
+    }
+    @keyframes toastIn { from{opacity:0;transform:translateX(-50%) translateY(12px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+
+    /* LOADING */
+    .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 16px; background: var(--bg); }
+    .spinner { width: 36px; height: 36px; border: 3px solid var(--primary-light); border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { font-size: 14px; color: var(--text3); font-weight: 600; letter-spacing: .5px; }
+
+    .divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+<div id="app"><div class="loading"><div class="spinner"></div><div class="loading-text">CONECTANDO...</div></div></div>
+<script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, onValue, push, update, remove, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
@@ -305,6 +279,7 @@ const db = getDatabase(fbApp);
 const installsRef = ref(db, 'analizadores');
 const equiposRef = ref(db, 'equipos');
 const historialCargasRef = ref(db, 'historialCargas');
+
 
 // ── STATE ──
 let records = [];
@@ -337,7 +312,7 @@ let prestamoForm = { de: 'CPT BT', a: 'CPT MT', nota: '', tipo: 'prestamo' };
 let modoSeleccionLote = false;
 let cargaData = []; // preview rows from excel
 let cargaView = 'upload'; // upload | preview
-let cargaSubView = 'subir';
+let cargaSubView = 'subir'; // subir | historial
 let historialCargas = [];
 let cargaAreaOrigen = 'CPT BT';
 let showImportModal = false;
@@ -427,13 +402,9 @@ onValue(installsRef, snap => {
   render();
 });
 
-
 onValue(historialCargasRef, snap => {
   historialCargas = [];
-  snap.forEach(c => {
-    const val = c.val();
-    historialCargas.push({ id: c.key, fecha: val.fecha, hora: val.hora, areaOrigen: val.areaOrigen, total: val.total, realizadoPor: val.realizadoPor });
-  });
+  snap.forEach(c => historialCargas.push({ id: c.key, ...c.val() }));
   historialCargas.sort((a, b) => ((b.fecha||'')+' '+(b.hora||'')).localeCompare((a.fecha||'')+' '+(a.hora||'')));
   render();
 });
@@ -1043,20 +1014,22 @@ function confirmarCargaMasiva() {
     count++;
   });
 
-  showToast('✅ ' + count + ' instalaciones registradas');
-  // Build memo HTML and save everything to Firebase
-  const memoHtml = buildMemoCargaMasiva(validos);
-  push(historialCargasRef, {
+  // Save to historial
+  const registroCarga = {
     fecha: today(),
     hora: new Date().toLocaleTimeString('es-SV', {hour:'2-digit', minute:'2-digit'}),
     areaOrigen: cargaAreaOrigen,
     total: validos.length,
     realizadoPor: sesionUsuario?.nombre || 'Desconocido',
-    memo: memoHtml
-  });
-  abrirMemo(memoHtml);
+    equipos: validos.map(r => ({ s: r.serie, v: r.vineta||'', c: r.caso, l: r.lugar, fi: r.fechaInst, fr: r.fechaRetiro, n: r.notas||'', iu: r.idUsuario||'', d: r.direccion||'', ac: r.accesorios||'', m: r.multiplicador||'', co: r.corrientes||'', cx: r.conexion||'' }))
+  };
+  // Always save to historial if there were valid rows to process
+  if (validos.length > 0) push(historialCargasRef, registroCarga);
+
+  showToast('✅ ' + count + ' instalaciones registradas');
+  generarMemoCargaMasiva(validos);
   cargaData = []; cargaView = 'upload';
-  tab = 'carga'; cargaSubView = 'historial';ar
+  tab = 'carga'; cargaSubView = 'historial'; // Show historial after confirmar
   render();
 }
 
@@ -1348,42 +1321,6 @@ function render() {
     return;
   }
 
-  // ── PC LAYOUT WRAPPER ──
-  const isPC = window.innerWidth >= 768;
-  if (isPC) {
-    const pcTabs = [
-      {key:'instalaciones', icon:'⚡', label:'Instalaciones'},
-      {key:'mapa', icon:'📍', label:'Mapa'},
-      {key:'inventario', icon:'📦', label:'Inventario'},
-      {key:'carga', icon:'📤', label:'Despachos'},
-    ];
-    let sidebar = '<div class="pc-sidebar">';
-    sidebar += '<div class="pc-sidebar-logo">';
-    sidebar += '<div style="display:flex;align-items:center;gap:10px">';
-    sidebar += '<div style="width:36px;height:36px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:10px;display:flex;align-items:center;justify-content:center">';
-    sidebar += '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="2" width="18" height="20" rx="2" stroke="white" stroke-width="1.8" fill="none"/><path d="M8 7h8M8 10h5" stroke="white" stroke-width="1.5" stroke-linecap="round"/><path d="M12 14l-2 4h4l-2 4" stroke="#7dd3fc" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-    sidebar += '</div><div><div style="font-size:15px;font-weight:800;color:#fff">CPT INNOVA</div><div style="font-size:10px;color:rgba(255,255,255,.6)">Analizadores de Red</div></div></div></div>';
-    sidebar += '<div class="pc-sidebar-nav">';
-    pcTabs.forEach(t => {
-      sidebar += '<button class="pc-nav-btn ' + (tab===t.key?'active':'') + '" onclick="switchTab(\''+t.key+'\')">';
-      sidebar += '<span class="pc-nav-icon">' + t.icon + '</span>' + t.label + '</button>';
-    });
-    sidebar += '</div>';
-    sidebar += '<div class="pc-sidebar-user" onclick="cerrarSesion()">👤 ' + (sesionUsuario?.nombre||'') + '  ↩</div>';
-    sidebar += '</div>';
-
-    // Inject sidebar before main content
-    html += sidebar;
-    html += '<div class="pc-main">';
-    // PC topbar
-    html += '<div class="pc-topbar">';
-    html += '<div style="font-size:18px;font-weight:800;color:var(--text)">' + pcTabs.find(t=>t.key===tab)?.icon + ' ' + pcTabs.find(t=>t.key===tab)?.label + '</div>';
-    if (tab === 'instalaciones') html += '<button class="btn-small" style="background:var(--primary);color:#fff;padding:8px 18px;border-radius:8px;font-size:13px" onclick="newInstall()">+ Nuevo</button>';
-    if (tab === 'inventario') html += '<button class="btn-small" style="background:var(--primary);color:#fff;padding:8px 18px;border-radius:8px;font-size:13px" onclick="newEquipo()">+ Equipo</button>';
-    html += '</div>';
-    html += '<div class="pc-content">';
-  }
-
   const counts = {
     TODOS: records.length,
     ACTIVO: records.filter(r => calcSt(r) === 'ACTIVO').length,
@@ -1558,7 +1495,6 @@ function render() {
 
   // MANTENIMIENTO MODAL
   if (showMantModal) {
-    const eq = equipos.find(x => x.id === mantEqId);
     html += `<div style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
       <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:90vh;overflow-y:auto;padding:20px;font-family:var(--font)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
@@ -1570,7 +1506,7 @@ function render() {
         <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px">ACCIÓN REALIZADA</div>
         <textarea placeholder="¿Qué se hizo para resolverlo?" oninput="setMantForm('accion',this.value)" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none;min-height:70px;margin-bottom:12px">${mantForm.accion}</textarea>
         <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px">OBSERVACIONES (SOPORTE ARGENTINA)</div>
-        <textarea placeholder="Indicaciones o notas del soporte remoto..." oninput="setMantForm('observaciones',this.value)" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none;min-height:60px;margin-bottom:12px">${mantForm.observaciones}</textarea>
+        <textarea placeholder="Indicaciones del soporte remoto..." oninput="setMantForm('observaciones',this.value)" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none;min-height:60px;margin-bottom:12px">${mantForm.observaciones}</textarea>
         <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:8px">RESULTADO</div>
         <div style="display:flex;gap:8px;margin-bottom:12px">
           <div onclick="setMantForm('resultado','pendiente')" style="flex:1;padding:9px 4px;border-radius:10px;border:2px solid ${mantForm.resultado==='pendiente'?'#f59e0b':'var(--border)'};background:${mantForm.resultado==='pendiente'?'#fffbeb':'#fff'};text-align:center;cursor:pointer;font-size:11px;font-weight:700;color:${mantForm.resultado==='pendiente'?'#f59e0b':'var(--text3)'}">⏳ Pendiente</div>
@@ -2155,7 +2091,6 @@ function render() {
         ${(() => {
           const conFallas = historial.filter(r => r.retirado && r.fallas && r.fallas.length > 0);
           if (conFallas.length === 0) return '';
-          // Count fallas
           const conteo = {};
           conFallas.forEach(r => r.fallas.forEach(f => { conteo[f] = (conteo[f]||0) + 1; }));
           const totalFallas = conFallas.length;
@@ -2168,23 +2103,12 @@ function render() {
             '<div style="text-align:center"><div style="font-size:22px;font-weight:800;font-family:var(--mono);color:' + (totalFallas/totalInst > 0.5 ? 'var(--red)' : 'var(--yellow)') + '">' + Math.round(totalFallas/totalInst*100) + '%</div><div style="font-size:9px;color:var(--text3);font-weight:600">TASA DE<br>FALLA</div></div>' +
             '</div>' +
             '<div style="display:flex;flex-direction:column;gap:4px">' +
-            Object.entries(conteo).sort((a,b) => b[1]-a[1]).map(([f,n]) =>
-              '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px">' +
-              '<span style="color:var(--text2)">• ' + f + '</span>' +
-              '<span style="font-weight:700;color:var(--red);font-family:var(--mono)">' + n + 'x</span>' +
-              '</div>'
-            ).join('') +
+            Object.entries(conteo).sort((a,b) => b[1]-a[1]).map(([f,n]) => '<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--text2)">• ' + f + '</span><span style="font-weight:700;color:var(--red);font-family:var(--mono)">' + n + 'x</span></div>').join('') +
             '</div>' +
             '<div style="margin-top:10px;padding-top:8px;border-top:1px solid #fecaca">' +
-            '<div style="font-size:9px;font-weight:700;color:var(--red);letter-spacing:1px;margin-bottom:6px">DETALLE CRONOLÓGICO</div>' +
-            conFallas.slice().reverse().map(r =>
-              '<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid #fee2e2">' +
-              '<div style="color:var(--text2)">' + r.fallas.join(', ') + (r.descripcionFalla ? ' — ' + r.descripcionFalla : '') + '</div>' +
-              '<div style="color:var(--text3);font-family:var(--mono);flex-shrink:0;margin-left:8px">' + fmtDate(r.fechaRetiroReal||r.fechaRetiro) + '</div>' +
-              '</div>'
-            ).join('') +
-            '</div>' +
-            '</div>';
+            '<div style="font-size:9px;font-weight:700;color:var(--red);letter-spacing:1px;margin-bottom:6px">DETALLE</div>' +
+            conFallas.slice().reverse().map(r => '<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid #fee2e2"><div style="color:var(--text2)">' + r.fallas.join(', ') + (r.descripcionFalla ? ' — ' + r.descripcionFalla : '') + '</div><div style="color:var(--text3);font-family:var(--mono);flex-shrink:0;margin-left:8px">' + fmtDate(r.fechaRetiroReal||r.fechaRetiro) + '</div></div>').join('') +
+            '</div></div>';
         })()}
         ${historial.length > 0 ? `
           <div class="section-title" style="margin-top:4px">Historial de instalaciones</div>
@@ -2223,16 +2147,13 @@ function render() {
             ${eq.historialMantenimiento.slice().reverse().map(m => {
               const resColor = m.resultado==='resuelto' ? 'var(--green)' : m.resultado==='sin_solucion' ? 'var(--red)' : '#f59e0b';
               const resLabel = m.resultado==='resuelto' ? '✅ Resuelto' : m.resultado==='sin_solucion' ? '❌ Sin solución' : '⏳ Pendiente';
-              return '<div class="historial-card">' +
-                '<div class="historial-row"><div>' +
+              return '<div class="historial-card"><div class="historial-row"><div>' +
                 '<div class="historial-lugar">' + (m.descripcion||'Sin descripción') + '</div>' +
                 (m.accion ? '<div class="historial-caso">Acción: ' + m.accion + '</div>' : '') +
                 (m.observaciones ? '<div style="font-size:11px;color:var(--text3);margin-top:2px">📋 ' + m.observaciones + '</div>' : '') +
                 '<div style="margin-top:4px"><span style="font-size:10px;font-weight:700;color:'+resColor+'">'+resLabel+'</span></div>' +
                 (m.registradoPor ? '<div style="font-size:10px;color:var(--text3);margin-top:2px">👤 '+m.registradoPor+'</div>' : '') +
-                '</div>' +
-                '<div class="historial-fecha">' + fmtDate(m.fechaInicio) + (m.fechaResolucion ? '<br>→ ' + fmtDate(m.fechaResolucion) : '') + '</div>' +
-                '</div></div>';
+                '</div><div class="historial-fecha">' + fmtDate(m.fechaInicio) + (m.fechaResolucion ? '<br>→ ' + fmtDate(m.fechaResolucion) : '') + '</div></div></div>';
             }).join('')}
           </div>` : ''}
         ${(eq.condicion||'bueno') === 'mantenimiento' ? `
@@ -2325,9 +2246,8 @@ function render() {
   else if (tab === 'carga') {
     html += '<div class="content">';
     // Toggle between subir and historial
-    // Toggle subir/historial
     html += '<div style="display:flex;gap:8px;margin-bottom:16px">';
-    html += '<button onclick="setCargaSubView(\'subir\')" style="flex:1;padding:10px;border-radius:10px;border:2px solid '+(cargaSubView==='subir'?'var(--primary)':'var(--border)')+';background:'+(cargaSubView==='subir'?'var(--primary-light)':'#fff')+';color:'+(cargaSubView==='subir'?'var(--primary)':'var(--text3)')+';font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer">📤 Subir archivo</button>';
+    html += '<button onclick="setCargaSubView(\'subir\')" style="flex:1;padding:10px;border-radius:10px;border:2px solid '+(cargaSubView==='subir'?'var(--primary)':'var(--border)')+';background:'+(cargaSubView==='subir'?'var(--primary-light)':'#fff')+';color:'+(cargaSubView==='subir'?'var(--primary)':'var(--text3)')+';font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer">📥 Subir archivo</button>';
     html += '<button onclick="setCargaSubView(\'historial\')" style="flex:1;padding:10px;border-radius:10px;border:2px solid '+(cargaSubView==='historial'?'var(--primary)':'var(--border)')+';background:'+(cargaSubView==='historial'?'var(--primary-light)':'#fff')+';color:'+(cargaSubView==='historial'?'var(--primary)':'var(--text3)')+';font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer">📋 Historial '+(historialCargas.length>0?'('+historialCargas.length+')':'')+'</button>';
     html += '</div>';
 
@@ -2336,13 +2256,13 @@ function render() {
       if (historialCargas.length === 0) {
         html += '<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Sin despachos registrados</div></div>';
       } else {
-        historialCargas.forEach(c => {
-          html += '<div style="background:var(--white);border:1px solid var(--border);border-left:3px solid var(--primary);border-radius:10px;padding:12px 14px;margin-bottom:10px;box-shadow:var(--shadow)">';
-          html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
+        historialCargas.forEach((c, i) => {
+          html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px">';
+          html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
           html += '<div style="font-size:13px;font-weight:700;color:var(--text)">' + fmtDate(c.fecha) + ' · ' + (c.hora||'') + '</div>';
           html += '<span style="background:var(--primary-light);color:var(--primary);font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px">' + c.total + ' eq.</span>';
           html += '</div>';
-          html += '<div style="font-size:11px;color:var(--text3);margin-bottom:10px">' + (c.areaOrigen||'CPT BT') + ' → Campos y Serv.' + (c.realizadoPor ? ' · 👤 ' + c.realizadoPor : '') + '</div>';
+          html += '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">' + (c.areaOrigen||'CPT BT') + ' → Campos y Serv.' + (c.realizadoPor ? ' · 👤 ' + c.realizadoPor : '') + '</div>';
           html += '<div style="display:flex;gap:6px;margin-bottom:6px">';
           html += '<button onclick="verMemo(\''+c.id+'\')" style="flex:1;padding:9px;border:1px solid var(--primary);border-radius:8px;background:var(--primary-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">📄 Ver memo</button>';
           html += '<button onclick="emailDespacho(\''+c.id+'\')" style="flex-shrink:0;padding:9px 12px;border:1px solid var(--accent);border-radius:8px;background:var(--accent-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">📧</button>';
@@ -2437,7 +2357,8 @@ function render() {
     html += '</div>';
 
         html += '<div style="height:20px"></div>';
-    } // close else subir
+    html += '</div>'; // close upload view else
+    } // close carga subview if/else
     html += '</div>'; // close content
   }
 
@@ -2471,9 +2392,6 @@ function render() {
     html += '<button onclick="verRetiros()" style="flex:1;padding:12px;border:none;border-radius:10px;background:var(--primary);font-family:var(--font);font-size:14px;font-weight:700;color:#fff;cursor:pointer">Ver retiros</button>';
     html += '</div></div></div>';
   }
-
-  // Close PC wrapper
-  if (isPC) html += '</div></div>'; // close pc-content + pc-main
 
   // BOTTOM NAV
   html += `<nav class="bottom-nav">
@@ -2514,7 +2432,12 @@ window.setInstTab = t => { instTab = t; filterStatus = 'TODOS'; render(); };
 window.handleFileUpload = e => { const f = e.target.files[0]; if (f) procesarExcel(f); };
 window.confirmarCarga = confirmarCargaMasiva;
 window.cancelarCarga = () => { cargaData = []; cargaView = 'upload'; render(); };
-window.setCargaSubView = v => { cargaSubView = v; render(); };
+window.verMemo = id => {
+  get(ref(db, 'historialCargas/' + id + '/memo')).then(snap => {
+    if (snap.exists()) abrirMemo(snap.val());
+    else showToast('Memo no disponible');
+  }).catch(() => showToast('Error al cargar memo'));
+};
 window.emailDespacho = id => {
   const c = historialCargas.find(x => x.id === id);
   if (!c) return;
@@ -2524,49 +2447,45 @@ window.emailDespacho = id => {
     const fechaFmt = c.fecha ? c.fecha.split('-').reverse().join('/') : '';
     let tabla = '';
     if (snap.exists()) {
-      // Parse rows from memo HTML
-      const memoHtml = snap.val();
       const parser = new DOMParser();
-      const doc = parser.parseFromString(memoHtml, 'text/html');
+      const doc = parser.parseFromString(snap.val(), 'text/html');
       const rows = doc.querySelectorAll('tbody tr');
       const pad = (s, w) => (s||'').substring(0, w).padEnd(w);
       tabla = pad('N SIGET', 16) + pad('Serie', 14) + pad('Vineta', 10) + 'Usuario\n';
       tabla += '-'.repeat(60) + '\n';
       rows.forEach(row => {
         const cells = row.querySelectorAll('td');
-        if (cells.length >= 4) {
-          tabla += pad(cells[0].textContent.trim(), 16) + pad(cells[1].textContent.trim(), 14) + pad(cells[2].textContent.trim(), 10) + cells[4].textContent.trim() + '\n';
-        }
+        if (cells.length >= 4) tabla += pad(cells[0].textContent.trim(), 16) + pad(cells[1].textContent.trim(), 14) + pad(cells[2].textContent.trim(), 10) + cells[4].textContent.trim() + '\n';
       });
     }
-    const lineas = [
-      'Para: Campos y Servicios',
-      'Asunto: Asignacion de ' + c.total + ' analizadores de redes ECAMEC',
-      'Fecha: ' + fechaFmt,
-      '',
-      'Mediante la presente se notifica asignacion de ' + c.total + ' analizadores de redes ECAMEC, los cuales seran usados para las siguientes mediciones.',
-      '',
-      tabla,
-      'Area: ' + (c.areaOrigen||'') + ' -> Campos y Servicios',
-      c.realizadoPor ? 'Registrado por: ' + c.realizadoPor : '',
-      '',
-      'Documento generado por CPT INNOVA - Sistema de Gestion de Analizadores de Red'
-    ].join('\n');
+    const lineas = ['Para: Campos y Servicios', 'Asunto: Asignacion de ' + c.total + ' analizadores de redes ECAMEC', 'Fecha: ' + fechaFmt, '', 'Mediante la presente se notifica asignacion de ' + c.total + ' analizadores de redes ECAMEC, los cuales seran usados para las siguientes mediciones.', '', tabla, 'Area: ' + (c.areaOrigen||'') + ' -> Campos y Servicios', c.realizadoPor ? 'Registrado por: ' + c.realizadoPor : '', '', 'Documento generado por CPT INNOVA - Sistema de Gestion de Analizadores de Red'].join('\n');
     window.location.href = 'mailto:?subject=' + asunto + '&body=' + encodeURIComponent(lineas);
   }).catch(() => showToast('Error al cargar memo'));
 };
 window.eliminarDespacho = id => {
-  if (!isAdmin()) return showToast('⚠️ Solo el administrador puede eliminar');
-  if (!confirm('¿Eliminar este despacho del historial?')) return;
-  remove(ref(db, 'historialCargas/' + id)).then(() => showToast('🗑 Despacho eliminado'));
+  if (!isAdmin()) return showToast('Solo el administrador puede eliminar');
+  if (!confirm('Eliminar este despacho del historial?')) return;
+  remove(ref(db, 'historialCargas/' + id)).then(() => showToast('Despacho eliminado'));
 };
-window.verMemo = id => {
-  get(ref(db, 'historialCargas/' + id + '/memo')).then(snap => {
-    if (snap.exists()) abrirMemo(snap.val());
-    else showToast('Memo no disponible');
-  }).catch(() => showToast('Error al cargar memo'));
+window.setCargaSubView = v => { cargaSubView = v; render(); };
+window.regenerarMemo = id => {
+  const c = historialCargas.find(x => x.id === id);
+  if (!c) return showToast('No se encontró el registro');
+  // Rebuild filas format expected by generarMemoCargaMasiva
+  const filas = (c.equipos||[]).map(e => ({
+    serie: e.s||e.serie||'', modelo: e.modelo||'', vineta: e.v||e.vineta||'',
+    caso: e.c||e.caso||'', lugar: e.l||e.lugar||'',
+    fechaInst: e.fi||e.fechaInst||'', fechaRetiro: e.fr||e.fechaRetiro||'', notas: e.n||e.notas||'',
+    idUsuario: e.iu||e.idUsuario||'', direccion: e.d||e.direccion||'',
+    accesorios: e.ac||e.accesorios||'', multiplicador: e.m||e.multiplicador||'',
+    corrientes: e.co||e.corrientes||'', conexion: e.cx||e.conexion||''
+  }));
+  // Temporarily set cargaAreaOrigen to saved value
+  const prevArea = cargaAreaOrigen;
+  cargaAreaOrigen = c.areaOrigen || 'CPT BT';
+  generarMemoCargaMasiva(filas);
+  cargaAreaOrigen = prevArea;
 };
-
 window.setCargaOrigen = a => { cargaAreaOrigen = a; render(); };
 window.cerrarAlerta = () => { showAlertaRetiros = false; render(); };
 window.setMapaFiltro = f => { mapaFiltro = f; render(); };
@@ -2690,59 +2609,6 @@ window.eliminarCondicion = (eqId, idx) => {
     .then(() => showToast('🗑 Registro eliminado'));
 };
 window.registrarDevolucion = handleDevolucion;
-window.closeCondicionModal = () => { showCondicionModal = false; condicionEqId = null; render(); };
-window.setCondicionField = (k, v) => { condicionForm[k] = v; render(); };
-window.setCondicionNota = v => { condicionForm.nota = v; };
-window.doCondicion = confirmCondicion;
-window.openCondicionModal = openCondicionModal;
-window.closePrestamoModal = () => { showPrestamoModal = false; prestamoId = null; render(); };
-window.setPrestamoField = (k, v) => { prestamoForm[k] = v; render(); };
-window.setPrestamoNota = v => { prestamoForm.nota = v; };
-window.doMovimiento = confirmMovimiento;
-window.activarModoLote = tipo => {
-  modoSeleccionLote = true;
-  seleccionLote = [];
-  tipoLote = tipo || 'prestamo';
-  render();
-};
-window.cancelarLote = () => { modoSeleccionLote = false; seleccionLote = []; render(); };
-window.toggleLote = id => {
-  const idx = seleccionLote.indexOf(id);
-  if (idx >= 0) seleccionLote.splice(idx, 1); else seleccionLote.push(id);
-  render();
-};
-window.toggleLoteCard = id => {
-  const eq = equipos.find(x => x.id === id);
-  if (!eq) return;
-  // For prestamo: must have prestado=true. For devolucion: must have last movimiento=devolucion
-  if (tipoLote === 'prestamo' && !eqPrestado(eq)) return;
-  if (tipoLote === 'devolucion') {
-    const movs = eq.movimientos || [];
-    const last = movs[movs.length - 1];
-    if (!last || last.tipo !== 'devolucion') return;
-  }
-  toggleLote(id);
-};
-window.generarLotePDF = () => {
-  if (seleccionLote.length === 0) return showToast('Selecciona al menos un equipo');
-  const items = seleccionLote.map(id => {
-    const eq = equipos.find(x => x.id === id);
-    if (!eq) return null;
-    const movs = (eq.movimientos||[]).filter(m => m.tipo === tipoLote);
-    const mov = movs.length > 0 ? movs[movs.length-1] : null;
-    return { eq, movimiento: mov };
-  }).filter(Boolean);
-  generateLotePDF(items, tipoLote);
-  modoSeleccionLote = false; seleccionLote = []; render();
-};
-window.generarMemo = (eqId, movIdx) => {
-  const eq = equipos.find(x => x.id === eqId);
-  if (!eq || !eq.movimientos) return;
-  const mov = eq.movimientos[movIdx];
-  if (mov) generateMemoPDF(eq, mov);
-};
-
-cion;
 window.closeCondicionModal = () => { showCondicionModal = false; condicionEqId = null; render(); };
 window.setCondicionField = (k, v) => { condicionForm[k] = v; render(); };
 window.setCondicionNota = v => { condicionForm.nota = v; };
