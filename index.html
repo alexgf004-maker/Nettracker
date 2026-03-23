@@ -262,7 +262,7 @@
 <div id="app"><div class="loading"><div class="spinner"></div><div class="loading-text">CONECTANDO...</div></div></div>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, onValue, push, update, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getDatabase, ref, onValue, push, update, remove, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDmwLWle24Nldh-Y6YBmYLaaDA6ZTpuKuc",
@@ -1013,13 +1013,20 @@ function confirmarCargaMasiva() {
     count++;
   });
 
-  // Save to historial
-
-
   showToast('✅ ' + count + ' instalaciones registradas');
-  generarMemoCargaMasiva(validos);
+  // Build memo HTML and save everything to Firebase
+  const memoHtml = buildMemoCargaMasiva(validos);
+  push(historialCargasRef, {
+    fecha: today(),
+    hora: new Date().toLocaleTimeString('es-SV', {hour:'2-digit', minute:'2-digit'}),
+    areaOrigen: cargaAreaOrigen,
+    total: validos.length,
+    realizadoPor: sesionUsuario?.nombre || 'Desconocido',
+    memo: memoHtml
+  });
+  abrirMemo(memoHtml);
   cargaData = []; cargaView = 'upload';
-  tab = 'carga'; cargaSubView = 'historial'; // Show historial after confirmar
+  tab = 'carga'; cargaSubView = 'historial';ar
   render();
 }
 
@@ -2341,15 +2348,10 @@ window.confirmarCarga = confirmarCargaMasiva;
 window.cancelarCarga = () => { cargaData = []; cargaView = 'upload'; render(); };
 window.setCargaSubView = v => { cargaSubView = v; render(); };
 window.verMemo = id => {
-  const c = historialCargas.find(x => x.id === id);
-  if (!c) return showToast('No encontrado');
-  // Load full record from Firebase to get memo HTML
-  import('https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js').then(({get}) => {
-    get(ref(db, 'historialCargas/' + id + '/memo')).then(snap => {
-      if (snap.exists()) abrirMemo(snap.val());
-      else showToast('Memo no disponible');
-    });
-  });
+  get(ref(db, 'historialCargas/' + id + '/memo')).then(snap => {
+    if (snap.exists()) abrirMemo(snap.val());
+    else showToast('Memo no disponible');
+  }).catch(() => showToast('Error al cargar memo'));
 };
 
 window.setCargaOrigen = a => { cargaAreaOrigen = a; render(); };
