@@ -2354,21 +2354,42 @@ window.setCargaSubView = v => { cargaSubView = v; render(); };
 window.emailDespacho = id => {
   const c = historialCargas.find(x => x.id === id);
   if (!c) return;
-  const asunto = encodeURIComponent('Memorandum de Asignacion de Equipos - ' + (c.areaOrigen||'CPT') + ' - ' + (c.fecha||''));
-  const fechaFmt = c.fecha ? c.fecha.split('-').reverse().join('/') : '';
-  const lineas = [
-    'Para: Campos y Servicios',
-    'Asunto: Asignacion de ' + c.total + ' analizadores de redes ECAMEC',
-    'Fecha: ' + fechaFmt,
-    '',
-    'Mediante la presente se notifica asignacion de ' + c.total + ' analizadores de redes ECAMEC, los cuales seran usados para las siguientes mediciones.',
-    '',
-    'Area: ' + (c.areaOrigen||'') + ' -> Campos y Servicios',
-    c.realizadoPor ? 'Registrado por: ' + c.realizadoPor : '',
-    '',
-    'Documento generado por CPT INNOVA - Sistema de Gestion de Analizadores de Red'
-  ].join('\n');
-  window.location.href = 'mailto:?subject=' + asunto + '&body=' + encodeURIComponent(lineas);
+  showToast('Preparando correo...');
+  get(ref(db, 'historialCargas/' + id + '/memo')).then(snap => {
+    const asunto = encodeURIComponent('Memorandum de Asignacion de Equipos - ' + (c.areaOrigen||'CPT') + ' - ' + (c.fecha||''));
+    const fechaFmt = c.fecha ? c.fecha.split('-').reverse().join('/') : '';
+    let tabla = '';
+    if (snap.exists()) {
+      // Parse rows from memo HTML
+      const memoHtml = snap.val();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(memoHtml, 'text/html');
+      const rows = doc.querySelectorAll('tbody tr');
+      const pad = (s, w) => (s||'').substring(0, w).padEnd(w);
+      tabla = pad('N SIGET', 16) + pad('Serie', 14) + pad('Vineta', 10) + 'Usuario\n';
+      tabla += '-'.repeat(60) + '\n';
+      rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        if (cells.length >= 4) {
+          tabla += pad(cells[0].textContent.trim(), 16) + pad(cells[1].textContent.trim(), 14) + pad(cells[2].textContent.trim(), 10) + cells[4].textContent.trim() + '\n';
+        }
+      });
+    }
+    const lineas = [
+      'Para: Campos y Servicios',
+      'Asunto: Asignacion de ' + c.total + ' analizadores de redes ECAMEC',
+      'Fecha: ' + fechaFmt,
+      '',
+      'Mediante la presente se notifica asignacion de ' + c.total + ' analizadores de redes ECAMEC, los cuales seran usados para las siguientes mediciones.',
+      '',
+      tabla,
+      'Area: ' + (c.areaOrigen||'') + ' -> Campos y Servicios',
+      c.realizadoPor ? 'Registrado por: ' + c.realizadoPor : '',
+      '',
+      'Documento generado por CPT INNOVA - Sistema de Gestion de Analizadores de Red'
+    ].join('\n');
+    window.location.href = 'mailto:?subject=' + asunto + '&body=' + encodeURIComponent(lineas);
+  }).catch(() => showToast('Error al cargar memo'));
 };
 window.eliminarDespacho = id => {
   if (!isAdmin()) return showToast('⚠️ Solo el administrador puede eliminar');
