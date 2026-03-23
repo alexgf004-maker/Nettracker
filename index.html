@@ -401,6 +401,7 @@ onValue(historialCargasRef, snap => {
   historialCargas = [];
   snap.forEach(c => historialCargas.push({ id: c.key, ...c.val() }));
   historialCargas.sort((a, b) => ((b.fecha||'')+' '+(b.hora||'')).localeCompare((a.fecha||'')+' '+(a.hora||'')));
+  console.log('historialCargas loaded:', historialCargas.length, historialCargas.map(c => c.fecha+' '+c.hora));
   render();
 });
 
@@ -954,7 +955,7 @@ function procesarExcel(file) {
         if (!serie) { status = 'error'; problema = 'Sin número de serie'; }
         else if (!eq) { status = 'error'; problema = 'Equipo no existe en inventario'; }
         else if ((eq.condicion||'bueno') === 'fuera') { status = 'error'; problema = 'Fuera de servicio'; }
-        else if (eqEnCampo(eq)) { status = 'error'; problema = 'Ya está en campo'; }
+        else if (eqEnCampo(eq)) { status = 'warning'; problema = 'Ya está en campo'; }
         else if (!caso) { status = 'warning'; problema = 'Sin número SIGET'; }
         else if (!fechaRetiro) { status = 'warning'; problema = 'Sin fecha de retiro'; }
 
