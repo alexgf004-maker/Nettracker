@@ -1028,9 +1028,18 @@ function confirmarCargaMasiva() {
   if (validos.length > 0) push(historialCargasRef, registroCarga);
 
   showToast('✅ ' + count + ' instalaciones registradas');
-  generarMemoCargaMasiva(validos);
+  const memoHtml = buildMemoCargaMasiva(validos);
+  push(historialCargasRef, {
+    fecha: today(),
+    hora: new Date().toLocaleTimeString('es-SV', {hour:'2-digit', minute:'2-digit'}),
+    areaOrigen: cargaAreaOrigen,
+    total: validos.length,
+    realizadoPor: sesionUsuario?.nombre || 'Desconocido',
+    memo: memoHtml
+  });
+  abrirMemo(memoHtml);
   cargaData = []; cargaView = 'upload';
-  tab = 'carga'; cargaSubView = 'historial'; // Show historial after confirmar
+  tab = 'carga'; cargaSubView = 'historial';
   render();
 }
 
