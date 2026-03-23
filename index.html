@@ -308,7 +308,7 @@ let prestamoForm = { de: 'CPT BT', a: 'CPT MT', nota: '', tipo: 'prestamo' };
 let modoSeleccionLote = false;
 let cargaData = []; // preview rows from excel
 let cargaView = 'upload'; // upload | preview
-let cargaSubView = 'subir'; // subir | historial
+let cargaSubView = 'subir';
 let historialCargas = [];
 let cargaAreaOrigen = 'CPT BT';
 let showImportModal = false;
@@ -397,9 +397,13 @@ onValue(installsRef, snap => {
   render();
 });
 
+
 onValue(historialCargasRef, snap => {
   historialCargas = [];
-  snap.forEach(c => historialCargas.push({ id: c.key, ...c.val() }));
+  snap.forEach(c => {
+    const val = c.val();
+    historialCargas.push({ id: c.key, fecha: val.fecha, hora: val.hora, areaOrigen: val.areaOrigen, total: val.total, realizadoPor: val.realizadoPor });
+  });
   historialCargas.sort((a, b) => ((b.fecha||'')+' '+(b.hora||'')).localeCompare((a.fecha||'')+' '+(a.hora||'')));
   render();
 });
@@ -1010,15 +1014,7 @@ function confirmarCargaMasiva() {
   });
 
   // Save to historial
-  const registroCarga = {
-    fecha: today(),
-    hora: new Date().toLocaleTimeString('es-SV', {hour:'2-digit', minute:'2-digit'}),
-    areaOrigen: cargaAreaOrigen,
-    total: validos.length,
-    realizadoPor: sesionUsuario?.nombre || 'Desconocido',
-    series: validos.map(r => r.caso).join(',')
-  };
-  if (validos.length > 0) push(historialCargasRef, registroCarga);
+
 
   showToast('✅ ' + count + ' instalaciones registradas');
   generarMemoCargaMasiva(validos);
@@ -1027,7 +1023,7 @@ function confirmarCargaMasiva() {
   render();
 }
 
-function generarMemoCargaMasiva(filas) {
+function buildMemoCargaMasiva(filas) {
   const esMT = cargaAreaOrigen === 'CPT MT' || cargaAreaOrigen === 'CPT DELSUR';
   const fecha = new Date().toLocaleDateString('es-SV');
   const td = (v, mono) => '<td style="padding:4px 6px;font-size:9px;border-bottom:1px solid #e2e8f0;'+(mono?'font-family:\'Courier New\',monospace;font-weight:700':'')+'">'+(v||'—')+'</td>';
@@ -1115,10 +1111,18 @@ function generarMemoCargaMasiva(filas) {
   <div class="footer">Documento generado por CPT INNOVA · Sistema de Gestión de Analizadores de Red · ${fecha}</div>
   <\/body><\/html>`;
 
+  return html;
+}
+
+function abrirMemo(html) {
   const win = window.open('', '_blank');
   win.document.write(html);
   win.document.close();
   setTimeout(() => win.print(), 500);
+}
+
+function generarMemoCargaMasiva(filas) {
+  abrirMemo(buildMemoCargaMasiva(filas));
 }
 
 function procesarExcelInventario(file) {
@@ -2153,25 +2157,25 @@ function render() {
   else if (tab === 'carga') {
     html += '<div class="content">';
     // Toggle between subir and historial
+    // Toggle subir/historial
     html += '<div style="display:flex;gap:8px;margin-bottom:16px">';
-    html += '<button onclick="setCargaSubView(\'subir\')" style="flex:1;padding:10px;border-radius:10px;border:2px solid '+(cargaSubView==='subir'?'var(--primary)':'var(--border)')+';background:'+(cargaSubView==='subir'?'var(--primary-light)':'#fff')+';color:'+(cargaSubView==='subir'?'var(--primary)':'var(--text3)')+';font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer">📥 Subir archivo</button>';
+    html += '<button onclick="setCargaSubView(\'subir\')" style="flex:1;padding:10px;border-radius:10px;border:2px solid '+(cargaSubView==='subir'?'var(--primary)':'var(--border)')+';background:'+(cargaSubView==='subir'?'var(--primary-light)':'#fff')+';color:'+(cargaSubView==='subir'?'var(--primary)':'var(--text3)')+';font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer">📤 Subir archivo</button>';
     html += '<button onclick="setCargaSubView(\'historial\')" style="flex:1;padding:10px;border-radius:10px;border:2px solid '+(cargaSubView==='historial'?'var(--primary)':'var(--border)')+';background:'+(cargaSubView==='historial'?'var(--primary-light)':'#fff')+';color:'+(cargaSubView==='historial'?'var(--primary)':'var(--text3)')+';font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer">📋 Historial '+(historialCargas.length>0?'('+historialCargas.length+')':'')+'</button>';
     html += '</div>';
 
     if (cargaSubView === 'historial') {
       html += '<div class="page-title">📋 Historial de despachos</div>';
       if (historialCargas.length === 0) {
-        html += '<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Aún no hay despachos registrados</div></div>';
+        html += '<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Sin despachos registrados</div></div>';
       } else {
         historialCargas.forEach(c => {
-          const btnMemo = '<button onclick="regenerarMemo(\''+c.id+'\')" style="width:100%;padding:9px;border:1px solid var(--primary);border-radius:8px;background:var(--primary-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">📄 Ver / Regenerar memo</button>';
           html += '<div style="background:var(--white);border:1px solid var(--border);border-left:3px solid var(--primary);border-radius:10px;padding:12px 14px;margin-bottom:10px;box-shadow:var(--shadow)">';
           html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
           html += '<div style="font-size:13px;font-weight:700;color:var(--text)">' + fmtDate(c.fecha) + ' · ' + (c.hora||'') + '</div>';
           html += '<span style="background:var(--primary-light);color:var(--primary);font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px">' + c.total + ' eq.</span>';
           html += '</div>';
           html += '<div style="font-size:11px;color:var(--text3);margin-bottom:10px">' + (c.areaOrigen||'CPT BT') + ' → Campos y Serv.' + (c.realizadoPor ? ' · 👤 ' + c.realizadoPor : '') + '</div>';
-          html += btnMemo;
+          html += '<button onclick="verMemo(\''+c.id+'\')" style="width:100%;padding:9px;border:1px solid var(--primary);border-radius:8px;background:var(--primary-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">📄 Ver memo</button>';
           html += '</div>';
         });
       }
@@ -2261,8 +2265,7 @@ function render() {
     html += '</div>';
 
         html += '<div style="height:20px"></div>';
-    html += '</div>'; // close upload view else
-    } // close carga subview if/else
+    } // close else subir
     html += '</div>'; // close content
   }
 
@@ -2337,28 +2340,18 @@ window.handleFileUpload = e => { const f = e.target.files[0]; if (f) procesarExc
 window.confirmarCarga = confirmarCargaMasiva;
 window.cancelarCarga = () => { cargaData = []; cargaView = 'upload'; render(); };
 window.setCargaSubView = v => { cargaSubView = v; render(); };
-window.regenerarMemo = id => {
+window.verMemo = id => {
   const c = historialCargas.find(x => x.id === id);
-  if (!c) return showToast('No se encontró el registro');
-  // Find records registered on the same date and area
-  const filas = records
-    .filter(r => r.fechaRegistro === c.fecha && r.areaInstalacion === 'Campos y Servicios')
-    .map(r => {
-      const eq = equipos.find(e => e.id === r.equipoId) || {};
-      return {
-        serie: r.serie||'', modelo: r.modelo||'', vineta: eq.vineta||'',
-        caso: r.caso||'', lugar: r.lugar||'',
-        fechaInst: r.fechaInstalacion ? r.fechaInstalacion.split('-').reverse().join('/') : '',
-        fechaRetiro: r.fechaRetiro ? r.fechaRetiro.split('-').reverse().join('/') : '',
-        notas: r.notas||'', idUsuario: '', direccion: '', accesorios: '', multiplicador: '', corrientes: '', conexion: ''
-      };
+  if (!c) return showToast('No encontrado');
+  // Load full record from Firebase to get memo HTML
+  import('https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js').then(({get}) => {
+    get(ref(db, 'historialCargas/' + id + '/memo')).then(snap => {
+      if (snap.exists()) abrirMemo(snap.val());
+      else showToast('Memo no disponible');
     });
-  if (filas.length === 0) return showToast('No se encontraron instalaciones para esta fecha');
-  const prevArea = cargaAreaOrigen;
-  cargaAreaOrigen = c.areaOrigen || 'CPT BT';
-  generarMemoCargaMasiva(filas);
-  cargaAreaOrigen = prevArea;
+  });
 };
+
 window.setCargaOrigen = a => { cargaAreaOrigen = a; render(); };
 window.cerrarAlerta = () => { showAlertaRetiros = false; render(); };
 window.setMapaFiltro = f => { mapaFiltro = f; render(); };
