@@ -879,28 +879,6 @@ function generateMemoPDF(eq, movimiento) {
   win.document.close();
   setTimeout(() => win.print(), 500);
 
-  // Email
-  const tipoM = movimiento.tipo === 'prestamo' ? 'PRESTAMO' : 'DEVOLUCION';
-  const asuntoM = encodeURIComponent('Memorandum de ' + tipoM + ' - ' + eq.serie + ' - ' + new Date().toLocaleDateString('es-SV'));
-  const lineasM = [
-    'Para: ' + (movimiento.a||''),
-    'Asunto: ' + tipoM + ' de equipo analizador de red',
-    'Fecha: ' + new Date().toLocaleDateString('es-SV'),
-    '',
-    'Serie: ' + eq.serie,
-    eq.vineta ? 'Vineta: ' + eq.vineta : '',
-    'Modelo: ' + (eq.modelo||''),
-    '',
-    'Movimiento: ' + (movimiento.de||'') + ' -> ' + (movimiento.a||''),
-    movimiento.nota ? 'Nota: ' + movimiento.nota : '',
-    '',
-    'Documento generado por CPT INNOVA - Sistema de Gestion de Analizadores de Red'
-  ].filter(l => l !== null && l !== undefined).join('\n');
-  setTimeout(() => {
-    if (confirm('Deseas enviar este memo por correo?')) {
-      window.location.href = 'mailto:?subject=' + asuntoM + '&body=' + encodeURIComponent(lineasM);
-    }
-  }, 1000);
 }
 
 function openCondicionModal(id) {
@@ -2108,7 +2086,10 @@ function render() {
                   <div class="historial-fecha">${fmtDate(m.fecha)}</div>
                 </div>
                 ${isAdmin() ? `<button onclick="eliminarMovimiento('${eq.id}', ${eq.movimientos.indexOf(m)})" style="width:100%;padding:8px;border:1px solid var(--red);border-radius:8px;background:var(--red-light);color:var(--red);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;margin-bottom:6px">🗑 Eliminar movimiento</button>` : ''}
-                <button onclick="generarMemo('${eq.id}',${eq.movimientos.indexOf(m)})" style="margin-top:8px;width:100%;padding:8px;border:1px solid var(--primary);border-radius:8px;background:var(--primary-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer">📄 Generar memorándum PDF</button>
+                <div style="display:flex;gap:6px;margin-top:8px">
+                  <button onclick="generarMemo('${eq.id}',${eq.movimientos.indexOf(m)})" style="flex:1;padding:8px;border:1px solid var(--primary);border-radius:8px;background:var(--primary-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer">📄 Generar memorándum PDF</button>
+                  <button onclick="emailMemo('${eq.id}',${eq.movimientos.indexOf(m)})" style="flex-shrink:0;padding:8px 12px;border:1px solid var(--accent);border-radius:8px;background:var(--accent-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer">📧</button>
+                </div>
               </div>`).join('')}
           </div>` : ''}
         ${(() => {
@@ -2682,6 +2663,29 @@ window.generarMemo = (eqId, movIdx) => {
   if (!eq || !eq.movimientos) return;
   const mov = eq.movimientos[movIdx];
   if (mov) generateMemoPDF(eq, mov);
+};
+window.emailMemo = (eqId, movIdx) => {
+  const eq = equipos.find(x => x.id === eqId);
+  if (!eq || !eq.movimientos) return;
+  const mov = eq.movimientos[movIdx];
+  if (!mov) return;
+  const tipoM = mov.tipo === 'prestamo' ? 'PRESTAMO' : 'DEVOLUCION';
+  const asunto = encodeURIComponent('Memorandum de ' + tipoM + ' - ' + eq.serie + ' - ' + new Date().toLocaleDateString('es-SV'));
+  const lineas = [
+    'Para: ' + (mov.a||''),
+    'Asunto: ' + tipoM + ' de equipo analizador de red',
+    'Fecha: ' + new Date().toLocaleDateString('es-SV'),
+    '',
+    'Serie: ' + eq.serie,
+    eq.vineta ? 'Vineta: ' + eq.vineta : '',
+    'Modelo: ' + (eq.modelo||''),
+    '',
+    'Movimiento: ' + (mov.de||'') + ' -> ' + (mov.a||''),
+    mov.nota ? 'Nota: ' + mov.nota : '',
+    '',
+    'Documento generado por CPT INNOVA - Sistema de Gestion de Analizadores de Red'
+  ].filter(Boolean).join('\n');
+  window.location.href = 'mailto:?subject=' + asunto + '&body=' + encodeURIComponent(lineas);
 };
 
 </script>
