@@ -51,6 +51,64 @@
 
     body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; max-width: 480px; margin: 0 auto; }
 
+    /* ── PC LAYOUT ── */
+    @media (min-width: 768px) {
+      body { max-width: 100%; margin: 0; }
+      #app { display: flex; min-height: 100vh; }
+
+      /* Sidebar */
+      .pc-sidebar {
+        width: 220px; flex-shrink: 0;
+        background: linear-gradient(180deg, var(--primary-dark) 0%, var(--primary) 100%);
+        position: fixed; top: 0; left: 0; bottom: 0;
+        display: flex; flex-direction: column;
+        z-index: 60; box-shadow: 4px 0 20px rgba(0,87,184,.2);
+      }
+      .pc-sidebar-logo {
+        padding: 20px 18px 16px;
+        border-bottom: 1px solid rgba(255,255,255,.15);
+      }
+      .pc-sidebar-nav {
+        flex: 1; padding: 12px 10px; display: flex; flex-direction: column; gap: 4px;
+      }
+      .pc-nav-btn {
+        display: flex; align-items: center; gap: 10px;
+        padding: 11px 14px; border-radius: 10px;
+        border: none; background: none; cursor: pointer;
+        font-family: var(--font); font-size: 13px; font-weight: 600;
+        color: rgba(255,255,255,.7); text-align: left; width: 100%;
+        transition: all .15s;
+      }
+      .pc-nav-btn:hover { background: rgba(255,255,255,.1); color: #fff; }
+      .pc-nav-btn.active { background: rgba(255,255,255,.2); color: #fff; }
+      .pc-nav-icon { font-size: 18px; }
+      .pc-sidebar-user {
+        padding: 14px 18px;
+        border-top: 1px solid rgba(255,255,255,.15);
+        font-size: 12px; color: rgba(255,255,255,.7);
+        cursor: pointer;
+      }
+
+      /* Main content area */
+      .pc-main {
+        margin-left: 220px; flex: 1;
+        display: flex; flex-direction: column;
+        min-height: 100vh;
+      }
+      .pc-topbar {
+        background: var(--white); border-bottom: 1px solid var(--border);
+        padding: 12px 24px; display: flex; align-items: center;
+        justify-content: space-between; position: sticky; top: 0; z-index: 50;
+        box-shadow: var(--shadow);
+      }
+      .pc-content { padding: 24px; max-width: 960px; }
+
+      /* Hide mobile elements */
+      header { display: none !important; }
+      .bottom-nav { display: none !important; }
+      .content { padding: 0 !important; }
+    }
+
     /* HEADER */
     header {
       background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 60%, #0077cc 100%);
@@ -228,39 +286,7 @@
     .section-title { font-size: 10px; font-weight: 700; color: var(--text3); letter-spacing: 1px; margin-bottom: 10px; text-transform: uppercase; }
 
     /* SELECTOR */
-    .selector-item { background: var(--white); border: 1.5px solid var(--border); border-radius: var(--radius-sm); padding: 14px; cursor: pointer; transition: all .15s; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .selector-item:active { border-color: var(--primary); background: var(--primary-light); }
-    .selector-item.disabled { opacity: .4; pointer-events: none; }
-
-    /* FAULT OPTIONS */
-    .fault-option { padding: 13px 16px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 8px; cursor: pointer; font-size: 15px; font-weight: 600; color: var(--text2); background: var(--white); transition: all .15s; display: flex; align-items: center; gap: 10px; }
-    .fault-option.selected { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
-
-    /* TOAST */
-    .toast {
-      position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
-      background: var(--primary-dark); color: #fff;
-      padding: 12px 20px; border-radius: 12px; font-size: 14px;
-      z-index: 400; box-shadow: var(--shadow-blue);
-      max-width: 90%; text-align: center; font-weight: 600;
-      animation: toastIn .25s ease;
-    }
-    @keyframes toastIn { from{opacity:0;transform:translateX(-50%) translateY(12px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
-
-    /* LOADING */
-    .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 16px; background: var(--bg); }
-    .spinner { width: 36px; height: 36px; border: 3px solid var(--primary-light); border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .loading-text { font-size: 14px; color: var(--text3); font-weight: 600; letter-spacing: .5px; }
-
-    .divider { height: 1px; background: var(--border); margin: 16px 0; }
-
-  </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-</head>
-<body>
-<div id="app"><div class="loading"><div class="spinner"></div><div class="loading-text">CONECTANDO...</div></div></div>
-<script type="module">
+    .selector-item { background: var(--white); border: 1.5px solid var(--border
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, onValue, push, update, remove, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
@@ -1320,6 +1346,42 @@ function render() {
       if (pinEl) pinEl.focus();
     }
     return;
+  }
+
+  // ── PC LAYOUT WRAPPER ──
+  const isPC = window.innerWidth >= 768;
+  if (isPC) {
+    const pcTabs = [
+      {key:'instalaciones', icon:'⚡', label:'Instalaciones'},
+      {key:'mapa', icon:'📍', label:'Mapa'},
+      {key:'inventario', icon:'📦', label:'Inventario'},
+      {key:'carga', icon:'📤', label:'Despachos'},
+    ];
+    let sidebar = '<div class="pc-sidebar">';
+    sidebar += '<div class="pc-sidebar-logo">';
+    sidebar += '<div style="display:flex;align-items:center;gap:10px">';
+    sidebar += '<div style="width:36px;height:36px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:10px;display:flex;align-items:center;justify-content:center">';
+    sidebar += '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="2" width="18" height="20" rx="2" stroke="white" stroke-width="1.8" fill="none"/><path d="M8 7h8M8 10h5" stroke="white" stroke-width="1.5" stroke-linecap="round"/><path d="M12 14l-2 4h4l-2 4" stroke="#7dd3fc" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    sidebar += '</div><div><div style="font-size:15px;font-weight:800;color:#fff">CPT INNOVA</div><div style="font-size:10px;color:rgba(255,255,255,.6)">Analizadores de Red</div></div></div></div>';
+    sidebar += '<div class="pc-sidebar-nav">';
+    pcTabs.forEach(t => {
+      sidebar += '<button class="pc-nav-btn ' + (tab===t.key?'active':'') + '" onclick="switchTab(\''+t.key+'\')">';
+      sidebar += '<span class="pc-nav-icon">' + t.icon + '</span>' + t.label + '</button>';
+    });
+    sidebar += '</div>';
+    sidebar += '<div class="pc-sidebar-user" onclick="cerrarSesion()">👤 ' + (sesionUsuario?.nombre||'') + '  ↩</div>';
+    sidebar += '</div>';
+
+    // Inject sidebar before main content
+    html += sidebar;
+    html += '<div class="pc-main">';
+    // PC topbar
+    html += '<div class="pc-topbar">';
+    html += '<div style="font-size:18px;font-weight:800;color:var(--text)">' + pcTabs.find(t=>t.key===tab)?.icon + ' ' + pcTabs.find(t=>t.key===tab)?.label + '</div>';
+    if (tab === 'instalaciones') html += '<button class="btn-small" style="background:var(--primary);color:#fff;padding:8px 18px;border-radius:8px;font-size:13px" onclick="newInstall()">+ Nuevo</button>';
+    if (tab === 'inventario') html += '<button class="btn-small" style="background:var(--primary);color:#fff;padding:8px 18px;border-radius:8px;font-size:13px" onclick="newEquipo()">+ Equipo</button>';
+    html += '</div>';
+    html += '<div class="pc-content">';
   }
 
   const counts = {
@@ -2410,6 +2472,9 @@ function render() {
     html += '</div></div></div>';
   }
 
+  // Close PC wrapper
+  if (isPC) html += '</div></div>'; // close pc-content + pc-main
+
   // BOTTOM NAV
   html += `<nav class="bottom-nav">
     <button class="nav-btn ${tab==='instalaciones'?'active':''}" onclick="switchTab('instalaciones')">
@@ -2625,6 +2690,59 @@ window.eliminarCondicion = (eqId, idx) => {
     .then(() => showToast('🗑 Registro eliminado'));
 };
 window.registrarDevolucion = handleDevolucion;
+window.closeCondicionModal = () => { showCondicionModal = false; condicionEqId = null; render(); };
+window.setCondicionField = (k, v) => { condicionForm[k] = v; render(); };
+window.setCondicionNota = v => { condicionForm.nota = v; };
+window.doCondicion = confirmCondicion;
+window.openCondicionModal = openCondicionModal;
+window.closePrestamoModal = () => { showPrestamoModal = false; prestamoId = null; render(); };
+window.setPrestamoField = (k, v) => { prestamoForm[k] = v; render(); };
+window.setPrestamoNota = v => { prestamoForm.nota = v; };
+window.doMovimiento = confirmMovimiento;
+window.activarModoLote = tipo => {
+  modoSeleccionLote = true;
+  seleccionLote = [];
+  tipoLote = tipo || 'prestamo';
+  render();
+};
+window.cancelarLote = () => { modoSeleccionLote = false; seleccionLote = []; render(); };
+window.toggleLote = id => {
+  const idx = seleccionLote.indexOf(id);
+  if (idx >= 0) seleccionLote.splice(idx, 1); else seleccionLote.push(id);
+  render();
+};
+window.toggleLoteCard = id => {
+  const eq = equipos.find(x => x.id === id);
+  if (!eq) return;
+  // For prestamo: must have prestado=true. For devolucion: must have last movimiento=devolucion
+  if (tipoLote === 'prestamo' && !eqPrestado(eq)) return;
+  if (tipoLote === 'devolucion') {
+    const movs = eq.movimientos || [];
+    const last = movs[movs.length - 1];
+    if (!last || last.tipo !== 'devolucion') return;
+  }
+  toggleLote(id);
+};
+window.generarLotePDF = () => {
+  if (seleccionLote.length === 0) return showToast('Selecciona al menos un equipo');
+  const items = seleccionLote.map(id => {
+    const eq = equipos.find(x => x.id === id);
+    if (!eq) return null;
+    const movs = (eq.movimientos||[]).filter(m => m.tipo === tipoLote);
+    const mov = movs.length > 0 ? movs[movs.length-1] : null;
+    return { eq, movimiento: mov };
+  }).filter(Boolean);
+  generateLotePDF(items, tipoLote);
+  modoSeleccionLote = false; seleccionLote = []; render();
+};
+window.generarMemo = (eqId, movIdx) => {
+  const eq = equipos.find(x => x.id === eqId);
+  if (!eq || !eq.movimientos) return;
+  const mov = eq.movimientos[movIdx];
+  if (mov) generateMemoPDF(eq, mov);
+};
+
+cion;
 window.closeCondicionModal = () => { showCondicionModal = false; condicionEqId = null; render(); };
 window.setCondicionField = (k, v) => { condicionForm[k] = v; render(); };
 window.setCondicionNota = v => { condicionForm.nota = v; };
