@@ -404,7 +404,11 @@ onValue(installsRef, snap => {
 
 onValue(historialCargasRef, snap => {
   historialCargas = [];
-  snap.forEach(c => historialCargas.push({ id: c.key, ...c.val() }));
+  snap.forEach(c => {
+    const v = c.val();
+    // Only load metadata - NOT memo HTML (too heavy for listener)
+    historialCargas.push({ id: c.key, fecha: v.fecha, hora: v.hora, areaOrigen: v.areaOrigen, total: v.total, realizadoPor: v.realizadoPor });
+  });
   historialCargas.sort((a, b) => ((b.fecha||'')+' '+(b.hora||'')).localeCompare((a.fecha||'')+' '+(a.hora||'')));
   render();
 });
