@@ -1028,9 +1028,6 @@ function confirmarCargaMasiva() {
     realizadoPor: sesionUsuario?.nombre || 'Desconocido',
     equipos: validos.map(r => ({ s: r.serie, v: r.vineta||'', c: r.caso, l: r.lugar, fi: r.fechaInst, fr: r.fechaRetiro, n: r.notas||'', iu: r.idUsuario||'', d: r.direccion||'', ac: r.accesorios||'', m: r.multiplicador||'', co: r.corrientes||'', cx: r.conexion||'' }))
   };
-  // Always save to historial if there were valid rows to process
-  if (validos.length > 0) push(historialCargasRef, registroCarga);
-
   showToast('✅ ' + count + ' instalaciones registradas');
   const memoHtml = buildMemoCargaMasiva(validos);
   push(historialCargasRef, {
@@ -1095,7 +1092,7 @@ function buildMemoCargaMasiva(filas) {
       </div>
       <div>
         <div class="company-name">CPT INNOVA</div>
-        <div class="company-sub">Calidad de producto BT · Analizadores de Red</div>
+        <div class="company-sub">Calidad del Producto Técnico · Analizadores de Red</div>
       </div>
     </div>
     <div>
