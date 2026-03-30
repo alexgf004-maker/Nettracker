@@ -1920,6 +1920,7 @@ function render() {
           <div class="stat-chip ${inventarioFiltro==='disponible'?'active':''}" onclick="setInvFiltro('disponible')" style="flex-shrink:0"><span class="stat-num" style="color:var(--green)">${enPlantel+enCucu}</span><span class="stat-label">Disponibles</span></div>
           <div class="stat-chip ${inventarioFiltro==='prestado'?'active':''}" onclick="setInvFiltro('prestado')" style="flex-shrink:0"><span class="stat-num" style="color:var(--primary)">${prestados}</span><span class="stat-label">Prestados</span></div>
           <div class="stat-chip ${inventarioFiltro==='instalado'?'active':''}" onclick="setInvFiltro('instalado')" style="flex-shrink:0"><span class="stat-num" style="color:var(--yellow)">${enCampo}</span><span class="stat-label">En campo</span></div>
+          <div class="stat-chip ${inventarioFiltro==='reservado'?'active':''}" onclick="setInvFiltro('reservado')" style="flex-shrink:0"><span class="stat-num" style="color:#d97706">${reservas.filter(r=>!r.confirmada).reduce((acc,r)=>acc+(r.equipos||[]).length,0)}</span><span class="stat-label">Reservados</span></div>
         </div>`;
       // Lote action bar (when in selection mode, show at top)
       if (modoReserva) {
@@ -1936,10 +1937,18 @@ function render() {
         html += '<button onclick="generarLotePDF()" ' + (seleccionLote.length === 0 ? 'disabled' : '') + ' style="background:#fff;color:var(--primary);border:none;border-radius:8px;padding:8px 14px;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;opacity:' + (seleccionLote.length === 0 ? '.5' : '1') + '">Generar PDF</button>';
         html += '</div>';
       }
-      html += '<div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">';
+      html += '<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">';
       html += '<div class="search-wrap" style="margin-bottom:0;flex:1"><span class="search-icon">🔍</span><input class="search-input" placeholder="Buscar por serie o modelo..." value="' + inventarioSearch + '" oninput="setInvSearch(this.value)" ' + (inventarioSearch ? 'data-active="true"' : '') + '></div>';
       html += '<button onclick="toggleVistaInv()" style="flex-shrink:0;padding:11px 14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--white);font-size:16px;cursor:pointer;box-shadow:var(--shadow)">' + (vistaInventario==='lista' ? '⊞' : '☰') + '</button>';
       html += '</div>';
+      if (!modoSeleccionLote && !modoReserva) {
+        html += '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">';
+        html += '<button onclick="activarModoReserva()" style="padding:7px 12px;border:1px solid #d97706;border-radius:8px;background:#fffbeb;color:#d97706;font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer">🔒 Reservar</button>';
+        html += '<button onclick="activarModoLote(\'prestamo\')" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;background:var(--white);color:var(--text2);font-family:var(--font);font-size:11px;font-weight:600;cursor:pointer">🔄 Lote préstamo</button>';
+        html += '<button onclick="activarModoLote(\'devolucion\')" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;background:var(--white);color:var(--text2);font-family:var(--font);font-size:11px;font-weight:600;cursor:pointer">✅ Lote devolución</button>';
+        html += '<label style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;background:var(--white);color:var(--text2);font-family:var(--font);font-size:11px;font-weight:600;cursor:pointer">📥 Importar<input type="file" accept=".xlsx,.xls" onchange="handleImportEquipos(event)" style="display:none"></label>';
+        html += '</div>';
+      }
       if (equipos.length === 0) {
         html += '<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">El inventario está vacío</div><button class="btn btn-primary" style="max-width:240px;margin:0 auto" onclick="newEquipo()">+ Agregar primer equipo</button></div>';
       } else {
@@ -1947,6 +1956,7 @@ function render() {
           if (inventarioFiltro === 'disponible' && eqSt(eq) !== 'disponible') return false;
           if (inventarioFiltro === 'prestado' && !eqPrestado(eq)) return false;
           if (inventarioFiltro === 'instalado' && !eqEnCampo(eq)) return false;
+          if (inventarioFiltro === 'reservado' && !reservas.some(r => !r.confirmada && (r.equipos||[]).includes(eq.id))) return false;
           if (inventarioSearch) {
             const q = inventarioSearch.toLowerCase();
             return eq.serie.toLowerCase().includes(q) || (eq.modelo||'').toLowerCase().includes(q);
