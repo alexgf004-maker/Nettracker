@@ -1920,7 +1920,7 @@ function render() {
           <div class="stat-chip ${inventarioFiltro==='disponible'?'active':''}" onclick="setInvFiltro('disponible')" style="flex-shrink:0"><span class="stat-num" style="color:var(--green)">${enPlantel+enCucu}</span><span class="stat-label">Disponibles</span></div>
           <div class="stat-chip ${inventarioFiltro==='prestado'?'active':''}" onclick="setInvFiltro('prestado')" style="flex-shrink:0"><span class="stat-num" style="color:var(--primary)">${prestados}</span><span class="stat-label">Prestados</span></div>
           <div class="stat-chip ${inventarioFiltro==='instalado'?'active':''}" onclick="setInvFiltro('instalado')" style="flex-shrink:0"><span class="stat-num" style="color:var(--yellow)">${enCampo}</span><span class="stat-label">En campo</span></div>
-          <div class="stat-chip ${inventarioFiltro==='reservado'?'active':''}" onclick="setInvFiltro('reservado')" style="flex-shrink:0"><span class="stat-num" style="color:#d97706">${reservas.filter(r=>!r.confirmada).reduce((acc,r)=>acc+(r.equipos||[]).length,0)}</span><span class="stat-label">Reservados</span></div>
+          <div class="stat-chip ${inventarioFiltro==='reservado'?'active':''}" onclick="setInvFiltro('reservado')" style="flex-shrink:0"><span class="stat-num" style="color:#d97706">${reservas.filter(r=>!r.confirmada).reduce((acc,r)=>acc+Object.keys(r.equipos||{}).length,0)}</span><span class="stat-label">Reservados</span></div>
         </div>`;
       // Lote action bar (when in selection mode, show at top)
       if (modoReserva) {
@@ -1956,7 +1956,7 @@ function render() {
           if (inventarioFiltro === 'disponible' && eqSt(eq) !== 'disponible') return false;
           if (inventarioFiltro === 'prestado' && !eqPrestado(eq)) return false;
           if (inventarioFiltro === 'instalado' && !eqEnCampo(eq)) return false;
-          if (inventarioFiltro === 'reservado' && !reservas.some(r => !r.confirmada && (r.equipos||[]).includes(eq.id))) return false;
+          if (inventarioFiltro === 'reservado' && !reservas.some(r => !r.confirmada && Object.values(r.equipos||{}).includes(eq.id))) return false;
           if (inventarioSearch) {
             const q = inventarioSearch.toLowerCase();
             return eq.serie.toLowerCase().includes(q) || (eq.modelo||'').toLowerCase().includes(q);
@@ -2018,7 +2018,7 @@ function render() {
                 else if (isPrestado) { const movs2=eq.movimientos||[]; const lm=movs2[movs2.length-1]; html += '<div style="font-size:10px;color:var(--primary);font-weight:600">' + (lm&&lm.a==='Campos y Servicios'?'🏗 Con Campos y Servicios':'🔄 Prestado') + '</div>'; }
                 html += '</div>';
                 html += '<div style="display:flex;flex-direction:column;gap:2px;align-items:flex-end;flex-shrink:0">';
-                const eqReserva = reservas.find(r => !r.confirmada && r.equipos && r.equipos.includes(eq.id));
+                const eqReserva = reservas.find(r => !r.confirmada && Object.values(r.equipos||{}).includes(eq.id));
                 if (eqReserva) html += '<span class="badge" style="font-size:8px;padding:2px 5px;background:#fef3c7;color:#d97706;white-space:nowrap">🔒 Reservado</span>';
                 if ((eq.condicion||'bueno')==='fuera') html += '<span class="badge badge-red" style="font-size:8px;padding:2px 5px">🔴 Fuera</span>';
                 else if ((eq.condicion||'bueno')==='mantenimiento') html += '<span class="badge" style="font-size:8px;padding:2px 5px;background:#f3f0ff;color:#7c3aed">🔧 Mant.</span>';
@@ -2030,7 +2030,7 @@ function render() {
               html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px">';
               html += '<div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text);word-break:break-all;flex:1;margin-right:4px">' + eq.serie + '</div>';
               html += '<div style="display:flex;flex-direction:column;gap:2px;align-items:flex-end">';
-              const eqResGrid = reservas.find(r => !r.confirmada && r.equipos && r.equipos.includes(eq.id));
+              const eqResGrid = reservas.find(r => !r.confirmada && Object.values(r.equipos||{}).includes(eq.id));
               if (eqResGrid) html += '<span class="badge" style="font-size:8px;padding:2px 5px;white-space:nowrap;background:#fef3c7;color:#d97706">🔒 Reservado</span>';
               if ((eq.condicion||'bueno') === 'fuera') {
                 html += '<span class="badge badge-red" style="font-size:8px;padding:2px 5px;white-space:nowrap">🔴 Fuera servicio</span>';
@@ -2072,7 +2072,7 @@ function render() {
           html += '<div style="background:#fffbeb;border:1px solid #fcd34d;border-left:3px solid #d97706;border-radius:10px;padding:12px 14px;margin-bottom:8px">';
           html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
           html += '<div style="font-size:13px;font-weight:700;color:var(--text)">Para: ' + (r.para||'') + '</div>';
-          html += '<span style="font-size:11px;font-weight:700;color:#d97706">' + (r.equipos||[]).length + ' equipos</span>';
+          html += '<span style="font-size:11px;font-weight:700;color:#d97706">' + Object.keys(r.equipos||{}).length + ' equipos</span>';
           html += '</div>';
           html += '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">Reservado por: 👤 ' + (r.creadoPor||'') + (r.fechaEstimada ? ' · ' + fmtDate(r.fechaEstimada) : '') + '</div>';
           if (r.nota) html += '<div style="font-size:11px;color:var(--text2);margin-bottom:8px;font-style:italic">' + r.nota + '</div>';
@@ -2730,17 +2730,18 @@ window.guardarReserva = () => {
   }).then(() => {
     showToast('🔒 Reserva creada para ' + reservaForm.para);
     showReservaModal = false; modoReserva = false; reservaEquiposSeleccionados = [];
+    inventarioFiltro = 'reservado';
     render();
-  });
+  }).catch(() => showToast('❌ Error al guardar la reserva'));
 };
 window.confirmarReserva = id => {
   const r = reservas.find(x => x.id === id);
   if (!r) return;
-  if (!confirm('Confirmar préstamo de ' + (r.equipos||[]).length + ' equipos para ' + r.para + '?')) return;
+  if (!confirm('Confirmar préstamo de ' + Object.keys(r.equipos||{}).length + ' equipos para ' + r.para + '?')) return;
   const usuario = sesionUsuario?.nombre || 'Desconocido';
   const sedeDest = r.para === 'CPT BT' ? 'Subestación Cucumacayán' : 'Plantel Central';
   // Register prestamo for each equipo
-  (r.equipos||[]).forEach(eqId => {
+  Object.values(r.equipos||{}).forEach(eqId => {
     const eq = equipos.find(x => x.id === eqId);
     if (!eq) return;
     const mov = { tipo: 'prestamo', de: r.para === 'CPT BT' ? 'CPT MT' : 'CPT BT', a: r.para, fecha: today(), nota: 'Confirmación de reserva · ' + (r.nota||''), registradoPor: usuario };
@@ -2749,7 +2750,7 @@ window.confirmarReserva = id => {
   });
   // Mark reserva as confirmed
   update(ref(db, 'reservas/' + id), { confirmada: true, confirmadaPor: usuario, fechaConfirmacion: today() })
-    .then(() => showToast('✅ Préstamo confirmado · ' + (r.equipos||[]).length + ' equipos'));
+    .then(() => showToast('✅ Préstamo confirmado · ' + Object.keys(r.equipos||{}).length + ' equipos'));
 };
 window.eliminarReserva = id => {
   if (!isAdmin()) return showToast('Solo el administrador puede eliminar reservas');
