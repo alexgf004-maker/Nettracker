@@ -1898,7 +1898,7 @@ function render() {
       html += '<div class="search-wrap" style="margin-bottom:0;flex:1"><span class="search-icon">🔍</span><input class="search-input" placeholder="Buscar por serie o modelo..." value="' + inventarioSearch + '" oninput="setInvSearch(this.value)" ' + (inventarioSearch ? 'data-active="true"' : '') + '></div>';
       html += '<button onclick="toggleVistaInv()" style="flex-shrink:0;padding:11px 14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--white);font-size:16px;cursor:pointer;box-shadow:var(--shadow)">' + (vistaInventario==='lista' ? '⊞' : '☰') + '</button>';
       html += '</div>';
-      if (!modoSeleccionLote && !modoReserva) {
+      if (!modoSeleccionLote) {
         html += '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">';
         html += '<button onclick="activarModoLote(\'prestamo\')" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;background:var(--white);color:var(--text2);font-family:var(--font);font-size:11px;font-weight:600;cursor:pointer">🔄 Lote préstamo</button>';
         html += '<button onclick="activarModoLote(\'devolucion\')" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;background:var(--white);color:var(--text2);font-family:var(--font);font-size:11px;font-weight:600;cursor:pointer">✅ Lote devolución</button>';
