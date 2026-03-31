@@ -1343,7 +1343,14 @@ function render() {
 
   // Pre-compute filtered records by instTab for instalaciones
   const instTabFilter = instTab === 'cpt_mt' ? 'CPT MT' : instTab === 'cpt_bt' ? 'CPT BT' : 'Campos y Servicios';
-  const recordsFiltrados = records.filter(r => (r.areaInstalacion || 'CPT MT') === instTabFilter);
+  const recordsFiltrados = records.filter(r => {
+    if ((r.areaInstalacion || 'CPT MT') !== instTabFilter) return false;
+    if (instTab === 'campos' && camposFiltro !== 'TODOS') {
+      const beneficiaria = r.areaBeneficiaria || (r.creadoPor ? (USUARIOS.find(u=>u.nombre===r.creadoPor)?.area || '') : '');
+      if (beneficiaria !== camposFiltro) return false;
+    }
+    return true;
+  });
   const countsFiltrados = {
     TODOS: recordsFiltrados.length,
     ACTIVO: recordsFiltrados.filter(r => calcSt(r) === 'ACTIVO').length,
