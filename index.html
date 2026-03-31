@@ -297,6 +297,7 @@ let editId = null;
 let editEqId = null;
 let filterStatus = 'TODOS';
 let instTab = 'cpt_mt'; // cpt_mt | cpt_bt | campos
+let camposFiltro = 'TODOS'; // TODOS | CPT MT | CPT BT
 let search = '';
 let showSelector = false;
 let showDescargaModal = false;
@@ -2456,7 +2457,8 @@ window.switchTab = t => {
   render();
 };
 window.setFilter = f => { filterStatus = f; render(); };
-window.setInstTab = t => { instTab = t; filterStatus = 'TODOS'; render(); };
+window.setInstTab = t => { instTab = t; filterStatus = 'TODOS'; camposFiltro = 'TODOS'; render(); };
+window.setCamposFiltro = f => { camposFiltro = f; render(); };
 window.handleFileUpload = e => { const f = e.target.files[0]; if (f) procesarExcel(f); };
 window.confirmarCarga = confirmarCargaMasiva;
 window.cancelarCarga = () => { cargaData = []; cargaView = 'upload'; render(); };
