@@ -1949,6 +1949,27 @@ function render() {
         html += '<label style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;background:var(--white);color:var(--text2);font-family:var(--font);font-size:11px;font-weight:600;cursor:pointer">📥 Importar<input type="file" accept=".xlsx,.xls" onchange="handleImportEquipos(event)" style="display:none"></label>';
         html += '</div>';
       }
+      // Reservas activas - show before equipment list
+      const reservasActivas = reservas.filter(r => !r.confirmada);
+      if (reservasActivas.length > 0) {
+        html += '<div style="margin-bottom:12px">';
+        html += '<div style="font-size:10px;font-weight:700;color:#d97706;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">🔒 Reservas pendientes</div>';
+        reservasActivas.forEach(r => {
+          html += '<div style="background:#fffbeb;border:1px solid #fcd34d;border-left:3px solid #d97706;border-radius:10px;padding:12px 14px;margin-bottom:8px">';
+          html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
+          html += '<div style="font-size:13px;font-weight:700;color:var(--text)">Para: ' + (r.para||'') + '</div>';
+          html += '<span style="font-size:11px;font-weight:700;color:#d97706">' + (r.equipos||[]).length + ' equipos</span>';
+          html += '</div>';
+          html += '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">👤 ' + (r.creadoPor||'') + (r.fechaEstimada ? ' · ' + fmtDate(r.fechaEstimada) : '') + '</div>';
+          if (r.nota) html += '<div style="font-size:11px;color:var(--text2);margin-bottom:8px;font-style:italic">' + r.nota + '</div>';
+          html += '<div style="display:flex;gap:6px">';
+          html += '<button onclick="confirmarReserva(\''+r.id+'\')" style="flex:1;padding:8px;border:none;border-radius:8px;background:#d97706;color:#fff;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">✅ Confirmar préstamo</button>';
+          if (isAdmin()) html += '<button onclick="eliminarReserva(\''+r.id+'\')" style="padding:8px 10px;border:1px solid var(--red);border-radius:8px;background:var(--red-light);color:var(--red);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">🗑</button>';
+          html += '</div></div>';
+        });
+        html += '</div>';
+      }
+
       if (equipos.length === 0) {
         html += '<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">El inventario está vacío</div><button class="btn btn-primary" style="max-width:240px;margin:0 auto" onclick="newEquipo()">+ Agregar primer equipo</button></div>';
       } else {
@@ -2061,27 +2082,6 @@ function render() {
             html += '<\/div>';
           });
         }
-      }
-      // Lote buttons at bottom - discrete
-      // Reservas activas
-      const reservasActivas = reservas.filter(r => !r.confirmada);
-      if (reservasActivas.length > 0) {
-        html += '<div style="margin-top:16px">';
-        html += '<div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">🔒 Reservas pendientes</div>';
-        reservasActivas.forEach(r => {
-          html += '<div style="background:#fffbeb;border:1px solid #fcd34d;border-left:3px solid #d97706;border-radius:10px;padding:12px 14px;margin-bottom:8px">';
-          html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
-          html += '<div style="font-size:13px;font-weight:700;color:var(--text)">Para: ' + (r.para||'') + '</div>';
-          html += '<span style="font-size:11px;font-weight:700;color:#d97706">' + (r.equipos||[]).length + ' equipos</span>';
-          html += '</div>';
-          html += '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">Reservado por: 👤 ' + (r.creadoPor||'') + (r.fechaEstimada ? ' · ' + fmtDate(r.fechaEstimada) : '') + '</div>';
-          if (r.nota) html += '<div style="font-size:11px;color:var(--text2);margin-bottom:8px;font-style:italic">' + r.nota + '</div>';
-          html += '<div style="display:flex;gap:6px">';
-          html += '<button onclick="confirmarReserva(\''+r.id+'\')" style="flex:1;padding:8px;border:none;border-radius:8px;background:#d97706;color:#fff;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">✅ Confirmar préstamo</button>';
-          if (isAdmin()) html += '<button onclick="eliminarReserva(\''+r.id+'\')" style="padding:8px 10px;border:1px solid var(--red);border-radius:8px;background:var(--red-light);color:var(--red);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">🗑</button>';
-          html += '</div></div>';
-        });
-        html += '</div>';
       }
 
       if (!modoSeleccionLote) {
