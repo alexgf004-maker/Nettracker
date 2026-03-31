@@ -1646,6 +1646,14 @@ function render() {
         html += "<button onclick=\"setInstTab('"+t.key+"')\" style=\"flex:1;padding:12px 4px;border:none;background:none;font-family:var(--font);font-size:12px;font-weight:700;color:"+(active?'var(--primary)':'var(--text3)')+";cursor:pointer;border-bottom:2px solid "+(active?'var(--primary)':'transparent')+";transition:all .15s\">"+t.label+"</button>";
       });
       html += '</div>';
+      if (instTab === 'campos') {
+        html += '<div style="display:flex;gap:6px;padding:8px 16px;background:var(--white);border-bottom:1px solid var(--border)">';
+        ['TODOS','CPT MT','CPT BT'].forEach(f => {
+          const ac = camposFiltro === f;
+          html += '<button onclick="setCamposFiltro(\''+f+'\')" style="padding:5px 14px;border-radius:20px;border:1.5px solid '+(ac?'var(--primary)':'var(--border)')+';background:'+(ac?'var(--primary)':'#fff')+';color:'+(ac?'#fff':'var(--text3)')+';font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer">'+(f==='TODOS'?'Todos':f)+'</button>';
+        });
+        html += '</div>';
+      }
 
       html += `<div class="content">
         <div class="stats-bar">
