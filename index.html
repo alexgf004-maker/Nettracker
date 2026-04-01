@@ -329,6 +329,7 @@ let locMode = 'gps';
 let selectorSearch = '';
 let inventarioSearch = '';
 let vistaInventario = 'lista'; // lista | grid
+let eqDetalleTab = 'general'; // general | mantenimiento | instalaciones | movimientos
 let inventarioFiltro = 'TODOS';
 let form = emptyForm();
 let equipoForm = emptyEF();
@@ -2104,9 +2105,9 @@ if (inventarioSearch) {
       const eq = equipos.find(x => x.id === editEqId);
       if (!eq) { view = 'lista'; return render(); }
       const st = eqSt(eq);
-      const c = st === 'disponible' ? 'var(--green)' : 'var(--yellow)';
-      const l = st === 'disponible' ? 'Disponible' : 'Instalado';
       const historial = records.filter(r => r.equipoId === eq.id).sort((a,b) => (b.fechaRegistro||'').localeCompare(a.fechaRegistro||''));
+      const condIcon = eq.condicion === 'fuera' ? '🔴' : eq.condicion === 'mantenimiento' ? '🔧' : eq.condicion === 'detalles' ? '🟡' : '🟢';
+
       html += `<div class="content">
         <div class="detail-hero">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
@@ -2116,176 +2117,191 @@ if (inventarioSearch) {
                 ? '<span class="badge badge-red">🔴 Fuera de servicio</span>'
                 : (eq.condicion||'bueno') === 'mantenimiento'
                 ? '<span class="badge" style="background:#f3f0ff;color:#7c3aed">🔧 En mantenimiento</span>'
-                : '<span class="badge ' + (st==='disponible'?'badge-green':st==='prestado'?'badge-blue':'badge-yellow') + '">' + l + '</span>' +
+                : '<span class="badge ' + (st==='disponible'?'badge-green':st==='prestado'?'badge-blue':'badge-yellow') + '">' + (st==='disponible'?'Disponible':st==='prestado'?'Prestado':'Instalado') + '</span>' +
                   ((eq.condicion||'bueno') === 'detalles' ? '<span class="badge badge-yellow">🟡 Con detalles</span>' : '')
               }
             </div>
           </div>
-        </div>
-        <div class="detail-grid">
-          ${eq.vineta ? `<div class="detail-row"><div class="detail-label">Viñeta</div><div class="detail-value" style="font-family:var(--mono);font-weight:700">${eq.vineta}</div></div>` : ''}
+          <div style="display:flex;gap:12px;margin-top:14px">
+            <div style="text-align:center"><div style="font-size:18px;font-weight:800;color:#fff;font-family:var(--mono)">${historial.length}</div><div style="font-size:9px;color:rgba(255,255,255,.7)">Instalaciones</div></div>
+            <div style="text-align:center"><div style="font-size:18px;font-weight:800;color:#fff;font-family:var(--mono)">${historial.filter(r=>r.retirado&&r.fallas&&r.fallas.length>0).length}</div><div style="font-size:9px;color:rgba(255,255,255,.7)">F. Físicas</div></div>
+            <div style="text-align:center"><div style="font-size:18px;font-weight:800;color:#fff;font-family:var(--mono)">${historial.filter(r=>r.descargas&&r.descargas.some(d=>d.medicionOk===false)).length}</div><div style="font-size:9px;color:rgba(255,255,255,.7)">F. Medición</div></div>
+            <div style="text-align:center"><div style="font-size:18px;font-weight:800;color:#fff;font-family:var(--mono)">${(eq.movimientos||[]).length}</div><div style="font-size:9px;color:rgba(255,255,255,.7)">Movimientos</div></div>
+          </div>
+        </div>`;
+
+      // TABS
+      const tabs = [{key:'general',label:'📋 General'},{key:'instalaciones',label:'📡 Instalaciones'},{key:'mantenimiento',label:'🔧 Mant.'},{key:'movimientos',label:'🔄 Movim.'}];
+      html += '<div style="display:flex;background:var(--white);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden">';
+      tabs.forEach(t => {
+        const active = eqDetalleTab === t.key;
+        html += '<button onclick="setEqDetalleTab(\'' + t.key + '\')" style="flex:1;padding:10px 4px;border:none;background:' + (active?'var(--primary)':'#fff') + ';color:' + (active?'#fff':'var(--text3)') + ';font-family:var(--font);font-size:10px;font-weight:700;cursor:pointer;border-right:1px solid var(--border)">' + t.label + '</button>';
+      });
+      html += '</div>';
+
+      // TAB: GENERAL
+      if (eqDetalleTab === 'general') {
+        html += `<div class="detail-grid">
+          ${eq.vineta ? '<div class="detail-row"><div class="detail-label">Viñeta</div><div class="detail-value" style="font-family:var(--mono);font-weight:700">'+eq.vineta+'</div></div>' : ''}
           <div class="detail-row"><div class="detail-label">Modelo / Marca</div><div class="detail-value">${eq.modelo||'—'}</div></div>
-          ${eq.notas ? `<div class="detail-row"><div class="detail-label">Notas</div><div class="detail-value">${eq.notas}</div></div>` : ''}
           <div class="detail-row"><div class="detail-label">Sede</div><div class="detail-value">${eq.sede||'Plantel Central'}</div></div>
-          ${eq.prestado ? `<div class="detail-row"><div class="detail-label">Prestado desde</div><div class="detail-value" style="color:var(--primary);font-weight:600">${fmtDate(eq.prestadoFecha)} · En Plantel Central</div></div>` : ''}
-          <div class="detail-row"><div class="detail-label">Registrado</div><div class="detail-value">${fmtDate(eq.fechaRegistro)}${eq.creadoPor ? ' · <span style="color:var(--text3);font-size:12px">'+eq.creadoPor+'</span>' : ''}</div></div>
-          ${eq.editadoPor ? `<div class="detail-row"><div class="detail-label">Editado por</div><div class="detail-value" style="color:var(--text3);font-size:13px">${eq.editadoPor} · ${fmtDate(eq.fechaEdicion)}</div></div>` : ''}
-          <div class="detail-row"><div class="detail-label">Total instalaciones</div><div class="detail-value">${historial.length}</div></div>
-        </div>
-        ${eq.historialCondicion && eq.historialCondicion.length > 0 ? `
-          <div class="section-title" style="margin-top:4px">Historial de condición</div>
-          <div class="list" style="margin-bottom:16px">
-            ${eq.historialCondicion.slice().reverse().map((h, hIdx) => {
-              const cOld = CONDICIONES.find(c => c.key === h.condicionAnterior);
-              const cNew = CONDICIONES.find(c => c.key === h.condicionNueva);
-              const realIdx = eq.historialCondicion.length - 1 - hIdx;
-              const delBtn = isAdmin() ? '<button onclick="eliminarCondicion(\''+eq.id+'\','+realIdx+')" style="background:none;border:none;font-size:11px;color:var(--red);cursor:pointer;padding:2px 4px;margin-top:4px;font-family:var(--font)">🗑 Eliminar</button>' : '';
-              return '<div class="historial-card"><div class="historial-row"><div><div class="historial-lugar">'+(cOld?cOld.icon+' '+cOld.label:'—')+' → '+(cNew?cNew.icon+' '+cNew.label:'—')+'</div>'+(h.nota?'<div class="historial-caso">'+h.nota+'</div>':'')+(h.registradoPor?'<div style="font-size:10px;color:var(--text3);margin-top:2px">👤 '+h.registradoPor+'</div>':'')+'</div><div class="historial-fecha">'+fmtDate(h.fecha)+'</div></div>'+delBtn+'</div>';
-            }).join('')}
-          </div>` : ''}
-        ${eq.movimientos && eq.movimientos.length > 0 ? `
-          <div class="section-title" style="margin-top:4px">Movimientos entre sedes</div>
-          <div class="list" style="margin-bottom:16px">
-            ${eq.movimientos.slice().reverse().map(m => `
-              <div class="historial-card">
-                <div class="historial-row">
-                  <div>
-                    <div class="historial-lugar">${m.de} → ${m.a}</div>
-                    <div class="historial-caso">${m.tipo==='prestamo'?'🔄 Préstamo':'✅ Devolución'}${m.nota?' · '+m.nota:''}</div>
-                    ${m.registradoPor ? `<div style="font-size:10px;color:var(--text3);margin-top:2px">👤 ${m.registradoPor}</div>` : ''}
-                  </div>
-                  <div class="historial-fecha">${fmtDate(m.fecha)}</div>
-                </div>
-                ${isAdmin() ? `<button onclick="eliminarMovimiento('${eq.id}', ${eq.movimientos.indexOf(m)})" style="width:100%;padding:8px;border:1px solid var(--red);border-radius:8px;background:var(--red-light);color:var(--red);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;margin-bottom:6px">🗑 Eliminar movimiento</button>` : ''}
-                <div style="display:flex;gap:6px;margin-top:8px">
-                  <button onclick="generarMemo('${eq.id}',${eq.movimientos.indexOf(m)})" style="flex:1;padding:8px;border:1px solid var(--primary);border-radius:8px;background:var(--primary-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer">📄 Generar memorándum PDF</button>
-                  <button onclick="emailMemo('${eq.id}',${eq.movimientos.indexOf(m)})" style="flex-shrink:0;padding:8px 12px;border:1px solid var(--accent);border-radius:8px;background:var(--accent-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer">📧</button>
-                </div>
-              </div>`).join('')}
-          </div>` : ''}
-        ${(() => {
-          // Fallas fisicas
+          <div class="detail-row"><div class="detail-label">Condición</div><div class="detail-value">${condIcon} ${(()=>{const c=CONDICIONES.find(x=>x.key===(eq.condicion||'bueno'));return c?c.label:'Bueno';})()}</div></div>
+          ${eq.notas ? '<div class="detail-row"><div class="detail-label">Notas</div><div class="detail-value">'+eq.notas+'</div></div>' : ''}
+          <div class="detail-row"><div class="detail-label">Registrado</div><div class="detail-value">${fmtDate(eq.fechaRegistro)}${eq.creadoPor?'<span style="color:var(--text3);font-size:12px"> · '+eq.creadoPor+'</span>':''}</div></div>
+        </div>`;
+        if (isAdmin()) html += `<button class="btn btn-primary" onclick="editEquipo('${eq.id}')">✏️ Editar equipo</button>`;
+        html += `<button class="btn" style="background:${(()=>{const c=CONDICIONES.find(x=>x.key===(eq.condicion||'bueno'));return c?c.bg:'var(--green-light)';})()};color:${(()=>{const c=CONDICIONES.find(x=>x.key===(eq.condicion||'bueno'));return c?c.color:'var(--green)';})()};border:1px solid ${(()=>{const c=CONDICIONES.find(x=>x.key===(eq.condicion||'bueno'));return c?c.color:'var(--green)';})()}" onclick="openCondicionModal('${eq.id}')">⚙️ Actualizar condición</button>`;
+        if (!eq.prestado && !eqEnCampo(eq) && (eq.condicion||'bueno') !== 'fuera') html += `<button class="btn" style="background:var(--primary-light);color:var(--primary);border:1px solid var(--primary)" onclick="registrarPrestamo('${eq.id}')">🔄 Registrar préstamo</button>`;
+        if (eq.prestado) html += `<button class="btn" style="background:var(--green-light);color:var(--green);border:1px solid var(--green)" onclick="registrarDevolucion('${eq.id}')">✅ Registrar devolución</button>`;
+        if (isAdmin()) html += `<button class="btn btn-secondary" style="color:var(--red)" onclick="delEquipo('${eq.id}')">Eliminar del inventario</button>`;
+      }
+
+      // TAB: MANTENIMIENTO
+      if (eqDetalleTab === 'mantenimiento') {
+        if ((eq.condicion||'bueno') === 'mantenimiento') {
+          html += `<button class="btn" style="background:#f3f0ff;color:#7c3aed;border:1px solid #7c3aed" onclick="openMantModal('${eq.id}')">🔧 Registrar ficha de mantenimiento</button>`;
+        }
+        if (eq.historialCondicion && eq.historialCondicion.length > 0) {
+          html += '<div class="section-title" style="margin-top:4px">Historial de condición</div>';
+          html += '<div class="list" style="margin-bottom:16px">';
+          eq.historialCondicion.slice().reverse().forEach((h, hIdx) => {
+            const cOld = CONDICIONES.find(c => c.key === h.condicionAnterior);
+            const cNew = CONDICIONES.find(c => c.key === h.condicionNueva);
+            const realIdx = eq.historialCondicion.length - 1 - hIdx;
+            html += '<div class="historial-card"><div class="historial-row"><div>';
+            html += '<div class="historial-lugar">' + (cOld?cOld.icon+' '+cOld.label:'—') + ' → ' + (cNew?cNew.icon+' '+cNew.label:'—') + '</div>';
+            if (h.nota) html += '<div class="historial-caso">' + h.nota + '</div>';
+            if (h.registradoPor) html += '<div style="font-size:10px;color:var(--text3);margin-top:2px">👤 '+h.registradoPor+'</div>';
+            html += '</div><div class="historial-fecha">' + fmtDate(h.fecha) + '</div></div>';
+            if (isAdmin()) html += '<button onclick="eliminarCondicion(\'' + eq.id + '\',' + realIdx + ')" style="background:none;border:none;font-size:11px;color:var(--red);cursor:pointer;padding:2px 4px;font-family:var(--font)">🗑 Eliminar</button>';
+            html += '</div>';
+          });
+          html += '</div>';
+        }
+        if (eq.historialMantenimiento && eq.historialMantenimiento.length > 0) {
+          html += '<div class="section-title">Fichas de mantenimiento</div>';
+          html += '<div class="list" style="margin-bottom:16px">';
+          eq.historialMantenimiento.slice().reverse().forEach(m => {
+            const resColor = m.resultado==='resuelto'?'var(--green)':m.resultado==='sin_solucion'?'var(--red)':'#f59e0b';
+            const resLabel = m.resultado==='resuelto'?'✅ Resuelto':m.resultado==='sin_solucion'?'❌ Sin solución':'⏳ Pendiente';
+            html += '<div class="historial-card"><div class="historial-row"><div>';
+            html += '<div class="historial-lugar">' + (m.descripcion||'Sin descripción') + '</div>';
+            if (m.accion) html += '<div class="historial-caso">Acción: ' + m.accion + '</div>';
+            if (m.observaciones) html += '<div style="font-size:11px;color:var(--text3);margin-top:2px">📋 ' + m.observaciones + '</div>';
+            html += '<div style="margin-top:4px"><span style="font-size:10px;font-weight:700;color:'+resColor+'">'+resLabel+'</span></div>';
+            if (m.registradoPor) html += '<div style="font-size:10px;color:var(--text3);margin-top:2px">👤 '+m.registradoPor+'</div>';
+            html += '</div><div class="historial-fecha">' + fmtDate(m.fechaInicio) + (m.fechaResolucion?'<br>→ '+fmtDate(m.fechaResolucion):'') + '</div></div></div>';
+          });
+          html += '</div>';
+        }
+        if ((!eq.historialCondicion || eq.historialCondicion.length === 0) && (!eq.historialMantenimiento || eq.historialMantenimiento.length === 0)) {
+          html += '<div class="empty"><div class="empty-icon">🔧</div><div class="empty-text">Sin historial de mantenimiento</div></div>';
+        }
+      }
+
+      // TAB: INSTALACIONES
+      if (eqDetalleTab === 'instalaciones') {
+        // Trazabilidad de fallas
+        html += `${(()=>{
           const conFallasFis = historial.filter(r => r.retirado && r.fallas && r.fallas.length > 0);
-          // Fallas de medicion
           const conFallasMed = historial.filter(r => r.descargas && r.descargas.some(d => d.medicionOk === false));
           if (conFallasFis.length === 0 && conFallasMed.length === 0) return '';
           const totalInst = historial.filter(r => r.retirado).length;
-          const totalDescargas = historial.filter(r => r.descargas && r.descargas.length > 0).length;
-
-          // Count fallas fisicas
           const conteoFis = {};
           conFallasFis.forEach(r => r.fallas.forEach(f => { conteoFis[f] = (conteoFis[f]||0) + 1; }));
-          // Count fallas medicion
           const conteoMed = {};
           conFallasMed.forEach(r => r.descargas.filter(d=>d.medicionOk===false).forEach(d => (d.fallasMedicion||[]).forEach(f => { conteoMed[f] = (conteoMed[f]||0) + 1; })));
-
           let out = '<div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:12px">';
           out += '<div style="font-size:10px;font-weight:700;color:var(--text);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px">📋 Trazabilidad de fallas</div>';
-
-          // Stats row
           out += '<div style="display:flex;gap:8px;margin-bottom:12px">';
-          out += '<div style="flex:1;background:var(--red-light);border-radius:10px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--red);font-family:var(--mono)">' + conFallasFis.length + '</div><div style="font-size:9px;color:var(--red);font-weight:600">FALLAS<br>FÍSICAS</div></div>';
-          out += '<div style="flex:1;background:var(--yellow-light);border-radius:10px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--yellow);font-family:var(--mono)">' + conFallasMed.length + '</div><div style="font-size:9px;color:var(--yellow);font-weight:600">FALLOS DE<br>MEDICIÓN</div></div>';
-          out += '<div style="flex:1;background:var(--border2);border-radius:10px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--text);font-family:var(--mono)">' + totalInst + '</div><div style="font-size:9px;color:var(--text3);font-weight:600">TOTAL<br>RETIRADAS</div></div>';
+          out += '<div style="flex:1;background:var(--red-light);border-radius:10px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--red);font-family:var(--mono)">'+conFallasFis.length+'</div><div style="font-size:9px;color:var(--red);font-weight:600">FALLAS<br>FÍSICAS</div></div>';
+          out += '<div style="flex:1;background:var(--yellow-light);border-radius:10px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--yellow);font-family:var(--mono)">'+conFallasMed.length+'</div><div style="font-size:9px;color:var(--yellow);font-weight:600">FALLOS DE<br>MEDICIÓN</div></div>';
+          out += '<div style="flex:1;background:var(--border2);border-radius:10px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--text);font-family:var(--mono)">'+totalInst+'</div><div style="font-size:9px;color:var(--text3);font-weight:600">TOTAL<br>RETIRADAS</div></div>';
           out += '</div>';
-
-          // Fallas fisicas breakdown
-          if (conFallasFis.length > 0) {
-            out += '<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:var(--red);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">🔧 Fallas físicas</div>';
-            out += Object.entries(conteoFis).sort((a,b)=>b[1]-a[1]).map(([f,n]) => '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border2)"><span style="color:var(--text2)">• '+f+'</span><span style="font-weight:700;color:var(--red);font-family:var(--mono)">'+n+'x</span></div>').join('');
-            out += '</div>';
-          }
-
-          // Fallas medicion breakdown
-          if (conFallasMed.length > 0) {
-            out += '<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:var(--yellow);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">📊 Fallos de medición</div>';
-            out += Object.entries(conteoMed).sort((a,b)=>b[1]-a[1]).map(([f,n]) => '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border2)"><span style="color:var(--text2)">• '+f+'</span><span style="font-weight:700;color:var(--yellow);font-family:var(--mono)">'+n+'x</span></div>').join('');
-            out += '</div>';
-          }
-
-          // Cronologia unificada
-          out += '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">';
-          out += '<div style="font-size:9px;font-weight:700;color:var(--text3);letter-spacing:1px;margin-bottom:6px;text-transform:uppercase">Cronología</div>';
-          // Build unified timeline
+          if (conFallasFis.length > 0) { out += '<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:var(--red);margin-bottom:6px">🔧 Fallas físicas</div>'; out += Object.entries(conteoFis).sort((a,b)=>b[1]-a[1]).map(([f,n])=>'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border2)"><span style="color:var(--text2)">• '+f+'</span><span style="font-weight:700;color:var(--red);font-family:var(--mono)">'+n+'x</span></div>').join(''); out += '</div>'; }
+          if (conFallasMed.length > 0) { out += '<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:var(--yellow);margin-bottom:6px">📊 Fallos de medición</div>'; out += Object.entries(conteoMed).sort((a,b)=>b[1]-a[1]).map(([f,n])=>'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border2)"><span style="color:var(--text2)">• '+f+'</span><span style="font-weight:700;color:var(--yellow);font-family:var(--mono)">'+n+'x</span></div>').join(''); out += '</div>'; }
           const timeline = [];
-          conFallasFis.forEach(r => timeline.push({ fecha: r.fechaRetiroReal||r.fechaRetiro, tipo: 'fisica', desc: r.fallas.join(', ') + (r.descripcionFalla?' — '+r.descripcionFalla:''), caso: r.caso }));
-          conFallasMed.forEach(r => r.descargas.filter(d=>d.medicionOk===false).forEach(d => timeline.push({ fecha: d.fecha, tipo: 'medicion', desc: (d.fallasMedicion||[]).join(', ') + (d.descripcionFalla?' — '+d.descripcionFalla:''), caso: r.caso })));
-          timeline.sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''));
-          out += timeline.map(e => '<div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:1px solid var(--border2)"><div><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;margin-right:4px;'+(e.tipo==='fisica'?'background:var(--red-light);color:var(--red)':'background:var(--yellow-light);color:var(--yellow)')+'">'+( e.tipo==='fisica'?'Física':'Medición')+'</span><span style="color:var(--text2)">' + e.desc + '</span>'+(e.caso?'<span style="color:var(--text3);font-size:10px"> · #'+e.caso+'</span>':'')+'</div><div style="color:var(--text3);font-family:var(--mono);flex-shrink:0;margin-left:8px">' + fmtDate(e.fecha) + '</div></div>').join('');
+          conFallasFis.forEach(r => timeline.push({fecha:r.fechaRetiroReal||r.fechaRetiro,tipo:'fisica',desc:r.fallas.join(', ')+(r.descripcionFalla?' — '+r.descripcionFalla:''),caso:r.caso}));
+          conFallasMed.forEach(r => r.descargas.filter(d=>d.medicionOk===false).forEach(d => timeline.push({fecha:d.fecha,tipo:'medicion',desc:(d.fallasMedicion||[]).join(', ')+(d.descripcionFalla?' — '+d.descripcionFalla:''),caso:r.caso})));
+          timeline.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+          out += '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)"><div style="font-size:9px;font-weight:700;color:var(--text3);letter-spacing:1px;margin-bottom:6px">CRONOLOGÍA</div>';
+          out += timeline.map(e=>'<div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:1px solid var(--border2)"><div><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;margin-right:4px;'+(e.tipo==='fisica'?'background:var(--red-light);color:var(--red)':'background:var(--yellow-light);color:var(--yellow)')+'">'+( e.tipo==='fisica'?'Física':'Medición')+'</span><span style="color:var(--text2)">'+e.desc+'</span>'+(e.caso?'<span style="color:var(--text3);font-size:10px"> · #'+e.caso+'</span>':'')+'</div><div style="color:var(--text3);font-family:var(--mono);flex-shrink:0;margin-left:8px">'+fmtDate(e.fecha)+'</div></div>').join('');
           out += '</div></div>';
           return out;
-        })()}
-        ${historial.length > 0 ? `
-          <div class="section-title" style="margin-top:4px">Historial de instalaciones</div>
-          <div class="list" style="margin-bottom:16px">
-            ${historial.map(r => {
-              const st2 = calcSt(r);
-              const tieneFallas = r.fallas && r.fallas.length > 0;
-              const sinProblema = r.sinProblema;
-              return `<div class="historial-card">
-                <div class="historial-row">
-                  <div>
-                    <div class="historial-lugar">${r.lugar||'Sin lugar'}</div>
-                    <div class="historial-caso">#${r.caso}</div>
-                    ${r.descargas && r.descargas.length > 0 ? `<div style="font-size:11px;color:var(--primary);font-weight:600;margin-top:2px">💾 ${r.descargas.length} descarga${r.descargas.length>1?'s':''}</div>` : ''}
-                  </div>
-                  <div class="historial-fecha">${fmtDate(r.fechaInstalacion)}<br>→ ${fmtDate(r.fechaRetiroReal||r.fechaRetiro)}</div>
-                </div>
-                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
-                  ${badgeSt(st2)}
-                  ${r.retirado && sinProblema ? `<span class="badge badge-green">✓ Sin problemas</span>` : ''}
-                  ${r.retirado && tieneFallas ? `<span class="badge badge-red">⚠ Con falla física</span>` : ''}
-                  ${r.retirado && r.descargaPendiente ? `<span class="badge badge-yellow" style="cursor:pointer" onclick="openDescargaModal('${r.id}')">⚠️ Descarga pendiente</span>` : ''}
-                  ${r.descargas && r.descargas.length > 0 && r.descargas.some(d => d.medicionOk===false) ? `<span class="badge badge-red">📊 Fallo medición</span>` : ''}
-                  ${r.descargas && r.descargas.length > 0 && r.descargas.every(d => d.medicionOk===true) ? `<span class="badge badge-green">📊 Medición OK</span>` : ''}
-                  ${r.retiradoPor ? `<div style="font-size:10px;color:var(--text3);margin-top:4px">👤 Retirado por: ${r.retiradoPor}</div>` : ''}
-                </div>
-                ${r.retirado && tieneFallas ? `
-                  <div style="margin-top:8px;padding:8px 10px;background:var(--red-light);border-radius:8px;border:1px solid #fecaca">
-                    <div style="font-size:11px;font-weight:600;color:var(--red);margin-bottom:4px">FALLAS FÍSICAS</div>
-                    ${r.fallas.map(f => '<div style="font-size:13px;color:var(--red);margin-bottom:2px">• '+f+'</div>').join('')}
-                    ${r.descripcionFalla ? '<div style="font-size:12px;color:var(--text2);margin-top:4px;font-style:italic">"'+r.descripcionFalla+'"</div>' : ''}
-                  </div>` : ''}
-                ${r.descargas && r.descargas.some(d=>d.medicionOk===false) ? `
-                  <div style="margin-top:8px;padding:8px 10px;background:var(--yellow-light);border-radius:8px;border:1px solid #fcd34d">
-                    <div style="font-size:11px;font-weight:600;color:var(--yellow);margin-bottom:4px">FALLOS DE MEDICIÓN</div>
-                    ${r.descargas.filter(d=>d.medicionOk===false).map(d => '<div style="font-size:12px;color:var(--yellow);margin-bottom:2px">'+fmtDate(d.fecha)+': '+d.fallasMedicion.join(', ')+(d.descripcionFalla?' — '+d.descripcionFalla:'')+'</div>').join('')}
-                  </div>` : ''}
-              </div>`;
-            }).join('')}
-          </div>` : ''}
-        ${eq.historialMantenimiento && eq.historialMantenimiento.length > 0 ? `
-          <div class="section-title" style="margin-top:4px">🔧 Historial de mantenimiento</div>
-          <div class="list" style="margin-bottom:16px">
-            ${eq.historialMantenimiento.slice().reverse().map(m => {
-              const resColor = m.resultado==='resuelto' ? 'var(--green)' : m.resultado==='sin_solucion' ? 'var(--red)' : '#f59e0b';
-              const resLabel = m.resultado==='resuelto' ? '✅ Resuelto' : m.resultado==='sin_solucion' ? '❌ Sin solución' : '⏳ Pendiente';
-              return '<div class="historial-card"><div class="historial-row"><div>' +
-                '<div class="historial-lugar">' + (m.descripcion||'Sin descripción') + '</div>' +
-                (m.accion ? '<div class="historial-caso">Acción: ' + m.accion + '</div>' : '') +
-                (m.observaciones ? '<div style="font-size:11px;color:var(--text3);margin-top:2px">📋 ' + m.observaciones + '</div>' : '') +
-                '<div style="margin-top:4px"><span style="font-size:10px;font-weight:700;color:'+resColor+'">'+resLabel+'</span></div>' +
-                (m.registradoPor ? '<div style="font-size:10px;color:var(--text3);margin-top:2px">👤 '+m.registradoPor+'</div>' : '') +
-                '</div><div class="historial-fecha">' + fmtDate(m.fechaInicio) + (m.fechaResolucion ? '<br>→ ' + fmtDate(m.fechaResolucion) : '') + '</div></div></div>';
-            }).join('')}
-          </div>` : ''}
-        ${(eq.condicion||'bueno') === 'mantenimiento' ? `
-          <button class="btn" style="background:#f3f0ff;color:#7c3aed;border:1px solid #7c3aed" onclick="openMantModal('${eq.id}')">🔧 Registrar ficha de mantenimiento</button>
-        ` : ''}
-        ${isAdmin() ? `<button class="btn btn-primary" onclick="editEquipo('${eq.id}')">Editar equipo</button>` : ''}
-        <button class="btn" style="background:${(() => { const c = CONDICIONES.find(x => x.key===(eq.condicion||'bueno')); return c?c.bg:'var(--green-light)'; })()};color:${(() => { const c = CONDICIONES.find(x => x.key===(eq.condicion||'bueno')); return c?c.color:'var(--green)'; })()};border:1px solid ${(() => { const c = CONDICIONES.find(x => x.key===(eq.condicion||'bueno')); return c?c.color:'var(--green)'; })()}" onclick="openCondicionModal('${eq.id}')">⚙️ Actualizar condición</button>
-        ${!eq.prestado && !eqEnCampo(eq) && (eq.condicion||'bueno') !== 'fuera' ? `
-          <button class="btn" style="background:var(--primary-light);color:var(--primary);border:1px solid var(--primary)" onclick="registrarPrestamo('${eq.id}')">🔄 Registrar préstamo</button>
-        ` : ''}
-        ${eq.prestado ? `
-          <button class="btn" style="background:var(--green-light);color:var(--green);border:1px solid var(--green)" onclick="registrarDevolucion('${eq.id}')">✅ Registrar devolución</button>
-        ` : ''}
-        ${isAdmin() ? `<button class="btn btn-secondary" style="color:var(--red)" onclick="delEquipo('${eq.id}')">Eliminar del inventario</button>` : ''}
-      </div>`;
+        })()}`;
+
+        if (historial.length === 0) {
+          html += '<div class="empty"><div class="empty-icon">📡</div><div class="empty-text">Sin instalaciones registradas</div></div>';
+        } else {
+          html += '<div class="section-title">Historial de instalaciones ('+historial.length+')</div>';
+          html += '<div class="list" style="margin-bottom:16px">';
+          historial.forEach(r => {
+            const st2 = calcSt(r);
+            const tieneFallas = r.fallas && r.fallas.length > 0;
+            const sinProblema = r.sinProblema;
+            html += '<div class="historial-card">';
+            html += '<div class="historial-row"><div>';
+            html += '<div class="historial-lugar">' + (r.lugar||'Sin lugar') + '</div>';
+            html += '<div class="historial-caso">#' + r.caso + '</div>';
+            if (r.descargas && r.descargas.length > 0) html += '<div style="font-size:11px;color:var(--primary);font-weight:600;margin-top:2px">💾 '+r.descargas.length+' descarga'+(r.descargas.length>1?'s':'')+'</div>';
+            html += '</div><div class="historial-fecha">' + fmtDate(r.fechaInstalacion) + '<br>→ ' + fmtDate(r.fechaRetiroReal||r.fechaRetiro) + '</div></div>';
+            html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">';
+            html += badgeSt(st2);
+            if (r.retirado && sinProblema) html += '<span class="badge badge-green">✓ Sin problemas</span>';
+            if (r.retirado && tieneFallas) html += '<span class="badge badge-red">⚠ Falla física</span>';
+            if (r.retirado && r.descargaPendiente) html += '<span class="badge badge-yellow" style="cursor:pointer" onclick="openDescargaModal(\'' + r.id + '\')">⚠️ Desc. pendiente</span>';
+            if (r.descargas && r.descargas.some(d=>d.medicionOk===false)) html += '<span class="badge badge-yellow">📊 Fallo medición</span>';
+            if (r.descargas && r.descargas.length>0 && r.descargas.every(d=>d.medicionOk===true)) html += '<span class="badge badge-green">📊 Medición OK</span>';
+            html += '</div>';
+            if (r.retirado && tieneFallas) {
+              html += '<div style="margin-top:8px;padding:8px 10px;background:var(--red-light);border-radius:8px">';
+              html += '<div style="font-size:11px;font-weight:600;color:var(--red);margin-bottom:4px">FALLAS FÍSICAS</div>';
+              r.fallas.forEach(f => { html += '<div style="font-size:12px;color:var(--red)">• '+f+'</div>'; });
+              if (r.descripcionFalla) html += '<div style="font-size:11px;color:var(--text2);margin-top:4px;font-style:italic">"'+r.descripcionFalla+'"</div>';
+              html += '</div>';
+            }
+            if (r.descargas && r.descargas.some(d=>d.medicionOk===false)) {
+              html += '<div style="margin-top:6px;padding:8px 10px;background:var(--yellow-light);border-radius:8px">';
+              html += '<div style="font-size:11px;font-weight:600;color:var(--yellow);margin-bottom:4px">FALLOS DE MEDICIÓN</div>';
+              r.descargas.filter(d=>d.medicionOk===false).forEach(d => {
+                html += '<div style="font-size:12px;color:var(--yellow)">'+fmtDate(d.fecha)+': '+(d.fallasMedicion||[]).join(', ')+(d.descripcionFalla?' — '+d.descripcionFalla:'')+'</div>';
+              });
+              html += '</div>';
+            }
+            if (r.retiradoPor) html += '<div style="font-size:10px;color:var(--text3);margin-top:6px">👤 Retirado por: '+r.retiradoPor+'</div>';
+            html += '</div>';
+          });
+          html += '</div>';
+        }
+      }
+
+      // TAB: MOVIMIENTOS
+      if (eqDetalleTab === 'movimientos') {
+        if (!eq.movimientos || eq.movimientos.length === 0) {
+          html += '<div class="empty"><div class="empty-icon">🔄</div><div class="empty-text">Sin movimientos registrados</div></div>';
+        } else {
+          html += '<div class="list" style="margin-bottom:16px">';
+          eq.movimientos.slice().reverse().forEach(m => {
+            const movIdx = eq.movimientos.indexOf(m);
+            html += '<div class="historial-card">';
+            html += '<div class="historial-row"><div>';
+            html += '<div class="historial-lugar">' + m.de + ' → ' + m.a + '</div>';
+            html += '<div class="historial-caso">' + (m.tipo==='prestamo'?'🔄 Préstamo':'✅ Devolución') + (m.nota?' · '+m.nota:'') + '</div>';
+            if (m.registradoPor) html += '<div style="font-size:10px;color:var(--text3);margin-top:2px">👤 '+m.registradoPor+'</div>';
+            html += '</div><div class="historial-fecha">'+fmtDate(m.fecha)+'</div></div>';
+            html += '<div style="display:flex;gap:6px;margin-top:8px">';
+            html += '<button onclick="generarMemo(\'' + eq.id + '\',' + movIdx + ')" style="flex:1;padding:8px;border:1px solid var(--primary);border-radius:8px;background:var(--primary-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer">📄 Memo PDF</button>';
+            html += '<button onclick="emailMemo(\'' + eq.id + '\',' + movIdx + ')" style="padding:8px 12px;border:1px solid var(--accent);border-radius:8px;background:var(--accent-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer">📧</button>';
+            if (isAdmin()) html += '<button onclick="eliminarMovimiento(\'' + eq.id + '\',' + movIdx + ')" style="padding:8px 10px;border:1px solid var(--red);border-radius:8px;background:var(--red-light);color:var(--red);font-family:var(--font);font-size:12px;cursor:pointer">🗑</button>';
+            html += '</div></div>';
+          });
+          html += '</div>';
+        }
+      }
+
+      html += '</div>';
     }
   }
-
-  
 
   // MAP TAB
   else if (tab === 'mapa') {
@@ -2679,9 +2695,10 @@ window.pickEquipo = id => {
   form.equipoId = id; form.serie = eq.serie; form.modelo = eq.modelo || '';
   showSelector = false; render();
 };
+window.setEqDetalleTab = t => { eqDetalleTab = t; render(); };
 window.newEquipo = () => { equipoForm = emptyEF(); editEqId = null; view = 'equipo_form'; render(); };
 window.saveEquipo = handleSaveEq;
-window.openEqDetalle = id => { editEqId = id; view = 'equipo_detalle'; render(); };
+window.openEqDetalle = id => { editEqId = id; view = 'equipo_detalle'; eqDetalleTab = 'general'; render(); };
 window.editEquipo = id => {
   if (!isAdmin()) return showToast('⚠️ Solo el administrador puede editar equipos');
   const eq = equipos.find(x => x.id === id); if (!eq) return;
