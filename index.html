@@ -22,12 +22,6 @@
 
 
     [data-theme="dark"] {
-    [data-theme="dark"] input, [data-theme="dark"] textarea, [data-theme="dark"] select {
-      background: var(--border2) !important; color: var(--text) !important; border-color: var(--border) !important;
-    }
-    [data-theme="dark"] .bottom-nav { background: var(--white); border-color: var(--border); }
-    [data-theme="dark"] .form-section, [data-theme="dark"] .detail-grid, [data-theme="dark"] .historial-card { background: var(--white) !important; border-color: var(--border) !important; }
-    [data-theme="dark"] .card { background: var(--white) !important; border-color: var(--border) !important; }
       --bg: #0d1117; --white: #161b22; --text: #e6edf3; --text2: #8b949e; --text3: #484f58;
       --border: #30363d; --border2: #21262d; --primary-light: #1c2d42; --accent-light: #0d2137;
       --green-light: #0d2b1e; --yellow-light: #2b1d09; --red-light: #2b0f0f;
@@ -262,7 +256,11 @@
 
     /* LOADING */
     .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 16px; background: var(--bg); }
-    .spinner { width: 36px; height: 36px; bord
+    .spinner { width: 36px; height: 36px; border: 3px solid var(--primary-light); border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { font-size: 14px; color: var(--text3); font-weight: 500; }
+  
+    .content { animation: fade
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, onValue, push, update, remove, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
@@ -1345,11 +1343,6 @@ function render() {
       </div>
     </div>`;
     el.innerHTML = html;
-  // Sync theme button icon after render
-  try {
-    const tb = document.getElementById('theme-btn');
-    if (tb) tb.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? '☀️' : '🌙';
-  } catch(e) {}
     // Focus PIN input if user selected
     if (loginForm.nombre) {
       const pinEl = document.getElementById('pin-input');
@@ -1405,7 +1398,7 @@ function render() {
         <div class="logo-sub" onclick="cerrarSesion()" style="cursor:pointer">👤 ${sesionUsuario?.nombre||''}  ↩</div>
       </div>
     </div>
-    <button onclick="toggleDarkMode()" id="theme-btn" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:10px;width:32px;height:32px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0">🌙</button>
+    <button onclick="toggleDarkMode()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:10px;width:32px;height:32px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${document.documentElement.getAttribute('data-theme')==='dark'?'☀️':'🌙'}</button>
     ${view === 'lista' && tab === 'instalaciones' ? `<button class="btn-small" onclick="newInstall()">+ Nuevo</button>` : ''}
     ${view === 'lista' && tab === 'inventario' && !modoSeleccionLote ? `<button class="btn-small" onclick="newEquipo()">+ Equipo</button>` : ''}
     ${view === 'lista' && tab === 'inventario' && modoSeleccionLote ? `<button class="btn-small" style="background:rgba(255,255,255,.3)" onclick="cancelarLote()">✕ Cancelar</button>` : ''}
@@ -2622,11 +2615,6 @@ if (inventarioSearch) {
   </nav>`;
 
   el.innerHTML = html;
-  // Sync theme button icon after render
-  try {
-    const tb = document.getElementById('theme-btn');
-    if (tb) tb.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? '☀️' : '🌙';
-  } catch(e) {}
 
   // Restore focus to search input if one was active
   const activeSearch = el.querySelector('input.search-input[data-active="true"]');
@@ -2640,18 +2628,13 @@ if (inventarioSearch) {
 // ── GLOBAL HANDLERS ──
 window.toggleDarkMode = () => {
   const dark = document.documentElement.getAttribute('data-theme') === 'dark';
-  const next = dark ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', next);
-  try { localStorage.setItem('cpt_theme', next); } catch(e) {}
-  const btn = document.getElementById('theme-btn');
-  if (btn) btn.textContent = next === 'dark' ? '☀️' : '🌙';
+  document.documentElement.setAttribute('data-theme', dark ? 'light' : 'dark');
+  try { localStorage.setItem('cpt_theme', dark ? 'light' : 'dark'); } catch(e) {}
   render();
 };
 try {
   const t = localStorage.getItem('cpt_theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   document.documentElement.setAttribute('data-theme', t);
-  // Update button after DOM renders
-  setTimeout(() => { const btn = document.getElementById('theme-btn'); if (btn) btn.textContent = t === 'dark' ? '☀️' : '🌙'; }, 100);
 } catch(e) {}
 window.goBack = () => { view = 'lista'; editId = null; editEqId = null; form = emptyForm(); equipoForm = emptyEF(); showSelector = false; render(); };
 window.switchTab = t => {
@@ -3009,17 +2992,7 @@ window.emailMemo = (eqId, movIdx) => {
   window.location.href = 'mailto:?subject=' + asunto + '&body=' + encodeURIComponent(lineas);
 };
 
-V'));
-  const lineas = [
-    'Para: ' + (mov.a||''),
-    'Asunto: ' + tipoM + ' de equipo analizador de red',
-    'Fecha: ' + new Date().toLocaleDateString('es-SV'),
-    '',
-    'Serie: ' + eq.serie,
-    eq.vineta ? 'Vineta: ' + eq.vineta : '',
-    'Modelo: ' + (eq.modelo||''),
-    '',
-    'Movimiento: ' + (mov.de||'') + ' -> ' + (mov.a||''),
+ento: ' + (mov.de||'') + ' -> ' + (mov.a||''),
     mov.nota ? 'Nota: ' + mov.nota : '',
     '',
     'Documento generado por CPT INNOVA - Sistema de Gestion de Analizadores de Red'
