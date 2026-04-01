@@ -1347,6 +1347,11 @@ function render() {
       </div>
     </div>`;
     el.innerHTML = html;
+  // Sync theme button icon after render
+  try {
+    const tb = document.getElementById('theme-btn');
+    if (tb) tb.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? '☀️' : '🌙';
+  } catch(e) {}
     // Focus PIN input if user selected
     if (loginForm.nombre) {
       const pinEl = document.getElementById('pin-input');
@@ -1402,7 +1407,7 @@ function render() {
         <div class="logo-sub" onclick="cerrarSesion()" style="cursor:pointer">👤 ${sesionUsuario?.nombre||''}  ↩</div>
       </div>
     </div>
-    <button onclick="toggleDarkMode()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:10px;width:32px;height:32px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${document.documentElement.getAttribute('data-theme')==='dark'?'☀️':'🌙'}</button>
+    <button onclick="toggleDarkMode()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:10px;width:32px;height:32px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0">🌙</button>
     <button onclick="toggleDarkMode()" id="theme-btn" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:10px;width:32px;height:32px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0">🌙</button>
     ${view === 'lista' && tab === 'instalaciones' ? `<button class="btn-small" onclick="newInstall()">+ Nuevo</button>` : ''}
     ${view === 'lista' && tab === 'inventario' && !modoSeleccionLote ? `<button class="btn-small" onclick="newEquipo()">+ Equipo</button>` : ''}
@@ -2620,6 +2625,11 @@ if (inventarioSearch) {
   </nav>`;
 
   el.innerHTML = html;
+  // Sync theme button icon after render
+  try {
+    const tb = document.getElementById('theme-btn');
+    if (tb) tb.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? '☀️' : '🌙';
+  } catch(e) {}
 
   // Restore focus to search input if one was active
   const activeSearch = el.querySelector('input.search-input[data-active="true"]');
@@ -2633,13 +2643,18 @@ if (inventarioSearch) {
 // ── GLOBAL HANDLERS ──
 window.toggleDarkMode = () => {
   const dark = document.documentElement.getAttribute('data-theme') === 'dark';
-  document.documentElement.setAttribute('data-theme', dark ? 'light' : 'dark');
-  try { localStorage.setItem('cpt_theme', dark ? 'light' : 'dark'); } catch(e) {}
+  const next = dark ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  try { localStorage.setItem('cpt_theme', next); } catch(e) {}
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = next === 'dark' ? '☀️' : '🌙';
   render();
 };
 try {
   const t = localStorage.getItem('cpt_theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   document.documentElement.setAttribute('data-theme', t);
+  // Update button after DOM renders
+  setTimeout(() => { const btn = document.getElementById('theme-btn'); if (btn) btn.textContent = t === 'dark' ? '☀️' : '🌙'; }, 100);
 } catch(e) {}
 window.goBack = () => { view = 'lista'; editId = null; editEqId = null; form = emptyForm(); equipoForm = emptyEF(); showSelector = false; render(); };
 window.switchTab = t => {
