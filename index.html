@@ -22,6 +22,12 @@
 
 
     [data-theme="dark"] {
+    [data-theme="dark"] input, [data-theme="dark"] textarea, [data-theme="dark"] select {
+      background: var(--border2) !important; color: var(--text) !important; border-color: var(--border) !important;
+    }
+    [data-theme="dark"] .bottom-nav { background: var(--white); border-color: var(--border); }
+    [data-theme="dark"] .form-section, [data-theme="dark"] .detail-grid, [data-theme="dark"] .historial-card { background: var(--white) !important; border-color: var(--border) !important; }
+    [data-theme="dark"] .card { background: var(--white) !important; border-color: var(--border) !important; }
       --bg: #0d1117; --white: #161b22; --text: #e6edf3; --text2: #8b949e; --text3: #484f58;
       --border: #30363d; --border2: #21262d; --primary-light: #1c2d42; --accent-light: #0d2137;
       --green-light: #0d2b1e; --yellow-light: #2b1d09; --red-light: #2b0f0f;
@@ -256,15 +262,7 @@
 
     /* LOADING */
     .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 16px; background: var(--bg); }
-    .spinner { width: 36px; height: 36px; border: 3px solid var(--primary-light); border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .loading-text { font-size: 14px; color: var(--text3); font-weight: 500; }
-  
-    .content { animation: fadeSlide .18s ease; }
-    @keyframes fadeSlide { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
-    .nav-btn.active .nav-icon { animation: navPop .2s ease; }
-    @keyframes navPop { 0%,100%{transform:scale(1)} 50%{transform:scale(1.2)} }</style>
-<script type="module">
+    .spinner { width: 36px; height: 36px; bord
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, onValue, push, update, remove, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
@@ -1407,7 +1405,6 @@ function render() {
         <div class="logo-sub" onclick="cerrarSesion()" style="cursor:pointer">👤 ${sesionUsuario?.nombre||''}  ↩</div>
       </div>
     </div>
-    <button onclick="toggleDarkMode()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:10px;width:32px;height:32px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0">🌙</button>
     <button onclick="toggleDarkMode()" id="theme-btn" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:10px;width:32px;height:32px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0">🌙</button>
     ${view === 'lista' && tab === 'instalaciones' ? `<button class="btn-small" onclick="newInstall()">+ Nuevo</button>` : ''}
     ${view === 'lista' && tab === 'inventario' && !modoSeleccionLote ? `<button class="btn-small" onclick="newEquipo()">+ Equipo</button>` : ''}
@@ -2995,6 +2992,24 @@ window.emailMemo = (eqId, movIdx) => {
   if (!mov) return;
   const tipoM = mov.tipo === 'prestamo' ? 'PRESTAMO' : 'DEVOLUCION';
   const asunto = encodeURIComponent('Memorandum de ' + tipoM + ' - ' + eq.serie + ' - ' + new Date().toLocaleDateString('es-SV'));
+  const lineas = [
+    'Para: ' + (mov.a||''),
+    'Asunto: ' + tipoM + ' de equipo analizador de red',
+    'Fecha: ' + new Date().toLocaleDateString('es-SV'),
+    '',
+    'Serie: ' + eq.serie,
+    eq.vineta ? 'Vineta: ' + eq.vineta : '',
+    'Modelo: ' + (eq.modelo||''),
+    '',
+    'Movimiento: ' + (mov.de||'') + ' -> ' + (mov.a||''),
+    mov.nota ? 'Nota: ' + mov.nota : '',
+    '',
+    'Documento generado por CPT INNOVA - Sistema de Gestion de Analizadores de Red'
+  ].filter(Boolean).join('\n');
+  window.location.href = 'mailto:?subject=' + asunto + '&body=' + encodeURIComponent(lineas);
+};
+
+V'));
   const lineas = [
     'Para: ' + (mov.a||''),
     'Asunto: ' + tipoM + ' de equipo analizador de red',
