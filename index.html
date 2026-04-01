@@ -1401,7 +1401,6 @@ function render() {
         <div class="logo-sub" onclick="cerrarSesion()" style="cursor:pointer">👤 ${sesionUsuario?.nombre||''}  ↩</div>
       </div>
     </div>
-    <button onclick="toggleDarkMode()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:10px;width:32px;height:32px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${document.documentElement.getAttribute('data-theme')==='dark'?'☀️':'🌙'}</button>
     ${view === 'lista' && tab === 'instalaciones' ? `<button class="btn-small" onclick="newInstall()">+ Nuevo</button>` : ''}
     ${view === 'lista' && tab === 'inventario' && !modoSeleccionLote ? `<button class="btn-small" onclick="newEquipo()">+ Equipo</button>` : ''}
     ${view === 'lista' && tab === 'inventario' && modoSeleccionLote ? `<button class="btn-small" style="background:rgba(255,255,255,.3)" onclick="cancelarLote()">✕ Cancelar</button>` : ''}
