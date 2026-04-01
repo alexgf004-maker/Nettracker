@@ -480,7 +480,7 @@ function handleSave() {
 }
 
 // ── RETIRO ──
-function openRetiroModal(id) { retiroId = id; retiroForm = { sinProblema: null, fallas: [], descripcion: '', sede: 'Plantel Central', energiaTipo: 'ninguna', energiaUna: '', energiaPunta: '', energiaResto: '', energiaValle: '' }; showRetiroModal = true; render(); }
+function openRetiroModal(id) { retiroId = id; retiroForm = { sinProblema: null, fallas: [], descripcion: '', sede: 'Plantel Central', energiaTipo: 'ninguna', energiaUna: '', energiaPunta: '', energiaResto: '', energiaValle: '', descargaConfirmada: null }; showRetiroModal = true; render(); }
 function closeRetiroModal() { showRetiroModal = false; retiroId = null; render(); }
 function toggleFalla(f) {
   retiroForm.sinProblema = false;
@@ -500,7 +500,7 @@ function handleRetiro() {
     : retiroForm.energiaTipo === 'tres'
     ? { tipo: 'tres', punta: retiroForm.energiaPunta, resto: retiroForm.energiaResto, valle: retiroForm.energiaValle }
     : { tipo: 'ninguna' };
-  const payload = { retirado: true, fechaRetiroReal: today(), sinProblema: retiroForm.sinProblema || false, fallas: retiroForm.fallas, descripcionFalla: retiroForm.descripcion, retiradoPor: sesionUsuario?.nombre || 'Desconocido', energiaRetiro: energiaRet };
+  const payload = { retirado: true, fechaRetiroReal: today(), sinProblema: retiroForm.sinProblema || false, fallas: retiroForm.fallas, descripcionFalla: retiroForm.descripcion, retiradoPor: sesionUsuario?.nombre || 'Desconocido', energiaRetiro: energiaRet, descargaConfirmada: retiroForm.descargaConfirmada === true, descargaPendiente: retiroForm.descargaConfirmada === false };
   const id = retiroId;
   const sedeRetiro = retiroForm.sede;
   const deployRec = records.find(x => x.id === id);
@@ -1419,6 +1419,14 @@ function render() {
           <textarea placeholder="Describe el problema..." oninput="setRetiroDesc(this.value)" style="width:100%;padding:12px;border:1.5px solid #e5e7eb;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:14px;outline:none;min-height:70px;resize:vertical">${retiroForm.descripcion}</textarea>
         </div>
 
+        <div style="margin-bottom:16px">
+          <div style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:8px">¿YA DESCARGASTE LA MEDICIÓN?</div>
+          <div style="display:flex;gap:8px">
+            <div onclick="setRetiroDescarga(true)" style="flex:1;padding:11px;border-radius:10px;border:2px solid ${retiroForm.descargaConfirmada===true?'var(--green)':'#e5e7eb'};background:${retiroForm.descargaConfirmada===true?'var(--green-light)':'#fff'};text-align:center;cursor:pointer;font-size:13px;font-weight:700;color:${retiroForm.descargaConfirmada===true?'var(--green)':'#6b7280'}">✅ Sí, ya descargué</div>
+            <div onclick="setRetiroDescarga(false)" style="flex:1;padding:11px;border-radius:10px;border:2px solid ${retiroForm.descargaConfirmada===false?'var(--red)':'#e5e7eb'};background:${retiroForm.descargaConfirmada===false?'var(--red-light)':'#fff'};text-align:center;cursor:pointer;font-size:13px;font-weight:700;color:${retiroForm.descargaConfirmada===false?'var(--red)':'#6b7280'}">⚠️ No descargué</div>
+          </div>
+          ${retiroForm.descargaConfirmada===false?'<div style="margin-top:8px;padding:8px 12px;background:var(--red-light);border-radius:8px;font-size:12px;color:var(--red);font-weight:600">⚠️ El equipo quedará marcado con descarga pendiente</div>':''}
+        </div>
         <div style="margin-bottom:12px">
           ${(()=>{
             const recR = records.find(x => x.id === retiroId);
@@ -1982,6 +1990,8 @@ if (inventarioSearch) {
                 else if (isPrestado) { const movs2=eq.movimientos||[]; const lm=movs2[movs2.length-1]; html += '<div style="font-size:10px;color:var(--primary);font-weight:600">' + (lm&&lm.a==='Campos y Servicios'?'🏗 Con Campos y Servicios':'🔄 Prestado') + '</div>'; }
                 html += '</div>';
                 html += '<div style="display:flex;flex-direction:column;gap:2px;align-items:flex-end;flex-shrink:0">';
+                const tienePendiente = records.some(r => r.equipoId === eq.id && r.retirado && r.descargaPendiente);
+                if (tienePendiente) html += '<span class="badge badge-yellow" style="font-size:8px;padding:2px 5px">⚠️ Desc.</span>';
                 if ((eq.condicion||'bueno')==='fuera') html += '<span class="badge badge-red" style="font-size:8px;padding:2px 5px">🔴 Fuera</span>';
                 else if ((eq.condicion||'bueno')==='mantenimiento') html += '<span class="badge" style="font-size:8px;padding:2px 5px;background:#f3f0ff;color:#7c3aed">🔧 Mant.</span>';
                 else { if (isPrestado) html += '<span class="badge badge-blue" style="font-size:8px;padding:2px 5px">Prest.</span>'; if (isEnCampo) html += '<span class="badge badge-yellow" style="font-size:8px;padding:2px 5px">Campo</span>'; if (!isPrestado&&!isEnCampo) html += '<span class="badge badge-green" style="font-size:8px;padding:2px 5px">Disp.</span>'; if ((eq.condicion||'bueno')==='detalles') html += '<span style="font-size:10px">🟡</span>'; }
@@ -1993,6 +2003,8 @@ if (inventarioSearch) {
               html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px">';
               html += '<div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text);word-break:break-all;flex:1;margin-right:4px">' + eq.serie + '</div>';
               html += '<div style="display:flex;flex-direction:column;gap:2px;align-items:flex-end">';
+              const tienePendGrid = records.some(r => r.equipoId === eq.id && r.retirado && r.descargaPendiente);
+              if (tienePendGrid) html += '<span class="badge badge-yellow" style="font-size:8px;padding:2px 5px;white-space:nowrap">⚠️ Descarga pend.</span>';
               if ((eq.condicion||'bueno') === 'fuera') {
                 html += '<span class="badge badge-red" style="font-size:8px;padding:2px 5px;white-space:nowrap">🔴 Fuera servicio</span>';
               } else if ((eq.condicion||'bueno') === 'mantenimiento') {
@@ -2558,6 +2570,7 @@ window.setEF = (k, v) => { equipoForm[k] = v; if (k === 'condicion' || k === 'se
 window.setLocMode = m => { locMode = m; render(); };
 window.triggerGPS = getGPS;
 window.setRetiroDesc = v => { retiroForm.descripcion = v; };
+window.setRetiroDescarga = v => { retiroForm.descargaConfirmada = v; render(); };
 window.toggleFalla = toggleFalla;
 window.toggleSinProblema = toggleSinProblema;
 window.doRetiro = handleRetiro;
@@ -2602,6 +2615,11 @@ window.setInvSearch = v => {
 };
 window.pickEquipo = id => {
   const eq = equipos.find(x => x.id === id); if (!eq) return;
+  // Check if equipo has pending download
+  const pendiente = records.find(r => r.equipoId === id && r.retirado && r.descargaPendiente);
+  if (pendiente) {
+    if (!confirm('⚠️ Este equipo tiene una descarga pendiente del caso #' + (pendiente.caso||'') + '. ¿Deseas instalarlo de todas formas?')) return;
+  }
   form.equipoId = id; form.serie = eq.serie; form.modelo = eq.modelo || '';
   showSelector = false; render();
 };
