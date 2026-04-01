@@ -20,6 +20,13 @@
 
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
+
+    [data-theme="dark"] {
+      --bg: #0d1117; --white: #161b22; --text: #e6edf3; --text2: #8b949e; --text3: #484f58;
+      --border: #30363d; --border2: #21262d; --primary-light: #1c2d42; --accent-light: #0d2137;
+      --green-light: #0d2b1e; --yellow-light: #2b1d09; --red-light: #2b0f0f;
+      --shadow: 0 1px 3px rgba(0,0,0,.3); --shadow-md: 0 4px 16px rgba(0,0,0,.4);
+    }
     :root {
       --primary: #0057b8;
       --primary-dark: #003d8f;
@@ -251,16 +258,7 @@
     .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 16px; background: var(--bg); }
     .spinner { width: 36px; height: 36px; border: 3px solid var(--primary-light); border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .loading-text { font-size: 14px; color: var(--text3); font-weight: 600; letter-spacing: .5px; }
-
-    .divider { height: 1px; background: var(--border); margin: 16px 0; }
-
-  </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-</head>
-<body>
-<div id="app"><div class="loading"><div class="spinner"></div><div class="loading-text">CONECTANDO...</div></div></div>
-<script type="module">
+    .loading-text { font-size: 14px; color: var(--text3);
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, onValue, push, update, remove, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
@@ -1398,6 +1396,7 @@ function render() {
         <div class="logo-sub" onclick="cerrarSesion()" style="cursor:pointer">👤 ${sesionUsuario?.nombre||''}  ↩</div>
       </div>
     </div>
+    <button onclick="toggleDarkMode()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:10px;width:32px;height:32px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${document.documentElement.getAttribute('data-theme')==='dark'?'☀️':'🌙'}</button>
     ${view === 'lista' && tab === 'instalaciones' ? `<button class="btn-small" onclick="newInstall()">+ Nuevo</button>` : ''}
     ${view === 'lista' && tab === 'inventario' && !modoSeleccionLote ? `<button class="btn-small" onclick="newEquipo()">+ Equipo</button>` : ''}
     ${view === 'lista' && tab === 'inventario' && modoSeleccionLote ? `<button class="btn-small" style="background:rgba(255,255,255,.3)" onclick="cancelarLote()">✕ Cancelar</button>` : ''}
@@ -1738,7 +1737,7 @@ function render() {
           const stripe = stCard==='ACTIVO'?'':stCard==='PROXIMO'?' yellow':stCard==='PROGRAMADO'?' purple':' gray';
           html += `<div onclick="openDetail('${r.id}')" style="background:var(--white);border:1px solid var(--border);border-left:3px solid ${stCard==='ACTIVO'?'var(--green)':stCard==='PROXIMO'?'var(--yellow)':stCard==='PROGRAMADO'?'#7c3aed':'var(--border2)'};border-radius:12px;padding:10px 14px;cursor:pointer;box-shadow:var(--shadow);margin-bottom:8px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
-              <div style="font-family:var(--mono);font-size:14px;font-weight:800;color:var(--text)">${r.serie||'—'}</div>
+              <div style="display:flex;align-items:center;gap:6px"><div style="font-family:var(--mono);font-size:14px;font-weight:800;color:var(--text)">${r.serie||'—'}</div>${(()=>{const eq=equipos.find(e=>e.id===r.equipoId);return eq&&eq.vineta?'<span style="font-size:10px;color:var(--text3);font-family:var(--mono);background:var(--border2);padding:2px 6px;border-radius:4px">🏷'+eq.vineta+'</span>':''})()}</div>
               ${badgeSt(stCard)}
             </div>
             <div style="font-size:11px;color:var(--text3);margin-bottom:4px">#${r.caso}${r.modelo?' · '+r.modelo:''}</div>
@@ -2625,6 +2624,16 @@ if (inventarioSearch) {
 }
 
 // ── GLOBAL HANDLERS ──
+window.toggleDarkMode = () => {
+  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.documentElement.setAttribute('data-theme', dark ? 'light' : 'dark');
+  try { localStorage.setItem('cpt_theme', dark ? 'light' : 'dark'); } catch(e) {}
+  render();
+};
+try {
+  const t = localStorage.getItem('cpt_theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  document.documentElement.setAttribute('data-theme', t);
+} catch(e) {}
 window.goBack = () => { view = 'lista'; editId = null; editEqId = null; form = emptyForm(); equipoForm = emptyEF(); showSelector = false; render(); };
 window.switchTab = t => {
   tab = t; view = 'lista'; editId = null; editEqId = null;
@@ -2940,6 +2949,24 @@ window.emailMemo = (eqId, movIdx) => {
   if (!mov) return;
   const tipoM = mov.tipo === 'prestamo' ? 'PRESTAMO' : 'DEVOLUCION';
   const asunto = encodeURIComponent('Memorandum de ' + tipoM + ' - ' + eq.serie + ' - ' + new Date().toLocaleDateString('es-SV'));
+  const lineas = [
+    'Para: ' + (mov.a||''),
+    'Asunto: ' + tipoM + ' de equipo analizador de red',
+    'Fecha: ' + new Date().toLocaleDateString('es-SV'),
+    '',
+    'Serie: ' + eq.serie,
+    eq.vineta ? 'Vineta: ' + eq.vineta : '',
+    'Modelo: ' + (eq.modelo||''),
+    '',
+    'Movimiento: ' + (mov.de||'') + ' -> ' + (mov.a||''),
+    mov.nota ? 'Nota: ' + mov.nota : '',
+    '',
+    'Documento generado por CPT INNOVA - Sistema de Gestion de Analizadores de Red'
+  ].filter(Boolean).join('\n');
+  window.location.href = 'mailto:?subject=' + asunto + '&body=' + encodeURIComponent(lineas);
+};
+
+' + tipoM + ' - ' + eq.serie + ' - ' + new Date().toLocaleDateString('es-SV'));
   const lineas = [
     'Para: ' + (mov.a||''),
     'Asunto: ' + tipoM + ' de equipo analizador de red',
