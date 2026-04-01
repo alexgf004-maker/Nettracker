@@ -321,7 +321,7 @@ let importData = [];
 let seleccionLote = [];
 let tipoLote = 'prestamo';
 let descargaId = null;
-let descargaForm = { tecnico: 'David García', notas: '' };
+let descargaForm = { tecnico: 'David García', notas: '', medicionOk: null, fallasMedicion: [], descripcionFalla: '' };
 let showRetiroModal = false;
 let retiroId = null;
 let retiroForm = { sinProblema: null, fallas: [], descripcion: '', sede: 'Plantel Central' };
@@ -535,17 +535,28 @@ function handleRetiro() {
 }
 
 // ── DESCARGA PARCIAL ──
-function openDescargaModal(id) { descargaId = id; descargaForm = { tecnico: 'David García', notas: '' }; showDescargaModal = true; render(); }
+function openDescargaModal(id) { descargaId = id; descargaForm = { tecnico: 'David García', notas: '', medicionOk: null, fallasMedicion: [], descripcionFalla: '' }; showDescargaModal = true; render(); }
 function closeDescargaModal() { showDescargaModal = false; descargaId = null; render(); }
 function handleDescarga() {
   if (!descargaForm.tecnico) return showToast('Selecciona un técnico');
+  if (descargaForm.medicionOk === null) return showToast('Indica si la medición fue correcta');
+  if (descargaForm.medicionOk === false && descargaForm.fallasMedicion.length === 0) return showToast('Selecciona al menos un tipo de fallo');
   const rec = records.find(x => x.id === descargaId);
   if (!rec) return;
-  const nueva = { fecha: today(), tecnico: descargaForm.tecnico, notas: descargaForm.notas, registradoPor: sesionUsuario?.nombre || 'Desconocido' };
+  const nueva = {
+    fecha: today(), tecnico: descargaForm.tecnico, notas: descargaForm.notas,
+    registradoPor: sesionUsuario?.nombre || 'Desconocido',
+    medicionOk: descargaForm.medicionOk,
+    fallasMedicion: descargaForm.fallasMedicion,
+    descripcionFalla: descargaForm.descripcionFalla
+  };
   const descargas = [...(rec.descargas || []), nueva];
   const id = descargaId;
   showDescargaModal = false; descargaId = null;
-  update(ref(db, `analizadores/${id}`), { descargas }).then(() => showToast('💾 Descarga registrada'));
+  // Mark descargaPendiente as resolved
+  update(ref(db, 'analizadores/' + id), { descargas, descargaPendiente: false }).then(() => {
+    showToast(descargaForm.medicionOk ? '💾 Descarga registrada correctamente' : '💾 Descarga registrada · Fallo anotado');
+  });
 }
 
 // ── DELETE DEPLOY ──
@@ -1390,8 +1401,8 @@ function render() {
 
   // RETIRO MODAL
   if (showRetiroModal) {
-    const FAULT_TYPES = ['No midió','Falla batería','Daño físico','Error en la medición'];
-    const FAULT_GRAVES = ['Equipo no funciona','Daño total'];
+    const FAULT_TYPES = ['Conector con falso','Falla batería (solo enciende energizado)','LED intermitente','No agarra WiFi','Tapadera no cierra'];
+    const FAULT_GRAVES = ['No enciende / Sin señales de vida','Equipo calcinado / Explosión'];
     const allOpts = ['Sin problemas', ...FAULT_TYPES];
     html += `<div style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
       <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:90vh;overflow-y:auto;padding:20px;font-family:'DM Sans',sans-serif">
@@ -1464,25 +1475,31 @@ function render() {
 
   // DESCARGA MODAL
   if (showDescargaModal) {
-    html += `<div style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
-      <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:80vh;overflow-y:auto;padding:20px;font-family:var(--font)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <div style="font-size:17px;font-weight:700;color:var(--text)">Registrar descarga parcial</div>
-          <button onclick="closeDescargaModal()" style="background:none;border:none;font-size:24px;color:var(--text3);cursor:pointer">✕</button>
-        </div>
-        <div style="font-size:13px;color:var(--text3);margin-bottom:16px">¿Quién realizó la descarga?</div>
-        ${TECNICOS.map(t => `
-          <div onclick="setDescargaTecnico('${t}')" style="padding:13px 16px;border:2px solid ${descargaForm.tecnico===t?'var(--primary)':'var(--border)'};border-radius:12px;margin-bottom:8px;cursor:pointer;font-size:15px;font-weight:600;color:${descargaForm.tecnico===t?'var(--primary)':'var(--text2)'};background:${descargaForm.tecnico===t?'var(--primary-light)':'#fff'};display:flex;align-items:center;gap:10px">
-            <span style="font-size:18px">${descargaForm.tecnico===t?'✅':'⬜'}</span> ${t}
-          </div>`).join('')}
-        <div style="margin-top:8px;margin-bottom:16px">
-          <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px">NOTAS (OPCIONAL)</div>
-          <textarea placeholder="Observaciones de la descarga..." oninput="setDescargaNotas(this.value)" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none;min-height:70px">${descargaForm.notas}</textarea>
-        </div>
-        <button onclick="doDescarga()" style="width:100%;background:var(--primary);color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">💾 Confirmar descarga</button>
-        <button onclick="closeDescargaModal()" style="width:100%;background:#fff;color:var(--text3);border:1px solid var(--border);border-radius:10px;padding:13px;font-family:var(--font);font-size:15px;cursor:pointer">Cancelar</button>
-      </div>
-    </div>`;
+    html += '<div style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">';
+    html += '<div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:90vh;overflow-y:auto;padding:20px;font-family:var(--font)">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:17px;font-weight:700;color:var(--text)">💾 Registrar descarga</div><button onclick="closeDescargaModal()" style="background:none;border:none;font-size:24px;color:var(--text3);cursor:pointer">✕</button></div>';
+    html += '<div style="font-size:12px;font-weight:700;color:var(--text3);margin-bottom:10px">¿QUIÉN REALIZÓ LA DESCARGA?</div>';
+    html += '<div onclick="setDescargaTecnico(\'David García\')" style="padding:10px 14px;border:2px solid '+(descargaForm.tecnico==='David García'?'var(--primary)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:14px;font-weight:600;color:'+(descargaForm.tecnico==='David García'?'var(--primary)':'var(--text2)')+';background:'+(descargaForm.tecnico==='David García'?'var(--primary-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(descargaForm.tecnico==='David García'?'✅':'⬜')+'</span> David García</div>';
+    html += '<div onclick="setDescargaTecnico(\'Bryan Francia\')" style="padding:10px 14px;border:2px solid '+(descargaForm.tecnico==='Bryan Francia'?'var(--primary)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:14px;font-weight:600;color:'+(descargaForm.tecnico==='Bryan Francia'?'var(--primary)':'var(--text2)')+';background:'+(descargaForm.tecnico==='Bryan Francia'?'var(--primary-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(descargaForm.tecnico==='Bryan Francia'?'✅':'⬜')+'</span> Bryan Francia</div>';
+    html += '<div onclick="setDescargaTecnico(\'Francisco Chulo\')" style="padding:10px 14px;border:2px solid '+(descargaForm.tecnico==='Francisco Chulo'?'var(--primary)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:14px;font-weight:600;color:'+(descargaForm.tecnico==='Francisco Chulo'?'var(--primary)':'var(--text2)')+';background:'+(descargaForm.tecnico==='Francisco Chulo'?'var(--primary-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(descargaForm.tecnico==='Francisco Chulo'?'✅':'⬜')+'</span> Francisco Chulo</div>';
+    html += '<div style="margin:14px 0 8px;font-size:12px;font-weight:700;color:var(--text3)">¿LA MEDICIÓN FUE CORRECTA?</div>';
+    html += '<div style="display:flex;gap:8px;margin-bottom:12px">';
+    html += '<div onclick="setDescargaMedicion(true)" style="flex:1;padding:11px;border-radius:10px;border:2px solid '+(descargaForm.medicionOk===true?'var(--green)':'var(--border)')+';background:'+(descargaForm.medicionOk===true?'var(--green-light)':'#fff')+';text-align:center;cursor:pointer;font-size:13px;font-weight:700;color:'+(descargaForm.medicionOk===true?'var(--green)':'var(--text3)')+'">✅ Sí, correcta</div>';
+    html += '<div onclick="setDescargaMedicion(false)" style="flex:1;padding:11px;border-radius:10px;border:2px solid '+(descargaForm.medicionOk===false?'var(--red)':'var(--border)')+';background:'+(descargaForm.medicionOk===false?'var(--red-light)':'#fff')+';text-align:center;cursor:pointer;font-size:13px;font-weight:700;color:'+(descargaForm.medicionOk===false?'var(--red)':'var(--text3)')+'">⚠️ Tuvo fallos</div>';
+    html += '</div>';
+    if (descargaForm.medicionOk === false) {
+      html += '<div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:8px">TIPO DE FALLO (puede ser más de uno)</div>';
+      html += '<div onclick="toggleFallaMedicion(\'Pocas mediciones (incompleta)\')" style="padding:10px 14px;border:2px solid '+(descargaForm.fallasMedicion.includes('Pocas mediciones (incompleta)')?'var(--red)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:12px;font-weight:600;color:'+(descargaForm.fallasMedicion.includes('Pocas mediciones (incompleta)')?'var(--red)':'var(--text2)')+';background:'+(descargaForm.fallasMedicion.includes('Pocas mediciones (incompleta)')?'var(--red-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(descargaForm.fallasMedicion.includes('Pocas mediciones (incompleta)')?'🔴':'⬜')+'</span> Pocas mediciones (incompleta)</div>';
+      html += '<div onclick="toggleFallaMedicion(\'Valores repetidos / pegados\')" style="padding:10px 14px;border:2px solid '+(descargaForm.fallasMedicion.includes('Valores repetidos / pegados')?'var(--red)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:12px;font-weight:600;color:'+(descargaForm.fallasMedicion.includes('Valores repetidos / pegados')?'var(--red)':'var(--text2)')+';background:'+(descargaForm.fallasMedicion.includes('Valores repetidos / pegados')?'var(--red-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(descargaForm.fallasMedicion.includes('Valores repetidos / pegados')?'🔴':'⬜')+'</span> Valores repetidos / pegados</div>';
+      html += '<div onclick="toggleFallaMedicion(\'No midio (archivo vacio)\')" style="padding:10px 14px;border:2px solid '+(descargaForm.fallasMedicion.includes('No midio (archivo vacio)')?'var(--red)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:12px;font-weight:600;color:'+(descargaForm.fallasMedicion.includes('No midio (archivo vacio)')?'var(--red)':'var(--text2)')+';background:'+(descargaForm.fallasMedicion.includes('No midio (archivo vacio)')?'var(--red-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(descargaForm.fallasMedicion.includes('No midio (archivo vacio)')?'🔴':'⬜')+'</span> No midio (archivo vacio)</div>';
+      html += '<div onclick="toggleFallaMedicion(\'Archivo demasiado pesado\')" style="padding:10px 14px;border:2px solid '+(descargaForm.fallasMedicion.includes('Archivo demasiado pesado')?'var(--red)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:12px;font-weight:600;color:'+(descargaForm.fallasMedicion.includes('Archivo demasiado pesado')?'var(--red)':'var(--text2)')+';background:'+(descargaForm.fallasMedicion.includes('Archivo demasiado pesado')?'var(--red-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(descargaForm.fallasMedicion.includes('Archivo demasiado pesado')?'🔴':'⬜')+'</span> Archivo demasiado pesado</div>';
+      html += '<div onclick="toggleFallaMedicion(\'Archivo demasiado liviano\')" style="padding:10px 14px;border:2px solid '+(descargaForm.fallasMedicion.includes('Archivo demasiado liviano')?'var(--red)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:12px;font-weight:600;color:'+(descargaForm.fallasMedicion.includes('Archivo demasiado liviano')?'var(--red)':'var(--text2)')+';background:'+(descargaForm.fallasMedicion.includes('Archivo demasiado liviano')?'var(--red-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(descargaForm.fallasMedicion.includes('Archivo demasiado liviano')?'🔴':'⬜')+'</span> Archivo demasiado liviano</div>';
+      html += '<div style="margin-top:8px"><div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px">DESCRIPCIÓN ADICIONAL</div><textarea placeholder="Describe el fallo..." oninput="setDescargaFallaDesc(this.value)" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none;min-height:60px">'+descargaForm.descripcionFalla+'</textarea></div>';
+    }
+    html += '<div style="margin:12px 0"><div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px">NOTAS GENERALES (OPCIONAL)</div><textarea placeholder="Observaciones adicionales..." oninput="setDescargaNotas(this.value)" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none;min-height:60px">'+descargaForm.notas+'</textarea></div>';
+    html += '<button onclick="doDescarga()" style="width:100%;background:var(--primary);color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">💾 Confirmar descarga</button>';
+    html += '<button onclick="closeDescargaModal()" style="width:100%;background:#fff;color:var(--text3);border:1px solid var(--border);border-radius:10px;padding:13px;font-family:var(--font);font-size:15px;cursor:pointer">Cancelar</button>';
+    html += '</div></div>';
   }
 
   // IMPORT INVENTARIO MODAL
@@ -2187,14 +2204,22 @@ if (inventarioSearch) {
                 <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
                   ${badgeSt(st2)}
                   ${r.retirado && sinProblema ? `<span class="badge badge-green">✓ Sin problemas</span>` : ''}
-                  ${r.retirado && tieneFallas ? `<span class="badge badge-red">⚠ Con falla</span>` : ''}
+                  ${r.retirado && tieneFallas ? `<span class="badge badge-red">⚠ Con falla física</span>` : ''}
+                  ${r.retirado && r.descargaPendiente ? `<span class="badge badge-yellow" style="cursor:pointer" onclick="openDescargaModal('${r.id}')">⚠️ Descarga pendiente</span>` : ''}
+                  ${r.descargas && r.descargas.length > 0 && r.descargas.some(d => d.medicionOk===false) ? `<span class="badge badge-red">📊 Fallo medición</span>` : ''}
+                  ${r.descargas && r.descargas.length > 0 && r.descargas.every(d => d.medicionOk===true) ? `<span class="badge badge-green">📊 Medición OK</span>` : ''}
                   ${r.retiradoPor ? `<div style="font-size:10px;color:var(--text3);margin-top:4px">👤 Retirado por: ${r.retiradoPor}</div>` : ''}
                 </div>
                 ${r.retirado && tieneFallas ? `
                   <div style="margin-top:8px;padding:8px 10px;background:var(--red-light);border-radius:8px;border:1px solid #fecaca">
-                    <div style="font-size:11px;font-weight:600;color:var(--red);margin-bottom:4px">FALLAS REGISTRADAS</div>
-                    ${r.fallas.map(f => `<div style="font-size:13px;color:var(--red);margin-bottom:2px">• ${f}</div>`).join('')}
-                    ${r.descripcionFalla ? `<div style="font-size:12px;color:var(--text2);margin-top:4px;font-style:italic">"${r.descripcionFalla}"</div>` : ''}
+                    <div style="font-size:11px;font-weight:600;color:var(--red);margin-bottom:4px">FALLAS FÍSICAS</div>
+                    ${r.fallas.map(f => '<div style="font-size:13px;color:var(--red);margin-bottom:2px">• '+f+'</div>').join('')}
+                    ${r.descripcionFalla ? '<div style="font-size:12px;color:var(--text2);margin-top:4px;font-style:italic">"'+r.descripcionFalla+'"</div>' : ''}
+                  </div>` : ''}
+                ${r.descargas && r.descargas.some(d=>d.medicionOk===false) ? `
+                  <div style="margin-top:8px;padding:8px 10px;background:var(--yellow-light);border-radius:8px;border:1px solid #fcd34d">
+                    <div style="font-size:11px;font-weight:600;color:var(--yellow);margin-bottom:4px">FALLOS DE MEDICIÓN</div>
+                    ${r.descargas.filter(d=>d.medicionOk===false).map(d => '<div style="font-size:12px;color:var(--yellow);margin-bottom:2px">'+fmtDate(d.fecha)+': '+d.fallasMedicion.join(', ')+(d.descripcionFalla?' — '+d.descripcionFalla:'')+'</div>').join('')}
                   </div>` : ''}
               </div>`;
             }).join('')}
@@ -2642,6 +2667,9 @@ window.closeDescargaModal = closeDescargaModal;
 window.doDescarga = handleDescarga;
 window.setDescargaTecnico = t => { descargaForm.tecnico = t; render(); };
 window.setDescargaNotas = v => { descargaForm.notas = v; };
+window.setDescargaMedicion = v => { descargaForm.medicionOk = v; if (!v) {} else { descargaForm.fallasMedicion = []; descargaForm.descripcionFalla = ''; } render(); };
+window.toggleFallaMedicion = f => { const i = descargaForm.fallasMedicion.indexOf(f); if (i>=0) descargaForm.fallasMedicion.splice(i,1); else descargaForm.fallasMedicion.push(f); render(); };
+window.setDescargaFallaDesc = v => { descargaForm.descripcionFalla = v; };
 window.registrarPrestamo = handlePrestamo;
 window.eliminarMovimiento = eliminarMovimientoFn;
 window.openMantModal = id => {
