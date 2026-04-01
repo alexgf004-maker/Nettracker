@@ -2397,10 +2397,7 @@ if (inventarioSearch) {
           html += '</div>';
           html += '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">' + (c.areaOrigen||'CPT BT') + ' → Campos y Serv.' + (c.realizadoPor ? ' · 👤 ' + c.realizadoPor : '') + '</div>';
           // Check retiro status
-          const instIds = c.instalacionIds || [];
-          const instDespacho = instIds.length > 0
-            ? records.filter(r => instIds.includes(r.id))
-            : records.filter(r => r.fechaRegistro === c.fecha && r.areaInstalacion === 'Campos y Servicios');
+          const instDespacho = c.instalacionIds ? records.filter(r => c.instalacionIds.includes(r.id)) : [];
           const retirados = instDespacho.filter(r => r.retirado).length;
           const pendientes = instDespacho.filter(r => !r.retirado).length;
           const descPend = instDespacho.filter(r => r.retirado && r.descargaPendiente).length;
@@ -2427,10 +2424,7 @@ if (inventarioSearch) {
       const c = historialCargas.find(x => x.id === despachoDetalle);
       if (!c) { cargaSubView = 'historial'; despachoDetalle = null; }
       else {
-        const instIds = c.instalacionIds || [];
-        const instDespacho = instIds.length > 0
-          ? records.filter(r => instIds.includes(r.id))
-          : records.filter(r => r.fechaRegistro === c.fecha && r.areaInstalacion === 'Campos y Servicios');
+        const instDespacho = getInstDespacho(c);
         const retirados = instDespacho.filter(r => r.retirado).length;
         const pendientes = instDespacho.filter(r => !r.retirado).length;
 
@@ -2679,14 +2673,44 @@ window.eliminarDespacho = id => {
   remove(ref(db, 'historialCargas/' + id)).then(() => showToast('Despacho eliminado'));
 };
 window.setCargaSubView = v => { cargaSubView = v; if (v !== 'despacho') despachoDetalle = null; render(); };
-window.gestionarRetiro = id => { despachoDetalle = id; cargaSubView = 'despacho'; render(); };
+window.getInstDespacho = (c) => {
+  if (c.instalacionIds && c.instalacionIds.length > 0) {
+    return records.filter(r => c.instalacionIds.includes(r.id));
+  }
+  // Fallback: parse series from memo HTML
+  if (c._series) {
+    return records.filter(r => c._series.includes(r.serie) && r.areaInstalacion === 'Campos y Servicios');
+  }
+  // Last resort: filter by date only (may include multiple despachos)
+  return records.filter(r => r.fechaRegistro === c.fecha && r.areaInstalacion === 'Campos y Servicios');
+};
+window.gestionarRetiro = id => {
+  const c = historialCargas.find(x => x.id === id);
+  if (!c) return;
+  // If no instalacionIds, load memo to extract series
+  if (!c.instalacionIds) {
+    get(ref(db, 'historialCargas/' + id + '/memo')).then(snap => {
+      if (snap.exists()) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(snap.val(), 'text/html');
+        const rows = doc.querySelectorAll('tbody tr');
+        const series = [];
+        rows.forEach(row => {
+          const cells = row.querySelectorAll('td');
+          if (cells.length >= 2) series.push(cells[1].textContent.trim());
+        });
+        c._series = series;
+      }
+      despachoDetalle = id; cargaSubView = 'despacho'; render();
+    }).catch(() => { despachoDetalle = id; cargaSubView = 'despacho'; render(); });
+  } else {
+    despachoDetalle = id; cargaSubView = 'despacho'; render();
+  }
+};
 window.retiroMasivo = id => {
   const c = historialCargas.find(x => x.id === id);
   if (!c) return;
-  const instIds = c.instalacionIds || [];
-  const instDespacho = instIds.length > 0
-    ? records.filter(r => instIds.includes(r.id) && !r.retirado)
-    : records.filter(r => r.fechaRegistro === c.fecha && r.areaInstalacion === 'Campos y Servicios' && !r.retirado);
+  const instDespacho = getInstDespacho(c).filter(r => !r.retirado);
   if (instDespacho.length === 0) return showToast('No hay instalaciones pendientes');
   if (!confirm('¿Marcar ' + instDespacho.length + ' equipos como retirados? Se marcarán con descarga pendiente.')) return;
   const usuario = sesionUsuario?.nombre || 'Desconocido';
