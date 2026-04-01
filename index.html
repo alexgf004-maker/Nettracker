@@ -494,6 +494,7 @@ function toggleSinProblema() {
   render();
 }
 function handleRetiro() {
+  if (retiroForm.descargaConfirmada === null) return showToast('⚠️ Indica si ya descargaste la medición');
   if (retiroForm.sinProblema === null && retiroForm.fallas.length === 0) return showToast('Indica si hubo algún problema');
   const energiaRet = retiroForm.energiaTipo === 'una'
     ? { tipo: 'una', una: retiroForm.energiaUna }
