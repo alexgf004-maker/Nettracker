@@ -2164,26 +2164,56 @@ if (inventarioSearch) {
               </div>`).join('')}
           </div>` : ''}
         ${(() => {
-          const conFallas = historial.filter(r => r.retirado && r.fallas && r.fallas.length > 0);
-          if (conFallas.length === 0) return '';
-          const conteo = {};
-          conFallas.forEach(r => r.fallas.forEach(f => { conteo[f] = (conteo[f]||0) + 1; }));
-          const totalFallas = conFallas.length;
+          // Fallas fisicas
+          const conFallasFis = historial.filter(r => r.retirado && r.fallas && r.fallas.length > 0);
+          // Fallas de medicion
+          const conFallasMed = historial.filter(r => r.descargas && r.descargas.some(d => d.medicionOk === false));
+          if (conFallasFis.length === 0 && conFallasMed.length === 0) return '';
           const totalInst = historial.filter(r => r.retirado).length;
-          return '<div style="background:var(--red-light);border:1px solid #fecaca;border-radius:var(--radius);padding:14px 16px;margin-bottom:12px">' +
-            '<div style="font-size:10px;font-weight:700;color:var(--red);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">⚠ Historial de fallas</div>' +
-            '<div style="display:flex;gap:12px;margin-bottom:10px">' +
-            '<div style="text-align:center"><div style="font-size:22px;font-weight:800;color:var(--red);font-family:var(--mono)">' + totalFallas + '</div><div style="font-size:9px;color:var(--red);font-weight:600">INSTALACIONES<br>CON FALLAS</div></div>' +
-            '<div style="text-align:center"><div style="font-size:22px;font-weight:800;color:var(--text);font-family:var(--mono)">' + totalInst + '</div><div style="font-size:9px;color:var(--text3);font-weight:600">TOTAL<br>RETIRADAS</div></div>' +
-            '<div style="text-align:center"><div style="font-size:22px;font-weight:800;font-family:var(--mono);color:' + (totalFallas/totalInst > 0.5 ? 'var(--red)' : 'var(--yellow)') + '">' + Math.round(totalFallas/totalInst*100) + '%</div><div style="font-size:9px;color:var(--text3);font-weight:600">TASA DE<br>FALLA</div></div>' +
-            '</div>' +
-            '<div style="display:flex;flex-direction:column;gap:4px">' +
-            Object.entries(conteo).sort((a,b) => b[1]-a[1]).map(([f,n]) => '<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--text2)">• ' + f + '</span><span style="font-weight:700;color:var(--red);font-family:var(--mono)">' + n + 'x</span></div>').join('') +
-            '</div>' +
-            '<div style="margin-top:10px;padding-top:8px;border-top:1px solid #fecaca">' +
-            '<div style="font-size:9px;font-weight:700;color:var(--red);letter-spacing:1px;margin-bottom:6px">DETALLE</div>' +
-            conFallas.slice().reverse().map(r => '<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid #fee2e2"><div style="color:var(--text2)">' + r.fallas.join(', ') + (r.descripcionFalla ? ' — ' + r.descripcionFalla : '') + '</div><div style="color:var(--text3);font-family:var(--mono);flex-shrink:0;margin-left:8px">' + fmtDate(r.fechaRetiroReal||r.fechaRetiro) + '</div></div>').join('') +
-            '</div></div>';
+          const totalDescargas = historial.filter(r => r.descargas && r.descargas.length > 0).length;
+
+          // Count fallas fisicas
+          const conteoFis = {};
+          conFallasFis.forEach(r => r.fallas.forEach(f => { conteoFis[f] = (conteoFis[f]||0) + 1; }));
+          // Count fallas medicion
+          const conteoMed = {};
+          conFallasMed.forEach(r => r.descargas.filter(d=>d.medicionOk===false).forEach(d => (d.fallasMedicion||[]).forEach(f => { conteoMed[f] = (conteoMed[f]||0) + 1; })));
+
+          let out = '<div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:12px">';
+          out += '<div style="font-size:10px;font-weight:700;color:var(--text);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px">📋 Trazabilidad de fallas</div>';
+
+          // Stats row
+          out += '<div style="display:flex;gap:8px;margin-bottom:12px">';
+          out += '<div style="flex:1;background:var(--red-light);border-radius:10px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--red);font-family:var(--mono)">' + conFallasFis.length + '</div><div style="font-size:9px;color:var(--red);font-weight:600">FALLAS<br>FÍSICAS</div></div>';
+          out += '<div style="flex:1;background:var(--yellow-light);border-radius:10px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--yellow);font-family:var(--mono)">' + conFallasMed.length + '</div><div style="font-size:9px;color:var(--yellow);font-weight:600">FALLOS DE<br>MEDICIÓN</div></div>';
+          out += '<div style="flex:1;background:var(--border2);border-radius:10px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--text);font-family:var(--mono)">' + totalInst + '</div><div style="font-size:9px;color:var(--text3);font-weight:600">TOTAL<br>RETIRADAS</div></div>';
+          out += '</div>';
+
+          // Fallas fisicas breakdown
+          if (conFallasFis.length > 0) {
+            out += '<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:var(--red);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">🔧 Fallas físicas</div>';
+            out += Object.entries(conteoFis).sort((a,b)=>b[1]-a[1]).map(([f,n]) => '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border2)"><span style="color:var(--text2)">• '+f+'</span><span style="font-weight:700;color:var(--red);font-family:var(--mono)">'+n+'x</span></div>').join('');
+            out += '</div>';
+          }
+
+          // Fallas medicion breakdown
+          if (conFallasMed.length > 0) {
+            out += '<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:700;color:var(--yellow);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">📊 Fallos de medición</div>';
+            out += Object.entries(conteoMed).sort((a,b)=>b[1]-a[1]).map(([f,n]) => '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border2)"><span style="color:var(--text2)">• '+f+'</span><span style="font-weight:700;color:var(--yellow);font-family:var(--mono)">'+n+'x</span></div>').join('');
+            out += '</div>';
+          }
+
+          // Cronologia unificada
+          out += '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">';
+          out += '<div style="font-size:9px;font-weight:700;color:var(--text3);letter-spacing:1px;margin-bottom:6px;text-transform:uppercase">Cronología</div>';
+          // Build unified timeline
+          const timeline = [];
+          conFallasFis.forEach(r => timeline.push({ fecha: r.fechaRetiroReal||r.fechaRetiro, tipo: 'fisica', desc: r.fallas.join(', ') + (r.descripcionFalla?' — '+r.descripcionFalla:''), caso: r.caso }));
+          conFallasMed.forEach(r => r.descargas.filter(d=>d.medicionOk===false).forEach(d => timeline.push({ fecha: d.fecha, tipo: 'medicion', desc: (d.fallasMedicion||[]).join(', ') + (d.descripcionFalla?' — '+d.descripcionFalla:''), caso: r.caso })));
+          timeline.sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''));
+          out += timeline.map(e => '<div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:1px solid var(--border2)"><div><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;margin-right:4px;'+(e.tipo==='fisica'?'background:var(--red-light);color:var(--red)':'background:var(--yellow-light);color:var(--yellow)')+'">'+( e.tipo==='fisica'?'Física':'Medición')+'</span><span style="color:var(--text2)">' + e.desc + '</span>'+(e.caso?'<span style="color:var(--text3);font-size:10px"> · #'+e.caso+'</span>':'')+'</div><div style="color:var(--text3);font-family:var(--mono);flex-shrink:0;margin-left:8px">' + fmtDate(e.fecha) + '</div></div>').join('');
+          out += '</div></div>';
+          return out;
         })()}
         ${historial.length > 0 ? `
           <div class="section-title" style="margin-top:4px">Historial de instalaciones</div>
