@@ -3392,14 +3392,11 @@ window.calcularValidacion = () => {
   const cpVS = parseFloat(g('vf-cp-vs'));
   const tapsStr = g('vf-taps');
 
-  if (!refVP || !refVS || !refLec || !refTap || !cpLec || !cpVS || !tapsStr) {
+  if (!refVP || !refVS || !refLec || isNaN(refTap) || !cpLec || !cpVS || !tapsStr) {
     return showToast('Completa todos los campos para calcular');
   }
   const taps = tapsStr.split(',').map(t => parseFloat(t.trim())).filter(t => !isNaN(t));
   if (taps.length === 0) return showToast('Ingresa los TAPs de la placa separados por coma');
-
-  // Save form state
-  valForm = { refCt, refMed, refVP, refVS, refLec, refTap, cpLec, cpVS, taps: tapsStr };
 
   // Calculation
   const relacionRef = refVP / refVS;             // Ej: 13200/240 = 55
@@ -3420,6 +3417,8 @@ window.calcularValidacion = () => {
     }
   });
 
+  // Save all form state including result
+  valForm = { refCt, refMed, refVP, refVS, refLec, refTap, cpLec, cpVS, taps: tapsStr };
   valForm.resultado = {
     tap: closestTap,
     multiplicador: closestRelacion + '/' + cpVS,
@@ -3447,7 +3446,8 @@ window.guardarValidacion = () => {
 };
 
 window.exportarValidaciones = el => {
-  const camp = validaciones.find(v => v.id === el.dataset.id);
+  const campId = typeof el === 'string' ? el : el.dataset.id;
+  const camp = validaciones.find(v => v.id === campId);
   if (!camp) return;
   const rows = (camp.usuarios || []).map(u => ({
     'NC': u.nc || '',
