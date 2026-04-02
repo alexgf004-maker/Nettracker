@@ -293,12 +293,21 @@ const installsRef = ref(db, 'analizadores');
 const equiposRef = ref(db, 'equipos');
 const historialCargasRef = ref(db, 'historialCargas');
 const historialAccesoriosRef = ref(db, 'historialAccesorios');
+const validacionesRef = ref(db, 'validaciones');
 
 
 // ── STATE ──
 let records = [];
 let equipos = [];
-let historialAccesorios = [];;
+let historialAccesorios = [];
+let validaciones = []; // { id, nombre, fecha, tipo, usuarios: [{...datos, estado, resultado}] }
+let valView = 'lista'; // lista | detalle | form
+let valCampanaId = null;
+let valUsuarioIdx = null;
+let valForm = {};
+let showValImport = false;
+let valImportData = [];
+let valTipo = 'monofasico';;
 // ── SESSION ──
 let sesionUsuario = null; // { nombre, pin }
 let loginForm = { nombre: '', pin: '', error: '' };
@@ -442,6 +451,15 @@ onValue(historialAccesoriosRef, snap => {
 });
 
 
+onValue(validacionesRef, snap => {
+  validaciones = [];
+  snap.forEach(x => {
+    const v = x.val();
+    validaciones.push({ id: x.key, ...v });
+  });
+  validaciones.reverse();
+  render();
+});
 onValue(equiposRef, snap => {
   equipos = [];
   snap.forEach(child => {
@@ -1844,6 +1862,9 @@ function render() {
     html += '<button onclick="newInstallFromDash()" style="flex:1;padding:12px;border:1.5px solid var(--primary);border-radius:12px;background:var(--primary-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">⚡ Nueva instalación</button>';
     html += '<button onclick="switchTab(this.dataset.t)" data-t="carga" style="flex:1;padding:12px;border:1.5px solid var(--border);border-radius:12px;background:var(--white);color:var(--text2);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">📤 Despacho</button>';
     html += '</div>';
+    html += '<div style="margin-top:10px">';
+    html += '<button onclick="switchTab(\'validaciones\')" style="width:100%;padding:12px;border:1.5px solid #7c3aed;border-radius:12px;background:#f3f0ff;color:#7c3aed;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">🔌 Validaciones de TAP' + (validaciones.length > 0 ? ' (' + validaciones.length + ' campañas)' : '') + '</button>';
+    html += '</div>';
     html += '</div>';
   }
 
@@ -2485,6 +2506,152 @@ if (inventarioSearch) {
 
       html += '</div>';
     }
+  }
+
+  // ── VALIDACIONES TAB ──
+  else if (tab === 'validaciones') {
+    html += '<div class="content">';
+    if (valView === 'lista') {
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">';
+      html += '<div style="font-size:18px;font-weight:800;color:var(--text)">🔌 Validaciones de TAP</div>';
+      html += '<button onclick="abrirNuevaValidacion()" style="padding:8px 14px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">+ Nueva campaña</button>';
+      html += '</div>';
+      if (validaciones.length === 0) {
+        html += '<div class="empty"><div class="empty-icon">🔌</div><div class="empty-text">Sin campañas de validación</div><div style="font-size:12px;color:var(--text3);margin-top:8px">Crea una nueva campaña subiendo<br>el listado de usuarios a validar</div></div>';
+      } else {
+        validaciones.forEach(v => {
+          const total = (v.usuarios||[]).length;
+          const validados2 = (v.usuarios||[]).filter(u => u.estado === 'validado').length;
+          const pct = total > 0 ? Math.round(validados2/total*100) : 0;
+          html += '<div onclick="abrirCampana(this.dataset.id)" data-id="'+v.id+'" style="background:var(--white);border:1px solid var(--border);border-left:4px solid #7c3aed;border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer">';
+          html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">';
+          html += '<div><div style="font-size:14px;font-weight:700;color:var(--text)">'+v.nombre+'</div>';
+          html += '<div style="font-size:11px;color:var(--text3);margin-top:2px">'+v.fecha+' · '+(v.tipo==='monofasico'?'Monofásico':v.tipo==='bifasico'?'Bifásico':'Trifásico')+'</div></div>';
+          html += '<span style="background:#f3f0ff;color:#7c3aed;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px">'+validados2+'/'+total+'</span>';
+          html += '</div>';
+          html += '<div style="height:6px;background:var(--border2);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+(pct===100?'var(--green)':'#7c3aed')+';border-radius:3px"></div></div>';
+          html += '<div style="font-size:10px;color:var(--text3);margin-top:4px">'+pct+'% completado</div>';
+          html += '</div>';
+        });
+      }
+      if (showValImport) {
+        html += '<div style="position:fixed;inset:0;background:#00000088;z-index:300;display:flex;align-items:flex-end">';
+        html += '<div style="background:var(--white);border-radius:20px 20px 0 0;width:100%;padding:20px;font-family:var(--font);max-height:90vh;overflow-y:auto">';
+        html += '<div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:6px">Nueva campaña de validación</div>';
+        html += '<div style="font-size:12px;color:var(--text3);margin-bottom:14px">Sube el Excel con los usuarios a validar</div>';
+        html += '<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">NOMBRE DE LA CAMPAÑA</div>';
+        html += '<input id="val-nombre" type="text" placeholder="Ej: Campaña Abril 2026" style="width:100%;padding:11px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none"></div>';
+        html += '<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">TIPO DE CONEXIÓN</div><div style="display:flex;gap:8px">';
+        [{t:'monofasico',l:'Monofásico'},{t:'bifasico',l:'Bifásico'},{t:'trifasico',l:'Trifásico'}].forEach(x => {
+          html += '<div onclick="setValTipo(this.dataset.t)" data-t="'+x.t+'" style="flex:1;padding:10px;border-radius:10px;border:2px solid '+(valTipo===x.t?'#7c3aed':'var(--border)')+';background:'+(valTipo===x.t?'#f3f0ff':'#fff')+';text-align:center;cursor:pointer;font-size:12px;font-weight:700;color:'+(valTipo===x.t?'#7c3aed':'var(--text3)')+'">'+x.l+'</div>';
+        });
+        html += '</div></div>';
+        html += '<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">ARCHIVO EXCEL</div>';
+        html += '<label style="display:block;padding:14px;border:2px dashed var(--border);border-radius:10px;text-align:center;cursor:pointer;color:var(--text3);font-size:13px">📂 Seleccionar archivo Excel<input type="file" accept=".xlsx,.xls" onchange="procesarExcelVal(this)" style="display:none"></label></div>';
+        if (valImportData.length > 0) {
+          html += '<div style="background:var(--green-light);border:1px solid var(--green);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--green);font-weight:600">✅ '+valImportData.length+' usuarios cargados</div>';
+          html += '<button onclick="confirmarNuevaValidacion()" style="width:100%;padding:13px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px">Crear campaña</button>';
+        }
+        html += '<button onclick="cerrarValImport()" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--text3);font-family:var(--font);font-size:14px;cursor:pointer">Cancelar</button>';
+        html += '</div></div>';
+      }
+    } else if (valView === 'detalle' && valCampanaId) {
+      const camp = validaciones.find(v => v.id === valCampanaId);
+      if (!camp) { valView = 'lista'; }
+      else {
+        const usrs = camp.usuarios || [];
+        const valCount = usrs.filter(u => u.estado === 'validado').length;
+        const pct2 = usrs.length > 0 ? Math.round(valCount/usrs.length*100) : 0;
+        html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">';
+        html += '<button onclick="setValView(\'lista\')" style="background:var(--primary-light);border:1px solid var(--primary);color:var(--primary);border-radius:8px;padding:6px 12px;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">← Volver</button>';
+        html += '<div style="font-size:15px;font-weight:800;color:var(--text)">'+camp.nombre+'</div>';
+        html += '</div>';
+        html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">';
+        html += '<div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;font-weight:700;color:var(--text)">Progreso</span><span style="font-size:12px;font-weight:800;color:#7c3aed">'+valCount+' / '+usrs.length+'</span></div>';
+        html += '<div style="height:8px;background:var(--border2);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct2+'%;background:'+(pct2===100?'var(--green)':'#7c3aed')+';border-radius:4px"></div></div>';
+        html += '</div>';
+        if (valCount > 0) {
+          html += '<button onclick="exportarValidaciones(this.dataset.id)" data-id="'+camp.id+'" style="width:100%;padding:11px;border:1px solid var(--green);border-radius:10px;background:var(--green-light);color:var(--green);font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;margin-bottom:12px">📊 Exportar Excel de respaldo</button>';
+        }
+        html += '<div style="display:flex;flex-direction:column;gap:8px">';
+        usrs.forEach((u, idx) => {
+          const ok = u.estado === 'validado';
+          html += '<div onclick="abrirFormVal(this.dataset.idx)" data-idx="'+idx+'" style="background:var(--white);border:1px solid var(--border);border-left:4px solid '+(ok?'var(--green)':'var(--border2)')+';border-radius:10px;padding:12px 14px;cursor:pointer">';
+          html += '<div style="display:flex;justify-content:space-between;align-items:flex-start">';
+          html += '<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:700;color:var(--text);font-family:var(--mono)">'+(u.siget||'—')+'</div>';
+          html += '<div style="font-size:11px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(u.nombre||'—')+'</div>';
+          html += '<div style="font-size:10px;color:var(--text3);margin-top:2px">'+(u.ct||'—')+' · '+(u.medidor||'—')+'</div></div>';
+          if (ok) {
+            html += '<div style="text-align:right;flex-shrink:0;margin-left:8px"><span style="background:var(--green-light);color:var(--green);font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px">✅ Validado</span>';
+            if (u.resultado) html += '<div style="font-size:10px;color:var(--text3);margin-top:4px">TAP '+u.resultado.tap+' · '+u.resultado.multiplicador+'</div>';
+            html += '</div>';
+          } else {
+            html += '<span style="background:var(--yellow-light);color:var(--yellow);font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;flex-shrink:0;margin-left:8px">⏳ Pendiente</span>';
+          }
+          html += '</div></div>';
+        });
+        html += '</div>';
+      }
+    } else if (valView === 'form' && valCampanaId !== null && valUsuarioIdx !== null) {
+      const camp2 = validaciones.find(v => v.id === valCampanaId);
+      const u2 = camp2?.usuarios?.[valUsuarioIdx];
+      if (!camp2 || !u2) { valView = 'detalle'; }
+      else {
+        html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">';
+        html += '<button onclick="setValView(\'detalle\')" style="background:var(--primary-light);border:1px solid var(--primary);color:var(--primary);border-radius:8px;padding:6px 12px;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">← Volver</button>';
+        html += '<div style="font-size:14px;font-weight:800;color:var(--text)">Validación de TAP</div>';
+        html += '</div>';
+        html += '<div style="background:#f3f0ff;border:1px solid #ddd6fe;border-radius:12px;padding:14px;margin-bottom:14px">';
+        html += '<div style="font-size:10px;font-weight:700;color:#7c3aed;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Usuario campaña</div>';
+        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
+        [['SIGET',u2.siget||'—'],['NC',u2.nc||'—'],['Nombre',u2.nombre||'—'],['CT/DS',u2.ct||'—'],['Medidor',u2.medidor||'—'],['Alimentador',u2.alimentador||'—']].forEach(([lbl,val]) => {
+          html += '<div><div style="font-size:9px;color:#7c3aed;font-weight:600;text-transform:uppercase">'+lbl+'</div><div style="font-size:12px;font-weight:700;color:var(--text)">'+val+'</div></div>';
+        });
+        if (u2.direccion) html += '<div style="grid-column:1/-1"><div style="font-size:9px;color:#7c3aed;font-weight:600;text-transform:uppercase">Dirección</div><div style="font-size:11px;color:var(--text2)">'+u2.direccion+'</div></div>';
+        html += '</div></div>';
+        if (camp2.tipo === 'monofasico') {
+          html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px">';
+          html += '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Usuario de referencia</div>';
+          html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">CT/DS referencia</div><input id="vf-ref-ct" type="text" placeholder="Ej: DS110465" value="'+(valForm.refCt||'')+'" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;outline:none"></div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Medidor referencia</div><input id="vf-ref-med" type="text" placeholder="Número medidor" value="'+(valForm.refMed||'')+'" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:13px;outline:none"></div>';
+          html += '</div></div>';
+          html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px">';
+          html += '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Transformador de referencia</div>';
+          html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Primario (V)</div><input id="vf-ref-vp" type="number" placeholder="Ej: 13200" value="'+(valForm.refVP||'')+'" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;outline:none"></div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Secundario (V)</div><input id="vf-ref-vs" type="number" placeholder="Ej: 240" value="'+(valForm.refVS||'')+'" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;outline:none"></div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura instantánea (V)</div><input id="vf-ref-lec" type="number" step="0.1" placeholder="Ej: 236" value="'+(valForm.refLec||'')+'" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;outline:none"></div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">TAP visible</div><input id="vf-ref-tap" type="number" min="1" max="9" placeholder="Ej: 3" value="'+(valForm.refTap||'')+'" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;outline:none"></div>';
+          html += '</div></div>';
+          html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">';
+          html += '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Transformador campaña (con tapón)</div>';
+          html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Secundario (V)</div><input id="vf-cp-vs" type="number" placeholder="Ej: 240" value="'+(valForm.cpVS||'')+'" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;outline:none"></div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura instantánea (V)</div><input id="vf-cp-lec" type="number" step="0.1" placeholder="Ej: 247" value="'+(valForm.cpLec||'')+'" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;outline:none"></div>';
+          html += '</div>';
+          html += '<div style="font-size:10px;color:var(--text3);margin-bottom:6px">TAPs de la placa (volt. primario, separados por coma)</div>';
+          html += '<input id="vf-taps" type="text" placeholder="Ej: 14400,13800,13200,12870,12540" value="'+(valForm.taps||'')+'" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;outline:none">';
+          html += '</div>';
+          html += '<button onclick="calcularValidacion()" style="width:100%;padding:13px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px">🔌 Calcular TAP estimado</button>';
+          if (valForm.resultado) {
+            const res = valForm.resultado;
+            html += '<div style="background:#f3f0ff;border:2px solid #7c3aed;border-radius:12px;padding:16px;margin-bottom:12px">';
+            html += '<div style="font-size:11px;font-weight:700;color:#7c3aed;text-transform:uppercase;margin-bottom:12px">Resultado</div>';
+            html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">';
+            html += '<div style="text-align:center"><div style="font-size:28px;font-weight:800;color:#7c3aed;font-family:var(--mono)">TAP '+res.tap+'</div><div style="font-size:10px;color:var(--text3);font-weight:600">TAP ESTIMADO</div></div>';
+            html += '<div style="text-align:center"><div style="font-size:18px;font-weight:800;color:var(--text);font-family:var(--mono)">'+res.multiplicador+'</div><div style="font-size:10px;color:var(--text3);font-weight:600">MULTIPLICADOR</div></div>';
+            html += '</div>';
+            html += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px">Prim. proyectado: <b>'+res.primarioProyectado.toFixed(1)+' V</b> · Relación calc.: <b>'+res.relacionCalc.toFixed(4)+'</b></div>';
+            html += '<button onclick="guardarValidacion()" style="width:100%;padding:11px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer">✅ Guardar validación</button>';
+            html += '</div>';
+          }
+        } else {
+          html += '<div style="background:var(--yellow-light);border:1px solid var(--yellow);border-radius:12px;padding:20px;text-align:center"><div style="font-size:28px;margin-bottom:8px">🚧</div><div style="font-size:14px;font-weight:700;color:var(--yellow)">Próximamente</div><div style="font-size:12px;color:var(--text3);margin-top:4px">Validación '+(camp2.tipo==='bifasico'?'bifásica':'trifásica')+' en desarrollo</div></div>';
+        }
+      }
+    }
+    html += '</div>';
   }
 
   // MAP TAB
@@ -3150,10 +3317,171 @@ window.eliminarMemoAcc = el => {
   window.addEventListener('offline', updateDot);
   setInterval(updateDot, 3000);
 })();
+// ── VALIDACIONES HANDLERS ──
+window.abrirNuevaValidacion = () => { showValImport = true; valImportData = []; valTipo = 'monofasico'; render(); };
+window.cerrarValImport = () => { showValImport = false; valImportData = []; render(); };
+window.setValTipo = el => { valTipo = el.dataset.t; render(); };
+window.setValView = v => { valView = v; if (v === 'lista') { valCampanaId = null; valUsuarioIdx = null; } render(); };
+
+window.procesarExcelVal = input => {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws);
+      valImportData = rows.map(r => ({
+        nc: r['NC']?.toString().trim() || '',
+        siget: (r['CÓDIGO SIGET'] || r['CODIGO SIGET'] || r['Código SIGET'] || '')?.toString().trim() || '',
+        nombre: (r['NOMBRE'] || '')?.toString().trim() || '',
+        direccion: (r['DIRECCIÓN'] || r['DIRECCION'] || '')?.toString().trim() || '',
+        ct: (r['CORTE'] || '')?.toString().trim() || '',
+        medidor: (r['MEDIDOR'] || '')?.toString().trim() || '',
+        alimentador: (r['ALIMENTADOR'] || '')?.toString().trim() || '',
+        lat: r['LATITUD']?.toString() || '',
+        lng: r['LONGITUD']?.toString() || '',
+        estado: 'pendiente',
+        resultado: null,
+      }));
+      render();
+    } catch(err) { showToast('❌ Error al leer el archivo: ' + err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+};
+
+window.confirmarNuevaValidacion = () => {
+  const nombre = document.getElementById('val-nombre')?.value?.trim();
+  if (!nombre) return showToast('Ingresa el nombre de la campaña');
+  if (valImportData.length === 0) return showToast('Carga el archivo Excel primero');
+  push(validacionesRef, {
+    nombre, fecha: today(), tipo: valTipo,
+    usuarios: valImportData,
+    creadoPor: sesionUsuario?.nombre || 'Desconocido',
+  }).then(() => {
+    showValImport = false; valImportData = [];
+    showToast('✅ Campaña creada con ' + valImportData.length + ' usuarios');
+  });
+};
+
+window.abrirCampana = el => {
+  valCampanaId = el.dataset.id; valView = 'detalle'; render();
+};
+
+window.abrirFormVal = el => {
+  valUsuarioIdx = parseInt(el.dataset.idx);
+  const camp = validaciones.find(v => v.id === valCampanaId);
+  const u = camp?.usuarios?.[valUsuarioIdx];
+  // Pre-load saved form data if already validated
+  if (u?.formData) { valForm = { ...u.formData }; }
+  else { valForm = {}; }
+  valView = 'form'; render();
+};
+
+window.calcularValidacion = () => {
+  const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  const refCt = g('vf-ref-ct');
+  const refMed = g('vf-ref-med');
+  const refVP = parseFloat(g('vf-ref-vp'));
+  const refVS = parseFloat(g('vf-ref-vs'));
+  const refLec = parseFloat(g('vf-ref-lec'));
+  const refTap = parseInt(g('vf-ref-tap'));
+  const cpLec = parseFloat(g('vf-cp-lec'));
+  const cpVS = parseFloat(g('vf-cp-vs'));
+  const tapsStr = g('vf-taps');
+
+  if (!refVP || !refVS || !refLec || !refTap || !cpLec || !cpVS || !tapsStr) {
+    return showToast('Completa todos los campos para calcular');
+  }
+  const taps = tapsStr.split(',').map(t => parseFloat(t.trim())).filter(t => !isNaN(t));
+  if (taps.length === 0) return showToast('Ingresa los TAPs de la placa separados por coma');
+
+  // Save form state
+  valForm = { refCt, refMed, refVP, refVS, refLec, refTap, cpLec, cpVS, taps: tapsStr };
+
+  // Calculation
+  const relacionRef = refVP / refVS;             // Ej: 13200/240 = 55
+  const primarioProyectado = refLec * relacionRef; // Ej: 236 * 55 = 12980
+  const relacionCalc = primarioProyectado / cpLec; // Ej: 12980 / 247 = 52.55
+
+  // Find closest TAP
+  let closestTap = -1;
+  let closestRelacion = null;
+  let minDiff = Infinity;
+  taps.forEach((voltPrim, i) => {
+    const relacion = voltPrim / cpVS;
+    const diff = Math.abs(relacion - relacionCalc);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closestTap = i + 1;
+      closestRelacion = voltPrim;
+    }
+  });
+
+  valForm.resultado = {
+    tap: closestTap,
+    multiplicador: closestRelacion + '/' + cpVS,
+    primarioProyectado,
+    relacionCalc,
+    ok: true,
+  };
+  render();
+};
+
+window.guardarValidacion = () => {
+  const camp = validaciones.find(v => v.id === valCampanaId);
+  if (!camp || valUsuarioIdx === null) return;
+  const usuarios = [...(camp.usuarios || [])];
+  usuarios[valUsuarioIdx] = {
+    ...usuarios[valUsuarioIdx],
+    estado: 'validado',
+    resultado: valForm.resultado,
+    formData: { ...valForm, resultado: valForm.resultado },
+  };
+  update(ref(db, 'validaciones/' + valCampanaId), { usuarios }).then(() => {
+    showToast('✅ Validación guardada');
+    valView = 'detalle'; valForm = {}; render();
+  });
+};
+
+window.exportarValidaciones = el => {
+  const camp = validaciones.find(v => v.id === el.dataset.id);
+  if (!camp) return;
+  const rows = (camp.usuarios || []).map(u => ({
+    'NC': u.nc || '',
+    'Código SIGET': u.siget || '',
+    'Nombre': u.nombre || '',
+    'CT/DS Campaña': u.ct || '',
+    'Medidor Campaña': u.medidor || '',
+    'Dirección': u.direccion || '',
+    'Estado': u.estado === 'validado' ? 'Validado' : 'Pendiente',
+    'TAP Estimado': u.resultado ? 'TAP ' + u.resultado.tap : '',
+    'Multiplicador': u.resultado ? u.resultado.multiplicador : '',
+    'CT/DS Referencia': u.formData?.refCt || '',
+    'Medidor Referencia': u.formData?.refMed || '',
+    'V. Prim. Referencia': u.formData?.refVP || '',
+    'V. Sec. Referencia': u.formData?.refVS || '',
+    'Lectura Referencia (V)': u.formData?.refLec || '',
+    'TAP Referencia': u.formData?.refTap || '',
+    'Lectura Campaña (V)': u.formData?.cpLec || '',
+    'V. Sec. Campaña': u.formData?.cpVS || '',
+    'TAPs Placa': u.formData?.taps || '',
+    'Primario Proyectado (V)': u.resultado ? u.resultado.primarioProyectado.toFixed(2) : '',
+    'Relación Calculada': u.resultado ? u.resultado.relacionCalc.toFixed(4) : '',
+  }));
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, ws, 'Validaciones');
+  XLSX.writeFile(wb, 'validaciones_' + camp.nombre.replace(/\s+/g,'_') + '_' + today() + '.xlsx');
+  showToast('📊 Excel exportado');
+};
+
 window.goBack = () => { view = 'lista'; editId = null; editEqId = null; form = emptyForm(); equipoForm = emptyEF(); showSelector = false; render(); };
 window.switchTab = t => {
   tab = t; view = 'lista'; editId = null; editEqId = null;
   if (t === 'instalaciones') filterStatus = 'TODOS';
+  if (t === 'validaciones') { valView = 'lista'; valCampanaId = null; valUsuarioIdx = null; }
   showGlobalSearch = false; globalSearch = '';
   render();
 };
