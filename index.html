@@ -1362,6 +1362,7 @@ function render() {
     TODOS: records.length,
     ACTIVO: records.filter(r => calcSt(r) === 'ACTIVO').length,
     PROXIMO: records.filter(r => calcSt(r) === 'PROXIMO').length,
+    VENCIDO: records.filter(r => calcSt(r) === 'VENCIDO').length,
     RETIRADO: records.filter(r => r.retirado).length,
     PROGRAMADO: records.filter(r => calcSt(r) === 'PROGRAMADO').length
   };
@@ -1835,7 +1836,7 @@ function render() {
         <div class="stats-bar">
           ${['TODOS','ACTIVO','PROXIMO','VENCIDO','RETIRADO'].map(s => `
             <div class="stat-chip ${filterStatus===s?'active':''}" onclick="setFilter('${s}')">
-              <span class="stat-num" style="color:${s==='TODOS'?'var(--blue)':s==='ACTIVO'?'var(--green)':s==='PROXIMO'?'var(--yellow)':s==='VENCIDO'?'var(--red)':'var(--gray)'}">${counts[s]}</span>
+              <span class="stat-num" style="color:${s==='TODOS'?'var(--blue)':s==='ACTIVO'?'var(--green)':s==='PROXIMO'?'var(--yellow)':s==='VENCIDO'?'var(--red)':'var(--gray)'}">${countsFiltrados[s]??counts[s]}</span>
               <span class="stat-label">${s==='TODOS'?'Total':s==='ACTIVO'?'Activos':s==='VENCIDO'?'Vencidos':s==='PROXIMO'?'Próximos':'Retirados'}</span>
             </div>`).join('')}
         </div>
