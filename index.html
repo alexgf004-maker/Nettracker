@@ -291,7 +291,9 @@ let equipos = [];
 let sesionUsuario = null; // { nombre, pin }
 let loginForm = { nombre: '', pin: '', error: '' };
 
-let tab = 'instalaciones';
+let tab = 'dashboard';
+let globalSearch = '';
+let showGlobalSearch = false;
 let showAlertaRetiros = false;
 let mapaFiltro = 'TODOS'; // TODOS | CPT MT | CPT BT | Campos y Servicios
 let alertaDismissed = false;
@@ -1403,6 +1405,7 @@ function render() {
     </div>
     ${view === 'lista' && tab === 'instalaciones' ? `<button class="btn-small" onclick="newInstall()">+ Nuevo</button>` : ''}
     ${view === 'lista' && tab === 'inventario' && !modoSeleccionLote ? `<button class="btn-small" onclick="newEquipo()">+ Equipo</button>` : ''}
+    <button onclick="toggleGlobalSearch()" class="btn-small" style="font-size:16px;padding:6px 10px">🔍</button>
     ${view === 'lista' && tab === 'inventario' && modoSeleccionLote ? `<button class="btn-small" style="background:rgba(255,255,255,.3)" onclick="cancelarLote()">✕ Cancelar</button>` : ''}
     ${view === 'lista' && tab !== 'instalaciones' && tab !== 'inventario' ? `<button class="btn-small" onclick="cerrarSesion()">👤 ${sesionUsuario?.nombre?.split(' ')[0]||''}</button>` : ''}
   </header>`;
@@ -1671,8 +1674,136 @@ function render() {
     </div>`;
   }
 
+  // ── GLOBAL SEARCH MODAL ──
+  if (showGlobalSearch) {
+    const q = globalSearch.toLowerCase().trim();
+    const instRes = q.length >= 2 ? records.filter(r => (r.serie||'').toLowerCase().includes(q) || (r.caso||'').toLowerCase().includes(q) || (r.lugar||'').toLowerCase().includes(q)).slice(0,6) : [];
+    const eqRes = q.length >= 2 ? equipos.filter(e => (e.serie||'').toLowerCase().includes(q) || (e.modelo||'').toLowerCase().includes(q) || (e.vineta||'').toLowerCase().includes(q)).slice(0,6) : [];
+    html += '<div style="position:fixed;inset:0;background:#00000088;z-index:300;display:flex;flex-direction:column;padding:60px 16px 16px">';
+    html += '<div style="background:var(--white);border-radius:16px;overflow:hidden;max-height:80vh;display:flex;flex-direction:column">';
+    html += '<div style="padding:14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center">';
+    html += '<input id="gsearch" autofocus placeholder="Buscar serie, caso, lugar, viñeta..." value="'+globalSearch+'" oninput="setGlobalSearch(this.value)" style="flex:1;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;font-family:var(--font);font-size:14px;outline:none">';
+    html += '<button onclick="toggleGlobalSearch()" style="background:none;border:none;font-size:22px;color:var(--text3);cursor:pointer">✕</button>';
+    html += '</div>';
+    html += '<div style="overflow-y:auto;padding:12px">';
+    if (q.length < 2) {
+      html += '<div style="text-align:center;color:var(--text3);padding:30px;font-size:14px">Escribe al menos 2 caracteres</div>';
+    } else if (instRes.length === 0 && eqRes.length === 0) {
+      html += '<div style="text-align:center;color:var(--text3);padding:30px;font-size:14px">Sin resultados para "'+q+'"</div>';
+    } else {
+      if (instRes.length > 0) {
+        html += '<div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Instalaciones</div>';
+        instRes.forEach(r => {
+          const st = calcSt(r);
+          const rid = r.id;
+          html += '<div onclick="goToInstall(this.dataset.id)" data-id="'+rid+'" style="padding:12px;border:1px solid var(--border);border-radius:10px;margin-bottom:6px;cursor:pointer">';
+          html += '<div style="display:flex;justify-content:space-between"><div style="font-family:var(--mono);font-weight:700">'+r.serie+'</div>'+badgeSt(st)+'</div>';
+          html += '<div style="font-size:12px;color:var(--text3)">#'+r.caso+' · '+(r.lugar||'')+'</div>';
+          html += '</div>';
+        });
+      }
+      if (eqRes.length > 0) {
+        html += '<div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin:8px 0">Inventario</div>';
+        eqRes.forEach(e => {
+          const eid = e.id;
+          html += '<div onclick="goToEquipo(this.dataset.id)" data-id="'+eid+'" style="padding:12px;border:1px solid var(--border);border-radius:10px;margin-bottom:6px;cursor:pointer">';
+          html += '<div style="font-family:var(--mono);font-weight:700">'+e.serie+(e.vineta?' <span style=&quot;font-size:11px;color:var(--text3)&quot;>🏷'+e.vineta+'</span>':'')+'</div>';
+          html += '<div style="font-size:12px;color:var(--text3)">'+(e.modelo||'')+'</div>';
+          html += '</div>';
+        });
+      }
+    }
+    html += '</div></div></div>';
+  }
+
+  // ── DASHBOARD TAB ──
+  if (tab === 'dashboard') {
+    const ua = userArea();
+    const activos = records.filter(r => calcSt(r) === 'ACTIVO');
+    const proximos = records.filter(r => !r.retirado && daysUntil(r.fechaRetiro) <= 7 && daysUntil(r.fechaRetiro) >= 0).sort((a,b) => daysUntil(a.fechaRetiro)-daysUntil(b.fechaRetiro));
+    const vencidos = records.filter(r => !r.retirado && daysUntil(r.fechaRetiro) < 0);
+    const descPend = records.filter(r => r.retirado && r.descargaPendiente);
+    const enMant = equipos.filter(e => (e.condicion||'bueno') === 'mantenimiento');
+    const fuera = equipos.filter(e => (e.condicion||'bueno') === 'fuera');
+    const disponibles = equipos.filter(e => eqSt(e) === 'disponible');
+    const enCampo = equipos.filter(e => eqEnCampo(e));
+
+    html += '<div class="content">';
+    html += '<div style="margin-bottom:16px">';
+    html += '<div style="font-size:20px;font-weight:800;color:var(--text)">Hola, '+(sesionUsuario?.nombre?.split(' ')[0]||'')+'! 👋</div>';
+    html += '<div style="font-size:12px;color:var(--text3);margin-top:2px">'+new Date().toLocaleDateString('es-SV',{weekday:'long',day:'numeric',month:'long'}).replace(/^./,c=>c.toUpperCase())+'</div>';
+    html += '</div>';
+
+    // Alerts
+    if (vencidos.length > 0) {
+      html += '<div onclick="switchTab(\"instalaciones\")" style="background:var(--red-light);border:1px solid #fecaca;border-radius:12px;padding:12px 16px;margin-bottom:10px;cursor:pointer">';
+      html += '<div style="font-size:13px;font-weight:700;color:var(--red)">⚠️ '+vencidos.length+' retiro'+(vencidos.length>1?'s':'')+' vencido'+(vencidos.length>1?'s':'')+'</div>';
+      html += '<div style="font-size:11px;color:var(--red);margin-top:2px">Toca para ver instalaciones</div></div>';
+    }
+    if (descPend.length > 0) {
+      html += '<div onclick="switchTab(\"inventario\")" style="background:var(--yellow-light);border:1px solid #fcd34d;border-radius:12px;padding:12px 16px;margin-bottom:10px;cursor:pointer">';
+      html += '<div style="font-size:13px;font-weight:700;color:var(--yellow)">💾 '+descPend.length+' descarga'+(descPend.length>1?'s':'')+' pendiente'+(descPend.length>1?'s':'')+'</div>';
+      html += '<div style="font-size:11px;color:var(--yellow);margin-top:2px">Toca para ver inventario</div></div>';
+    }
+
+    // Active installs
+    html += '<div style="background:linear-gradient(135deg,var(--primary-dark),var(--primary));border-radius:14px;padding:16px;margin-bottom:12px;color:#fff">';
+    html += '<div style="font-size:11px;color:rgba(255,255,255,.7);margin-bottom:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Instalaciones activas</div>';
+    html += '<div style="display:flex;gap:12px">';
+    html += '<div style="flex:1;text-align:center"><div style="font-size:26px;font-weight:800;font-family:var(--mono)">'+activos.filter(r=>(r.areaInstalacion||'CPT MT')==='CPT MT').length+'</div><div style="font-size:10px;color:rgba(255,255,255,.7)">CPT MT</div></div>';
+    html += '<div style="width:1px;background:rgba(255,255,255,.2)"></div>';
+    html += '<div style="flex:1;text-align:center"><div style="font-size:26px;font-weight:800;font-family:var(--mono)">'+activos.filter(r=>(r.areaInstalacion||'CPT MT')==='CPT BT').length+'</div><div style="font-size:10px;color:rgba(255,255,255,.7)">CPT BT</div></div>';
+    html += '<div style="width:1px;background:rgba(255,255,255,.2)"></div>';
+    html += '<div style="flex:1;text-align:center"><div style="font-size:26px;font-weight:800;font-family:var(--mono)">'+activos.filter(r=>(r.areaInstalacion||'CPT MT')==='Campos y Servicios').length+'</div><div style="font-size:10px;color:rgba(255,255,255,.7)">C&S</div></div>';
+    html += '</div></div>';
+
+    // Retiros proximos
+    html += '<div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Retiros próximos (7 días)</div>';
+    if (proximos.length === 0) {
+      html += '<div style="background:var(--green-light);border:1px solid var(--green);border-radius:12px;padding:12px 16px;margin-bottom:12px;font-size:13px;color:var(--green);font-weight:600">✅ Sin retiros próximos</div>';
+    } else {
+      html += '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">';
+      proximos.slice(0,5).forEach(r => {
+        const d = daysUntil(r.fechaRetiro);
+        const color = d===0?'var(--red)':d<=3?'var(--yellow)':'var(--text2)';
+        const label = d===0?'HOY':d===1?'Mañana':'en '+d+'d';
+        const rid = r.id;
+        html += '<div onclick="goToInstall(this.dataset.id)" data-id="'+rid+'" style="background:var(--white);border:1px solid var(--border);border-radius:10px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer">';
+        html += '<div><div style="font-family:var(--mono);font-size:13px;font-weight:700">'+r.serie+'</div><div style="font-size:11px;color:var(--text3)">'+(r.areaInstalacion||'CPT MT')+' · '+(r.lugar||'')+'</div></div>';
+        html += '<span style="font-size:12px;font-weight:800;color:'+color+'">'+label+'</span>';
+        html += '</div>';
+      });
+      if (proximos.length > 5) html += '<div style="font-size:11px;color:var(--text3);text-align:center;padding:4px">+'+(proximos.length-5)+' más</div>';
+      html += '</div>';
+    }
+
+    // Equipment grid
+    html += '<div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Estado del inventario</div>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">';
+    [
+      {n:disponibles.length, label:'Disponibles', color:'var(--green)'},
+      {n:enCampo.length, label:'En campo', color:'var(--yellow)'},
+      {n:enMant.length, label:'En mantenimiento', color:'#7c3aed'},
+      {n:fuera.length, label:'Fuera de servicio', color:'var(--red)'}
+    ].forEach(item => {
+      html += '<div onclick="switchTab(\"inventario\")" style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px;cursor:pointer">';
+      html += '<div style="font-size:22px;font-weight:800;color:'+item.color+';font-family:var(--mono)">'+item.n+'</div>';
+      html += '<div style="font-size:11px;color:var(--text3);margin-top:2px">'+item.label+'</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+
+    // Quick actions
+    html += '<div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Acciones rápidas</div>';
+    html += '<div style="display:flex;gap:8px">';
+    html += '<button onclick="newInstallFromDash()" style="flex:1;padding:12px;border:1.5px solid var(--primary);border-radius:12px;background:var(--primary-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">⚡ Nueva instalación</button>';
+    html += '<button onclick="switchTab(\"carga\")" style="flex:1;padding:12px;border:1.5px solid var(--border);border-radius:12px;background:var(--white);color:var(--text2);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">📤 Despacho</button>';
+    html += '</div>';
+    html += '</div>';
+  }
+
   // ── DESPLIEGUES TAB ──
-  if (tab === 'instalaciones') {
+  else if (tab === 'instalaciones') {
 
     if (view === 'lista') {
       const filtered = recordsFiltrados.filter(r => {
@@ -2602,17 +2733,20 @@ if (inventarioSearch) {
 
   // BOTTOM NAV
   html += `<nav class="bottom-nav">
-    <button class="nav-btn ${tab==='instalaciones'?'active':''}" onclick="switchTab('instalaciones')">
-      <span class="nav-icon">⚡</span><span class="nav-label">Instalaciones</span>
+    <button class="nav-btn ${tab==='dashboard'?'active':''}" onclick="switchTab('dashboard')">
+      <span class="nav-icon">🏠</span><span class="nav-label">Inicio</span>
     </button>
-    <button class="nav-btn ${tab==='mapa'?'active':''}" onclick="switchTab('mapa')">
-      <span class="nav-icon">📍</span><span class="nav-label">Mapa</span>
+    <button class="nav-btn ${tab==='instalaciones'?'active':''}" onclick="switchTab('instalaciones')">
+      <span class="nav-icon">⚡</span><span class="nav-label">Instalac.</span>
     </button>
     <button class="nav-btn ${tab==='inventario'?'active':''}" onclick="switchTab('inventario')">
       <span class="nav-icon">📦</span><span class="nav-label">Inventario</span>
     </button>
     <button class="nav-btn ${tab==='carga'?'active':''}" onclick="switchTab('carga')">
-      <span class="nav-icon">📥</span><span class="nav-label">Despachos</span>
+      <span class="nav-icon">📤</span><span class="nav-label">Despachos</span>
+    </button>
+    <button class="nav-btn ${tab==='mapa'?'active':''}" onclick="switchTab('mapa')">
+      <span class="nav-icon">📍</span><span class="nav-label">Mapa</span>
     </button>
   </nav>`;
 
@@ -2638,10 +2772,36 @@ try {
   const t = localStorage.getItem('cpt_theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   document.documentElement.setAttribute('data-theme', t);
 } catch(e) {}
+window.toggleGlobalSearch = () => { showGlobalSearch = !showGlobalSearch; globalSearch = ''; render(); setTimeout(() => { const el = document.getElementById('gsearch'); if (el) el.focus(); }, 50); };
+window.setGlobalSearch = v => {
+  globalSearch = v;
+  const el = document.getElementById('gsearch');
+  const pos = el ? el.selectionStart : null;
+  render();
+  const nel = document.getElementById('gsearch');
+  if (nel && pos !== null) { nel.focus(); nel.setSelectionRange(pos, pos); }
+};
+window.goToInstall = el => {
+  const id = typeof el === 'string' ? el : el.dataset.id;
+  showGlobalSearch = false; tab = 'instalaciones'; view = 'detalle'; editId = id;
+  const r = records.find(x => x.id === id);
+  if (r) instTab = (r.areaInstalacion||'CPT MT')==='CPT BT'?'cpt_bt':(r.areaInstalacion==='Campos y Servicios'?'campos':'cpt_mt');
+  render();
+};
+window.goToEquipo = el => {
+  const id = typeof el === 'string' ? el : el.dataset.id;
+  showGlobalSearch = false; tab = 'inventario'; view = 'equipo_detalle'; editEqId = id; eqDetalleTab = 'general'; render();
+};
+window.newInstallFromDash = () => {
+  tab = 'instalaciones'; instTab = userInstTab();
+  if (equipos.filter(e => (eqSt(e)==='disponible'||eqSt(e)==='prestado') && (e.condicion||'bueno')!=='fuera' && (e.condicion||'bueno')!=='mantenimiento').length===0) return showToast('No hay equipos disponibles');
+  form = emptyForm(); form.areaInstalacion = userArea(); editId = null; view = 'form'; render();
+};
 window.goBack = () => { view = 'lista'; editId = null; editEqId = null; form = emptyForm(); equipoForm = emptyEF(); showSelector = false; render(); };
 window.switchTab = t => {
   tab = t; view = 'lista'; editId = null; editEqId = null;
   if (t === 'instalaciones') filterStatus = 'TODOS';
+  showGlobalSearch = false; globalSearch = '';
   render();
 };
 window.setFilter = f => { filterStatus = f; render(); };
