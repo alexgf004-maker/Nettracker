@@ -263,6 +263,7 @@
     .content { animation: fadeSlide .18s ease; }
     @keyframes fadeSlide { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:translateY(0)} }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, onValue, push, update, remove, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
@@ -282,11 +283,13 @@ const db = getDatabase(fbApp);
 const installsRef = ref(db, 'analizadores');
 const equiposRef = ref(db, 'equipos');
 const historialCargasRef = ref(db, 'historialCargas');
+const historialAccesoriosRef = ref(db, 'historialAccesorios');
 
 
 // ── STATE ──
 let records = [];
 let equipos = [];
+let historialAccesorios = [];;
 // ── SESSION ──
 let sesionUsuario = null; // { nombre, pin }
 let loginForm = { nombre: '', pin: '', error: '' };
@@ -422,6 +425,13 @@ onValue(historialCargasRef, snap => {
   historialCargas.sort((a, b) => ((b.fecha||'')+' '+(b.hora||'')).localeCompare((a.fecha||'')+' '+(a.hora||'')));
   render();
 });
+onValue(historialAccesoriosRef, snap => {
+  historialAccesorios = [];
+  snap.forEach(x => { const v = x.val(); historialAccesorios.push({ id: x.key, ...v }); });
+  historialAccesorios.reverse();
+  render();
+});
+
 
 onValue(equiposRef, snap => {
   equipos = [];
@@ -2453,14 +2463,15 @@ if (inventarioSearch) {
     const visibles = records.filter(r => {
       const st = calcSt(r);
       const areaOk = mapaFiltro === 'TODOS' || (r.areaInstalacion||'CPT MT') === mapaFiltro;
-      return (st === 'ACTIVO' || st === 'PROXIMO') && r.lat && r.lng && areaOk;
+      return (st === 'ACTIVO' || st === 'PROXIMO' || st === 'VENCIDO') && r.lat && r.lng && areaOk;
     });
     const sinGPS = records.filter(r => {
       const st = calcSt(r);
-      return (st === 'ACTIVO' || st === 'PROXIMO') && (!r.lat || !r.lng);
+      return (st === 'ACTIVO' || st === 'PROXIMO' || st === 'VENCIDO') && (!r.lat || !r.lng);
     });
     const countActivo = records.filter(r => calcSt(r)==='ACTIVO' && r.lat).length;
     const countProximo = records.filter(r => calcSt(r)==='PROXIMO' && r.lat).length;
+    const countVencido = records.filter(r => calcSt(r)==='VENCIDO' && r.lat).length;
 
     // Build iframe HTML with embedded Leaflet map
     const markers = visibles.map(r => {
@@ -2468,13 +2479,15 @@ if (inventarioSearch) {
       const area = r.areaInstalacion || 'CPT MT';
       const color = areaColor(area);
       const proximo = st === 'PROXIMO';
-      const label = proximo ? 'Retiro próximo' : 'Activo';
+      const vencido = st === 'VENCIDO';
+      const markerColor = vencido ? '#dc2626' : areaColor(area);
+      const label = vencido ? '⚠️ Vencido' : proximo ? 'Retiro próximo' : 'Activo';
       const dias = daysUntil(r.fechaRetiro);
       const diasTxt = dias === 0 ? 'HOY' : dias > 0 ? 'en ' + dias + 'd' : Math.abs(dias) + 'd vencido';
-      return JSON.stringify({lat: parseFloat(r.lat), lng: parseFloat(r.lng), serie: r.serie, modelo: r.modelo||'', caso: r.caso, lugar: r.lugar||'', label, color, proximo, dias: diasTxt, area});
+      return JSON.stringify({lat: parseFloat(r.lat), lng: parseFloat(r.lng), serie: r.serie, modelo: r.modelo||'', caso: r.caso, lugar: r.lugar||'', label, color: markerColor, proximo, vencido, dias: diasTxt, area});
     });
 
-    const mapHtml = `<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'/>\x3cscript src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'><\/script><style>*{margin:0;padding:0}body,html,#map{width:100%;height:100%}.leaflet-popup-content{font-family:sans-serif;min-width:140px}.ps{font-weight:800;font-size:14px;color:#0a1628}.pm{font-size:12px;color:#64748b;margin-top:2px}.pb{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;margin-top:5px}<\/style><\/head><body><div id='map'><\/div>\x3cscript>var markers=${JSON.stringify(markers)};var map=L.map('map');L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:''}).addTo(map);var bounds=[];markers.forEach(function(m){var d=JSON.parse(m);var border=d.proximo?'3px solid #ef4444':'3px solid white';var dot=d.proximo?'<div style="position:absolute;top:-4px;right:-4px;width:7px;height:7px;border-radius:50%;background:#ef4444;border:1px solid white"><\/div>':'';var icon=L.divIcon({className:'',html:'<div style="position:relative;width:16px;height:16px;border-radius:50%;background:'+d.color+';border:'+border+';box-shadow:0 2px 8px rgba(0,0,0,.4)">'+(d.proximo?'<div style="position:absolute;top:-5px;right:-5px;width:8px;height:8px;border-radius:50%;background:#ef4444;border:1px solid white"><\/div>':'')+'<\/div>',iconSize:[16,16],iconAnchor:[8,8]});var popup='<div class=ps>'+d.serie+'<\/div><div class=pm>'+d.modelo+'<\/div><div class=pm>📍 '+d.lugar+'<\/div><div class=pm>#'+d.caso+' · '+(d.area||'CPT MT')+'<\/div><span class=pb style="background:'+(d.color=='#0057b8'?'#e8f0fb':'#fffbeb')+';color:'+d.color+'">'+d.label+'<\/span><br><a href="https://maps.google.com/?q='+d.lat+','+d.lng+'" target=_blank style="font-size:11px;color:#0057b8;margin-top:4px;display:inline-block">Ver en Google Maps →<\/a>';L.marker([d.lat,d.lng],{icon:icon}).bindPopup(popup).addTo(map);bounds.push([d.lat,d.lng]);});if(bounds.length>0){if(bounds.length===1){map.setView(bounds[0],14);}else{map.fitBounds(bounds,{padding:[20,20]});}}else{map.setView([13.7942,-88.8965],8);}<\/script><\/body><\/html>`;
+    const mapHtml = `<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'/>\x3cscript src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'><\/script><style>*{margin:0;padding:0}body,html,#map{width:100%;height:100%}.leaflet-popup-content{font-family:sans-serif;min-width:140px}.ps{font-weight:800;font-size:14px;color:#0a1628}.pm{font-size:12px;color:#64748b;margin-top:2px}.pb{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;margin-top:5px}<\/style><\/head><body><div id='map'><\/div>\x3cscript>var markers=${JSON.stringify(markers)};var map=L.map('map');L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:''}).addTo(map);var bounds=[];markers.forEach(function(m){var d=JSON.parse(m);var border=d.vencido?'3px solid #dc2626':d.proximo?'3px solid #ef4444':'3px solid white';var dot=d.proximo?'<div style="position:absolute;top:-4px;right:-4px;width:7px;height:7px;border-radius:50%;background:#ef4444;border:1px solid white"><\/div>':'';var icon=L.divIcon({className:'',html:'<div style="position:relative;width:16px;height:16px;border-radius:50%;background:'+d.color+';border:'+border+';box-shadow:0 2px 8px rgba(0,0,0,.4)">'+(d.proximo?'<div style="position:absolute;top:-5px;right:-5px;width:8px;height:8px;border-radius:50%;background:#ef4444;border:1px solid white"><\/div>':'')+'<\/div>',iconSize:[16,16],iconAnchor:[8,8]});var popup='<div class=ps>'+d.serie+'<\/div><div class=pm>'+d.modelo+'<\/div><div class=pm>📍 '+d.lugar+'<\/div><div class=pm>#'+d.caso+' · '+(d.area||'CPT MT')+'<\/div><span class=pb style="background:'+(d.color=='#0057b8'?'#e8f0fb':'#fffbeb')+';color:'+d.color+'">'+d.label+'<\/span><br><a href="https://maps.google.com/?q='+d.lat+','+d.lng+'" target=_blank style="font-size:11px;color:#0057b8;margin-top:4px;display:inline-block">Ver en Google Maps →<\/a>';L.marker([d.lat,d.lng],{icon:icon}).bindPopup(popup).addTo(map);bounds.push([d.lat,d.lng]);});if(bounds.length>0){if(bounds.length===1){map.setView(bounds[0],14);}else{map.fitBounds(bounds,{padding:[20,20]});}}else{map.setView([13.7942,-88.8965],8);}<\/script><\/body><\/html>`;
 
     const encodedHtml = 'data:text/html;charset=utf-8,' + encodeURIComponent(mapHtml);
 
@@ -2485,6 +2498,7 @@ if (inventarioSearch) {
     html += '<div class="stat-chip active"><span class="stat-num" style="color:var(--primary)">' + visibles.length + '</span><span class="stat-label">En mapa</span></div>';
     html += '<div class="stat-chip"><span class="stat-num" style="color:var(--green)">' + countActivo + '</span><span class="stat-label">Activos</span></div>';
     html += '<div class="stat-chip"><span class="stat-num" style="color:var(--yellow)">' + countProximo + '</span><span class="stat-label">Próximos</span></div>';
+    html += '<div class="stat-chip"><span class="stat-num" style="color:var(--red)">' + countVencido + '</span><span class="stat-label">Vencidos</span></div>';
     html += '</div>';
 
     // Filter chips
@@ -2660,7 +2674,28 @@ if (inventarioSearch) {
       html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Serie hasta</div><input id="acc-serie-hasta" type="text" placeholder="Ej: 136700" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;outline:none"></div>';
       html += '</div></div>';
 
-      html += '<button onclick="generarMemoAccesorios()" style="width:100%;padding:14px;border:none;border-radius:12px;background:var(--primary);color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer">📄 Generar memo</button>';
+      html += '<button onclick="generarMemoAccesorios()" style="width:100%;padding:14px;border:none;border-radius:12px;background:var(--primary);color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;margin-bottom:20px">📄 Generar y guardar memo</button>';
+
+      // Historial de accesorios
+      if (historialAccesorios.length > 0) {
+        html += '<div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">Historial de memos (' + historialAccesorios.length + ')</div>';
+        historialAccesorios.forEach(m => {
+          html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px">';
+          html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
+          html += '<div style="font-size:13px;font-weight:700;color:var(--text)">' + fmtDate(m.fecha) + ' · ' + (m.hora||'') + '</div>';
+          html += '<div style="font-size:11px;color:var(--text3)">' + (m.de||'') + ' → ' + (m.para||'') + '</div>';
+          html += '</div>';
+          html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">';
+          (m.items||[]).forEach(item => {
+            html += '<span style="background:var(--primary-light);color:var(--primary);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px">' + item.qty + ' ' + item.label + (item.detalle?' · '+item.detalle:'') + '</span>';
+          });
+          html += '</div>';
+          html += '<div style="display:flex;gap:6px">';
+          html += '<button onclick="reimprimirMemoAcc(this.dataset.id)" data-id="' + m.id + '" style="flex:1;padding:8px;border:1px solid var(--primary);border-radius:8px;background:var(--primary-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">📄 Reimprimir</button>';
+          if (isAdmin()) html += '<button onclick="eliminarMemoAcc(this.dataset.id)" data-id="' + m.id + '" style="padding:8px 12px;border:1px solid var(--red);border-radius:8px;background:var(--red-light);color:var(--red);font-family:var(--font);font-size:12px;cursor:pointer">🗑</button>';
+          html += '</div></div>';
+        });
+      }
 
     } else {
     html += '<div class="page-title">📤 Despachos a C&S</div>';
@@ -3041,6 +3076,25 @@ ${mantHistorial.length > 0 ? `
   win.document.write(html);
   win.document.close();
   win.onload = () => { win.focus(); win.print(); };
+};
+window.reimprimirMemoAcc = el => {
+  const id = typeof el === 'string' ? el : el.dataset.id;
+  const m = historialAccesorios.find(x => x.id === id);
+  if (!m) return;
+  // Rebuild memo HTML from saved data
+  const fecha = fmtDate(m.fecha);
+  const itemRows = (m.items||[]).map(item => '<tr><td>'+item.label+'</td><td style="text-align:center"><span style="font-family:Courier New,monospace;font-weight:700;font-size:13px;color:#0057b8">'+item.qty+'</span></td><td style="color:#64748b">'+( item.detalle||'—')+'</td></tr>').join('');
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;color:#0a1628;padding:16px;font-size:10px}.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;border-bottom:2px solid #0057b8;padding-bottom:8px}.logo-box{width:36px;height:36px;background:linear-gradient(135deg,#003d8f,#0077cc);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}.company-name{font-size:14px;font-weight:800;color:#0057b8}.section-title{font-size:9px;font-weight:700;color:#0057b8;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #e8f0fb}table{width:100%;border-collapse:collapse;margin-bottom:16px}thead{background:#0057b8}thead th{padding:6px 8px;text-align:left;font-size:9px;font-weight:700;color:#fff}tbody td{padding:8px;font-size:11px;border-bottom:1px solid #e2e8f0}.firma-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:8px}.firma-line{border-top:1.5px solid #0a1628;margin-top:28px;padding-top:6px;text-align:center}.footer{margin-top:10px;padding-top:6px;border-top:1px solid #e2e8f0;text-align:center;font-size:8px;color:#94a3b8}@media print{body{padding:8px}@page{margin:8mm 6mm}}</style></head><body><div class="header"><div style="display:flex;align-items:center;gap:12px"><div class="logo-box"><svg width="30" height="30" viewBox="0 0 24 24" fill="none"><rect x="3" y="2" width="18" height="20" rx="2" stroke="white" stroke-width="1.8" fill="none"/><path d="M8 7h8M8 10h5" stroke="white" stroke-width="1.5" stroke-linecap="round"/><path d="M12 14l-2 4h4l-2 4" stroke="#7dd3fc" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div><div class="company-name">CPT INNOVA</div><div style="font-size:9px;color:#94a3b8">Calidad del Producto Técnico · Analizadores de Red</div></div></div><div style="text-align:right"><div style="font-size:8px;color:#94a3b8;letter-spacing:2px;text-transform:uppercase">Memorándum de</div><div style="font-size:13px;font-weight:800;color:#0057b8">ENTREGA DE ACCESORIOS</div><div style="font-size:9px;color:#64748b;text-align:right;margin-top:4px">Para: ${m.para} · ${fecha}</div></div></div><div style="margin-bottom:16px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0"><div><div style="font-size:8px;color:#94a3b8;text-transform:uppercase">Entrega</div><div style="font-size:12px;font-weight:700;margin-top:2px">${m.de}</div></div><div><div style="font-size:8px;color:#94a3b8;text-transform:uppercase">Recibe</div><div style="font-size:12px;font-weight:700;margin-top:2px">${m.para}</div></div></div></div><div class="section-title">Accesorios entregados</div><table><thead><tr><th>Accesorio</th><th style="text-align:center;width:80px">Cantidad</th><th>Detalle</th></tr></thead><tbody>${itemRows}</tbody></table><div class="section-title">Firmas de conformidad</div><div class="firma-grid"><div class="firma-line"><div style="font-size:10px;color:#64748b">Entrega</div><div style="font-size:13px;font-weight:700;margin-top:2px">${m.de}</div></div><div class="firma-line"><div style="font-size:10px;color:#64748b">Recibe</div><div style="font-size:13px;font-weight:700;margin-top:2px">${m.para}</div></div></div><div class="footer">Documento generado por CPT INNOVA · Sistema de Gestión de Analizadores de Red · ${fecha}</div></body></html>`;
+  const container = document.createElement('div');
+  container.innerHTML = html;
+  document.body.appendChild(container);
+  const opt = { margin:[8,6,8,6], filename:'memo_accesorios_'+m.fecha+'.pdf', image:{type:'jpeg',quality:0.98}, html2canvas:{scale:2}, jsPDF:{unit:'mm',format:'letter',orientation:'portrait'} };
+  html2pdf().set(opt).from(container).save().then(() => { document.body.removeChild(container); });
+};
+window.eliminarMemoAcc = el => {
+  const id = typeof el === 'string' ? el : el.dataset.id;
+  if (!confirm('¿Eliminar este memo del historial?')) return;
+  remove(ref(db, 'historialAccesorios/' + id)).then(() => showToast('🗑 Memo eliminado'));
 };
 window.goBack = () => { view = 'lista'; editId = null; editEqId = null; form = emptyForm(); equipoForm = emptyEF(); showSelector = false; render(); };
 window.switchTab = t => {
