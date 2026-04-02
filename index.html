@@ -3367,11 +3367,11 @@ window.confirmarNuevaValidacion = () => {
 };
 
 window.abrirCampana = el => {
-  valCampanaId = el.dataset.id; valView = 'detalle'; render();
+  valCampanaId = typeof el === 'string' ? el : el.dataset.id; valView = 'detalle'; render();
 };
 
 window.abrirFormVal = el => {
-  valUsuarioIdx = parseInt(el.dataset.idx);
+  valUsuarioIdx = parseInt(typeof el === 'string' ? el : el.dataset.idx);
   const camp = validaciones.find(v => v.id === valCampanaId);
   const u = camp?.usuarios?.[valUsuarioIdx];
   // Pre-load saved form data if already validated
