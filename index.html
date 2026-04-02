@@ -318,8 +318,9 @@ let prestamoForm = { de: 'CPT BT', a: 'CPT MT', nota: '', tipo: 'prestamo' };
 let modoSeleccionLote = false;
 let cargaData = []; // preview rows from excel
 let cargaView = 'upload'; // upload | preview
-let cargaSubView = 'subir'; // subir | historial
-let despachoDetalle = null; // id of despacho being managed // subir | historial
+let cargaSubView = 'subir'; // subir | historial | accesorios
+let despachoDetalle = null; // id of despacho being managed
+let accesoriosForm = { de: 'CPT MT', para: 'Campos y Servicios', candados: '', cadenas: '', sellos: '', serieDesde: '', serieHasta: '' }; // subir | historial
 let historialCargas = [];
 let cargaAreaOrigen = 'CPT BT';
 let showImportModal = false;
@@ -2521,6 +2522,7 @@ if (inventarioSearch) {
     html += '<div style="display:flex;gap:8px;margin-bottom:16px">';
     html += '<button onclick="setCargaSubView(\'subir\')" style="flex:1;padding:10px;border-radius:10px;border:2px solid '+(cargaSubView==='subir'?'var(--primary)':'var(--border)')+';background:'+(cargaSubView==='subir'?'var(--primary-light)':'#fff')+';color:'+(cargaSubView==='subir'?'var(--primary)':'var(--text3)')+';font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer">📥 Subir archivo</button>';
     html += '<button onclick="setCargaSubView(\'historial\')" style="flex:1;padding:10px;border-radius:10px;border:2px solid '+(cargaSubView==='historial'?'var(--primary)':'var(--border)')+';background:'+(cargaSubView==='historial'?'var(--primary-light)':'#fff')+';color:'+(cargaSubView==='historial'?'var(--primary)':'var(--text3)')+';font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer">📋 Historial '+(historialCargas.length>0?'('+historialCargas.length+')':'')+'</button>';
+    html += '<button onclick="setCargaSubView(\'accesorios\')" style="flex:1;padding:10px;border-radius:10px;border:2px solid '+(cargaSubView==='accesorios'?'var(--primary)':'var(--border)')+';background:'+(cargaSubView==='accesorios'?'var(--primary-light)':'#fff')+';color:'+(cargaSubView==='accesorios'?'var(--primary)':'var(--text3)')+';font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer">🔒 Accesorios</button>';
     html += '</div>';
 
     if (cargaSubView === 'historial') {
@@ -2614,6 +2616,45 @@ if (inventarioSearch) {
         });
         html += '</div>';
       }
+    } else if (cargaSubView === 'accesorios') {
+      html += '<div class="page-title">🔒 Memo de Accesorios</div>';
+      html += '<div style="font-size:12px;color:var(--text3);margin-bottom:16px">Genera un memo de entrega de candados, cadenas y sellos</div>';
+
+      // De / Para
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">';
+      html += '<div><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">DE</div>';
+      html += '<select onchange="setAccForm(\'de\',this.value)" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:13px;background:var(--white);color:var(--text)">';
+      [...AREAS].forEach(a => { html += '<option value="'+a+'"'+(accesoriosForm.de===a?' selected':'')+'>'+a+'</option>'; });
+      html += '</select></div>';
+      html += '<div><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">PARA</div>';
+      html += '<select onchange="setAccForm(\'para\',this.value)" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:13px;background:var(--white);color:var(--text)">';
+      [...AREAS].forEach(a => { html += '<option value="'+a+'"'+(accesoriosForm.para===a?' selected':'')+'>'+a+'</option>'; });
+      html += '</select></div>';
+      html += '</div>';
+
+      // Candados
+      html += '<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">🔒 CANDADOS CON LLAVE (cantidad)</div>';
+      html += '<input type="number" min="0" placeholder="0" value="'+( accesoriosForm.candados||'')+'" oninput="setAccForm(\'candados\',this.value)" style="width:100%;padding:11px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none"></div>';
+
+      // Cadenas
+      html += '<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">⛓️ CADENAS (cantidad)</div>';
+      html += '<input type="number" min="0" placeholder="0" value="'+(accesoriosForm.cadenas||'')+'" oninput="setAccForm(\'cadenas\',this.value)" style="width:100%;padding:11px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none"></div>';
+
+      // Sellos
+      html += '<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">🏷️ SELLOS (cantidad)</div>';
+      html += '<input type="number" min="0" placeholder="0" value="'+(accesoriosForm.sellos||'')+'" oninput="setAccForm(\'sellos\',this.value)" style="width:100%;padding:11px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none"></div>';
+
+      // Serie sellos
+      if (accesoriosForm.sellos && parseInt(accesoriosForm.sellos) > 0) {
+        html += '<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">RANGO DE SERIE (sellos)</div>';
+        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+        html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Desde</div><input type="text" placeholder="Ej: 134567" value="'+(accesoriosForm.serieDesde||'')+'" oninput="setAccForm(\'serieDesde\',this.value)" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--mono);font-size:13px;outline:none"></div>';
+        html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Hasta</div><input type="text" placeholder="Ej: 136700" value="'+(accesoriosForm.serieHasta||'')+'" oninput="setAccForm(\'serieHasta\',this.value)" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--mono);font-size:13px;outline:none"></div>';
+        html += '</div></div>';
+      }
+
+      html += '<button onclick="generarMemoAccesorios()" style="width:100%;padding:14px;border:none;border-radius:12px;background:var(--primary);color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer">📄 Generar memo</button>';
+
     } else {
     html += '<div class="page-title">📤 Despachos a C&S</div>';
     html += '<div style="font-size:13px;color:var(--text3);margin-bottom:20px">Importa instalaciones para <strong style="color:var(--primary)">Campos y Servicios</strong> desde un archivo Excel.</div>';
@@ -3042,7 +3083,102 @@ window.eliminarDespacho = id => {
   if (!confirm('Eliminar este despacho del historial?')) return;
   remove(ref(db, 'historialCargas/' + id)).then(() => showToast('Despacho eliminado'));
 };
-window.setCargaSubView = v => { cargaSubView = v; if (v !== 'despacho') despachoDetalle = null; render(); };
+window.setCargaSubView = v => { cargaSubView = v; if (v !== 'despacho') despachoDetalle = null; if (v === 'accesorios') accesoriosForm = { de: 'CPT MT', para: 'Campos y Servicios', candados: '', cadenas: '', sellos: '', serieDesde: '', serieHasta: '' }; render(); };
+window.setAccForm = (k, v) => { accesoriosForm[k] = v; render(); };
+window.generarMemoAccesorios = () => {
+  const f = accesoriosForm;
+  const items = [];
+  if (parseInt(f.candados) > 0) items.push({ label: '🔒 Candados con llave', qty: parseInt(f.candados), detalle: '' });
+  if (parseInt(f.cadenas) > 0) items.push({ label: '⛓️ Cadenas', qty: parseInt(f.cadenas), detalle: '' });
+  if (parseInt(f.sellos) > 0) {
+    const det = (f.serieDesde && f.serieHasta) ? ' (serie ' + f.serieDesde + ' al ' + f.serieHasta + ')' : '';
+    items.push({ label: '🏷️ Sellos de seguridad', qty: parseInt(f.sellos), detalle: det });
+  }
+  if (items.length === 0) return showToast('Ingresa al menos un accesorio');
+  const fecha = new Date().toLocaleDateString('es-SV', {day:'2-digit',month:'2-digit',year:'numeric'});
+  const html = `<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:Arial,sans-serif;color:#0a1628;padding:16px;font-size:10px}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;border-bottom:2px solid #0057b8;padding-bottom:8px}
+  .logo-box{width:36px;height:36px;background:linear-gradient(135deg,#003d8f,#0077cc);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .company-name{font-size:14px;font-weight:800;color:#0057b8}
+  .company-sub{font-size:10px;color:#94a3b8;margin-top:2px}
+  .memo-type{font-size:14px;font-weight:800;color:#0057b8;text-align:right}
+  .memo-label{font-size:10px;color:#94a3b8;letter-spacing:2px;text-transform:uppercase;text-align:right}
+  .section-title{font-size:9px;font-weight:700;color:#0057b8;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #e8f0fb}
+  table{width:100%;border-collapse:collapse;margin-bottom:16px}
+  thead{background:#0057b8}
+  thead th{padding:6px 8px;text-align:left;font-size:9px;font-weight:700;color:#fff;letter-spacing:.5px;text-transform:uppercase}
+  tbody td{padding:8px 8px;font-size:11px;border-bottom:1px solid #e2e8f0}
+  .qty{font-family:'Courier New',monospace;font-weight:700;font-size:13px;color:#0057b8}
+  .firma-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:8px}
+  .firma-line{border-top:1.5px solid #0a1628;margin-top:28px;padding-top:6px;text-align:center}
+  .firma-label{font-size:10px;color:#64748b}
+  .firma-name{font-size:13px;font-weight:700;margin-top:2px}
+  .footer{margin-top:10px;padding-top:6px;border-top:1px solid #e2e8f0;text-align:center;font-size:8px;color:#94a3b8}
+  @media print{body{padding:8px}@page{margin:8mm 6mm}}
+</style></head><body>
+<div class="header">
+  <div style="display:flex;align-items:center;gap:12px">
+    <div class="logo-box">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
+        <rect x="3" y="2" width="18" height="20" rx="2" stroke="white" stroke-width="1.8" fill="none"/>
+        <path d="M8 7h8M8 10h5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M12 14l-2 4h4l-2 4" stroke="#7dd3fc" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div>
+      <div class="company-name">CPT INNOVA</div>
+      <div class="company-sub">Calidad del Producto Técnico · Analizadores de Red</div>
+    </div>
+  </div>
+  <div>
+    <div class="memo-label">Memorándum de</div>
+    <div class="memo-type">ENTREGA DE ACCESORIOS</div>
+    <div style="font-size:11px;color:#64748b;text-align:right;margin-top:4px">Para: ${f.para} · ${fecha}</div>
+  </div>
+</div>
+
+<div style="margin-bottom:16px">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0">
+    <div><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px">Entrega</div><div style="font-size:12px;font-weight:700;margin-top:2px">${f.de}</div></div>
+    <div><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px">Recibe</div><div style="font-size:12px;font-weight:700;margin-top:2px">${f.para}</div></div>
+  </div>
+</div>
+
+<div class="section-title">Accesorios entregados</div>
+<table>
+  <thead><tr><th>Accesorio</th><th style="text-align:center;width:80px">Cantidad</th><th>Detalle</th></tr></thead>
+  <tbody>
+    ${items.map(item => `<tr>
+      <td>${item.label}</td>
+      <td style="text-align:center"><span class="qty">${item.qty}</span></td>
+      <td style="color:#64748b">${item.detalle||'—'}</td>
+    </tr>`).join('')}
+  </tbody>
+</table>
+
+<div class="section-title">Firmas de conformidad</div>
+<div class="firma-grid">
+  <div class="firma-line">
+    <div class="firma-label">Entrega</div>
+    <div class="firma-name">${f.de}</div>
+  </div>
+  <div class="firma-line">
+    <div class="firma-label">Recibe</div>
+    <div class="firma-name">${f.para}</div>
+  </div>
+</div>
+
+<div class="footer">Documento generado por CPT INNOVA · Sistema de Gestión de Analizadores de Red · ${fecha}</div>
+</body></html>`;
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  win.onload = () => { win.focus(); win.print(); };
+};
 window.getInstDespacho = (c) => {
   if (c.instalacionIds && c.instalacionIds.length > 0) {
     return records.filter(r => c.instalacionIds.includes(r.id));
