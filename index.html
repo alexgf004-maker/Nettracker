@@ -2772,6 +2772,7 @@ try {
   const t = localStorage.getItem('cpt_theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   document.documentElement.setAttribute('data-theme', t);
 } catch(e) {}
+window.dashAction = el => { switchTab(el.dataset.action); };
 window.toggleGlobalSearch = () => { showGlobalSearch = !showGlobalSearch; globalSearch = ''; render(); setTimeout(() => { const el = document.getElementById('gsearch'); if (el) el.focus(); }, 50); };
 window.setGlobalSearch = v => {
   globalSearch = v;
