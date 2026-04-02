@@ -475,6 +475,17 @@ function handleSave() {
   if (!form.caso.trim()) return showToast('Ingresa el código de caso / campaña');
   if (!form.fechaRetiro) return showToast('Ingresa la fecha de retiro');
   if (!form.lugar.trim()) return showToast('Ingresa la ubicación del equipo');
+  // #13 Duplicate check - verify equipo not already active
+  if (!editId) {
+    const activa = records.find(r => r.equipoId === form.equipoId && !r.retirado);
+    if (activa) return showToast('⚠️ Este equipo ya tiene una instalación activa en #' + (activa.caso||'?'));
+  }
+  // #13 Duplicate series check
+  const eq = equipos.find(e => e.id === form.equipoId);
+  if (eq) {
+    const yaActivo = records.find(r => r.serie === eq.serie && !r.retirado && r.id !== editId);
+    if (yaActivo) return showToast('⚠️ La serie ' + eq.serie + ' ya está instalada en caso #' + (yaActivo.caso||'?'));
+  }
   const usuario = sesionUsuario?.nombre || 'Desconocido';
   const energiaInst = form.energiaTipoInst === 'una'
     ? { tipo: 'una', una: form.energiaInstUna }
@@ -998,9 +1009,9 @@ function procesarExcel(file) {
         if (!serie) { status = 'error'; problema = 'Sin número de serie'; }
         else if (!eq) { status = 'error'; problema = 'Equipo no existe en inventario'; }
         else if ((eq.condicion||'bueno') === 'fuera') { status = 'error'; problema = 'Fuera de servicio'; }
-        else if (eqEnCampo(eq)) { status = 'warning'; problema = 'Ya está en campo'; }
-        else if (!caso) { status = 'warning'; problema = 'Sin número SIGET'; }
-        else if (!fechaRetiro) { status = 'warning'; problema = 'Sin fecha de retiro'; }
+        else if (eqEnCampo(eq)) { status = 'error'; problema = '⚠️ Ya está instalado — instalación activa detectada'; }
+        else if (!caso) { status = 'error'; problema = 'Sin número SIGET (obligatorio)'; }
+        else if (!fechaRetiro) { status = 'error'; problema = 'Sin fecha de retiro (obligatoria)'; }
 
         return { serie, caso, lugar, fechaInst, fechaRetiro, notas, lat, lng, status, problema, equipoId: eq?.id, modelo: eq?.modelo||'', vineta: eq?.vineta||'', idUsuario, direccion, accesorios, multiplicador, corrientes, conexion };
       });
@@ -3414,7 +3425,12 @@ window.setInvSearch = v => {
 };
 window.pickEquipo = id => {
   const eq = equipos.find(x => x.id === id); if (!eq) return;
-  // Check if equipo has pending download
+  // Check active install (duplicate)
+  const activa = records.find(r => r.equipoId === id && !r.retirado);
+  if (activa) {
+    if (!confirm('⚠️ Este equipo ya tiene una instalación activa en caso #' + (activa.caso||'?') + '. ¿Deseas registrar otra de todas formas?')) return;
+  }
+  // Check pending download
   const pendiente = records.find(r => r.equipoId === id && r.retirado && r.descargaPendiente);
   if (pendiente) {
     if (!confirm('⚠️ Este equipo tiene una descarga pendiente del caso #' + (pendiente.caso||'') + '. ¿Deseas instalarlo de todas formas?')) return;
