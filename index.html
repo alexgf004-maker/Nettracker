@@ -120,14 +120,21 @@
     /* STATS */
     .stats-bar { display: flex; gap: 8px; margin-bottom: 16px; }
     .stat-chip {
-      flex: 1; background: var(--white); border: 1px solid var(--border);
-      border-radius: var(--radius-sm); padding: 10px 6px;
+      flex: 1; background: var(--white); border: 1.5px solid var(--border);
+      border-radius: 50px; padding: 8px 6px;
       display: flex; flex-direction: column; align-items: center;
-      cursor: pointer; box-shadow: var(--shadow); transition: all .15s;
+      cursor: pointer; transition: all .18s; position: relative; overflow: hidden;
+    }
+    .stat-chip::after {
+      content: ''; position: absolute; bottom: 0; left: 10%; right: 10%;
+      height: 3px; border-radius: 3px 3px 0 0;
+      background: currentColor; opacity: 0; transition: opacity .18s;
     }
     .stat-chip.active { border-color: var(--primary); background: var(--primary-light); }
-    .stat-num { font-size: 20px; font-weight: 800; font-family: var(--mono); }
-    .stat-label { font-size: 9px; color: var(--text3); margin-top: 2px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; }
+    .stat-chip.active::after { opacity: 1; }
+    .stat-chip:active { transform: scale(.96); }
+    .stat-num { font-size: 22px; font-weight: 800; font-family: var(--mono); line-height: 1; }
+    .stat-label { font-size: 8px; color: var(--text3); margin-top: 3px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
 
     /* SEARCH */
     .search-wrap { position: relative; margin-bottom: 16px; }
@@ -1869,8 +1876,8 @@ function render() {
       html += `<div class="content">
         <div class="stats-bar">
           ${['TODOS','ACTIVO','PROXIMO','VENCIDO','RETIRADO'].map(s => `
-            <div class="stat-chip ${filterStatus===s?'active':''}" onclick="setFilter('${s}')">
-              <span class="stat-num" style="color:${s==='TODOS'?'var(--blue)':s==='ACTIVO'?'var(--green)':s==='PROXIMO'?'var(--yellow)':s==='VENCIDO'?'var(--red)':'var(--gray)'}">${countsFiltrados[s]??counts[s]}</span>
+            <div class="stat-chip ${filterStatus===s?'active':''}" onclick="setFilter('${s}')" style="color:${s==='TODOS'?'var(--blue)':s==='ACTIVO'?'var(--green)':s==='PROXIMO'?'var(--yellow)':s==='VENCIDO'?'var(--red)':'var(--gray)'}">
+              <span class="stat-num">${countsFiltrados[s]??counts[s]}</span>
               <span class="stat-label">${s==='TODOS'?'Total':s==='ACTIVO'?'Activos':s==='VENCIDO'?'Vencidos':s==='PROXIMO'?'Próximos':'Retirados'}</span>
             </div>`).join('')}
         </div>
@@ -2100,10 +2107,10 @@ function render() {
       const enCampo = equipos.filter(e => eqSt(e) === 'instalado').length;
       html += `<div class="content">
         <div class="stats-bar">
-          <div class="stat-chip ${inventarioFiltro==='TODOS'?'active':''}" onclick="setInvFiltro('TODOS')" style="flex-shrink:0"><span class="stat-num" style="color:var(--primary)">${equipos.length}</span><span class="stat-label">Total</span></div>
-          <div class="stat-chip ${inventarioFiltro==='disponible'?'active':''}" onclick="setInvFiltro('disponible')" style="flex-shrink:0"><span class="stat-num" style="color:var(--green)">${enPlantel+enCucu}</span><span class="stat-label">Disponibles</span></div>
-          <div class="stat-chip ${inventarioFiltro==='prestado'?'active':''}" onclick="setInvFiltro('prestado')" style="flex-shrink:0"><span class="stat-num" style="color:var(--primary)">${prestados}</span><span class="stat-label">Prestados</span></div>
-          <div class="stat-chip ${inventarioFiltro==='instalado'?'active':''}" onclick="setInvFiltro('instalado')" style="flex-shrink:0"><span class="stat-num" style="color:var(--yellow)">${enCampo}</span><span class="stat-label">En campo</span></div>
+          <div class="stat-chip ${inventarioFiltro==='TODOS'?'active':''}" onclick="setInvFiltro('TODOS')" style="flex-shrink:0;color:var(--primary)"><span class="stat-num">${equipos.length}</span><span class="stat-label">Total</span></div>
+          <div class="stat-chip ${inventarioFiltro==='disponible'?'active':''}" onclick="setInvFiltro('disponible')" style="flex-shrink:0;color:var(--green)"><span class="stat-num">${enPlantel+enCucu}</span><span class="stat-label">Disponibles</span></div>
+          <div class="stat-chip ${inventarioFiltro==='prestado'?'active':''}" onclick="setInvFiltro('prestado')" style="flex-shrink:0;color:var(--primary)"><span class="stat-num">${prestados}</span><span class="stat-label">Prestados</span></div>
+          <div class="stat-chip ${inventarioFiltro==='instalado'?'active':''}" onclick="setInvFiltro('instalado')" style="flex-shrink:0;color:var(--yellow)"><span class="stat-num">${enCampo}</span><span class="stat-label">En campo</span></div>
 
         </div>`;
       // Lote action bar (when in selection mode, show at top)
@@ -2518,10 +2525,10 @@ if (inventarioSearch) {
 
     // Stats bar
     html += '<div style="padding:10px 16px;display:flex;gap:8px;flex-shrink:0">';
-    html += '<div class="stat-chip active"><span class="stat-num" style="color:var(--primary)">' + visibles.length + '</span><span class="stat-label">En mapa</span></div>';
-    html += '<div class="stat-chip"><span class="stat-num" style="color:var(--green)">' + countActivo + '</span><span class="stat-label">Activos</span></div>';
-    html += '<div class="stat-chip"><span class="stat-num" style="color:var(--yellow)">' + countProximo + '</span><span class="stat-label">Próximos</span></div>';
-    html += '<div class="stat-chip"><span class="stat-num" style="color:var(--red)">' + countVencido + '</span><span class="stat-label">Vencidos</span></div>';
+    html += '<div class="stat-chip active" style="color:var(--primary)"><span class="stat-num">' + visibles.length + '</span><span class="stat-label">En mapa</span></div>';
+    html += '<div class="stat-chip" style="color:var(--green)"><span class="stat-num">' + countActivo + '</span><span class="stat-label">Activos</span></div>';
+    html += '<div class="stat-chip" style="color:var(--yellow)"><span class="stat-num">' + countProximo + '</span><span class="stat-label">Próximos</span></div>';
+    html += '<div class="stat-chip" style="color:var(--red)"><span class="stat-num">' + countVencido + '</span><span class="stat-label">Vencidos</span></div>';
     html += '</div>';
 
     // Filter chips
