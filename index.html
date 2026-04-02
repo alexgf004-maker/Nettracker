@@ -475,10 +475,10 @@ function handleSave() {
   if (!form.caso.trim()) return showToast('Ingresa el código de caso / campaña');
   if (!form.fechaRetiro) return showToast('Ingresa la fecha de retiro');
   if (!form.lugar.trim()) return showToast('Ingresa la ubicación del equipo');
-  // #13 Duplicate check - verify equipo not already active
+  // Validación de duplicados
   if (!editId) {
     const activa = records.find(r => r.equipoId === form.equipoId && !r.retirado);
-    if (activa) return showToast('⚠️ Este equipo ya tiene una instalación activa en #' + (activa.caso||'?'));
+    if (activa) return showToast('⚠️ Este equipo ya tiene instalación activa en #' + (activa.caso||'?'));
   }
   // #13 Duplicate series check
   const eq = equipos.find(e => e.id === form.equipoId);
@@ -1029,6 +1029,14 @@ function confirmarCargaMasiva() {
   const validos = cargaData.filter(r => r.status === 'ok' || r.status === 'warning');
   if (validos.length === 0) return showToast('No hay registros válidos para importar');
 
+  // Show progress
+  let procesados = 0;
+  const total = validos.length;
+  const progressEl = document.getElementById('carga-progress');
+  const progressBar = document.getElementById('carga-progress-bar');
+  const progressTxt = document.getElementById('carga-progress-txt');
+  if (progressEl) progressEl.style.display = 'block';
+
   let count = 0;
   const instalacionIds = [];
   validos.forEach(r => {
@@ -1056,6 +1064,9 @@ function confirmarCargaMasiva() {
 
     // Register installation
     const newRef = push(ref(db, 'analizadores'), payload);
+    procesados++;
+    if (progressBar) { progressBar.style.width = Math.round(procesados/total*100)+'%'; }
+    if (progressTxt) { progressTxt.textContent = procesados + ' / ' + total; }
     instalacionIds.push(newRef.key);
 
     // Register prestamo movement (avoid duplicate if already prestado today to same area)
@@ -3110,6 +3121,17 @@ window.eliminarMemoAcc = el => {
   remove(ref(db, 'historialAccesorios/' + id)).then(() => showToast('🗑 Memo eliminado'));
 };
 // ── CONNECTION MONITOR ──
+(function() {
+  function updateDot() {
+    const dot = document.getElementById('conn-dot');
+    if (!dot) return;
+    dot.style.background = navigator.onLine ? '#22c55e' : '#ef4444';
+    dot.title = navigator.onLine ? 'Conectado' : 'Sin conexión';
+  }
+  window.addEventListener('online', updateDot);
+  window.addEventListener('offline', updateDot);
+  setInterval(updateDot, 3000);
+})();
 (function() {
   function updateDot() {
     const dot = document.getElementById('conn-dot');
