@@ -262,6 +262,8 @@
   
     .content { animation: fadeSlide .18s ease; }
     @keyframes fadeSlide { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:translateY(0)} }
+    .badge-vencido { animation: pulse-red 1.5s ease-in-out infinite; }
+    @keyframes pulse-red { 0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.4)} 50%{box-shadow:0 0 0 5px rgba(220,38,38,0)} }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script type="module">
@@ -1308,7 +1310,7 @@ function addToGoogleCalendar(r) {
 function badgeSt(st) {
   if (st === 'ACTIVO') return '<span class="badge badge-green">Activo</span>';
   if (st === 'PROXIMO') return '<span class="badge badge-yellow">Retiro próximo</span>';
-  if (st === 'VENCIDO') return '<span class="badge badge-red">⚠️ Vencido</span>';
+  if (st === 'VENCIDO') return '<span class="badge badge-red badge-vencido">⚠️ Vencido</span>';
   if (st === 'PROGRAMADO') return '<span class="badge" style="background:#f3f0ff;color:#7c3aed">Programado</span>';
   return '<span class="badge badge-gray">Retirado</span>';
 }
@@ -1404,7 +1406,9 @@ function render() {
   html += `<header>
     <div class="header-left">
       ${showBack ? `<button class="back-btn" onclick="goBack()">←</button>` : ''}
-      <div class="logo-mark">
+      <div style="position:relative;display:inline-block">
+        <div id="conn-dot" style="position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:50%;background:#22c55e;border:1.5px solid rgba(255,255,255,.7);z-index:10"></div>
+        <div class="logo-mark">
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <rect x="3" y="2" width="18" height="20" rx="2" stroke="white" stroke-width="1.8" fill="none"/>
     <path d="M8 7h8M8 10h5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
@@ -1415,14 +1419,16 @@ function render() {
 </div>
       <div>
         <div class="logo-text">CPT INNOVA</div>
-        <div class="logo-sub" onclick="cerrarSesion()" style="cursor:pointer">👤 ${sesionUsuario?.nombre||''}  ↩</div>
+        <div class="logo-sub">Analizadores de Red</div>
       </div>
     </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
     ${view === 'lista' && tab === 'instalaciones' ? `<button class="btn-small" onclick="newInstall()">+ Nuevo</button>` : ''}
     ${view === 'lista' && tab === 'inventario' && !modoSeleccionLote ? `<button class="btn-small" onclick="newEquipo()">+ Equipo</button>` : ''}
-    <button onclick="toggleGlobalSearch()" class="btn-small" style="font-size:16px;padding:6px 10px">🔍</button>
     ${view === 'lista' && tab === 'inventario' && modoSeleccionLote ? `<button class="btn-small" style="background:rgba(255,255,255,.3)" onclick="cancelarLote()">✕ Cancelar</button>` : ''}
-    ${view === 'lista' && tab !== 'instalaciones' && tab !== 'inventario' ? `<button class="btn-small" onclick="cerrarSesion()">👤 ${sesionUsuario?.nombre?.split(' ')[0]||''}</button>` : ''}
+    <button onclick="toggleGlobalSearch()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:10px;width:32px;height:32px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center">🔍</button>
+    <div onclick="cerrarSesion()" title="Cerrar sesión" style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.25);border:2px solid rgba(255,255,255,.4);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;font-weight:800;color:#fff;flex-shrink:0">${(sesionUsuario?.nombre||' ').split(' ').map(w=>w[0]).slice(0,2).join('')}</div>
+    </div>
   </header>`;
 
   // RETIRO MODAL
@@ -2909,8 +2915,9 @@ window.exportHojaVida = eqId => {
 <head>
 <meta charset="UTF-8">
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family: Arial, sans-serif; color: #0a1628; font-size: 10px; padding: 20px; }
+  body { font-family: 'Inter', Arial, sans-serif; color: #0a1628; font-size: 10px; padding: 20px; }
   .header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom: 2px solid #0057b8; padding-bottom: 10px; margin-bottom: 16px; }
   .logo-box { width:36px; height:36px; background:linear-gradient(135deg,#003d8f,#0077cc); border-radius:8px; display:flex; align-items:center; justify-content:center; }
   h1 { font-size: 16px; font-weight: 800; color: #0057b8; }
@@ -3096,6 +3103,18 @@ window.eliminarMemoAcc = el => {
   if (!confirm('¿Eliminar este memo del historial?')) return;
   remove(ref(db, 'historialAccesorios/' + id)).then(() => showToast('🗑 Memo eliminado'));
 };
+// ── CONNECTION MONITOR ──
+(function() {
+  function updateDot() {
+    const dot = document.getElementById('conn-dot');
+    if (!dot) return;
+    dot.style.background = navigator.onLine ? '#22c55e' : '#ef4444';
+    dot.title = navigator.onLine ? 'Conectado' : 'Sin conexión';
+  }
+  window.addEventListener('online', updateDot);
+  window.addEventListener('offline', updateDot);
+  setInterval(updateDot, 3000);
+})();
 window.goBack = () => { view = 'lista'; editId = null; editEqId = null; form = emptyForm(); equipoForm = emptyEF(); showSelector = false; render(); };
 window.switchTab = t => {
   tab = t; view = 'lista'; editId = null; editEqId = null;
@@ -3173,8 +3192,9 @@ window.generarMemoAccesorios = () => {
   const html = `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8">
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
   *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:Arial,sans-serif;color:#0a1628;padding:16px;font-size:10px}
+  body{font-family:'Inter',Arial,sans-serif;color:#0a1628;padding:16px;font-size:10px}
   .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;border-bottom:2px solid #0057b8;padding-bottom:8px}
   .logo-box{width:36px;height:36px;background:linear-gradient(135deg,#003d8f,#0077cc);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
   .company-name{font-size:14px;font-weight:800;color:#0057b8}
