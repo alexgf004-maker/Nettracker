@@ -2617,41 +2617,48 @@ if (inventarioSearch) {
         html += '</div>';
       }
     } else if (cargaSubView === 'accesorios') {
+      // Static form - reads values from DOM on submit, no oninput render
       html += '<div class="page-title">🔒 Memo de Accesorios</div>';
-      html += '<div style="font-size:12px;color:var(--text3);margin-bottom:16px">Genera un memo de entrega de candados, cadenas y sellos</div>';
+      html += '<div style="font-size:12px;color:var(--text3);margin-bottom:16px">Genera un memo de entrega de accesorios</div>';
 
-      // De / Para
       html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">';
       html += '<div><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">DE</div>';
-      html += '<select onchange="setAccForm(\'de\',this.value)" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:13px;background:var(--white);color:var(--text)">';
-      [...AREAS].forEach(a => { html += '<option value="'+a+'"'+(accesoriosForm.de===a?' selected':'')+'>'+a+'</option>'; });
+      html += '<select id="acc-de" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:13px;background:var(--white);color:var(--text)">';
+      [...AREAS].forEach(a => { html += '<option value="'+a+'"'+(a==='CPT MT'?' selected':'')+'>'+a+'</option>'; });
       html += '</select></div>';
       html += '<div><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">PARA</div>';
-      html += '<select onchange="setAccForm(\'para\',this.value)" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:13px;background:var(--white);color:var(--text)">';
-      [...AREAS].forEach(a => { html += '<option value="'+a+'"'+(accesoriosForm.para===a?' selected':'')+'>'+a+'</option>'; });
+      html += '<select id="acc-para" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:13px;background:var(--white);color:var(--text)">';
+      [...AREAS].forEach(a => { html += '<option value="'+a+'"'+(a==='Campos y Servicios'?' selected':'')+'>'+a+'</option>'; });
       html += '</select></div>';
       html += '</div>';
 
       // Candados
-      html += '<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">🔒 CANDADOS CON LLAVE (cantidad)</div>';
-      html += '<input type="number" min="0" placeholder="0" value="'+( accesoriosForm.candados||'')+'" oninput="setAccForm(\'candados\',this.value)" style="width:100%;padding:11px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none"></div>';
+      html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px">';
+      html += '<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px">🔒 Candados con llave</div>';
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+      html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Cantidad</div><input id="acc-candados" type="number" min="0" placeholder="0" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:14px;outline:none"></div>';
+      html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Notas (opcional)</div><input id="acc-candados-notas" type="text" placeholder="Ej: cuello largo" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:13px;outline:none"></div>';
+      html += '</div></div>';
 
       // Cadenas
-      html += '<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">⛓️ CADENAS (cantidad)</div>';
-      html += '<input type="number" min="0" placeholder="0" value="'+(accesoriosForm.cadenas||'')+'" oninput="setAccForm(\'cadenas\',this.value)" style="width:100%;padding:11px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none"></div>';
+      html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px">';
+      html += '<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px">⛓️ Cadenas</div>';
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+      html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Cantidad</div><input id="acc-cadenas" type="number" min="0" placeholder="0" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:14px;outline:none"></div>';
+      html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Notas (opcional)</div><input id="acc-cadenas-notas" type="text" placeholder="Ej: con argollas" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:13px;outline:none"></div>';
+      html += '</div></div>';
 
       // Sellos
-      html += '<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">🏷️ SELLOS (cantidad)</div>';
-      html += '<input type="number" min="0" placeholder="0" value="'+(accesoriosForm.sellos||'')+'" oninput="setAccForm(\'sellos\',this.value)" style="width:100%;padding:11px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none"></div>';
-
-      // Serie sellos
-      if (accesoriosForm.sellos && parseInt(accesoriosForm.sellos) > 0) {
-        html += '<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">RANGO DE SERIE (sellos)</div>';
-        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
-        html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Desde</div><input type="text" placeholder="Ej: 134567" value="'+(accesoriosForm.serieDesde||'')+'" oninput="setAccForm(\'serieDesde\',this.value)" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--mono);font-size:13px;outline:none"></div>';
-        html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Hasta</div><input type="text" placeholder="Ej: 136700" value="'+(accesoriosForm.serieHasta||'')+'" oninput="setAccForm(\'serieHasta\',this.value)" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--mono);font-size:13px;outline:none"></div>';
-        html += '</div></div>';
-      }
+      html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:16px">';
+      html += '<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px">🏷️ Sellos de seguridad</div>';
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">';
+      html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Cantidad</div><input id="acc-sellos" type="number" min="0" placeholder="0" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:14px;outline:none"></div>';
+      html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Notas (opcional)</div><input id="acc-sellos-notas" type="text" placeholder="Ej: con distintivo rojo" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:13px;outline:none"></div>';
+      html += '</div>';
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+      html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Serie desde</div><input id="acc-serie-desde" type="text" placeholder="Ej: 134567" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;outline:none"></div>';
+      html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Serie hasta</div><input id="acc-serie-hasta" type="text" placeholder="Ej: 136700" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;outline:none"></div>';
+      html += '</div></div>';
 
       html += '<button onclick="generarMemoAccesorios()" style="width:100%;padding:14px;border:none;border-radius:12px;background:var(--primary);color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer">📄 Generar memo</button>';
 
@@ -3084,15 +3091,28 @@ window.eliminarDespacho = id => {
   remove(ref(db, 'historialCargas/' + id)).then(() => showToast('Despacho eliminado'));
 };
 window.setCargaSubView = v => { cargaSubView = v; if (v !== 'despacho') despachoDetalle = null; if (v === 'accesorios') accesoriosForm = { de: 'CPT MT', para: 'Campos y Servicios', candados: '', cadenas: '', sellos: '', serieDesde: '', serieHasta: '' }; render(); };
-window.setAccForm = (k, v) => { accesoriosForm[k] = v; render(); };
 window.generarMemoAccesorios = () => {
-  const f = accesoriosForm;
+  const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  const f = {
+    de: g('acc-de') || 'CPT MT',
+    para: g('acc-para') || 'Campos y Servicios',
+    candados: g('acc-candados'),
+    candadosNotas: g('acc-candados-notas'),
+    cadenas: g('acc-cadenas'),
+    cadenasNotas: g('acc-cadenas-notas'),
+    sellos: g('acc-sellos'),
+    sellosNotas: g('acc-sellos-notas'),
+    serieDesde: g('acc-serie-desde'),
+    serieHasta: g('acc-serie-hasta'),
+  };
   const items = [];
-  if (parseInt(f.candados) > 0) items.push({ label: '🔒 Candados con llave', qty: parseInt(f.candados), detalle: '' });
-  if (parseInt(f.cadenas) > 0) items.push({ label: '⛓️ Cadenas', qty: parseInt(f.cadenas), detalle: '' });
+  if (parseInt(f.candados) > 0) items.push({ label: 'Candados con llave', qty: parseInt(f.candados), detalle: f.candadosNotas || '' });
+  if (parseInt(f.cadenas) > 0) items.push({ label: 'Cadenas', qty: parseInt(f.cadenas), detalle: f.cadenasNotas || '' });
   if (parseInt(f.sellos) > 0) {
-    const det = (f.serieDesde && f.serieHasta) ? ' (serie ' + f.serieDesde + ' al ' + f.serieHasta + ')' : '';
-    items.push({ label: '🏷️ Sellos de seguridad', qty: parseInt(f.sellos), detalle: det });
+    let det = '';
+    if (f.serieDesde && f.serieHasta) det += 'Serie: ' + f.serieDesde + ' al ' + f.serieHasta;
+    if (f.sellosNotas) det += (det ? ' · ' : '') + f.sellosNotas;
+    items.push({ label: 'Sellos de seguridad', qty: parseInt(f.sellos), detalle: det });
   }
   if (items.length === 0) return showToast('Ingresa al menos un accesorio');
   const fecha = new Date().toLocaleDateString('es-SV', {day:'2-digit',month:'2-digit',year:'numeric'});
