@@ -364,7 +364,7 @@ let form = emptyForm();
 let equipoForm = emptyEF();
 
 const SEDES = ['Plantel Central', 'Subestación Cucumacayán'];
-const TECNICOS = ['David García', 'Bryan Francia', 'Francisco Chulo'];
+const TECNICOS = ['David García', 'Bryan Francia', 'Francisco Chulo', 'Vicente Ramos'];
 const AREAS = ['CPT DELSUR', 'CPT MT', 'CPT BT', 'Campos y Servicios'];
 const ADMIN = 'David García';
 const isAdmin = () => sesionUsuario?.nombre === ADMIN;
@@ -2088,17 +2088,22 @@ function render() {
         ${r.descargas && r.descargas.length > 0 ? `
           <div class="section-title" style="margin-top:4px">Descargas parciales (${r.descargas.length})</div>
           <div class="list" style="margin-bottom:16px">
-            ${r.descargas.slice().reverse().map(d => `
-              <div class="historial-card">
-                <div class="historial-row">
-                  <div>
-                    <div class="historial-lugar">💾 ${d.tecnico}</div>
-                    <div class="historial-caso">${d.notas||'Sin observaciones'}</div>
-                    ${d.registradoPor && d.registradoPor !== d.tecnico ? `<div style="font-size:10px;color:var(--text3);margin-top:2px">Registrado por: ${d.registradoPor}</div>` : ''}
-                  </div>
-                  <div class="historial-fecha">${fmtDate(d.fecha)}</div>
-                </div>
-              </div>`).join('')}
+            ${r.descargas.slice().reverse().map(d => {
+                const icono = d.medicionOk===true?'✅':d.medicionOk===false?'❌':'💾';
+                const badgeBg = d.medicionOk===true?'#dcfce7':d.medicionOk===false?'#fee2e2':'#f1f5f9';
+                const badgeColor = d.medicionOk===true?'#16a34a':d.medicionOk===false?'#dc2626':'#64748b';
+                const badgeLabel = d.medicionOk===true?'Medición OK':d.medicionOk===false?'Con fallo':'Sin estado';
+                const fallasHtml = (d.medicionOk===false&&d.fallasMedicion&&d.fallasMedicion.length>0)?'<div style="font-size:11px;color:#dc2626;font-weight:600;margin-top:3px">'+d.fallasMedicion.join(' · ')+'</div>':'';
+                const descHtml = d.descripcionFalla?'<div style="font-size:11px;color:var(--text2);margin-top:2px">'+d.descripcionFalla+'</div>':'';
+                const regHtml = (d.registradoPor&&d.registradoPor!==d.tecnico)?'<div style="font-size:10px;color:var(--text3);margin-top:2px">Registrado por '+d.registradoPor+'</div>':'';
+                return '<div class="historial-card"><div class="historial-row"><div style="flex:1;min-width:0">'
+                  +'<div class="historial-lugar" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+icono+' '+d.tecnico
+                  +' <span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;background:'+badgeBg+';color:'+badgeColor+'">'+badgeLabel+'</span></div>'
+                  +fallasHtml+descHtml
+                  +'<div class="historial-caso">'+(d.notas||'Sin observaciones')+'</div>'
+                  +regHtml
+                  +'</div><div class="historial-fecha">'+fmtDate(d.fecha)+'</div></div></div>';
+              }).join('')}
           </div>` : ''}
         ${r.lat || !r.retirado ? `
           <div style="display:flex;gap:8px;margin-bottom:10px">
