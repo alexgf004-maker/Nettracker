@@ -309,6 +309,10 @@ let valUsuarioIdx = null;
 let valForm = {};
 let modoMantenimiento = false;
 let valTipoUsuario = 'monofasico';
+let calView = false; // show calendar in dashboard
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth(); // 0-indexed
+let calDiaSeleccionado = null;
 let showValImport = false;
 let valImportData = [];
 let valTipo = 'monofasico';;
@@ -1887,6 +1891,111 @@ function render() {
       html += '<button onclick="toggleMantenimiento()" style="width:100%;padding:10px;border:1.5px solid '+(modoMantenimiento?'var(--red)':'var(--border)')+';border-radius:12px;background:'+(modoMantenimiento?'var(--red-light)':'#fff')+';color:'+(modoMantenimiento?'var(--red)':'var(--text3)')+';font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer">'+(modoMantenimiento?'🔧 Desactivar mantenimiento':'🔧 Activar mantenimiento')+'</button>';
       html += '</div>';
     }
+    html += '</div>';
+
+    // ── CALENDARIO DE ACTIVIDAD ──
+    html += '<div style="margin-top:14px">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">';
+    html += '<div style="font-size:13px;font-weight:700;color:var(--text)">📅 Actividad</div>';
+    html += '<button onclick="toggleCal()" style="font-size:11px;font-weight:700;padding:5px 12px;border:1px solid var(--border);border-radius:20px;background:var(--white);color:var(--text3);cursor:pointer">'+(calView?'Ocultar':'Ver calendario')+'</button>';
+    html += '</div>';
+
+    if (calView) {
+      // Build activity map from all data
+      const actMap = {};
+      const addAct = (fecha, tipo, label) => {
+        if (!fecha) return;
+        const d = fecha.toString().split('T')[0].substring(0,10);
+        if (!actMap[d]) actMap[d] = [];
+        actMap[d].push({ tipo, label });
+      };
+      // Instalaciones y retiros
+      records.forEach(r => {
+        if (r.fechaInstalacion) addAct(r.fechaInstalacion, 'install', '⚡ Instalación: '+( r.caso||r.serie||''));
+        if (r.retirado && r.fechaRetiroReal) addAct(r.fechaRetiroReal, 'retiro', '📤 Retiro: '+(r.caso||r.serie||''));
+        // Descargas
+        (r.descargas||[]).forEach(d => {
+          if (d.fecha) addAct(d.fecha, 'descarga', '💾 Descarga: '+(r.caso||r.serie||'')+(d.medicionOk===false?' ❌':''));
+        });
+      });
+      // Despachos
+      historialCargas.forEach(h => {
+        if (h.fecha) addAct(h.fecha, 'despacho', '📦 Despacho: '+(h.total||'')+(h.total?' equipos':''));
+      });
+      // Validaciones
+      validaciones.forEach(v => {
+        (v.usuarios||[]).forEach(u => {
+          if (u.fechaValidacion) addAct(u.fechaValidacion, 'validacion', '🔌 Validación: '+(u.siget||u.nombre||''));
+        });
+      });
+
+      // Calendar grid
+      const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+      const DIAS = ['D','L','M','X','J','V','S'];
+      const firstDay = new Date(calYear, calMonth, 1).getDay();
+      const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+      const today2 = new Date();
+      const todayStr = today2.getFullYear()+'-'+String(today2.getMonth()+1).padStart(2,'0')+'-'+String(today2.getDate()).padStart(2,'0');
+
+      html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:14px;padding:14px">';
+      // Month nav
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
+      html += '<button onclick="calNav(-1)" style="width:28px;height:28px;border:1px solid var(--border);border-radius:8px;background:var(--white);cursor:pointer;font-size:14px">‹</button>';
+      html += '<div style="font-size:14px;font-weight:800;color:var(--text)">'+MESES[calMonth]+' '+calYear+'</div>';
+      html += '<button onclick="calNav(1)" style="width:28px;height:28px;border:1px solid var(--border);border-radius:8px;background:var(--white);cursor:pointer;font-size:14px">›</button>';
+      html += '</div>';
+      // Day headers
+      html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">';
+      DIAS.forEach(d => { html += '<div style="text-align:center;font-size:10px;font-weight:700;color:var(--text3);padding:2px 0">'+d+'</div>'; });
+      html += '</div>';
+      // Day cells
+      html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">';
+      // Empty cells before first day
+      for (let i=0; i<firstDay; i++) html += '<div></div>';
+      for (let d=1; d<=daysInMonth; d++) {
+        const ds = calYear+'-'+String(calMonth+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+        const acts = actMap[ds] || [];
+        const isToday = ds === todayStr;
+        const isSel = ds === calDiaSeleccionado;
+        const hasAct = acts.length > 0;
+        // Color dots by type
+        const tipos = [...new Set(acts.map(a=>a.tipo))];
+        const dotColors = { install:'#16a34a', retiro:'#ea580c', descarga:'#0057b8', despacho:'#7c3aed', validacion:'#0891b2' };
+        html += '<div onclick="selCal(\''+ds+'\')" style="aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:8px;cursor:'+(hasAct?'pointer':'default')+';background:'+(isSel?'var(--primary)':isToday?'var(--primary-light)':'transparent')+';border:'+(isToday&&!isSel?'1.5px solid var(--primary)':'1.5px solid transparent')+'">';
+        html += '<div style="font-size:12px;font-weight:'+(isToday||isSel?'800':'500')+';color:'+(isSel?'#fff':isToday?'var(--primary)':'var(--text)')+'">'+d+'</div>';
+        if (hasAct) {
+          html += '<div style="display:flex;gap:2px;margin-top:1px">';
+          tipos.slice(0,3).forEach(t => { html += '<div style="width:4px;height:4px;border-radius:50%;background:'+(isSel?'rgba(255,255,255,.8)':dotColors[t]||'var(--primary)')+'"></div>'; });
+          html += '</div>';
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+
+      // Selected day detail
+      if (calDiaSeleccionado) {
+        const selActs = actMap[calDiaSeleccionado] || [];
+        const [sy,sm,sd] = calDiaSeleccionado.split('-');
+        html += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border2)">';
+        html += '<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px">'+parseInt(sd)+' de '+MESES[parseInt(sm)-1]+' '+sy+'</div>';
+        if (selActs.length === 0) {
+          html += '<div style="font-size:12px;color:var(--text3);text-align:center;padding:8px 0">Sin actividad este día</div>';
+        } else {
+          const dotColors2 = { install:'#16a34a', retiro:'#ea580c', descarga:'#0057b8', despacho:'#7c3aed', validacion:'#0891b2' };
+          const bgColors = { install:'#dcfce7', retiro:'#ffedd5', descarga:'#dbeafe', despacho:'#f3f0ff', validacion:'#cffafe' };
+          selActs.forEach(a => {
+            html += '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:'+(bgColors[a.tipo]||'#f8fafc')+';border-radius:8px;margin-bottom:4px">';
+            html += '<div style="width:6px;height:6px;border-radius:50%;background:'+(dotColors2[a.tipo]||'var(--primary)')+';flex-shrink:0"></div>';
+            html += '<div style="font-size:12px;color:var(--text);font-weight:500">'+a.label+'</div>';
+            html += '</div>';
+          });
+        }
+        html += '</div>';
+      }
+      html += '</div>'; // end calendar card
+    }
+    html += '</div>'; // end actividad section
+
     html += '</div>';
   }
 
@@ -3525,6 +3634,19 @@ window.toggleMantenimiento = () => {
   set(mantenimientoRef, nuevo).then(() => {
     showToast(nuevo ? '🔧 Modo mantenimiento activado' : '✅ Mantenimiento desactivado');
   });
+};
+// ── CALENDAR HANDLERS ──
+window.toggleCal = () => { calView = !calView; calDiaSeleccionado = null; render(); };
+window.calNav = dir => {
+  calMonth += dir;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  calDiaSeleccionado = null;
+  render();
+};
+window.selCal = ds => {
+  calDiaSeleccionado = calDiaSeleccionado === ds ? null : ds;
+  render();
 };
 window.goBack = () => { view = 'lista'; editId = null; editEqId = null; form = emptyForm(); equipoForm = emptyEF(); showSelector = false; render(); };
 window.switchTab = t => {
