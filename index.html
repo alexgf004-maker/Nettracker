@@ -1372,6 +1372,12 @@ function render() {
   const el = document.getElementById('app');
   if (!el) return;
 
+  // ── MANTENIMIENTO ──
+  if (modoMantenimiento && sesionUsuario && sesionUsuario.nombre !== 'David García') {
+    el.innerHTML = '<div style="position:fixed;inset:0;background:#0a1628;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--font)"><div style="font-size:48px;margin-bottom:20px">🔧</div><div style="font-size:22px;font-weight:800;color:#fff;margin-bottom:8px">En mantenimiento</div><div style="font-size:14px;color:rgba(255,255,255,.5);text-align:center;max-width:280px;line-height:1.6">La app está siendo actualizada.<br>Vuelve en unos minutos.</div></div>';
+    return;
+  }
+
   // Auto-show alerta if not dismissed and has upcoming retiros
   if (sesionUsuario && !alertaDismissed && !showAlertaRetiros) {
     const ua = userArea(); const proximos = records.filter(r => !r.retirado && daysUntil(r.fechaRetiro) <= 3 && daysUntil(r.fechaRetiro) >= 0 && (r.areaInstalacion||'CPT MT') === ua);
