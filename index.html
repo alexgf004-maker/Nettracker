@@ -1381,7 +1381,7 @@ function render() {
 
   // ── MANTENIMIENTO ──
   if (modoMantenimiento && sesionUsuario && sesionUsuario.nombre !== 'David García') {
-    el.innerHTML = '<div style="position:fixed;inset:0;background:#0a1628;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--font)"><div style="font-size:48px;margin-bottom:20px">🔧</div><div style="font-size:22px;font-weight:800;color:#fff;margin-bottom:8px">En mantenimiento</div><div style="font-size:14px;color:rgba(255,255,255,.5);text-align:center;max-width:280px;line-height:1.6">David está haciendo actualizaciones.<br>Vuelve en unos minutos.</div></div>';
+    el.innerHTML = '<div style="position:fixed;inset:0;background:#0a1628;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--font)"><div style="font-size:48px;margin-bottom:20px">🔧</div><div style="font-size:22px;font-weight:800;color:#fff;margin-bottom:8px">En mantenimiento</div><div style="font-size:14px;color:rgba(255,255,255,.5);text-align:center;max-width:280px;line-height:1.6">David está haciendo actualizaciones.<br>Vuelve en unos minutos.</div><button onclick="cerrarSesion()" style="margin-top:24px;padding:10px 24px;border:1.5px solid rgba(255,255,255,.3);border-radius:20px;background:transparent;color:rgba(255,255,255,.6);font-size:13px;cursor:pointer">← Cambiar perfil</button></div>';
     return;
   }
 
