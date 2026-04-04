@@ -1891,10 +1891,8 @@ function render() {
       html += '<button onclick="toggleMantenimiento()" style="width:100%;padding:10px;border:1.5px solid '+(modoMantenimiento?'var(--red)':'var(--border)')+';border-radius:12px;background:'+(modoMantenimiento?'var(--red-light)':'#fff')+';color:'+(modoMantenimiento?'var(--red)':'var(--text3)')+';font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer">'+(modoMantenimiento?'🔧 Desactivar mantenimiento':'🔧 Activar mantenimiento')+'</button>';
       html += '</div>';
     }
-    html += '</div>';
 
     // ── CALENDARIO DE ACTIVIDAD ──
-    try {
     html += '<div style="margin-top:14px">';
     html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">';
     html += '<div style="font-size:13px;font-weight:700;color:var(--text)">📅 Actividad</div>';
@@ -1904,30 +1902,29 @@ function render() {
     if (calView) {
       // Build activity map from all data
       const actMap = {};
-      const addAct = (fecha, tipo, label, sub) => {
+      const addAct = (fecha, tipo, label) => {
         if (!fecha) return;
         const d = fecha.toString().split('T')[0].substring(0,10);
         if (!actMap[d]) actMap[d] = [];
-        actMap[d].push({ tipo, label, sub: sub||'' });
+        actMap[d].push({ tipo, label });
       };
       // Instalaciones y retiros
       records.forEach(r => {
-        const sub = [r.lugar, r.idUsuario ? '#'+r.idUsuario : ''].filter(Boolean).join(' · ');
-        if (r.fechaInstalacion) addAct(r.fechaInstalacion, 'install', '⚡ Instalación: '+(r.caso||r.serie||''), sub);
-        if (r.retirado && r.fechaRetiroReal) addAct(r.fechaRetiroReal, 'retiro', '📤 Retiro: '+(r.caso||r.serie||''), sub);
+        if (r.fechaInstalacion) addAct(r.fechaInstalacion, 'install', '⚡ Instalación: '+( r.caso||r.serie||''));
+        if (r.retirado && r.fechaRetiroReal) addAct(r.fechaRetiroReal, 'retiro', '📤 Retiro: '+(r.caso||r.serie||''));
         // Descargas
         (r.descargas||[]).forEach(d => {
-          if (d.fecha) addAct(d.fecha, 'descarga', '💾 Descarga: '+(r.caso||r.serie||'')+(d.medicionOk===false?' ❌':''), sub);
+          if (d.fecha) addAct(d.fecha, 'descarga', '💾 Descarga: '+(r.caso||r.serie||'')+(d.medicionOk===false?' ❌':''));
         });
       });
       // Despachos
       historialCargas.forEach(h => {
-        if (h.fecha) addAct(h.fecha, 'despacho', '📦 Despacho: '+(h.total||'')+(h.total?' equipos':''), (h.areaOrigen||''));
+        if (h.fecha) addAct(h.fecha, 'despacho', '📦 Despacho: '+(h.total||'')+(h.total?' equipos':''));
       });
       // Validaciones
       validaciones.forEach(v => {
         (v.usuarios||[]).forEach(u => {
-          if (u.fechaValidacion) addAct(u.fechaValidacion, 'validacion', '🔌 Validación: '+(u.siget||''), (u.nombre||''));
+          if (u.fechaValidacion) addAct(u.fechaValidacion, 'validacion', '🔌 Validación: '+(u.siget||u.nombre||''));
         });
       });
 
@@ -1986,12 +1983,9 @@ function render() {
           const dotColors2 = { install:'#16a34a', retiro:'#ea580c', descarga:'#0057b8', despacho:'#7c3aed', validacion:'#0891b2' };
           const bgColors = { install:'#dcfce7', retiro:'#ffedd5', descarga:'#dbeafe', despacho:'#f3f0ff', validacion:'#cffafe' };
           selActs.forEach(a => {
-            html += '<div style="padding:8px 10px;background:'+(bgColors[a.tipo]||'#f8fafc')+';border-radius:8px;margin-bottom:4px">';
-            html += '<div style="display:flex;align-items:center;gap:8px">';
+            html += '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:'+(bgColors[a.tipo]||'#f8fafc')+';border-radius:8px;margin-bottom:4px">';
             html += '<div style="width:6px;height:6px;border-radius:50%;background:'+(dotColors2[a.tipo]||'var(--primary)')+';flex-shrink:0"></div>';
-            html += '<div style="font-size:12px;color:var(--text);font-weight:600">'+a.label+'</div>';
-            html += '</div>';
-            if (a.sub) html += '<div style="font-size:11px;color:var(--text3);margin-top:3px;padding-left:14px">'+a.sub+'</div>';
+            html += '<div style="font-size:12px;color:var(--text);font-weight:500">'+a.label+'</div>';
             html += '</div>';
           });
         }
@@ -2000,7 +1994,6 @@ function render() {
       html += '</div>'; // end calendar card
     }
     html += '</div>'; // end actividad section
-    } catch(e) { html += '<div style="font-size:11px;color:var(--red);padding:8px">Error calendario: '+e.message+'</div>'; }
 
     html += '</div>';
   }
