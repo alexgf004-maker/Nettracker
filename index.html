@@ -1984,9 +1984,12 @@ function render() {
           const dotColors2 = { install:'#16a34a', retiro:'#ea580c', descarga:'#0057b8', despacho:'#7c3aed', validacion:'#0891b2' };
           const bgColors = { install:'#dcfce7', retiro:'#ffedd5', descarga:'#dbeafe', despacho:'#f3f0ff', validacion:'#cffafe' };
           selActs.forEach(a => {
-            html += '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:'+(bgColors[a.tipo]||'#f8fafc')+';border-radius:8px;margin-bottom:4px">';
+            html += '<div style="padding:8px 10px;background:'+(bgColors[a.tipo]||'#f8fafc')+';border-radius:8px;margin-bottom:4px">';
+            html += '<div style="display:flex;align-items:center;gap:8px">';
             html += '<div style="width:6px;height:6px;border-radius:50%;background:'+(dotColors2[a.tipo]||'var(--primary)')+';flex-shrink:0"></div>';
-            html += '<div style="font-size:12px;color:var(--text);font-weight:500">'+a.label+'</div>';
+            html += '<div style="font-size:12px;color:var(--text);font-weight:600">'+a.label+'</div>';
+            html += '</div>';
+            if (a.sub) html += '<div style="font-size:11px;color:var(--text3);margin-top:3px;padding-left:14px">'+a.sub+'</div>';
             html += '</div>';
           });
         }
