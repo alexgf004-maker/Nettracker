@@ -276,7 +276,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, onValue, push, update, remove, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getDatabase, ref, onValue, push, update, remove, get, set } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDmwLWle24Nldh-Y6YBmYLaaDA6ZTpuKuc",
@@ -295,6 +295,7 @@ const equiposRef = ref(db, 'equipos');
 const historialCargasRef = ref(db, 'historialCargas');
 const historialAccesoriosRef = ref(db, 'historialAccesorios');
 const validacionesRef = ref(db, 'validaciones');
+const mantenimientoRef = ref(db, 'config/mantenimiento');
 
 
 // ── STATE ──
@@ -454,6 +455,10 @@ onValue(historialAccesoriosRef, snap => {
 });
 
 
+onValue(mantenimientoRef, snap => {
+  modoMantenimiento = snap.exists() ? snap.val() === true : false;
+  render();
+});
 onValue(validacionesRef, snap => {
   validaciones = [];
   snap.forEach(x => {
@@ -1376,7 +1381,7 @@ function render() {
 
   // ── MANTENIMIENTO ──
   if (modoMantenimiento && sesionUsuario && sesionUsuario.nombre !== 'David García') {
-    el.innerHTML = '<div style="position:fixed;inset:0;background:#0a1628;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--font)"><div style="font-size:48px;margin-bottom:20px">🔧</div><div style="font-size:22px;font-weight:800;color:#fff;margin-bottom:8px">En mantenimiento</div><div style="font-size:14px;color:rgba(255,255,255,.5);text-align:center;max-width:280px;line-height:1.6">La app está siendo actualizada.<br>Vuelve en unos minutos.</div></div>';
+    el.innerHTML = '<div style="position:fixed;inset:0;background:#0a1628;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--font)"><div style="font-size:48px;margin-bottom:20px">🔧</div><div style="font-size:22px;font-weight:800;color:#fff;margin-bottom:8px">En mantenimiento</div><div style="font-size:14px;color:rgba(255,255,255,.5);text-align:center;max-width:280px;line-height:1.6">David está haciendo actualizaciones.<br>Vuelve en unos minutos.</div></div>';
     return;
   }
 
@@ -3516,9 +3521,10 @@ window.autoFillTaps = () => {
   if (TAPS[vp]) { tapsEl.value = TAPS[vp]; valForm.cpVP = parseFloat(vp); valForm.taps = TAPS[vp]; }
 };
 window.toggleMantenimiento = () => {
-  modoMantenimiento = !modoMantenimiento;
-  showToast(modoMantenimiento ? '🔧 Modo mantenimiento activado' : '✅ Mantenimiento desactivado');
-  render();
+  const nuevo = !modoMantenimiento;
+  set(mantenimientoRef, nuevo).then(() => {
+    showToast(nuevo ? '🔧 Modo mantenimiento activado' : '✅ Mantenimiento desactivado');
+  });
 };
 window.goBack = () => { view = 'lista'; editId = null; editEqId = null; form = emptyForm(); equipoForm = emptyEF(); showSelector = false; render(); };
 window.switchTab = t => {
