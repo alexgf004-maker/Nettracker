@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -1909,7 +1910,6 @@ function render() {
         actMap[d].push({ tipo, label });
       };
       // Instalaciones y retiros
-      if (records.length > 0) console.log('DEBUG record[0]:', JSON.stringify({lugar:records[0].lugar, idUsuario:records[0].idUsuario, fechaInstalacion:records[0].fechaInstalacion, caso:records[0].caso}));
       records.forEach(r => {
         const sub = [r.lugar||r.nombre||r.usuario||'', r.idUsuario||r.id_usuario||r.nc||'', r.direccion||''].filter(Boolean).join(' · ');
         if (r.fechaInstalacion) addAct(r.fechaInstalacion, 'install', '⚡ Instalación: '+(r.caso||r.serie||''), sub);
@@ -1975,6 +1975,8 @@ function render() {
 
       // Selected day detail
       if (calDiaSeleccionado) {
+        console.log('DEBUG actMap['+calDiaSeleccionado+']:', JSON.stringify((actMap[calDiaSeleccionado]||[]).map(a=>({label:a.label,sub:a.sub}))));
+        console.log('DEBUG selActs for', calDiaSeleccionado, ':', JSON.stringify((actMap[calDiaSeleccionado]||[]).map(a=>({label:a.label,sub:a.sub}))));
         const selActs = actMap[calDiaSeleccionado] || [];
         const [sy,sm,sd] = calDiaSeleccionado.split('-');
         html += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border2)">';
