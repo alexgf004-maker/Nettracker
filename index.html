@@ -1894,6 +1894,7 @@ function render() {
     html += '</div>';
 
     // ── CALENDARIO DE ACTIVIDAD ──
+    try {
     html += '<div style="margin-top:14px">';
     html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">';
     html += '<div style="font-size:13px;font-weight:700;color:var(--text)">📅 Actividad</div>';
@@ -1999,6 +2000,7 @@ function render() {
       html += '</div>'; // end calendar card
     }
     html += '</div>'; // end actividad section
+    } catch(e) { html += '<div style="font-size:11px;color:var(--red);padding:8px">Error calendario: '+e.message+'</div>'; }
 
     html += '</div>';
   }
