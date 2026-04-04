@@ -1909,8 +1909,9 @@ function render() {
         actMap[d].push({ tipo, label });
       };
       // Instalaciones y retiros
+      if (records.length > 0) console.log('DEBUG record[0]:', JSON.stringify({lugar:records[0].lugar, idUsuario:records[0].idUsuario, fechaInstalacion:records[0].fechaInstalacion, caso:records[0].caso}));
       records.forEach(r => {
-        const sub = [r.lugar, r.idUsuario ? 'ID: '+r.idUsuario : ''].filter(Boolean).join(' · ');
+        const sub = [r.lugar||r.nombre||r.usuario||'', r.idUsuario||r.id_usuario||r.nc||'', r.direccion||''].filter(Boolean).join(' · ');
         if (r.fechaInstalacion) addAct(r.fechaInstalacion, 'install', '⚡ Instalación: '+(r.caso||r.serie||''), sub);
         if (r.retirado && r.fechaRetiroReal) addAct(r.fechaRetiroReal, 'retiro', '📤 Retiro: '+(r.caso||r.serie||''), sub);
         // Descargas
