@@ -1559,6 +1559,7 @@ function render() {
     html += '<div onclick="setDescargaTecnico(\'David García\')" style="padding:10px 14px;border:2px solid '+(descargaForm.tecnico==='David García'?'var(--primary)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:14px;font-weight:600;color:'+(descargaForm.tecnico==='David García'?'var(--primary)':'var(--text2)')+';background:'+(descargaForm.tecnico==='David García'?'var(--primary-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(descargaForm.tecnico==='David García'?'✅':'⬜')+'</span> David García</div>';
     html += '<div onclick="setDescargaTecnico(\'Bryan Francia\')" style="padding:10px 14px;border:2px solid '+(descargaForm.tecnico==='Bryan Francia'?'var(--primary)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:14px;font-weight:600;color:'+(descargaForm.tecnico==='Bryan Francia'?'var(--primary)':'var(--text2)')+';background:'+(descargaForm.tecnico==='Bryan Francia'?'var(--primary-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(descargaForm.tecnico==='Bryan Francia'?'✅':'⬜')+'</span> Bryan Francia</div>';
     html += '<div onclick="setDescargaTecnico(\'Francisco Chulo\')" style="padding:10px 14px;border:2px solid '+(descargaForm.tecnico==='Francisco Chulo'?'var(--primary)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:14px;font-weight:600;color:'+(descargaForm.tecnico==='Francisco Chulo'?'var(--primary)':'var(--text2)')+';background:'+(descargaForm.tecnico==='Francisco Chulo'?'var(--primary-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(descargaForm.tecnico==='Francisco Chulo'?'✅':'⬜')+'</span> Francisco Chulo</div>';
+    html += '<div onclick="setDescargaTecnico(\'Vicente Ramos\')" style="padding:10px 14px;border:2px solid '+(descargaForm.tecnico==='Vicente Ramos'?'var(--primary)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:14px;font-weight:600;color:'+(descargaForm.tecnico==='Vicente Ramos'?'var(--primary)':'var(--text2)')+';background:'+(descargaForm.tecnico==='Vicente Ramos'?'var(--primary-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(descargaForm.tecnico==='Vicente Ramos'?'✅':'⬜')+'</span> Vicente Ramos</div>';
     html += '<div style="margin:14px 0 8px;font-size:12px;font-weight:700;color:var(--text3)">¿LA MEDICIÓN FUE CORRECTA?</div>';
     html += '<div style="display:flex;gap:8px;margin-bottom:12px">';
     html += '<div onclick="setDescargaMedicion(true)" style="flex:1;padding:11px;border-radius:10px;border:2px solid '+(descargaForm.medicionOk===true?'var(--green)':'var(--border)')+';background:'+(descargaForm.medicionOk===true?'var(--green-light)':'#fff')+';text-align:center;cursor:pointer;font-size:13px;font-weight:700;color:'+(descargaForm.medicionOk===true?'var(--green)':'var(--text3)')+'">✅ Sí, correcta</div>';
@@ -1868,6 +1869,11 @@ function render() {
     html += '<div style="margin-top:10px">';
     html += '<button onclick="switchTab(\'validaciones\')" style="width:100%;padding:12px;border:1.5px solid #7c3aed;border-radius:12px;background:#f3f0ff;color:#7c3aed;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">🔌 Validaciones de TAP' + (validaciones.length > 0 ? ' (' + validaciones.length + ' campañas)' : '') + '</button>';
     html += '</div>';
+    if (isAdmin()) {
+      html += '<div style="margin-top:8px">';
+      html += '<button onclick="toggleMantenimiento()" style="width:100%;padding:10px;border:1.5px solid '+(modoMantenimiento?'var(--red)':'var(--border)')+';border-radius:12px;background:'+(modoMantenimiento?'var(--red-light)':'#fff')+';color:'+(modoMantenimiento?'var(--red)':'var(--text3)')+';font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer">'+(modoMantenimiento?'🔧 Desactivar mantenimiento':'🔧 Activar mantenimiento')+'</button>';
+      html += '</div>';
+    }
     html += '</div>';
   }
 
@@ -2088,22 +2094,17 @@ function render() {
         ${r.descargas && r.descargas.length > 0 ? `
           <div class="section-title" style="margin-top:4px">Descargas parciales (${r.descargas.length})</div>
           <div class="list" style="margin-bottom:16px">
-            ${r.descargas.slice().reverse().map(d => {
-                const icono = d.medicionOk===true?'✅':d.medicionOk===false?'❌':'💾';
-                const badgeBg = d.medicionOk===true?'#dcfce7':d.medicionOk===false?'#fee2e2':'#f1f5f9';
-                const badgeColor = d.medicionOk===true?'#16a34a':d.medicionOk===false?'#dc2626':'#64748b';
-                const badgeLabel = d.medicionOk===true?'Medición OK':d.medicionOk===false?'Con fallo':'Sin estado';
-                const fallasHtml = (d.medicionOk===false&&d.fallasMedicion&&d.fallasMedicion.length>0)?'<div style="font-size:11px;color:#dc2626;font-weight:600;margin-top:3px">'+d.fallasMedicion.join(' · ')+'</div>':'';
-                const descHtml = d.descripcionFalla?'<div style="font-size:11px;color:var(--text2);margin-top:2px">'+d.descripcionFalla+'</div>':'';
-                const regHtml = (d.registradoPor&&d.registradoPor!==d.tecnico)?'<div style="font-size:10px;color:var(--text3);margin-top:2px">Registrado por '+d.registradoPor+'</div>':'';
-                return '<div class="historial-card"><div class="historial-row"><div style="flex:1;min-width:0">'
-                  +'<div class="historial-lugar" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+icono+' '+d.tecnico
-                  +' <span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;background:'+badgeBg+';color:'+badgeColor+'">'+badgeLabel+'</span></div>'
-                  +fallasHtml+descHtml
-                  +'<div class="historial-caso">'+(d.notas||'Sin observaciones')+'</div>'
-                  +regHtml
-                  +'</div><div class="historial-fecha">'+fmtDate(d.fecha)+'</div></div></div>';
-              }).join('')}
+            ${r.descargas.slice().reverse().map(d => `
+              <div class="historial-card">
+                <div class="historial-row">
+                  <div>
+                    <div class="historial-lugar">💾 ${d.tecnico}</div>
+                    <div class="historial-caso">${d.notas||'Sin observaciones'}</div>
+                    ${d.registradoPor && d.registradoPor !== d.tecnico ? `<div style="font-size:10px;color:var(--text3);margin-top:2px">Registrado por: ${d.registradoPor}</div>` : ''}
+                  </div>
+                  <div class="historial-fecha">${fmtDate(d.fecha)}</div>
+                </div>
+              </div>`).join('')}
           </div>` : ''}
         ${r.lat || !r.retirado ? `
           <div style="display:flex;gap:8px;margin-bottom:10px">
@@ -2592,6 +2593,7 @@ if (inventarioSearch) {
           if (ok) {
             html += '<div style="text-align:right;flex-shrink:0;margin-left:8px"><span style="background:var(--green-light);color:var(--green);font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px">✅ Validado</span>';
             if (u.resultado) html += '<div style="font-size:10px;color:var(--text3);margin-top:4px">TAP '+u.resultado.tap+' · '+u.resultado.multiplicador+'</div>';
+            if (u.fechaValidacion) html += '<div style="font-size:9px;color:var(--text3);margin-top:2px">'+u.fechaValidacion+(u.validadoPor?' · '+u.validadoPor:'')+'</div>';
             html += '</div>';
           } else {
             html += '<span style="background:var(--yellow-light);color:var(--yellow);font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;flex-shrink:0;margin-left:8px">⏳ Pendiente</span>';
@@ -3453,6 +3455,8 @@ window.guardarValidacion = () => {
   usuarios[valUsuarioIdx] = {
     ...usuarios[valUsuarioIdx],
     estado: 'validado',
+    fechaValidacion: today(),
+    validadoPor: sesionUsuario?.nombre || 'Desconocido',
     resultado: valForm.resultado,
     formData: { ...valForm, resultado: valForm.resultado },
   };
@@ -3502,6 +3506,11 @@ window.autoFillTaps = () => {
   const vp = vpEl.value;
   const TAPS = {'13200':'14400,13800,13200,12870,12540','7620':'8001,7810,7620,7430,7240','2400':'2520,2460,2400,2340,2280'};
   if (TAPS[vp]) { tapsEl.value = TAPS[vp]; valForm.cpVP = parseFloat(vp); valForm.taps = TAPS[vp]; }
+};
+window.toggleMantenimiento = () => {
+  modoMantenimiento = !modoMantenimiento;
+  showToast(modoMantenimiento ? '🔧 Modo mantenimiento activado' : '✅ Mantenimiento desactivado');
+  render();
 };
 window.goBack = () => { view = 'lista'; editId = null; editEqId = null; form = emptyForm(); equipoForm = emptyEF(); showSelector = false; render(); };
 window.switchTab = t => {
