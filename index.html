@@ -1910,16 +1910,17 @@ function render() {
       };
       // Instalaciones y retiros
       records.forEach(r => {
-        if (r.fechaInstalacion) addAct(r.fechaInstalacion, 'install', '⚡ Instalación: '+( r.caso||r.serie||''));
-        if (r.retirado && r.fechaRetiroReal) addAct(r.fechaRetiroReal, 'retiro', '📤 Retiro: '+(r.caso||r.serie||''));
+        const sub = [r.lugar, r.idUsuario ? 'ID: '+r.idUsuario : ''].filter(Boolean).join(' · ');
+        if (r.fechaInstalacion) addAct(r.fechaInstalacion, 'install', '⚡ Instalación: '+(r.caso||r.serie||''), sub);
+        if (r.retirado && r.fechaRetiroReal) addAct(r.fechaRetiroReal, 'retiro', '📤 Retiro: '+(r.caso||r.serie||''), sub);
         // Descargas
-        (r.descargas||[]).forEach(d => {
-          if (d.fecha) addAct(d.fecha, 'descarga', '💾 Descarga: '+(r.caso||r.serie||'')+(d.medicionOk===false?' ❌':''));
+        (r.descargas||[]).forEach(dsc => {
+          if (dsc.fecha) addAct(dsc.fecha, 'descarga', '💾 Descarga: '+(r.caso||r.serie||'')+(dsc.medicionOk===false?' ❌':''), sub);
         });
       });
       // Despachos
       historialCargas.forEach(h => {
-        if (h.fecha) addAct(h.fecha, 'despacho', '📦 Despacho: '+(h.total||'')+(h.total?' equipos':''));
+        if (h.fecha) addAct(h.fecha, 'despacho', '📦 Despacho: '+(h.total||'')+(h.total?' equipos':''), h.areaOrigen||'');
       });
       // Validaciones
       validaciones.forEach(v => {
