@@ -308,6 +308,10 @@ let valCampanaId = null;
 let valUsuarioIdx = null;
 let valForm = {};
 let modoMantenimiento = false;
+let showReporteModal = false;
+let reporteMes = new Date().getMonth() + 1;
+let reporteAnio = new Date().getFullYear();
+let reporteArea = 'TODOS';
 let valTipoUsuario = 'monofasico';
 let calView = false; // show calendar in dashboard
 let calYear = new Date().getFullYear();
@@ -1886,10 +1890,48 @@ function render() {
     html += '<div style="margin-top:10px">';
     html += '<button onclick="switchTab(\'validaciones\')" style="width:100%;padding:12px;border:1.5px solid #7c3aed;border-radius:12px;background:#f3f0ff;color:#7c3aed;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">🔌 Validaciones de TAP' + (validaciones.length > 0 ? ' (' + validaciones.length + ' campañas)' : '') + '</button>';
     html += '</div>';
+    html += '<div style="margin-top:8px">';
+    html += '<button onclick="abrirReporteModal()" style="width:100%;padding:12px;border:1.5px solid #0891b2;border-radius:12px;background:#ecfeff;color:#0891b2;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">📊 Reporte mensual</button>';
+    html += '</div>';
     if (isAdmin()) {
       html += '<div style="margin-top:8px">';
       html += '<button onclick="toggleMantenimiento()" style="width:100%;padding:10px;border:1.5px solid '+(modoMantenimiento?'var(--red)':'var(--border)')+';border-radius:12px;background:'+(modoMantenimiento?'var(--red-light)':'#fff')+';color:'+(modoMantenimiento?'var(--red)':'var(--text3)')+';font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer">'+(modoMantenimiento?'🔧 Desactivar mantenimiento':'🔧 Activar mantenimiento')+'</button>';
       html += '</div>';
+    }
+
+    // ── REPORTE MODAL ──
+    if (showReporteModal) {
+      const MESES_R = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+      const AREAS_R = ['TODOS','CPT MT','CPT BT','Campos y Servicios'];
+      html += '<div style="position:fixed;inset:0;background:#00000088;z-index:300;display:flex;align-items:flex-end">';
+      html += '<div style="background:var(--white);border-radius:20px 20px 0 0;width:100%;padding:20px;font-family:var(--font)">';
+      html += '<div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:16px">📊 Reporte mensual</div>';
+      // Mes selector
+      html += '<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">MES</div>';
+      html += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
+      MESES_R.forEach((m,i) => {
+        const mes = i+1;
+        html += '<div onclick="setReporteMes('+mes+')" style="padding:6px 10px;border-radius:8px;border:2px solid '+(reporteMes===mes?'#0891b2':'var(--border)')+';background:'+(reporteMes===mes?'#ecfeff':'#fff')+';color:'+(reporteMes===mes?'#0891b2':'var(--text3)')+';font-size:11px;font-weight:700;cursor:pointer">'+m+'</div>';
+      });
+      html += '</div></div>';
+      // Año selector
+      const anioActual = new Date().getFullYear();
+      html += '<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">AÑO</div>';
+      html += '<div style="display:flex;gap:6px">';
+      [anioActual-1, anioActual, anioActual+1].forEach(a => {
+        html += '<div onclick="setReporteAnio('+a+')" style="padding:6px 14px;border-radius:8px;border:2px solid '+(reporteAnio===a?'#0891b2':'var(--border)')+';background:'+(reporteAnio===a?'#ecfeff':'#fff')+';color:'+(reporteAnio===a?'#0891b2':'var(--text3)')+';font-size:12px;font-weight:700;cursor:pointer">'+a+'</div>';
+      });
+      html += '</div></div>';
+      // Área selector
+      html += '<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">ÁREA</div>';
+      html += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
+      AREAS_R.forEach(a => {
+        html += '<div onclick="setReporteArea(this.dataset.a)" data-a="'+a+'" style="padding:6px 10px;border-radius:8px;border:2px solid '+(reporteArea===a?'#0891b2':'var(--border)')+';background:'+(reporteArea===a?'#ecfeff':'#fff')+';color:'+(reporteArea===a?'#0891b2':'var(--text3)')+';font-size:11px;font-weight:700;cursor:pointer">'+(a==='TODOS'?'Todas las áreas':a)+'</div>';
+      });
+      html += '</div></div>';
+      html += '<button onclick="generarReporteMensual()" style="width:100%;padding:13px;border:none;border-radius:10px;background:#0891b2;color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px">⬇️ Generar Excel</button>';
+      html += '<button onclick="cerrarReporteModal()" style="width:100%;padding:11px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--text3);font-family:var(--font);font-size:13px;cursor:pointer">Cancelar</button>';
+      html += '</div></div>';
     }
 
     // ── CALENDARIO DE ACTIVIDAD ──
@@ -3652,6 +3694,109 @@ window.selCal = ds => {
   calDiaSeleccionado = calDiaSeleccionado === ds ? null : ds;
   render();
 };
+// ── REPORTE MENSUAL HANDLERS ──
+window.abrirReporteModal = () => { showReporteModal = true; render(); };
+window.cerrarReporteModal = () => { showReporteModal = false; render(); };
+window.setReporteMes = m => { reporteMes = m; render(); };
+window.setReporteAnio = a => { reporteAnio = a; render(); };
+window.setReporteArea = el => { reporteArea = typeof el === 'string' ? el : el.dataset.a; render(); };
+
+window.generarReporteMensual = () => {
+  const mes = reporteMes;
+  const anio = reporteAnio;
+  const area = reporteArea;
+  const MESES_N = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const mesNombre = MESES_N[mes-1];
+  const mesStr = String(mes).padStart(2,'0');
+  const prefijo = anio+'-'+mesStr;
+
+  // Filter function
+  const enMes = fecha => fecha && fecha.toString().startsWith(prefijo);
+  const enArea = r => area === 'TODOS' || (r.areaInstalacion||'CPT MT') === area || (r.areaBeneficiaria||'') === area;
+
+  // ── HOJA 1: RESUMEN ──
+  const areas = area === 'TODOS' ? ['CPT MT','CPT BT','Campos y Servicios'] : [area];
+  const resumen = [];
+  resumen.push(['Reporte Mensual — '+mesNombre+' '+anio+(area!=='TODOS'?' ('+area+')':'')]);
+  resumen.push([]);
+  resumen.push(['Área','Instalaciones','Retiros','Descargas OK','Descargas con fallo','Despachos','Validaciones completadas']);
+  areas.forEach(a => {
+    const inst = records.filter(r => enMes(r.fechaInstalacion) && (r.areaInstalacion===a||r.areaBeneficiaria===a)).length;
+    const ret  = records.filter(r => r.retirado && enMes(r.fechaRetiroReal) && (r.areaInstalacion===a||r.areaBeneficiaria===a)).length;
+    const descs = records.filter(r => (r.areaInstalacion===a||r.areaBeneficiaria===a)).flatMap(r=>(r.descargas||[]).filter(d=>enMes(d.fecha)));
+    const descOk = descs.filter(d=>d.medicionOk===true).length;
+    const descFail = descs.filter(d=>d.medicionOk===false).length;
+    const desp = historialCargas.filter(h=>enMes(h.fecha)&&(area==='TODOS'||h.areaOrigen===a||a==='Campos y Servicios')).length;
+    const vals = validaciones.flatMap(v=>(v.usuarios||[]).filter(u=>u.estado==='validado'&&enMes(u.fechaValidacion))).length;
+    resumen.push([a, inst, ret, descOk, descFail, a==='CPT MT'||a==='CPT BT'?desp:'—', a==='CPT MT'?vals:'—']);
+  });
+  resumen.push([]);
+  // Totals
+  const totalInst = records.filter(r=>enMes(r.fechaInstalacion)&&(area==='TODOS'||enArea(r))).length;
+  const totalRet  = records.filter(r=>r.retirado&&enMes(r.fechaRetiroReal)&&(area==='TODOS'||enArea(r))).length;
+  const allDescs  = records.filter(r=>area==='TODOS'||enArea(r)).flatMap(r=>(r.descargas||[]).filter(d=>enMes(d.fecha)));
+  const totalDesp = historialCargas.filter(h=>enMes(h.fecha)).length;
+  const totalVals = validaciones.flatMap(v=>(v.usuarios||[]).filter(u=>u.estado==='validado'&&enMes(u.fechaValidacion))).length;
+  resumen.push(['TOTAL',totalInst,totalRet,allDescs.filter(d=>d.medicionOk===true).length,allDescs.filter(d=>d.medicionOk===false).length,totalDesp,totalVals]);
+
+  // ── HOJA 2: DETALLE INSTALACIONES ──
+  const instRows = [['N° SIGET','Serie','Viñeta','Lugar','Área','Sede','Multiplicador','F. Instalación','F. Retiro Prog.','Notas']];
+  records.filter(r=>enMes(r.fechaInstalacion)&&(area==='TODOS'||enArea(r))).forEach(r => {
+    instRows.push([r.caso||'',r.serie||'',r.vineta||'',r.lugar||'',r.areaInstalacion||'',r.sede||'',r.multiplicador||'',r.fechaInstalacion||'',r.fechaRetiro||'',r.notas||'']);
+  });
+
+  // ── HOJA 3: DETALLE RETIROS ──
+  const retRows = [['N° SIGET','Serie','Lugar','Área','F. Retiro Real','Retirado por','Fallas físicas','Descarga OK']];
+  records.filter(r=>r.retirado&&enMes(r.fechaRetiroReal)&&(area==='TODOS'||enArea(r))).forEach(r => {
+    const fallas = (r.fallas||[]).join(', ');
+    const ultDesc = (r.descargas||[]).slice(-1)[0];
+    retRows.push([r.caso||'',r.serie||'',r.lugar||'',r.areaInstalacion||'',r.fechaRetiroReal||'',r.retiradoPor||'',fallas||'Sin fallas',ultDesc?( ultDesc.medicionOk===true?'Sí':ultDesc.medicionOk===false?'No':'—'):'Pendiente']);
+  });
+
+  // ── HOJA 4: DESCARGAS ──
+  const descRows = [['N° SIGET','Serie','Lugar','Fecha descarga','Técnico','Medición OK','Fallos medición','Observaciones']];
+  records.filter(r=>area==='TODOS'||enArea(r)).forEach(r => {
+    (r.descargas||[]).filter(d=>enMes(d.fecha)).forEach(d => {
+      descRows.push([r.caso||'',r.serie||'',r.lugar||'',d.fecha||'',d.tecnico||'',d.medicionOk===true?'Sí':d.medicionOk===false?'No':'—',(d.fallasMedicion||[]).join(', ')||'',d.notas||'']);
+    });
+  });
+
+  // ── HOJA 5: DESPACHOS ──
+  const despRows = [['Fecha','Área origen','Total equipos','Realizado por']];
+  historialCargas.filter(h=>enMes(h.fecha)&&(area==='TODOS'||h.areaOrigen===area||area==='Campos y Servicios')).forEach(h => {
+    despRows.push([h.fecha||'',h.areaOrigen||'',h.total||'',h.realizadoPor||'']);
+  });
+
+  // ── HOJA 6: VALIDACIONES ──
+  const valRows = [['Campaña','N° SIGET','Nombre','CT/DS','Medidor','Fecha validación','Validado por','TAP estimado','Multiplicador']];
+  validaciones.forEach(v => {
+    (v.usuarios||[]).filter(u=>u.estado==='validado'&&enMes(u.fechaValidacion)).forEach(u => {
+      valRows.push([v.nombre||'',u.siget||'',u.nombre||'',u.ct||'',u.medidor||'',u.fechaValidacion||'',u.validadoPor||'',u.resultado?'TAP '+u.resultado.tap:'',u.resultado?u.resultado.multiplicador:'']);
+    });
+  });
+
+  // Build workbook
+  const wb = XLSX.utils.book_new();
+  const addSheet = (name, data) => {
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    // Style header row
+    const range = XLSX.utils.decode_range(ws['!ref']||'A1');
+    ws['!cols'] = Array(range.e.c+1).fill({ wch: 20 });
+    XLSX.utils.book_append_sheet(wb, ws, name);
+  };
+  addSheet('Resumen', resumen);
+  addSheet('Instalaciones', instRows);
+  addSheet('Retiros', retRows);
+  addSheet('Descargas', descRows);
+  addSheet('Despachos', despRows);
+  addSheet('Validaciones', valRows);
+
+  XLSX.writeFile(wb, 'Reporte_'+mesNombre+'_'+anio+(area!=='TODOS'?'_'+area.replace(/\s/g,'_'):'')+'.xlsx');
+  showReporteModal = false;
+  showToast('📊 Reporte generado correctamente');
+  render();
+};
+
 window.goBack = () => { view = 'lista'; editId = null; editEqId = null; form = emptyForm(); equipoForm = emptyEF(); showSelector = false; render(); };
 window.switchTab = t => {
   tab = t; view = 'lista'; editId = null; editEqId = null;
