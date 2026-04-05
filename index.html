@@ -1923,6 +1923,25 @@ function render() {
     html += '<div style="margin-top:10px">';
     html += '<button onclick="switchTab(\'validaciones\')" style="width:100%;padding:12px;border:1.5px solid #7c3aed;border-radius:12px;background:#f3f0ff;color:#7c3aed;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">🔌 Validaciones de TAP' + (validaciones.length > 0 ? ' (' + validaciones.length + ' campañas)' : '') + '</button>';
     html += '</div>';
+    if (showReporteModal) {
+      const MESES_R = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+      html += '<div style="position:fixed;inset:0;background:#00000088;z-index:300;display:flex;align-items:flex-end">';
+      html += '<div style="background:var(--white);border-radius:20px 20px 0 0;width:100%;padding:20px;font-family:var(--font);max-height:90vh;overflow-y:auto">';
+      html += '<div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:14px">📊 Reporte mensual</div>';
+      html += '<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">MES</div><div style="display:flex;gap:4px;flex-wrap:wrap">';
+      MESES_R.forEach((m,i) => { const mes=i+1; html += '<div onclick="setReporteMes('+mes+')" style="padding:5px 9px;border-radius:8px;border:2px solid '+(reporteMes===mes?'#0891b2':'var(--border)')+';background:'+(reporteMes===mes?'#ecfeff':'#fff')+';color:'+(reporteMes===mes?'#0891b2':'var(--text3)')+';font-size:11px;font-weight:700;cursor:pointer">'+m+'</div>'; });
+      html += '</div></div>';
+      const anioActual = new Date().getFullYear();
+      html += '<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">AÑO</div><div style="display:flex;gap:6px">';
+      [anioActual-1,anioActual,anioActual+1].forEach(a => { html += '<div onclick="setReporteAnio('+a+')" style="padding:6px 14px;border-radius:8px;border:2px solid '+(reporteAnio===a?'#0891b2':'var(--border)')+';background:'+(reporteAnio===a?'#ecfeff':'#fff')+';color:'+(reporteAnio===a?'#0891b2':'var(--text3)')+';font-size:12px;font-weight:700;cursor:pointer">'+a+'</div>'; });
+      html += '</div></div>';
+      html += '<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">ÁREA</div><div style="display:flex;gap:6px;flex-wrap:wrap">';
+      ['TODOS','CPT MT','CPT BT','Campos y Servicios'].forEach(a => { html += '<div onclick="setReporteArea(this.dataset.a)" data-a="'+a+'" style="padding:6px 10px;border-radius:8px;border:2px solid '+(reporteArea===a?'#0891b2':'var(--border)')+';background:'+(reporteArea===a?'#ecfeff':'#fff')+';color:'+(reporteArea===a?'#0891b2':'var(--text3)')+';font-size:11px;font-weight:700;cursor:pointer">'+(a==='TODOS'?'Todas':a)+'</div>'; });
+      html += '</div></div>';
+      html += '<button onclick="generarReporteMensual()" style="width:100%;padding:13px;border:none;border-radius:10px;background:#0891b2;color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px">⬇️ Generar Excel</button>';
+      html += '<button onclick="cerrarReporteModal()" style="width:100%;padding:11px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--text3);font-family:var(--font);font-size:13px;cursor:pointer">Cancelar</button>';
+      html += '</div></div>';
+    }
     if (isAdmin()) {
       html += '<div style="margin-top:8px">';
       html += '<button onclick="toggleMantenimiento()" style="width:100%;padding:10px;border:1.5px solid '+(modoMantenimiento?'var(--red)':'var(--border)')+';border-radius:12px;background:'+(modoMantenimiento?'var(--red-light)':'#fff')+';color:'+(modoMantenimiento?'var(--red)':'var(--text3)')+';font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer">'+(modoMantenimiento?'🔧 Desactivar mantenimiento':'🔧 Activar mantenimiento')+'</button>';
@@ -4252,6 +4271,51 @@ window.madelyGenerarCartas = el => {
   cerrarMadelyModal();
 };
 
+// ── REPORTE MENSUAL HANDLERS ──
+window.abrirReporteModal = () => { showReporteModal = true; render(); };
+window.cerrarReporteModal = () => { showReporteModal = false; render(); };
+window.setReporteMes = m => { reporteMes = m; render(); };
+window.setReporteAnio = a => { reporteAnio = a; render(); };
+window.setReporteArea = el => { reporteArea = typeof el === 'string' ? el : el.dataset.a; render(); };
+window.generarReporteMensual = () => {
+  const mes = reporteMes, anio = reporteAnio, area = reporteArea;
+  const MESES_N = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const mesNombre = MESES_N[mes-1];
+  const prefijo = anio+'-'+String(mes).padStart(2,'0');
+  const enMes = f => f && f.toString().startsWith(prefijo);
+  const enArea = r => area==='TODOS'||(r.areaInstalacion||'CPT MT')===area||(r.areaBeneficiaria||'')===area;
+  const areas = area==='TODOS'?['CPT MT','CPT BT','Campos y Servicios']:[area];
+  // Resumen
+  const res = [['Reporte — '+mesNombre+' '+anio+(area!=='TODOS'?' ('+area+')':'')],[],['Área','Instalaciones','Retiros','Descargas OK','Descargas con fallo','Despachos','Validaciones']];
+  areas.forEach(a => {
+    const inst = records.filter(r=>enMes(r.fechaInstalacion)&&(r.areaInstalacion===a||r.areaBeneficiaria===a)).length;
+    const ret  = records.filter(r=>r.retirado&&enMes(r.fechaRetiroReal)&&(r.areaInstalacion===a||r.areaBeneficiaria===a)).length;
+    const descs = records.filter(r=>r.areaInstalacion===a||r.areaBeneficiaria===a).flatMap(r=>(r.descargas||[]).filter(d=>enMes(d.fecha)));
+    const desp = historialCargas.filter(h=>enMes(h.fecha)&&(area==='TODOS'||h.areaOrigen===a)).length;
+    const vals = validaciones.flatMap(v=>(v.usuarios||[]).filter(u=>u.estado==='validado'&&enMes(u.fechaValidacion))).length;
+    res.push([a,inst,ret,descs.filter(d=>d.medicionOk===true).length,descs.filter(d=>d.medicionOk===false).length,desp,vals]);
+  });
+  res.push([]);
+  const allD = records.filter(r=>area==='TODOS'||enArea(r)).flatMap(r=>(r.descargas||[]).filter(d=>enMes(d.fecha)));
+  res.push(['TOTAL',records.filter(r=>enMes(r.fechaInstalacion)&&(area==='TODOS'||enArea(r))).length,records.filter(r=>r.retirado&&enMes(r.fechaRetiroReal)&&(area==='TODOS'||enArea(r))).length,allD.filter(d=>d.medicionOk===true).length,allD.filter(d=>d.medicionOk===false).length,historialCargas.filter(h=>enMes(h.fecha)).length,validaciones.flatMap(v=>(v.usuarios||[]).filter(u=>u.estado==='validado'&&enMes(u.fechaValidacion))).length]);
+  // Detalles
+  const instR = [['SIGET','Serie','Lugar','Área','F. Instalación','F. Retiro']];
+  records.filter(r=>enMes(r.fechaInstalacion)&&(area==='TODOS'||enArea(r))).forEach(r=>instR.push([r.caso||'',r.serie||'',r.lugar||'',r.areaInstalacion||'',r.fechaInstalacion||'',r.fechaRetiro||'']));
+  const retR = [['SIGET','Serie','Lugar','Área','F. Retiro Real','Por','Fallas']];
+  records.filter(r=>r.retirado&&enMes(r.fechaRetiroReal)&&(area==='TODOS'||enArea(r))).forEach(r=>retR.push([r.caso||'',r.serie||'',r.lugar||'',r.areaInstalacion||'',r.fechaRetiroReal||'',r.retiradoPor||'',(r.fallas||[]).join(', ')||'Sin fallas']));
+  const descR = [['SIGET','Serie','Fecha','Técnico','Medición OK','Fallos']];
+  records.filter(r=>area==='TODOS'||enArea(r)).forEach(r=>{(r.descargas||[]).filter(d=>enMes(d.fecha)).forEach(d=>descR.push([r.caso||'',r.serie||'',d.fecha||'',d.tecnico||'',d.medicionOk===true?'Sí':d.medicionOk===false?'No':'—',(d.fallasMedicion||[]).join(', ')||'']));});
+  const despR = [['Fecha','Área origen','Total','Por']];
+  historialCargas.filter(h=>enMes(h.fecha)&&(area==='TODOS'||h.areaOrigen===area)).forEach(h=>despR.push([h.fecha||'',h.areaOrigen||'',h.total||'',h.realizadoPor||'']));
+  const valR = [['Campaña','SIGET','Nombre','Fecha validación','TAP','Multiplicador']];
+  validaciones.forEach(v=>{(v.usuarios||[]).filter(u=>u.estado==='validado'&&enMes(u.fechaValidacion)).forEach(u=>valR.push([v.nombre||'',u.siget||'',u.nombre||'',u.fechaValidacion||'',u.resultado?'TAP '+u.resultado.tap:'',u.resultado?u.resultado.multiplicador:'']));});
+  const wb = XLSX.utils.book_new();
+  const addS = (n,d) => { const ws=XLSX.utils.aoa_to_sheet(d); ws['!cols']=Array(10).fill({wch:20}); XLSX.utils.book_append_sheet(wb,ws,n); };
+  addS('Resumen',res); addS('Instalaciones',instR); addS('Retiros',retR);
+  addS('Descargas',descR); addS('Despachos',despR); addS('Validaciones',valR);
+  XLSX.writeFile(wb,'Reporte_'+mesNombre+'_'+anio+(area!=='TODOS'?'_'+area.replace(/\s/g,'_'):'')+'.xlsx');
+  showReporteModal=false; showToast('📊 Reporte generado'); render();
+};
 window.goBack = () => { view = 'lista'; editId = null; editEqId = null; form = emptyForm(); equipoForm = emptyEF(); showSelector = false; render(); };
 window.switchTab = t => {
   tab = t; view = 'lista'; editId = null; editEqId = null;
