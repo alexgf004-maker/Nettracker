@@ -854,10 +854,7 @@ function generateLotePDF(equiposLote, tipo) {
 <\/body>
 <\/html>`;
 
-  const win = window.open('', '_blank');
-  win.document.write(html);
-  win.document.close();
-  setTimeout(() => win.print(), 500);
+  abrirDoc(html, 'documento.html');
 }
 
 function generateMemoPDF(eq, movimiento) {
@@ -994,10 +991,7 @@ function generateMemoPDF(eq, movimiento) {
 <\/body>
 <\/html>`;
 
-  const win = window.open('', '_blank');
-  win.document.write(html);
-  win.document.close();
-  setTimeout(() => win.print(), 500);
+  abrirDoc(html, 'documento.html');
 
 }
 
@@ -1269,10 +1263,7 @@ function buildMemoCargaMasiva(filas) {
 }
 
 function abrirMemo(html) {
-  const win = window.open('', '_blank');
-  win.document.write(html);
-  win.document.close();
-  setTimeout(() => win.print(), 500);
+  abrirDoc(html, 'documento.html');
 }
 
 function generarMemoCargaMasiva(filas) {
@@ -2957,6 +2948,10 @@ if (inventarioSearch) {
         html += '<button onclick="generarTodasCartas(this.dataset.id)" data-id="'+camp.id+'" style="flex:1;padding:11px;border:none;border-radius:10px;background:var(--primary);color:#fff;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">✉️ Todas las cartas</button>';
         html += '<button onclick="generarTodasHojas(this.dataset.id)" data-id="'+camp.id+'" style="flex:1;padding:11px;border:1px solid var(--primary);border-radius:10px;background:var(--primary-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">📋 Todas las hojas</button>';
         html += '</div>';
+        html += '<div style="display:flex;gap:8px;margin-bottom:14px">';
+        html += '<button onclick="descargarTodasCartas(this.dataset.id)" data-id="'+camp.id+'" style="flex:1;padding:9px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--text3);font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer">⬇️ Descargar cartas</button>';
+        html += '<button onclick="descargarTodasHojas(this.dataset.id)" data-id="'+camp.id+'" style="flex:1;padding:9px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--text3);font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer">⬇️ Descargar hojas</button>';
+        html += '</div>';
         // User list
         html += '<div style="display:flex;flex-direction:column;gap:6px">';
         (camp.usuarios||[]).forEach((u, idx) => {
@@ -3591,10 +3586,7 @@ ${mantHistorial.length > 0 ? `
 </html>`;
 
   // Open in new window and print
-  const win = window.open('', '_blank');
-  win.document.write(html);
-  win.document.close();
-  win.onload = () => { win.focus(); win.print(); };
+  abrirDoc(html, 'documento.html');
 };
 window.reimprimirMemoAcc = el => {
   const id = typeof el === 'string' ? el : el.dataset.id;
@@ -3674,7 +3666,10 @@ function renderMadelyModal() {
         inner += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#f8fafc;border-radius:8px;margin-bottom:6px">';
         inner += '<div><div style="font-size:13px;font-weight:700;color:#0D1B2A">'+camp.nombre+'</div>';
         inner += '<div style="font-size:11px;color:#64748b">'+(camp.usuarios||[]).length+' usuarios</div></div>';
-        inner += '<button onclick="madelyGenerarCartas(this.dataset.id)" data-id="'+camp.id+'" style="padding:6px 12px;border:none;border-radius:8px;background:#7c3aed;color:#fff;font-size:11px;font-weight:700;cursor:pointer">✉️ Generar</button>';
+        inner += '<div style="display:flex;gap:6px">';
+        inner += '<button onclick="madelyGenerarCartas(this.dataset.id)" data-id="'+camp.id+'" style="padding:6px 10px;border:none;border-radius:8px;background:#7c3aed;color:#fff;font-size:11px;font-weight:700;cursor:pointer">✉️ Ver</button>';
+        inner += '<button onclick="madelyDescargarCartas(this.dataset.id)" data-id="'+camp.id+'" style="padding:6px 10px;border:1px solid #7c3aed;border-radius:8px;background:#f3f0ff;color:#7c3aed;font-size:11px;font-weight:700;cursor:pointer">⬇️ Descargar</button>';
+        inner += '</div>';
         inner += '</div>';
       });
     }
@@ -3944,6 +3939,50 @@ window.confirmarNuevaCampaña = () => {
   });
 };
 
+
+window.descargarTodasCartas = el => {
+  const campId = typeof el === 'string' ? el : el.dataset.id;
+  const camp = cartasCampañas.find(v => v.id === campId);
+  if (!camp) return;
+  let html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>';
+  camp.usuarios.forEach((u,i) => {
+    const carta = buildCarta(u, camp, madelyFirmaUrl);
+    const body = carta.match(/<body>([\s\S]*?)<\/body>/);
+    if (body) html += body[1];
+  });
+  html += '</body></html>';
+  descargarDoc(html, 'cartas_' + (camp.nombre||'campaña').replace(/ /g,'_') + '.html');
+  showToast('⬇️ Descargando cartas...');
+};
+window.descargarTodasHojas = el => {
+  const campId = typeof el === 'string' ? el : el.dataset.id;
+  const camp = cartasCampañas.find(v => v.id === campId);
+  if (!camp) return;
+  let html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>';
+  camp.usuarios.forEach((u,i) => {
+    const hoja = buildHoja(u);
+    const body = hoja.match(/<body>([\s\S]*?)<\/body>/);
+    if (body) html += body[1];
+  });
+  html += '</body></html>';
+  descargarDoc(html, 'hojas_' + (camp.nombre||'campaña').replace(/ /g,'_') + '.html');
+  showToast('⬇️ Descargando hojas...');
+};
+window.madelyDescargarCartas = el => {
+  const campId = typeof el === 'string' ? el : el.dataset.id;
+  const camp = cartasCampañas.find(v => v.id === campId);
+  if (!camp) return;
+  let html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>';
+  camp.usuarios.forEach(u => {
+    const carta = buildCarta(u, camp, madelyFirmaUrl);
+    const body = carta.match(/<body>([\s\S]*?)<\/body>/);
+    if (body) html += body[1];
+  });
+  html += '</body></html>';
+  descargarDoc(html, 'cartas_firmadas_' + (camp.nombre||'campaña').replace(/ /g,'_') + '.html');
+  cerrarMadelyModal();
+  showToast('⬇️ Descargando cartas firmadas...');
+};
 window.abrirCampaña = el => {
   cartasCampañaActual = typeof el === 'string' ? el : el.dataset.id;
   cartasView = 'detalle'; render();
@@ -4054,6 +4093,7 @@ p{font-size:11px;line-height:1.75;color:var(--ink);margin-bottom:12px;font-weigh
     <div class="footer"><p>Distribuidora de Electricidad del Sur, S.A. de C.V. (DELSUR) · Grupo EPM · Este documento es de carácter informativo y no constituye una obligación contractual.</p></div>
   </div>
 </div>
+<div id=\"cb\" style=\"position:fixed;bottom:0;left:0;right:0;background:#1A3F7A;padding:12px;display:flex;gap:8px;justify-content:center;z-index:999\"><button onclick=\"window.print()\" style=\"padding:10px 18px;background:#fff;color:#1A3F7A;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer\">🖨 Imprimir / PDF</button><button onclick=\"document.getElementById(&quot;cb&quot;).style.display=&quot;none&quot;;window.print();setTimeout(function(){document.getElementById(&quot;cb&quot;).style.display=&quot;flex&quot;},1500)\" style=\"padding:10px 18px;background:#0055A4;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer\">📄 PDF sin barra</button></div><div style=\"height:65px\"></div>
 </body></html>`;
 }
 
@@ -4154,6 +4194,7 @@ body{font-family:'DM Sans',sans-serif;background:#fff;color:var(--blue-dark)}
     <div class="firma-area"><div class="firma-linea"></div><div class="firma-label">Representante del usuario</div></div>
   </div>
 </div>
+<div id=\"hb\" style=\"position:fixed;bottom:0;left:0;right:0;background:#103060;padding:12px;display:flex;gap:8px;justify-content:center;z-index:999\"><button onclick=\"window.print()\" style=\"padding:10px 18px;background:#fff;color:#103060;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer\">🖨 Imprimir / PDF</button><button onclick=\"document.getElementById(&quot;hb&quot;).style.display=&quot;none&quot;;window.print();setTimeout(function(){document.getElementById(&quot;hb&quot;).style.display=&quot;flex&quot;},1500)\" style=\"padding:10px 18px;background:#1a5cb8;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer\">📄 PDF sin barra</button></div><div style=\"height:65px\"></div>
 </body></html>`;
 }
 
@@ -4162,9 +4203,7 @@ window.generarCartaIndividual = (id, idx) => {
   if (!camp) return;
   const usuario = camp.usuarios[idx];
   const html = buildCarta(usuario, camp, madelyFirmaUrl);
-  const win = window.open('', '_blank');
-  win.document.write(html);
-  win.document.close();
+  abrirDoc(html, 'carta_' + (usuario.siget||'doc') + '.html');
 };
 
 window.generarHojaIndividual = (id, idx) => {
@@ -4172,9 +4211,7 @@ window.generarHojaIndividual = (id, idx) => {
   if (!camp) return;
   const usuario = camp.usuarios[idx];
   const html = buildHoja(usuario);
-  const win = window.open('', '_blank');
-  win.document.write(html);
-  win.document.close();
+  abrirDoc(html, 'hoja_' + (usuario.siget||'doc') + '.html');
 };
 
 window.generarTodasCartas = el => {
@@ -4191,9 +4228,7 @@ window.generarTodasCartas = el => {
     if (bodyMatch) allHtml += bodyMatch[1] + (i < camp.usuarios.length-1 ? '<div class="page-break"></div>' : '');
   });
   allHtml += '</body></html>';
-  const win = window.open('', '_blank');
-  win.document.write(allHtml);
-  win.document.close();
+  abrirDoc(allHtml, 'cartas_' + (camp.nombre||'camp').replace(/ /g,'_') + '.html');
   showToast('✅ '+camp.usuarios.length+' cartas generadas');
 };
 
@@ -4211,9 +4246,7 @@ window.generarTodasHojas = el => {
     if (bodyMatch) allHtml += bodyMatch[1] + (i < camp.usuarios.length-1 ? '<div class="page-break"></div>' : '');
   });
   allHtml += '</body></html>';
-  const win = window.open('', '_blank');
-  win.document.write(allHtml);
-  win.document.close();
+  abrirDoc(allHtml, 'hojas_' + (camp.nombre||'camp').replace(/ /g,'_') + '.html');
   showToast('✅ '+camp.usuarios.length+' hojas generadas');
 };
 
@@ -4297,6 +4330,29 @@ window.generarReporteMensual = () => {
   XLSX.writeFile(wb,'Reporte_'+MN[mes-1]+'_'+anio+(area!=='TODOS'?'_'+area.replace(/ /g,'_'):'')+'.xlsx');
   showReporteModal=false;showToast('📊 Reporte generado');render();
 };
+
+// ── DOC HELPERS ──
+function abrirDoc(html, filename) {
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, '_blank');
+  setTimeout(() => {
+    if (!win || win.closed) {
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  }, 800);
+}
+function descargarDoc(html, filename) {
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
 window.goBack = () => { view = 'lista'; editId = null; editEqId = null; form = emptyForm(); equipoForm = emptyEF(); showSelector = false; render(); };
 window.switchTab = t => {
   tab = t; view = 'lista'; editId = null; editEqId = null;
@@ -4451,10 +4507,7 @@ window.generarMemoAccesorios = () => {
 
 <div class="footer">Documento generado por CPT INNOVA · Sistema de Gestión de Analizadores de Red · ${fecha}</div>
 </body></html>`;
-  const win = window.open('', '_blank');
-  win.document.write(html);
-  win.document.close();
-  win.onload = () => { win.focus(); win.print(); };
+  abrirDoc(html, 'documento.html');
 };
 window.getInstDespacho = (c) => {
   if (c.instalacionIds && c.instalacionIds.length > 0) {
