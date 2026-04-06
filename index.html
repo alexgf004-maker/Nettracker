@@ -2844,8 +2844,113 @@ if (inventarioSearch) {
             html += '<button onclick="guardarValidacion()" style="width:100%;padding:11px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer">✅ Guardar validación</button>';
             html += '</div>';
           }
-        } else {
-          html += '<div style="background:var(--yellow-light);border:1px solid var(--yellow);border-radius:12px;padding:20px;text-align:center"><div style="font-size:28px;margin-bottom:8px">🚧</div><div style="font-size:14px;font-weight:700;color:var(--yellow)">Próximamente</div><div style="font-size:12px;color:var(--text3);margin-top:4px">Validación '+(valTipoUsuario==='bifasico'?'bifásica':'trifásica')+' en desarrollo</div></div>';
+        } else if (valTipoUsuario === 'bifasico') {
+          // ── BIFÁSICO ──
+          const bVP = '<option value="">Seleccionar...</option>'
+            + '<option value="13200" '+(valForm.refVP==13200?'selected':'')+'>13,200 V</option>'
+            + '<option value="7620"  '+(valForm.refVP==7620 ?'selected':'')+'>7,620 V</option>'
+            + '<option value="2400"  '+(valForm.refVP==2400 ?'selected':'')+'>2,400 V</option>';
+          const bVS = vs => '<option value="">Seleccionar...</option>'
+            + '<option value="120" '+(valForm[vs]==120?'selected':'')+'>120 V</option>'
+            + '<option value="240" '+(valForm[vs]==240?'selected':'')+'>240 V</option>'
+            + '<option value="480" '+(valForm[vs]==480?'selected':'')+'>480 V</option>';
+          const bTap = '<option value="">TAP...</option>'
+            + [1,2,3,4,5].map(t=>'<option value="'+t+'" '+(valForm.refTap==t?'selected':'')+'>TAP '+t+'</option>').join('');
+          const sel = (id,opts) => '<select id="'+id+'" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;background:var(--white);outline:none">'+opts+'</select>';
+          const inp = (id,val,ph) => '<input id="'+id+'" type="number" step="0.1" placeholder="'+ph+'" value="'+(val||'')+'" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;outline:none">';
+
+          html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px">';
+          html += '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:10px">Transformador de referencia (bifásico)</div>';
+          html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">CT/DS referencia</div><input id="vf-ref-ct" type="text" value="'+(valForm.refCt||'')+'" placeholder="DS110465" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;outline:none"></div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Medidor referencia</div><input id="vf-ref-med" type="text" value="'+(valForm.refMed||'')+'" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:13px;outline:none"></div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Primario</div>'+sel('vf-ref-vp',bVP)+'</div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Secundario</div>'+sel('vf-ref-vs',bVS('refVS'))+'</div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vab ref (V)</div>'+inp('vf-ref-lec1',valForm.refLec1,'Ej: 236')+'</div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vbc ref (V)</div>'+inp('vf-ref-lec2',valForm.refLec2,'Ej: 238')+'</div>';
+          html += '<div style="grid-column:1/-1"><div style="font-size:10px;color:var(--text3);margin-bottom:4px">TAP visible</div>'+sel('vf-ref-tap',bTap)+'</div>';
+          html += '</div></div>';
+
+          html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">';
+          html += '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:10px">Transformador campaña (bifásico)</div>';
+          html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Secundario campaña</div>'+sel('vf-cp-vs',bVS('cpVS'))+'</div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Primario campaña</div>'+sel('vf-cp-vp',bVP)+'</div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vab campaña (V)</div>'+inp('vf-cp-lec1',valForm.cpLec1,'Ej: 247')+'</div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vbc campaña (V)</div>'+inp('vf-cp-lec2',valForm.cpLec2,'Ej: 245')+'</div>';
+          html += '</div>';
+          html += '<div style="margin-top:8px"><div style="font-size:10px;color:var(--text3);margin-bottom:4px">TAPs de la placa (separados por coma)</div>';
+          html += '<input id="vf-taps" type="text" placeholder="Ej: 14400,13800,13200,12870,12540" value="'+(valForm.taps||'')+'" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;outline:none"></div>';
+          html += '</div>';
+
+          html += '<button onclick="calcularValidacion()" style="width:100%;padding:13px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px">🔌 Calcular TAP estimado</button>';
+          if (valForm.resultado) {
+            const res = valForm.resultado;
+            html += '<div style="background:#f3f0ff;border:2px solid #7c3aed;border-radius:12px;padding:16px;margin-bottom:12px">';
+            html += '<div style="font-size:11px;font-weight:700;color:#7c3aed;text-transform:uppercase;margin-bottom:12px">Resultado</div>';
+            html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">';
+            html += '<div style="text-align:center"><div style="font-size:28px;font-weight:800;color:#7c3aed;font-family:var(--mono)">TAP '+res.tap+'</div><div style="font-size:10px;color:var(--text3);font-weight:600">TAP ESTIMADO</div></div>';
+            html += '<div style="text-align:center"><div style="font-size:18px;font-weight:800;color:var(--text);font-family:var(--mono)">'+res.multiplicador+'</div><div style="font-size:10px;color:var(--text3);font-weight:600">MULTIPLICADOR</div></div>';
+            html += '</div>';
+            html += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px">Relación prom. calculada: <b>'+res.relacionCalc.toFixed(4)+'</b></div>';
+            html += '<button onclick="guardarValidacion()" style="width:100%;padding:11px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer">✅ Guardar validación</button>';
+            html += '</div>';
+          }
+
+        } else if (valTipoUsuario === 'trifasico') {
+          // ── TRIFÁSICO: VP = 23000/13200/4160, TAPs * √3 ──
+          const tVP = '<option value="">Seleccionar...</option>'
+            + '<option value="23000" '+(valForm.refVP==23000?'selected':'')+'>23,000 V</option>'
+            + '<option value="13200" '+(valForm.refVP==13200?'selected':'')+'>13,200 V</option>'
+            + '<option value="4160"  '+(valForm.refVP==4160 ?'selected':'')+'>4,160 V</option>';
+          const tVS = vs => '<option value="">Seleccionar...</option>'
+            + '<option value="120" '+(valForm[vs]==120?'selected':'')+'>120 V</option>'
+            + '<option value="208" '+(valForm[vs]==208?'selected':'')+'>208 V</option>'
+            + '<option value="480" '+(valForm[vs]==480?'selected':'')+'>480 V</option>';
+          const tTap = '<option value="">TAP...</option>'
+            + [1,2,3,4,5].map(t=>'<option value="'+t+'" '+(valForm.refTap==t?'selected':'')+'>TAP '+t+'</option>').join('');
+          const tSel = (id,opts) => '<select id="'+id+'" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;background:var(--white);outline:none">'+opts+'</select>';
+          const tInp = (id,val,ph) => '<input id="'+id+'" type="number" step="0.1" placeholder="'+ph+'" value="'+(val||'')+'" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;outline:none">';
+
+          html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px">';
+          html += '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:10px">Transformador de referencia (trifásico)</div>';
+          html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">CT/DS referencia</div><input id="vf-ref-ct" type="text" value="'+(valForm.refCt||'')+'" placeholder="DS110465" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;outline:none"></div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Medidor referencia</div><input id="vf-ref-med" type="text" value="'+(valForm.refMed||'')+'" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:13px;outline:none"></div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Primario</div>'+tSel('vf-ref-vp',tVP)+'</div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Secundario</div>'+tSel('vf-ref-vs',tVS('refVS'))+'</div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vab ref (V)</div>'+tInp('vf-ref-lec1',valForm.refLec1,'Ej: 236')+'</div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vbc ref (V)</div>'+tInp('vf-ref-lec2',valForm.refLec2,'Ej: 238')+'</div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vca ref (V)</div>'+tInp('vf-ref-lec3',valForm.refLec3,'Ej: 237')+'</div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">TAP visible</div>'+tSel('vf-ref-tap',tTap)+'</div>';
+          html += '</div></div>';
+
+          html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">';
+          html += '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:10px">Transformador campaña (trifásico)</div>';
+          html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Secundario campaña</div>'+tSel('vf-cp-vs',tVS('cpVS'))+'</div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Primario campaña</div><select id="vf-cp-vp" onchange="autoFillTapsTri()" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;background:var(--white);outline:none">'+tVP+'</select></div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vab campaña (V)</div>'+tInp('vf-cp-lec1',valForm.cpLec1,'Ej: 247')+'</div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vbc campaña (V)</div>'+tInp('vf-cp-lec2',valForm.cpLec2,'Ej: 245')+'</div>';
+          html += '<div style="grid-column:1/-1"><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vca campaña (V)</div>'+tInp('vf-cp-lec3',valForm.cpLec3,'Ej: 246')+'</div>';
+          html += '</div>';
+          html += '<div style="margin-top:8px"><div style="font-size:10px;color:var(--text3);margin-bottom:4px">TAPs de la placa — valores ×√3 (separados por coma)</div>';
+          html += '<input id="vf-taps" type="text" placeholder="Ej: 24940,23900,22900,22290,21755" value="'+(valForm.taps||'')+'" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;outline:none"></div>';
+          html += '</div>';
+
+          html += '<button onclick="calcularValidacion()" style="width:100%;padding:13px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px">🔌 Calcular TAP estimado</button>';
+          if (valForm.resultado) {
+            const res = valForm.resultado;
+            html += '<div style="background:#f3f0ff;border:2px solid #7c3aed;border-radius:12px;padding:16px;margin-bottom:12px">';
+            html += '<div style="font-size:11px;font-weight:700;color:#7c3aed;text-transform:uppercase;margin-bottom:12px">Resultado</div>';
+            html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">';
+            html += '<div style="text-align:center"><div style="font-size:28px;font-weight:800;color:#7c3aed;font-family:var(--mono)">TAP '+res.tap+'</div><div style="font-size:10px;color:var(--text3);font-weight:600">TAP ESTIMADO</div></div>';
+            html += '<div style="text-align:center"><div style="font-size:18px;font-weight:800;color:var(--text);font-family:var(--mono)">'+res.multiplicador+'</div><div style="font-size:10px;color:var(--text3);font-weight:600">MULTIPLICADOR</div></div>';
+            html += '</div>';
+            html += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px">Relación prom. calculada: <b>'+res.relacionCalc.toFixed(4)+'</b></div>';
+            html += '<button onclick="guardarValidacion()" style="width:100%;padding:11px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer">✅ Guardar validación</button>';
+            html += '</div>';
+          }
         }
       }
     }
@@ -3760,53 +3865,79 @@ window.abrirFormVal = el => {
 
 window.calcularValidacion = () => {
   const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
-  const refCt = g('vf-ref-ct');
-  const refMed = g('vf-ref-med');
+  const tipo = valTipoUsuario;
+  const refCt = g('vf-ref-ct'), refMed = g('vf-ref-med');
   const refVP = parseFloat(g('vf-ref-vp'));
   const refVS = parseFloat(g('vf-ref-vs'));
-  const refLec = parseFloat(g('vf-ref-lec'));
   const refTap = parseInt(g('vf-ref-tap'));
-  const cpLec = parseFloat(g('vf-cp-lec'));
-  const cpVSraw = g('vf-cp-vs');
-  const cpVS = cpVSraw === 'otro' ? parseFloat(prompt('Ingresa el voltaje secundario:')) : parseFloat(cpVSraw);
-  const refVSraw = g('vf-ref-vs');
-  if (refVSraw === 'otro') { const v = prompt('Ingresa el voltaje secundario de referencia:'); if (v) document.getElementById('vf-ref-vs').value = v; }
+  const cpVP = parseFloat(g('vf-cp-vp') || g('vf-ref-vp')); // trifasico uses vf-cp-vp
+  const cpVS = parseFloat(g('vf-cp-vs'));
   const tapsStr = g('vf-taps');
 
-  if (!refVP || !refVS || !refLec || isNaN(refTap) || !cpLec || !cpVS || !tapsStr) {
+  if (!refVP || !refVS || isNaN(refTap) || !cpVS || !tapsStr) {
     return showToast('Completa todos los campos para calcular');
   }
   const taps = tapsStr.split(',').map(t => parseFloat(t.trim())).filter(t => !isNaN(t));
-  if (taps.length === 0) return showToast('Ingresa los TAPs de la placa separados por coma');
+  if (!taps.length) return showToast('Ingresa los TAPs separados por coma');
 
-  // Calculation
-  const relacionRef = refVP / refVS;             // Ej: 13200/240 = 55
-  const primarioProyectado = refLec * relacionRef; // Ej: 236 * 55 = 12980
-  const relacionCalc = primarioProyectado / cpLec; // Ej: 12980 / 247 = 52.55
+  // Relación de referencia del trafo de referencia
+  const relRef = refVP / refVS;
 
-  // Find closest TAP
-  let closestTap = -1;
-  let closestRelacion = null;
-  let minDiff = Infinity;
-  taps.forEach((voltPrim, i) => {
-    const relacion = voltPrim / cpVS;
-    const diff = Math.abs(relacion - relacionCalc);
-    if (diff < minDiff) {
-      minDiff = diff;
-      closestTap = i + 1;
-      closestRelacion = voltPrim;
-    }
+  let relacionCalc = 0;
+  let primProyectado = 0;
+  let formData = { tipoConexion: tipo, refCt, refMed, refVP, refVS, refTap, cpVS, taps: tapsStr };
+
+  if (tipo === 'monofasico') {
+    const refLec = parseFloat(g('vf-ref-lec'));
+    const cpLec  = parseFloat(g('vf-cp-lec'));
+    if (!refLec || !cpLec) return showToast('Ingresa las lecturas instantáneas');
+    // Primario proyectado = lectura_ref × relación_ref
+    primProyectado = refLec * relRef;
+    // Relación del trafo campaña = primario_proyectado / lectura_campaña
+    relacionCalc = primProyectado / cpLec;
+    Object.assign(formData, { refLec, cpLec });
+
+  } else if (tipo === 'bifasico') {
+    // 2 lecturas por fase — promedio de relaciones
+    const r1 = parseFloat(g('vf-ref-lec1')), r2 = parseFloat(g('vf-ref-lec2'));
+    const c1 = parseFloat(g('vf-cp-lec1')),  c2 = parseFloat(g('vf-cp-lec2'));
+    if (!r1 || !r2 || !c1 || !c2) return showToast('Ingresa las 2 lecturas por fase (Vab y Vbc)');
+    // Relación por fase = prim_proyectado_fase / lec_campaña_fase
+    const relFase1 = (r1 * relRef) / c1;
+    const relFase2 = (r2 * relRef) / c2;
+    relacionCalc = (relFase1 + relFase2) / 2;
+    primProyectado = ((r1 + r2) / 2) * relRef;
+    Object.assign(formData, { refLec1: r1, refLec2: r2, cpLec1: c1, cpLec2: c2 });
+
+  } else if (tipo === 'trifasico') {
+    // 3 lecturas por fase — promedio de relaciones
+    const r1 = parseFloat(g('vf-ref-lec1')), r2 = parseFloat(g('vf-ref-lec2')), r3 = parseFloat(g('vf-ref-lec3'));
+    const c1 = parseFloat(g('vf-cp-lec1')),  c2 = parseFloat(g('vf-cp-lec2')),  c3 = parseFloat(g('vf-cp-lec3'));
+    if (!r1 || !r2 || !r3 || !c1 || !c2 || !c3) return showToast('Ingresa las 3 lecturas por fase (Vab, Vbc, Vca)');
+    const relFase1 = (r1 * relRef) / c1;
+    const relFase2 = (r2 * relRef) / c2;
+    const relFase3 = (r3 * relRef) / c3;
+    relacionCalc = (relFase1 + relFase2 + relFase3) / 3;
+    primProyectado = ((r1 + r2 + r3) / 3) * relRef;
+    Object.assign(formData, { refLec1: r1, refLec2: r2, refLec3: r3, cpLec1: c1, cpLec2: c2, cpLec3: c3, cpVP });
+  }
+
+  // Buscar TAP más cercano: relación de cada TAP = voltPrimario / cpVS
+  let closestTap = -1, closestVP = null, minDiff = Infinity;
+  taps.forEach((vp, i) => {
+    const rel = vp / cpVS;
+    const diff = Math.abs(rel - relacionCalc);
+    if (diff < minDiff) { minDiff = diff; closestTap = i + 1; closestVP = vp; }
   });
 
-  // Save all form state including result
-  valForm = { refCt, refMed, refVP, refVS, refLec, refTap, cpLec, cpVS, taps: tapsStr };
-  valForm.resultado = {
+  formData.resultado = {
     tap: closestTap,
-    multiplicador: closestRelacion + '/' + cpVS,
-    primarioProyectado,
+    multiplicador: closestVP + '/' + cpVS,
+    primarioProyectado: primProyectado,
     relacionCalc,
     ok: true,
   };
+  valForm = formData;
   render();
 };
 
