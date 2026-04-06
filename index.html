@@ -3944,10 +3944,12 @@ window.descargarTodasCartas = el => {
   const campId = typeof el === 'string' ? el : el.dataset.id;
   const camp = cartasCampañas.find(v => v.id === campId);
   if (!camp) return;
-  let html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>';
+  const _sc = buildCarta(camp.usuarios[0], camp, madelyFirmaUrl);
+  const _hm = _sc.match(/<head>([\s\S]*?)<\/head>/);
+  let html = '<!DOCTYPE html><html lang="es"><head>' + (_hm?_hm[1]:'<meta charset="UTF-8">') + '<style>@page{size:letter;margin:0}.page-break{page-break-after:always}<\/style><\/head><body>';
   camp.usuarios.forEach((u,i) => {
     const carta = buildCarta(u, camp, madelyFirmaUrl);
-    const body = carta.match(/<body>([\s\S]*?)<\/body>/);
+    const body = carta.match(/<body>([\s\S]*)<\/body>/);
     if (body) html += body[1];
   });
   html += '</body></html>';
@@ -3958,10 +3960,12 @@ window.descargarTodasHojas = el => {
   const campId = typeof el === 'string' ? el : el.dataset.id;
   const camp = cartasCampañas.find(v => v.id === campId);
   if (!camp) return;
-  let html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>';
+  const _sh = buildHoja(camp.usuarios[0]);
+  const _hmh = _sh.match(/<head>([\s\S]*?)<\/head>/);
+  let html = '<!DOCTYPE html><html lang="es"><head>' + (_hmh?_hmh[1]:'<meta charset="UTF-8">') + '<style>@page{size:letter;margin:8mm}.page-break{page-break-after:always}<\/style><\/head><body>';
   camp.usuarios.forEach((u,i) => {
     const hoja = buildHoja(u);
-    const body = hoja.match(/<body>([\s\S]*?)<\/body>/);
+    const body = hoja.match(/<body>([\s\S]*)<\/body>/);
     if (body) html += body[1];
   });
   html += '</body></html>';
@@ -3972,10 +3976,12 @@ window.madelyDescargarCartas = el => {
   const campId = typeof el === 'string' ? el : el.dataset.id;
   const camp = cartasCampañas.find(v => v.id === campId);
   if (!camp) return;
-  let html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>';
+  const _sc = buildCarta(camp.usuarios[0], camp, madelyFirmaUrl);
+  const _hm = _sc.match(/<head>([\s\S]*?)<\/head>/);
+  let html = '<!DOCTYPE html><html lang="es"><head>' + (_hm?_hm[1]:'<meta charset="UTF-8">') + '<style>@page{size:letter;margin:0}.page-break{page-break-after:always}<\/style><\/head><body>';
   camp.usuarios.forEach(u => {
     const carta = buildCarta(u, camp, madelyFirmaUrl);
-    const body = carta.match(/<body>([\s\S]*?)<\/body>/);
+    const body = carta.match(/<body>([\s\S]*)<\/body>/);
     if (body) html += body[1];
   });
   html += '</body></html>';
@@ -4218,10 +4224,9 @@ window.generarTodasCartas = el => {
   const campId = typeof el === 'string' ? el : el.dataset.id;
   const camp = cartasCampañas.find(v => v.id === campId);
   if (!camp) return;
-  let allHtml = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
-<style>@page{size:letter;margin:0}body{background:#fff}@media print{.page-break{page-break-after:always}}</style>
-</head><body>`;
+  const _sc3 = buildCarta(camp.usuarios[0], camp, madelyFirmaUrl);
+  const _hm3 = _sc3.match(/<head>([\s\S]*?)<\/head>/);
+  let allHtml = '<!DOCTYPE html><html lang="es"><head>' + (_hm3?_hm3[1]:'') + '<style>@page{size:letter;margin:0}.page-break{page-break-after:always}<\/style><\/head><body>';
   camp.usuarios.forEach((u, i) => {
     const carta = buildCarta(u, camp, madelyFirmaUrl);
     const bodyMatch = carta.match(/<body>([\s\S]*)<\/body>/);
@@ -4236,10 +4241,9 @@ window.generarTodasHojas = el => {
   const campId = typeof el === 'string' ? el : el.dataset.id;
   const camp = cartasCampañas.find(v => v.id === campId);
   if (!camp) return;
-  let allHtml = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>@page{size:letter;margin:8mm}body{background:#fff}@media print{.page-break{page-break-after:always}}</style>
-</head><body>`;
+  const _sh3 = buildHoja(camp.usuarios[0]);
+  const _hmh3 = _sh3.match(/<head>([\s\S]*?)<\/head>/);
+  let allHtml = '<!DOCTYPE html><html lang="es"><head>' + (_hmh3?_hmh3[1]:'') + '<style>@page{size:letter;margin:8mm}.page-break{page-break-after:always}<\/style><\/head><body>';
   camp.usuarios.forEach((u, i) => {
     const hoja = buildHoja(u);
     const bodyMatch = hoja.match(/<body>([\s\S]*)<\/body>/);
