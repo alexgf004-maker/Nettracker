@@ -334,7 +334,7 @@ let madelyLoginForm = { pass: '', error: '', step: 'login' };
 let madelyFirmaUrl = null;
 let madelyFirmaHash = null;
 let showMadelyModal = false;
-let madelyFirmaPos = { x: 62, y: 82 }; // % position on carta (default: firma area)
+let madelyFirmaPos = { x: 55, y: 83 }; // % position (default: coordinadora firma area)
 let madelyPosicionandoCamp = null; // campId being positioned
 let showValImport = false;
 let valImportData = [];
@@ -4012,7 +4012,7 @@ function buildCarta(usuario, camp, firmaUrl, firmaPos) {
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{--ink:#0D1B2A;--blue:#0055A4;--blue-mid:#1A3F7A;--blue-bg:#EAF1FB;--teal:#00897B;--rule:#C8D8EE;--gray-50:#F8FAFC;--gray-400:#94A3B8;--gray-600:#4A5E78}
 body{background:#fff;font-family:'Inter',sans-serif}
-.hoja{width:216mm;background:#fff;display:grid;grid-template-columns:62px 1fr;min-height:279mm}
+.hoja{width:216mm;background:#fff;display:grid;grid-template-columns:62px 1fr;min-height:279mm;position:relative}
 .sidebar{background:var(--blue-mid);display:flex;flex-direction:column;align-items:center;padding:36px 0 28px;position:relative}
 .sidebar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:4px;background:var(--teal)}
 .sidebar-text{writing-mode:vertical-rl;transform:rotate(180deg);font-family:'Inter',sans-serif;font-size:7.5px;font-weight:500;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,.35);margin-top:auto;margin-bottom:16px}
@@ -4086,7 +4086,7 @@ p{font-size:11px;line-height:1.75;color:var(--ink);margin-bottom:12px;font-weigh
       <div class="firmas">
         <div class="firma"><div class="firma-espacio"></div><div class="firma-rol">Autorizado</div><div class="firma-nombre">Personal Encargado</div></div>
         <div class="firma">
-          <div style="height:60px;display:flex;align-items:flex-end;margin-bottom:4px">${firmaHtml}</div>
+          <div style="height:60px;display:flex;align-items:flex-end;margin-bottom:4px">${firmaPos ? '<div style="height:40px"></div>' : firmaHtml}</div>
           <div style="border-bottom:1px solid rgba(13,27,42,.2);margin-bottom:6px"></div>
           <div class="firma-rol">Coordinadora</div>
           <div class="firma-nombre">Idalia Madelyn Osegueda</div>
@@ -4099,7 +4099,7 @@ p{font-size:11px;line-height:1.75;color:var(--ink);margin-bottom:12px;font-weigh
   </div>
 </div>
 <div id=\"cb\" style=\"position:fixed;bottom:0;left:0;right:0;background:#1A3F7A;padding:12px;display:flex;gap:8px;justify-content:center;z-index:999\"><button onclick=\"window.print()\" style=\"padding:10px 18px;background:#fff;color:#1A3F7A;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer\">🖨 Imprimir / PDF</button><button onclick=\"document.getElementById(&quot;cb&quot;).style.display=&quot;none&quot;;window.print();setTimeout(function(){document.getElementById(&quot;cb&quot;).style.display=&quot;flex&quot;},1500)\" style=\"padding:10px 18px;background:#0055A4;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer\">📄 PDF sin barra</button></div><div style=\"height:65px\"></div>
-\${firmaPos && firmaUrl ? '<img src="'+firmaUrl+'" style="position:absolute;left:'+firmaPos.x+'%;top:'+firmaPos.y+'%;max-height:55px;max-width:170px;z-index:50;pointer-events:none" />' : ''}
+${firmaPos && firmaUrl ? '<img src="'+firmaUrl+'" style="position:absolute;left:'+firmaPos.x+'%;top:'+firmaPos.y+'%;max-height:55px;max-width:170px;z-index:50;pointer-events:none;transform:translate(-50%,-50%)">' : ''}
 </body></html>`;
 }
 
@@ -4317,7 +4317,7 @@ function renderFirmaPositioner(campId) {
   if (!camp || !camp.usuarios || camp.usuarios.length === 0) return;
 
   // Build a preview carta (first user, no firma yet)
-  const previewCarta = buildCarta(camp.usuarios[0], camp, null);
+  const previewCarta = buildCarta(camp.usuarios[0], camp, null, null);
 
   const overlay = document.createElement('div');
   overlay.id = 'firma-positioner';
@@ -4345,10 +4345,12 @@ function renderFirmaPositioner(campId) {
 
   document.body.appendChild(overlay);
 
-  // Load carta in iframe
+  // Load carta preview in iframe
   const iframe = document.getElementById('carta-iframe');
-  const blob = new Blob([previewCarta], { type: 'text/html;charset=utf-8' });
-  iframe.src = URL.createObjectURL(blob);
+  const previewBlob = new Blob([previewCarta], { type: 'text/html;charset=utf-8' });
+  const previewUrl = URL.createObjectURL(previewBlob);
+  iframe.src = previewUrl;
+  iframe.onload = () => { setTimeout(() => URL.revokeObjectURL(previewUrl), 5000); };
 
   // Scale iframe to fit screen width
   const wrap = document.getElementById('carta-preview-container');
