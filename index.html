@@ -4317,7 +4317,7 @@ function renderFirmaPositioner(campId) {
     '<div style="background:#e2e8f0;padding:8px 16px;font-size:11px;color:#475569;text-align:center;flex-shrink:0">' +
       '📌 Arrastra la firma · Luego toca <strong>Confirmar posición</strong>' +
     '</div>' +
-    '<div id="fp-wrap" style="flex:1;overflow:auto;background:#CDD5E0;display:flex;justify-content:center;padding:12px">' +
+    '<div id="fp-wrap" style="flex:1;overflow-y:scroll;overflow-x:hidden;background:#CDD5E0;display:flex;justify-content:center;align-items:flex-start;padding:12px">' +
       '<div id="fp-container" style="position:relative;flex-shrink:0">' +
         '<div id="fp-loading" style="position:absolute;inset:0;background:rgba(255,255,255,.95);display:flex;align-items:center;justify-content:center;z-index:20;font-size:13px;color:#475569">Cargando diseño...</div>' +
         '<iframe id="fp-iframe" style="width:595px;height:842px;border:none;display:block;transform-origin:top left" scrolling="no"></iframe>' +
@@ -4340,10 +4340,24 @@ function renderFirmaPositioner(campId) {
     URL.revokeObjectURL(blobUrl);
     var availW = Math.min(window.innerWidth - 24, 595);
     var scale = availW / 595;
-    iframe.style.transform = 'scale(' + scale + ')';
+    var scaledW = Math.round(595 * scale);
+    var scaledH = Math.round(842 * scale);
+    // Resize iframe to scaled dimensions — NO css transform needed
+    // This means layout = visual size, scroll works correctly
+    iframe.style.width = scaledW + 'px';
+    iframe.style.height = scaledH + 'px';
+    iframe.style.transform = 'none';
+    // Inject viewport meta so carta content scales down inside iframe
+    try {
+      var iDoc = iframe.contentDocument;
+      var meta = iDoc.querySelector('meta[name="viewport"]');
+      if (!meta) { meta = iDoc.createElement('meta'); meta.name = 'viewport'; iDoc.head.appendChild(meta); }
+      meta.content = 'width=595, initial-scale=' + scale.toFixed(3);
+    } catch(e) {}
     var container = document.getElementById('fp-container');
-    container.style.width = (595 * scale) + 'px';
-    container.style.height = (842 * scale) + 'px';
+    container.style.width = scaledW + 'px';
+    container.style.height = scaledH + 'px';
+    container.style.flexShrink = '0';
     document.getElementById('fp-loading').style.display = 'none';
     var firmaEl = document.getElementById('fp-firma');
     firmaEl.style.left = (madelyFirmaPos.x / 100 * 595 * scale) + 'px';
