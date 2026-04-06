@@ -298,6 +298,7 @@ const validacionesRef = ref(db, 'validaciones');
 const mantenimientoRef = ref(db, 'config/mantenimiento');
 const cartasRef = ref(db, 'campañasCartas');
 const madelySignRef = ref(db, 'config/madelyFirma');
+const madelyLogRef  = ref(db, 'config/madelyFirmaLog');
 
 
 // ── STATE ──
@@ -334,7 +335,8 @@ let madelyLoginForm = { pass: '', error: '', step: 'login' };
 let madelyFirmaUrl = null;
 let madelyFirmaHash = null;
 let showMadelyModal = false;
-let madelyFirmaPos = { x: 55, y: 83 }; // % position (default: coordinadora firma area)
+let madelyFirmaPos = { x: 55, y: 83 };
+let madelyFirmaLog = []; // [{ts, campaña, total}] // % position (default: coordinadora firma area)
 let madelyPosicionandoCamp = null; // campId being positioned
 let showValImport = false;
 let valImportData = [];
@@ -494,6 +496,12 @@ onValue(madelySignRef, snap => {
     madelyFirmaHash = data.hash || null;
     madelyFirmaUrl = data.firmaUrl || null;
   }
+});
+
+onValue(madelyLogRef, snap => {
+  madelyFirmaLog = [];
+  if (snap.exists()) snap.forEach(x => madelyFirmaLog.push(x.val()));
+  madelyFirmaLog.sort((a,b) => (b.ts||0)-(a.ts||0));
 });
 onValue(mantenimientoRef, snap => {
   modoMantenimiento = snap.exists() ? snap.val() === true : false;
@@ -3759,28 +3767,64 @@ function renderMadelyModal() {
       inner += '<button onclick="madelyLogin()" style="width:100%;padding:13px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px">Acceder</button>';
     }
   } else if (madelyLoginForm.step === 'dashboard') {
-    inner += '<div style="margin-bottom:14px">';
+    // ── Firma status ──
     if (madelyFirmaUrl) {
-      inner += '<div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:8px">FIRMA ACTUAL</div>';
-      inner += '<img src="'+madelyFirmaUrl+'" style="max-width:100%;max-height:120px;border:1px solid #e2e8f0;border-radius:8px;padding:8px;background:#f8fafc">';
+      inner += '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px;margin-bottom:12px;display:flex;align-items:center;gap:10px">';
+      inner += '<div style="flex:1"><div style="font-size:11px;font-weight:700;color:#16a34a;margin-bottom:6px">🔐 FIRMA REGISTRADA</div>';
+      inner += '<img src="'+madelyFirmaUrl+'" style="max-height:60px;max-width:180px;border:1px solid #bbf7d0;border-radius:6px;padding:4px;background:#fff"></div>';
+      inner += '</div>';
     } else {
-      inner += '<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:10px;padding:12px;font-size:12px;color:#92400e;font-weight:600;margin-bottom:12px">⚠️ No hay firma cargada aún</div>';
+      inner += '<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:10px;padding:12px;font-size:12px;color:#92400e;font-weight:600;margin-bottom:12px">⚠️ No hay firma registrada aún</div>';
     }
-    inner += '</div>';
+    // ── Upload / update ──
     inner += '<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:6px">'+(madelyFirmaUrl?'ACTUALIZAR FIRMA':'SUBIR FIRMA')+'</div>';
     inner += '<label style="display:block;padding:12px;border:2px dashed #e2e8f0;border-radius:8px;text-align:center;cursor:pointer;color:#64748b;font-size:13px">📷 Seleccionar imagen (PNG o JPG)<input type="file" accept="image/*" onchange="madelyUploadFirma(this)" style="display:none"></label></div>';
-    // Campaigns list for Madelyn
+    // ── Eliminar firma ──
+    if (madelyFirmaUrl) {
+      inner += '<button onclick="madelyConfirmarEliminar()" style="width:100%;padding:10px;border:1.5px solid #ef4444;border-radius:10px;background:#fff;color:#ef4444;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:10px">🗑 Eliminar mi firma del sistema</button>';
+    }
+    // ── Cambiar contraseña ──
+    inner += '<button onclick="madelyPasoContrasena()" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;color:#475569;font-size:13px;cursor:pointer;margin-bottom:10px">🔑 Cambiar mi contraseña</button>';
+    // ── Historial de uso ──
+    if (madelyFirmaLog.length > 0) {
+      inner += '<div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:6px">📋 Últimos usos de tu firma</div>';
+      inner += '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px;margin-bottom:10px;max-height:120px;overflow-y:auto">';
+      madelyFirmaLog.slice(0,8).forEach(log => {
+        const d = log.ts ? new Date(log.ts).toLocaleString('es-SV',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
+        inner += '<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid #f1f5f9">';
+        inner += '<span style="color:#334155">'+d+' · '+log.campana+'</span>';
+        inner += '<span style="color:#7c3aed;font-weight:700">'+log.total+' cartas</span></div>';
+      });
+      inner += '</div>';
+    } else {
+      inner += '<div style="font-size:11px;color:#94a3b8;margin-bottom:10px">Aún no se ha usado tu firma en ninguna campaña.</div>';
+    }
+    // ── Campaigns ──
     if (cartasCampañas.length > 0) {
       inner += '<div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px">Campañas disponibles</div>';
       cartasCampañas.slice(0,5).forEach(camp => {
         inner += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#f8fafc;border-radius:8px;margin-bottom:6px">';
         inner += '<div><div style="font-size:13px;font-weight:700;color:#0D1B2A">'+camp.nombre+'</div>';
         inner += '<div style="font-size:11px;color:#64748b">'+(camp.usuarios||[]).length+' usuarios</div></div>';
-        inner += '<button onclick="abrirPosicionFirma(this.dataset.id)" data-id="'+camp.id+'" style="padding:6px 14px;border:none;border-radius:8px;background:#7c3aed;color:#fff;font-size:11px;font-weight:700;cursor:pointer">✍️ Firmar y generar</button>';
+        inner += '<button onclick="abrirPosicionFirma(this.dataset.id)" data-id="'+camp.id+'" style="padding:6px 14px;border:none;border-radius:8px;background:#7c3aed;color:#fff;font-size:11px;font-weight:700;cursor:pointer">'+(madelyFirmaUrl?'✍️ Firmar':'⚠️ Sin firma')+'</button>';
         inner += '</div>';
       });
     }
     inner += '<button onclick="madelyLogout()" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;color:#64748b;font-size:13px;cursor:pointer;margin-top:8px">Cerrar sesión</button>';
+  } else if (madelyLoginForm.step === 'confirmar-eliminar') {
+    inner += '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:16px;margin-bottom:14px">';
+    inner += '<div style="font-size:14px;font-weight:800;color:#dc2626;margin-bottom:8px">⚠️ ¿Eliminar tu firma?</div>';
+    inner += '<div style="font-size:12px;color:#7f1d1d;line-height:1.6">Esta acción elimina permanentemente tu firma del sistema. Las cartas ya generadas no se verán afectadas, pero no podrás firmar nuevas campañas hasta subir una firma nueva.</div>';
+    inner += '</div>';
+    inner += '<button onclick="madelyEliminarFirma()" style="width:100%;padding:13px;border:none;border-radius:10px;background:#dc2626;color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px">Sí, eliminar mi firma</button>';
+    inner += '<button onclick="_mlyStep(\'dashboard\')" style="width:100%;padding:11px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;color:#64748b;font-size:13px;cursor:pointer">Cancelar</button>';
+  } else if (madelyLoginForm.step === 'cambiar-pass') {
+    inner += '<div style="font-size:14px;font-weight:800;color:#0D1B2A;margin-bottom:14px">🔑 Cambiar contraseña</div>';
+    inner += '<input id="mly-pass-new" type="password" placeholder="Nueva contraseña" style="width:100%;padding:11px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:14px;outline:none;margin-bottom:8px">';
+    inner += '<input id="mly-pass-new2" type="password" placeholder="Repetir nueva contraseña" style="width:100%;padding:11px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:14px;outline:none;margin-bottom:8px">';
+    if (madelyLoginForm.error) inner += '<div style="color:#ef4444;font-size:12px;font-weight:600;margin-bottom:8px">'+madelyLoginForm.error+'</div>';
+    inner += '<button onclick="madelyGuardarNuevaPass()" style="width:100%;padding:13px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px">Guardar nueva contraseña</button>';
+    inner += '<button onclick="_mlyStep(\'dashboard\',true)" style="width:100%;padding:11px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;color:#64748b;font-size:13px;cursor:pointer">Cancelar</button>';
   }
   inner += '<button onclick="cerrarMadelyModal()" style="width:100%;padding:11px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;color:#64748b;font-size:13px;cursor:pointer;margin-top:8px">Cancelar</button>';
   inner += '</div>';
@@ -4111,6 +4155,7 @@ window.madelyDescargarCartas = el => {
   const campId = typeof el === 'string' ? el : el.dataset.id;
   const camp = cartasCampañas.find(v => v.id === campId);
   if (!camp) return;
+  push(madelyLogRef, { ts: Date.now(), campana: camp.nombre, total: (camp.usuarios||[]).length });
   const _sc = buildCarta(camp.usuarios[0], camp, madelyFirmaUrl, madelyFirmaPos);
   const _hm = _sc.match(/<head>([\s\S]*?)<\/head>/);
   let html = '<!DOCTYPE html><html lang="es"><head>' + (_hm?_hm[1]:'<meta charset="UTF-8">') + '<style>@page{size:letter;margin:0}.page-break{page-break-after:always}<\/style><\/head><body>';
@@ -4422,10 +4467,56 @@ window.madelyUploadFirma = input => {
   reader.readAsDataURL(file);
 };
 
+window._mlyStep = (step, clearErr) => {
+  madelyLoginForm.step = step;
+  if (clearErr) madelyLoginForm.error = '';
+  renderMadelyModal();
+};
+window._mlyStep = (step, clearErr) => {
+  madelyLoginForm.step = step;
+  if (clearErr) madelyLoginForm.error = '';
+  renderMadelyModal();
+};
+// ── ELIMINAR FIRMA ──
+window.madelyConfirmarEliminar = () => {
+  madelyLoginForm.step = 'confirmar-eliminar';
+  renderMadelyModal();
+};
+window.madelyEliminarFirma = () => {
+  set(madelySignRef, { hash: madelyFirmaHash, firmaUrl: null }).then(() => {
+    madelyFirmaUrl = null;
+    madelyLoginForm.step = 'dashboard';
+    showToast('✅ Firma eliminada del sistema');
+    renderMadelyModal();
+  });
+};
+// ── CAMBIAR CONTRASEÑA ──
+window.madelyPasoContrasena = () => {
+  madelyLoginForm.step = 'cambiar-pass';
+  madelyLoginForm.error = '';
+  renderMadelyModal();
+};
+window.madelyGuardarNuevaPass = () => {
+  const p1 = document.getElementById('mly-pass-new')?.value?.trim();
+  const p2 = document.getElementById('mly-pass-new2')?.value?.trim();
+  if (!p1 || p1.length < 4) { madelyLoginForm.error = 'Mínimo 4 caracteres'; renderMadelyModal(); return; }
+  if (p1 !== p2) { madelyLoginForm.error = 'Las contraseñas no coinciden'; renderMadelyModal(); return; }
+  const hash = btoa('mly_' + p1 + '_delsur2026');
+  set(madelySignRef, { hash, firmaUrl: madelyFirmaUrl || null }).then(() => {
+    madelyFirmaHash = hash;
+    madelyLoginForm.step = 'dashboard';
+    madelyLoginForm.error = '';
+    showToast('✅ Contraseña actualizada');
+    renderMadelyModal();
+  });
+};
 // ── FIRMA POSICIONAMIENTO ──
 window.abrirPosicionFirma = el => {
   const campId = typeof el === 'string' ? el : el.dataset.id;
-  madelyPosicionandoCamp = campId;
+  const camp = cartasCampañas.find(v => v.id === campId);
+  if (!madelyFirmaUrl) { showToast('⚠️ Sube una firma antes de firmar cartas'); return; }
+  if (!confirm('Se colocará tu firma en ' + (camp ? (camp.usuarios||[]).length : 0) + ' cartas de "' + (camp ? camp.nombre : '') + '". ¿Confirmas?')) return;
+
   renderFirmaPositioner(campId);
 };
 
@@ -4580,6 +4671,8 @@ window.madelyGenerarCartas = el => {
   const campId = typeof el === 'string' ? el : el.dataset.id;
   const camp = cartasCampañas.find(v => v.id === campId);
   if (!camp) return;
+  // Log this usage
+  push(madelyLogRef, { ts: Date.now(), campana: camp.nombre, total: (camp.usuarios||[]).length });
   const sc = buildCarta(camp.usuarios[0], camp, madelyFirmaUrl, madelyFirmaPos);
   const hm = sc.match(/<head>([\s\S]*?)<\/head>/);
   let html = '<!DOCTYPE html><html lang="es"><head>' + (hm?hm[1]:'') +
@@ -4995,126 +5088,4 @@ window.guardarMant = () => {
   if (!eq) return;
   if (!mantForm.descripcion.trim()) return showToast('Ingresa la descripción del problema');
   const ficha = { ...mantForm, registradoPor: sesionUsuario?.nombre || 'Desconocido', fecha: today() };
-  const historialMantenimiento = [...(eq.historialMantenimiento || []), ficha];
-  const updates = { historialMantenimiento };
-  if (mantForm.resultado === 'resuelto') updates.condicion = 'bueno';
-  showMantModal = false; mantEqId = null;
-  update(ref(db, 'equipos/' + eq.id), updates).then(() => showToast('🔧 Ficha guardada' + (mantForm.resultado === 'resuelto' ? ' · Equipo marcado como Bueno' : '')));
-};
-
-window.eliminarCondicion = (eqId, idx) => {
-  if (!isAdmin()) return showToast('⚠️ Solo el administrador puede eliminar esto');
-  const eq = equipos.find(x => x.id === eqId);
-  if (!eq || !eq.historialCondicion) return;
-  if (!confirm('¿Eliminar este registro de condición?')) return;
-  const hist = eq.historialCondicion.filter((_, i) => i !== idx);
-  // Restore condicion to last remaining entry or 'bueno'
-  const lastCond = hist.length > 0 ? hist[hist.length-1].condicionNueva : 'bueno';
-  update(ref(db, 'equipos/' + eqId), { historialCondicion: hist, condicion: lastCond })
-    .then(() => showToast('🗑 Registro eliminado'));
-};
-window.registrarDevolucion = handleDevolucion;
-window.closeCondicionModal = () => { showCondicionModal = false; condicionEqId = null; render(); };
-window.setCondicionField = (k, v) => { condicionForm[k] = v; render(); };
-window.setCondicionNota = v => { condicionForm.nota = v; };
-window.doCondicion = confirmCondicion;
-window.openCondicionModal = openCondicionModal;
-window.closePrestamoModal = () => { showPrestamoModal = false; prestamoId = null; render(); };
-window.setPrestamoField = (k, v) => { prestamoForm[k] = v; render(); };
-window.setPrestamoNota = v => { prestamoForm.nota = v; };
-window.doMovimiento = confirmMovimiento;
-window.activarModoLote = tipo => {
-  modoSeleccionLote = true;
-  seleccionLote = [];
-  tipoLote = tipo || 'prestamo';
-  render();
-};
-window.cancelarLote = () => { modoSeleccionLote = false; seleccionLote = []; render(); };
-window.toggleLote = id => {
-  const idx = seleccionLote.indexOf(id);
-  if (idx >= 0) seleccionLote.splice(idx, 1); else seleccionLote.push(id);
-  render();
-};
-window.toggleLoteCard = id => {
-  const eq = equipos.find(x => x.id === id);
-  if (!eq) return;
-  // For prestamo: must have prestado=true. For devolucion: must have last movimiento=devolucion
-  if (tipoLote === 'prestamo' && !eqPrestado(eq)) return;
-  if (tipoLote === 'devolucion') {
-    const movs = eq.movimientos || [];
-    const last = movs[movs.length - 1];
-    if (!last || last.tipo !== 'devolucion') return;
-  }
-  toggleLote(id);
-};
-window.generarLotePDF = () => {
-  if (seleccionLote.length === 0) return showToast('Selecciona al menos un equipo');
-  const items = seleccionLote.map(id => {
-    const eq = equipos.find(x => x.id === id);
-    if (!eq) return null;
-    const movs = (eq.movimientos||[]).filter(m => m.tipo === tipoLote);
-    const mov = movs.length > 0 ? movs[movs.length-1] : null;
-    return { eq, movimiento: mov };
-  }).filter(Boolean);
-  generateLotePDF(items, tipoLote);
-  modoSeleccionLote = false; seleccionLote = []; render();
-};
-window.generarMemo = (eqId, movIdx) => {
-  const eq = equipos.find(x => x.id === eqId);
-  if (!eq || !eq.movimientos) return;
-  const mov = eq.movimientos[movIdx];
-  if (mov) generateMemoPDF(eq, mov);
-};
-window.emailMemo = (eqId, movIdx) => {
-  const eq = equipos.find(x => x.id === eqId);
-  if (!eq || !eq.movimientos) return;
-  const mov = eq.movimientos[movIdx];
-  if (!mov) return;
-  const tipoM = mov.tipo === 'prestamo' ? 'PRESTAMO' : 'DEVOLUCION';
-  const asunto = encodeURIComponent('Memorandum de ' + tipoM + ' - ' + eq.serie + ' - ' + new Date().toLocaleDateString('es-SV'));
-  const lineas = [
-    'Para: ' + (mov.a||''),
-    'Asunto: ' + tipoM + ' de equipo analizador de red',
-    'Fecha: ' + new Date().toLocaleDateString('es-SV'),
-    '',
-    'Serie: ' + eq.serie,
-    eq.vineta ? 'Vineta: ' + eq.vineta : '',
-    'Modelo: ' + (eq.modelo||''),
-    '',
-    'Movimiento: ' + (mov.de||'') + ' -> ' + (mov.a||''),
-    mov.nota ? 'Nota: ' + mov.nota : '',
-    '',
-    'Documento generado por CPT INNOVA - Sistema de Gestion de Analizadores de Red'
-  ].filter(Boolean).join('\n');
-  window.location.href = 'mailto:?subject=' + asunto + '&body=' + encodeURIComponent(lineas);
-};
-
-window.emailMemo = (eqId, movIdx) => {
-  const eq = equipos.find(x => x.id === eqId);
-  if (!eq || !eq.movimientos) return;
-  const mov = eq.movimientos[movIdx];
-  if (!mov) return;
-  const tipoM = mov.tipo === 'prestamo' ? 'PRESTAMO' : 'DEVOLUCION';
-  const asunto = encodeURIComponent('Memorandum de ' + tipoM + ' - ' + eq.serie + ' - ' + new Date().toLocaleDateString('es-SV'));
-  const lineas = [
-    'Para: ' + (mov.a||''),
-    'Asunto: ' + tipoM + ' de equipo analizador de red',
-    'Fecha: ' + new Date().toLocaleDateString('es-SV'),
-    '',
-    'Serie: ' + eq.serie,
-    eq.vineta ? 'Vineta: ' + eq.vineta : '',
-    'Modelo: ' + (eq.modelo||''),
-    '',
-    'Movimiento: ' + (mov.de||'') + ' -> ' + (mov.a||''),
-    mov.nota ? 'Nota: ' + mov.nota : '',
-    '',
-    'Documento generado por CPT INNOVA - Sistema de Gestion de Analizadores de Red'
-  ].filter(Boolean).join('\n');
-  window.location.href = 'mailto:?subject=' + asunto + '&body=' + encodeURIComponent(lineas);
-};
-
-</script>
-<body>
-  <div id="app"><div class="loading"><div class="spinner"></div><div class="loading-text">Cargando...</div></div></div>
-</body>
-</html>
+  const historialMantenimiento = [...(eq.historialMantenimiento || []), f
