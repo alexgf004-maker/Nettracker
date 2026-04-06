@@ -4101,12 +4101,10 @@ p{font-size:11px;line-height:1.75;color:var(--ink);margin-bottom:12px;font-weigh
       </div>
     </div>
     <div class="footer"><p>Distribuidora de Electricidad del Sur, S.A. de C.V. (DELSUR) · Grupo EPM · Este documento es de carácter informativo y no constituye una obligación contractual.</p></div>
+  ${firmaPos && firmaUrl ? '<img src="'+firmaUrl+'" style="position:absolute;left:'+firmaPos.x+'%;top:'+firmaPos.y+'%;max-height:55px;max-width:150px;z-index:50;pointer-events:none">' : ''}
   </div>
+div id=\"cb\" style=\"position:fixed;bottom:0;left:0;right:0;background:#1A3F7A;padding:12px;display:flex;gap:8px;justify-content:center;z-index:999\"><button onclick=\"window.print()\" style=\"padding:10px 18px;background:#fff;color:#1A3F7A;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer\">🖨 Imprimir / PDF</button><button onclick=\"document.getElementById(&quot;cb&quot;).style.display=&quot;none&quot;;window.print();setTimeout(function(){document.getElementById(&quot;cb&quot;).style.display=&quot;flex&quot;},1500)\" style=\"padding:10px 18px;background:#0055A4;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer\">📄 PDF sin barra</button></div><div style=\"height:65px\"></div>
 
-${firmaPos && firmaUrl ? '<img src="'+firmaUrl+'" style="position:absolute;left:'+firmaPos.x+'%;top:'+firmaPos.y+'%;max-height:55px;max-width:150px;z-index:50;pointer-events:none">' : ''}
-</div>
-<div id=\"cb\" style=\"position:fixed;bottom:0;left:0;right:0;background:#1A3F7A;padding:12px;display:flex;gap:8px;justify-content:center;z-index:999\"><button onclick=\"window.print()\" style=\"padding:10px 18px;background:#fff;color:#1A3F7A;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer\">🖨 Imprimir / PDF</button><button onclick=\"document.getElementById(&quot;cb&quot;).style.display=&quot;none&quot;;window.print();setTimeout(function(){document.getElementById(&quot;cb&quot;).style.display=&quot;flex&quot;},1500)\" style=\"padding:10px 18px;background:#0055A4;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer\">📄 PDF sin barra</button></div><div style=\"height:65px\"></div>
-${firmaPos && firmaUrl ? '<img src="'+firmaUrl+'" style="position:absolute;left:'+firmaPos.x+'%;top:'+firmaPos.y+'%;max-height:55px;max-width:170px;z-index:50;pointer-events:none;transform:translate(-50%,-50%)">' : ''}
 </body></html>`;
 }
 
