@@ -4340,24 +4340,20 @@ function renderFirmaPositioner(campId) {
     URL.revokeObjectURL(blobUrl);
     var availW = Math.min(window.innerWidth - 24, 595);
     var scale = availW / 595;
-    var scaledW = Math.round(595 * scale);
-    var scaledH = Math.round(842 * scale);
-    // Resize iframe to scaled dimensions — NO css transform needed
-    // This means layout = visual size, scroll works correctly
-    iframe.style.width = scaledW + 'px';
-    iframe.style.height = scaledH + 'px';
+    var sw = Math.round(595 * scale);
+    var sh = Math.round(842 * scale);
+    // Use CSS zoom — unlike transform it shrinks both visual AND layout
+    // so the container correctly sizes to the visual dimensions and scroll works
+    iframe.style.width = '595px';
+    iframe.style.height = '842px';
+    iframe.style.zoom = scale;
     iframe.style.transform = 'none';
-    // Inject viewport meta so carta content scales down inside iframe
-    try {
-      var iDoc = iframe.contentDocument;
-      var meta = iDoc.querySelector('meta[name="viewport"]');
-      if (!meta) { meta = iDoc.createElement('meta'); meta.name = 'viewport'; iDoc.head.appendChild(meta); }
-      meta.content = 'width=595, initial-scale=' + scale.toFixed(3);
-    } catch(e) {}
+    iframe.style.display = 'block';
     var container = document.getElementById('fp-container');
-    container.style.width = scaledW + 'px';
-    container.style.height = scaledH + 'px';
+    container.style.width = sw + 'px';
+    container.style.height = sh + 'px';
     container.style.flexShrink = '0';
+    container.style.overflow = 'visible';
     document.getElementById('fp-loading').style.display = 'none';
     var firmaEl = document.getElementById('fp-firma');
     firmaEl.style.left = (madelyFirmaPos.x / 100 * 595 * scale) + 'px';
