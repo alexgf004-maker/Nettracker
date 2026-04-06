@@ -298,7 +298,7 @@ const validacionesRef = ref(db, 'validaciones');
 const mantenimientoRef = ref(db, 'config/mantenimiento');
 const cartasRef = ref(db, 'campañasCartas');
 const madelySignRef = ref(db, 'config/madelyFirma');
-const madelyLogRef  = ref(db, 'config/madelyFirmaLog');
+const madelyLogRef  = ref(db, 'firmaLog');
 
 
 // ── STATE ──
@@ -498,11 +498,12 @@ onValue(madelySignRef, snap => {
   }
 });
 
-onValue(madelyLogRef, snap => {
+try { onValue(madelyLogRef, snap => {
   madelyFirmaLog = [];
   if (snap.exists()) snap.forEach(x => madelyFirmaLog.push(x.val()));
   madelyFirmaLog.sort((a,b) => (b.ts||0)-(a.ts||0));
-});
+  render();
+}); } catch(e) { console.warn('firmaLog listener error:', e); }
 onValue(mantenimientoRef, snap => {
   modoMantenimiento = snap.exists() ? snap.val() === true : false;
   render();
@@ -4036,6 +4037,13 @@ window.exportarValidaciones = el => {
   showToast('📊 Excel exportado');
 };
 
+window.autoFillTapsTri = () => {
+  const vpEl = document.getElementById('vf-cp-vp');
+  const tapsEl = document.getElementById('vf-taps');
+  if (!vpEl || !tapsEl) return;
+  const T = {'23000':'24940,23900,22900,22290,21755','13200':'14400,13800,13200,12870,12540','4160':'4389,4266,4160,4053,3946'};
+  if (T[vpEl.value]) { tapsEl.value = T[vpEl.value]; valForm.taps = T[vpEl.value]; }
+};
 window.autoFillTaps = () => {
   const vpEl = document.getElementById('vf-cp-vp');
   const tapsEl = document.getElementById('vf-taps');
@@ -5082,10 +5090,4 @@ window.openMantModal = id => {
   showMantModal = true; render();
 };
 window.closeMantModal = () => { showMantModal = false; mantEqId = null; render(); };
-window.setMantForm = (k, v) => { mantForm[k] = v; if (k === 'resultado') render(); };
-window.guardarMant = () => {
-  const eq = equipos.find(x => x.id === mantEqId);
-  if (!eq) return;
-  if (!mantForm.descripcion.trim()) return showToast('Ingresa la descripción del problema');
-  const ficha = { ...mantForm, registradoPor: sesionUsuario?.nombre || 'Desconocido', fecha: today() };
-  const historialMantenimiento = [...(eq.historialMantenimiento || []), f
+win
