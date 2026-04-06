@@ -4208,7 +4208,7 @@ window.generarCartaIndividual = (id, idx) => {
   const camp = cartasCampañas.find(v => v.id === (typeof id==='string'?id:id.dataset?.id));
   if (!camp) return;
   const usuario = camp.usuarios[idx];
-  const html = buildCarta(usuario, camp, madelyFirmaUrl, madelyFirmaPos);
+  const html = buildCarta(usuario, camp, madelyFirmaUrl);
   abrirDoc(html, 'carta_' + (usuario.siget||'doc') + '.html');
 };
 
@@ -4310,123 +4310,95 @@ window.abrirPosicionFirma = el => {
 };
 
 function renderFirmaPositioner(campId) {
-  const existing = document.getElementById('firma-positioner');
-  if (existing) existing.remove();
-
-  const camp = cartasCampañas.find(v => v.id === campId);
+  var ex = document.getElementById('firma-positioner');
+  if (ex) ex.remove();
+  var camp = cartasCampañas.find(function(v){ return v.id === campId; });
   if (!camp || !camp.usuarios || camp.usuarios.length === 0) return;
-
-  // Build a preview carta (first user, no firma yet)
-  const previewCarta = buildCarta(camp.usuarios[0], camp, null, null);
-
-  const overlay = document.createElement('div');
+  var previewHtml = buildCarta(camp.usuarios[0], camp, null, null);
+  var overlay = document.createElement('div');
   overlay.id = 'firma-positioner';
   overlay.style.cssText = 'position:fixed;inset:0;background:#1A3F7A;z-index:1000;display:flex;flex-direction:column;font-family:var(--font)';
-
+  var firmaImgHtml = (madelyFirmaUrl ? '<img src="'+madelyFirmaUrl+'" style="max-height:60px;max-width:160px;display:block;pointer-events:none">' : '<div style="padding:8px 16px;color:#7c3aed;font-size:12px;font-weight:700">FIRMA</div>') +
+        '</div>';
   overlay.innerHTML =
     '<div style="background:#1A3F7A;padding:12px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0">' +
-      '<button onclick="cerrarFirmaPositioner()" style="padding:8px 14px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:8px;color:#fff;font-size:13px;cursor:pointer">← Volver</button>' +
+      '<button id="fp-back" style="padding:8px 14px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:8px;color:#fff;font-size:13px;cursor:pointer">← Volver</button>' +
       '<div style="flex:1;font-size:13px;font-weight:700;color:#fff">Arrastra la firma a su posición</div>' +
     '</div>' +
     '<div style="background:#e2e8f0;padding:8px 16px;font-size:11px;color:#475569;text-align:center;flex-shrink:0">' +
-      '📌 Arrastra la firma · Cuando estés conforme, toca <strong>Confirmar posición</strong>' +
+      '📌 Arrastra la firma · Luego toca <strong>Confirmar posición</strong>' +
     '</div>' +
-    '<div id="carta-preview-wrap" style="flex:1;overflow:auto;display:flex;justify-content:center;align-items:flex-start;padding:12px;background:#CDD5E0;position:relative">' +
-      '<div id="carta-preview-container" style="position:relative;display:inline-block">' +
-        '<iframe id="carta-iframe" srcdoc="" style="width:595px;height:842px;border:none;display:block;transform-origin:top left" scrolling="no"></iframe>' +
-        '<div id="firma-drag" style="position:absolute;cursor:grab;user-select:none;touch-action:none;z-index:10;border:2px dashed #7c3aed;border-radius:4px;padding:4px;background:rgba(255,255,255,.85);display:none">' +
-          (madelyFirmaUrl ? '<img src="'+madelyFirmaUrl+'" style="max-height:60px;max-width:160px;display:block;pointer-events:none">' : '<div style="padding:8px 16px;color:#7c3aed;font-size:12px;font-weight:700">FIRMA</div>') +
+    '<div id="fp-wrap" style="flex:1;overflow:auto;background:#CDD5E0;display:flex;justify-content:center;padding:12px">' +
+      '<div id="fp-container" style="position:relative;flex-shrink:0">' +
+        '<div id="fp-loading" style="position:absolute;inset:0;background:rgba(255,255,255,.95);display:flex;align-items:center;justify-content:center;z-index:20;font-size:13px;color:#475569">Cargando diseño...</div>' +
+        '<iframe id="fp-iframe" style="width:595px;height:842px;border:none;display:block;transform-origin:top left" scrolling="no"></iframe>' +
+        '<div id="fp-firma" style="position:absolute;top:0;left:0;cursor:grab;touch-action:none;user-select:none;z-index:15;border:2px dashed #7c3aed;border-radius:4px;padding:6px;background:rgba(255,255,255,.9);display:none">' +
+          firmaImgHtml +
         '</div>' +
       '</div>' +
     '</div>' +
     '<div style="background:#1A3F7A;padding:12px 16px;display:flex;gap:8px;flex-shrink:0">' +
-      '<button onclick="confirmarFirmaPos()" style="flex:1;padding:12px;background:#00897B;color:#fff;border:none;border-radius:10px;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer">✅ Confirmar posición</button>' +
+      '<button id="fp-confirm" style="flex:1;padding:12px;background:#00897B;color:#fff;border:none;border-radius:10px;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer">✅ Confirmar posición</button>' +
     '</div>';
-
   document.body.appendChild(overlay);
-
-  // Load carta preview in iframe
-  const iframe = document.getElementById('carta-iframe');
-  const previewBlob = new Blob([previewCarta], { type: 'text/html;charset=utf-8' });
-  const previewUrl = URL.createObjectURL(previewBlob);
-  iframe.src = previewUrl;
-
-  // Scale + init drag AFTER iframe loads
-  let scale = 1;
-  iframe.onload = () => {
-    URL.revokeObjectURL(previewUrl);
-
-    // Scale iframe to fit screen width
-    const wrap = document.getElementById('carta-preview-container');
-    const availW = Math.min(window.innerWidth - 24, 595);
-    scale = availW / 595;
+  document.getElementById('fp-back').onclick = function(){ cerrarFirmaPositioner(); };
+  document.getElementById('fp-confirm').onclick = function(){ confirmarFirmaPos(); };
+  var iframe = document.getElementById('fp-iframe');
+  var blob = new Blob([previewHtml], { type: 'text/html;charset=utf-8' });
+  var blobUrl = URL.createObjectURL(blob);
+  iframe.src = blobUrl;
+  iframe.onload = function() {
+    URL.revokeObjectURL(blobUrl);
+    var availW = Math.min(window.innerWidth - 24, 595);
+    var scale = availW / 595;
     iframe.style.transform = 'scale(' + scale + ')';
-    wrap.style.width = (595 * scale) + 'px';
-    wrap.style.height = (842 * scale) + 'px';
-
-    // Position firma drag at saved position
-    const firmaDrag = document.getElementById('firma-drag');
-    firmaDrag.style.left = (madelyFirmaPos.x / 100 * 595 * scale) + 'px';
-    firmaDrag.style.top = (madelyFirmaPos.y / 100 * 842 * scale) + 'px';
-    firmaDrag.style.display = 'block';
-  };
-
-  // ── Drag logic (mouse + touch) ──
-  let dragging = false, startX, startY, startL, startT;
-
-  function getPos(e) {
-    return e.touches ? { x: e.touches[0].clientX, y: e.touches[0].clientY }
-                     : { x: e.clientX, y: e.clientY };
-  }
-
-  function onStart(e) {
-    e.preventDefault();
-    dragging = true;
-    const p = getPos(e);
-    startX = p.x; startY = p.y;
-    startL = parseInt(firmaDrag.style.left) || 0;
-    startT = parseInt(firmaDrag.style.top) || 0;
-    firmaDrag.style.cursor = 'grabbing';
-  }
-
-  function onMove(e) {
-    if (!dragging) return;
-    e.preventDefault();
-    const p = getPos(e);
-    const dx = p.x - startX, dy = p.y - startY;
-    const containerW = 595 * scale, containerH = 842 * scale;
-    const newL = Math.max(0, Math.min(containerW - firmaDrag.offsetWidth, startL + dx));
-    const newT = Math.max(0, Math.min(containerH - firmaDrag.offsetHeight, startT + dy));
-    firmaDrag.style.left = newL + 'px';
-    firmaDrag.style.top = newT + 'px';
-  }
-
-  function onEnd() {
-    if (!dragging) return;
-    dragging = false;
-    const firmaDragEl = document.getElementById('firma-drag');
-    if (firmaDragEl) firmaDragEl.style.cursor = 'grab';
-    // Save position as % of carta dimensions
-    const containerW = 595 * scale, containerH = 842 * scale;
-    const el = document.getElementById('firma-drag');
-    if (el) {
-      madelyFirmaPos.x = (parseInt(el.style.left) / containerW) * 100;
-      madelyFirmaPos.y = (parseInt(el.style.top) / containerH) * 100;
+    var container = document.getElementById('fp-container');
+    container.style.width = (595 * scale) + 'px';
+    container.style.height = (842 * scale) + 'px';
+    document.getElementById('fp-loading').style.display = 'none';
+    var firmaEl = document.getElementById('fp-firma');
+    firmaEl.style.left = (madelyFirmaPos.x / 100 * 595 * scale) + 'px';
+    firmaEl.style.top  = (madelyFirmaPos.y / 100 * 842 * scale) + 'px';
+    firmaEl.style.display = 'block';
+    var isDragging = false, ox = 0, oy = 0;
+    function getXY(e){ return e.touches ? [e.touches[0].clientX,e.touches[0].clientY] : [e.clientX,e.clientY]; }
+    function startDrag(e){
+      e.preventDefault(); isDragging = true;
+      var xy = getXY(e);
+      ox = xy[0] - firmaEl.offsetLeft;
+      oy = xy[1] - firmaEl.offsetTop;
+      firmaEl.style.cursor = 'grabbing';
+      document.addEventListener('mousemove', moveDrag);
+      document.addEventListener('touchmove', moveDrag, { passive: false });
+      document.addEventListener('mouseup', stopDrag);
+      document.addEventListener('touchend', stopDrag);
     }
-  }
-
-  firmaDrag.addEventListener('mousedown', onStart);
-  firmaDrag.addEventListener('touchstart', onStart, { passive: false });
-  document.addEventListener('mousemove', onMove);
-  document.addEventListener('touchmove', onMove, { passive: false });
-  document.addEventListener('mouseup', onEnd);
-  document.addEventListener('touchend', onEnd);
-
-  overlay._cleanup = () => {
-    document.removeEventListener('mousemove', onMove);
-    document.removeEventListener('touchmove', onMove);
-    document.removeEventListener('mouseup', onEnd);
-    document.removeEventListener('touchend', onEnd);
+    function moveDrag(e){
+      if (!isDragging) return; e.preventDefault();
+      var xy = getXY(e);
+      var maxX = 595*scale - firmaEl.offsetWidth;
+      var maxY = 842*scale - firmaEl.offsetHeight;
+      firmaEl.style.left = Math.max(0, Math.min(maxX, xy[0]-ox)) + 'px';
+      firmaEl.style.top  = Math.max(0, Math.min(maxY, xy[1]-oy)) + 'px';
+    }
+    function stopDrag(){
+      if (!isDragging) return; isDragging = false;
+      firmaEl.style.cursor = 'grab';
+      madelyFirmaPos.x = (firmaEl.offsetLeft / (595*scale)) * 100;
+      madelyFirmaPos.y = (firmaEl.offsetTop  / (842*scale)) * 100;
+      document.removeEventListener('mousemove', moveDrag);
+      document.removeEventListener('touchmove', moveDrag);
+      document.removeEventListener('mouseup', stopDrag);
+      document.removeEventListener('touchend', stopDrag);
+    }
+    firmaEl.addEventListener('mousedown', startDrag);
+    firmaEl.addEventListener('touchstart', startDrag, { passive: false });
+    overlay._cleanup = function(){
+      document.removeEventListener('mousemove', moveDrag);
+      document.removeEventListener('touchmove', moveDrag);
+      document.removeEventListener('mouseup', stopDrag);
+      document.removeEventListener('touchend', stopDrag);
+    };
   };
 }
 
@@ -4476,8 +4448,21 @@ window.madelyDescConPos = el => {
 
 window.madelyGenerarCartas = el => {
   const campId = typeof el === 'string' ? el : el.dataset.id;
-  generarTodasCartas(campId);
+  const camp = cartasCampañas.find(v => v.id === campId);
+  if (!camp) return;
+  const sc = buildCarta(camp.usuarios[0], camp, madelyFirmaUrl, madelyFirmaPos);
+  const hm = sc.match(/<head>([\s\S]*?)<\/head>/);
+  let html = '<!DOCTYPE html><html lang="es"><head>' + (hm?hm[1]:'') +
+    '<style>@page{size:letter;margin:0}.page-break{page-break-after:always}<\/style><\/head><body>';
+  camp.usuarios.forEach((u,i) => {
+    const carta = buildCarta(u, camp, madelyFirmaUrl, madelyFirmaPos);
+    const body = carta.match(/<body>([\s\S]*)<\/body>/);
+    if (body) html += body[1] + (i < camp.usuarios.length-1 ? '<div class="page-break"></div>' : '');
+  });
+  html += '</body></html>';
   cerrarMadelyModal();
+  abrirDoc(html, 'cartas_firmadas_' + (camp.nombre||'campaña').replace(/ /g,'_') + '.html');
+  showToast('✉️ ' + camp.usuarios.length + ' cartas con firma generadas');
 };
 
 window.abrirReporteModal = () => { showReporteModal = true; render(); };
