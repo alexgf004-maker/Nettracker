@@ -2866,7 +2866,7 @@ if (inventarioSearch) {
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">CT/DS referencia</div><input id="vf-ref-ct" type="text" value="'+(valForm.refCt||'')+'" placeholder="DS110465" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;outline:none"></div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Medidor referencia</div><input id="vf-ref-med" type="text" value="'+(valForm.refMed||'')+'" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:13px;outline:none"></div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Primario</div>'+sel('vf-ref-vp',bVP)+'</div>';
-          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Secundario</div><select id="vf-ref-vs" onchange="valVSOtro(this)" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;background:var(--white);outline:none">'+bVS('refVS')+'</select></div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Secundario</div>'+sel('vf-ref-vs',bVS('refVS'))+'</div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vab ref (V)</div>'+inp('vf-ref-lec1',valForm.refLec1,'Ej: 236')+'</div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vbc ref (V)</div>'+inp('vf-ref-lec2',valForm.refLec2,'Ej: 238')+'</div>';
           html += '<div style="grid-column:1/-1"><div style="font-size:10px;color:var(--text3);margin-bottom:4px">TAP visible</div>'+sel('vf-ref-tap',bTap)+'</div>';
@@ -2875,7 +2875,7 @@ if (inventarioSearch) {
           html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">';
           html += '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:10px">Transformador campaña (bifásico)</div>';
           html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Secundario campaña</div><select id="vf-cp-vs" onchange="valVSOtro(this)" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;background:var(--white);outline:none">'+bVS('cpVS')+'</select></div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Secundario campaña</div>'+sel('vf-cp-vs',bVS('cpVS'))+'</div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Primario campaña</div><select id="vf-cp-vp" onchange="autoFillTaps()" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;background:var(--white);outline:none">'+bVP+'</select></div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vab campaña (V)</div>'+inp('vf-cp-lec1',valForm.cpLec1,'Ej: 247')+'</div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vbc campaña (V)</div>'+inp('vf-cp-lec2',valForm.cpLec2,'Ej: 245')+'</div>';
@@ -2920,7 +2920,7 @@ if (inventarioSearch) {
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">CT/DS referencia</div><input id="vf-ref-ct" type="text" value="'+(valForm.refCt||'')+'" placeholder="DS110465" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;outline:none"></div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Medidor referencia</div><input id="vf-ref-med" type="text" value="'+(valForm.refMed||'')+'" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:13px;outline:none"></div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Primario</div>'+tSel('vf-ref-vp',tVP)+'</div>';
-          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Secundario</div><select id="vf-ref-vs" onchange="valVSOtro(this)" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;background:var(--white);outline:none">'+tVS('refVS')+'</select></div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Secundario</div>'+tSel('vf-ref-vs',tVS('refVS'))+'</div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vab ref (V)</div>'+tInp('vf-ref-lec1',valForm.refLec1,'Ej: 236')+'</div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vbc ref (V)</div>'+tInp('vf-ref-lec2',valForm.refLec2,'Ej: 238')+'</div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vca ref (V)</div>'+tInp('vf-ref-lec3',valForm.refLec3,'Ej: 237')+'</div>';
@@ -2930,7 +2930,7 @@ if (inventarioSearch) {
           html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">';
           html += '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:10px">Transformador campaña (trifásico)</div>';
           html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Secundario campaña</div><select id="vf-cp-vs" onchange="valVSOtro(this)" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;background:var(--white);outline:none">'+tVS('cpVS')+'</select></div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Secundario campaña</div>'+tSel('vf-cp-vs',tVS('cpVS'))+'</div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Primario campaña</div><select id="vf-cp-vp" onchange="autoFillTapsTri()" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;background:var(--white);outline:none">'+tVP+'</select></div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vab campaña (V)</div>'+tInp('vf-cp-lec1',valForm.cpLec1,'Ej: 247')+'</div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vbc campaña (V)</div>'+tInp('vf-cp-lec2',valForm.cpLec2,'Ej: 245')+'</div>';
@@ -5117,4 +5117,19 @@ window.emailMemo = (eqId, movIdx) => {
     'Fecha: ' + new Date().toLocaleDateString('es-SV'),
     '',
     'Serie: ' + eq.serie,
-    eq.vineta ? '
+    eq.vineta ? 'Vineta: ' + eq.vineta : '',
+    'Modelo: ' + (eq.modelo||''),
+    '',
+    'Movimiento: ' + (mov.de||'') + ' -> ' + (mov.a||''),
+    mov.nota ? 'Nota: ' + mov.nota : '',
+    '',
+    'Documento generado por CPT INNOVA - Sistema de Gestion de Analizadores de Red'
+  ].filter(Boolean).join('\n');
+  window.location.href = 'mailto:?subject=' + asunto + '&body=' + encodeURIComponent(lineas);
+};
+
+</script>
+<body>
+  <div id="app"><div class="loading"><div class="spinner"></div><div class="loading-text">Cargando...</div></div></div>
+</body>
+</html>
