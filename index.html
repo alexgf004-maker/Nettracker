@@ -478,7 +478,7 @@ window.doLogin = async ()=>{
 };
 
 window.doLogout=()=>{me=null;$('loginUser').value='';$('loginPin').value='';$('loginAlert').innerHTML='';screen('loginScreen');};
-$('loginPin').addEventListener('keydown',e=>{if(e.key==='Enter')window.doLogin();});
+const _lp=$('loginPin'); if(_lp) _lp.addEventListener('keydown',e=>{if(e.key==='Enter')window.doLogin();});
 
 // EMP TABS
 window.empTab=(t,btn)=>{
@@ -497,7 +497,7 @@ function initForm(){
   $('togV').classList.remove('on');$('togHE').classList.remove('on');
   hide('heBox');$('empAlert').innerHTML='';
 }
-$('empFecha').addEventListener('change',function(){const l=$('empFechaLbl');if(l)l.textContent=fmtLong(this.value);});
+const _ef=$('empFecha'); if(_ef) _ef.addEventListener('change',function(){const l=$('empFechaLbl');if(l)l.textContent=fmtLong(this.value);});
 
 window.togF=f=>{
   if(f==='v'){$('togV').classList.toggle('on');}
