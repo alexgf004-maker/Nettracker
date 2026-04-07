@@ -3999,7 +3999,7 @@ window.autoFillTapsTri = () => {
   const tapsEl = document.getElementById('vf-taps');
   if (!vpEl || !tapsEl) return;
   const T = {'23000':'24940,23900,22900,22290,21755','13200':'13860,13530,13200,12870,12540','4160':'4364,4260,4157,4054,3950'};
-  if (T[vpEl.value]) { tapsEl.value = T[vpEl.value]; valForm.taps = T[vpEl.value]; }
+  const _tv = vpEl.value.trim(); if (T[_tv]) { tapsEl.value = T[_tv]; valForm.taps = T[_tv]; }
 };
 window.valVSOtro = sel => {
   if (sel.id !== 'vf-ref-vs' && sel.id !== 'vf-cp-vs') return;
@@ -4011,7 +4011,7 @@ window.autoFillTaps = () => {
   const vpEl = document.getElementById('vf-cp-vp');
   const tapsEl = document.getElementById('vf-taps');
   if (!vpEl || !tapsEl) return;
-  const vp = vpEl.value;
+  const vp = vpEl.value.trim();
   const TAPS = {'13200':'14400,13800,13200,12870,12540','7620':'8001,7810,7620,7430,7240','2400':'2520,2460,2400,2340,2280'};
   if (TAPS[vp]) { tapsEl.value = TAPS[vp]; valForm.cpVP = parseFloat(vp); valForm.taps = TAPS[vp]; }
 };
