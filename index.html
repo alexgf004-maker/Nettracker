@@ -2876,7 +2876,7 @@ if (inventarioSearch) {
           html += '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:10px">Transformador campaña (bifásico)</div>';
           html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Secundario campaña</div>'+sel('vf-cp-vs',bVS('cpVS'))+'</div>';
-          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Primario campaña</div><select id="vf-cp-vp" onchange="autoFillTaps()" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;background:var(--white);outline:none">'+bVP+'</select></div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Primario campaña (auto-llena TAPs)</div><select id="vf-cp-vp" onchange="autoFillTaps()" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;background:var(--white);color:var(--text);outline:none"><option value="">Seleccionar para auto-llenar TAPs...</option><option value="13200" '+(valForm.cpVP==13200?'selected':'')+'>13200 V</option><option value="7620" '+(valForm.cpVP==7620?'selected':'')+'>7620 V</option><option value="2400" '+(valForm.cpVP==2400?'selected':'')+'>2400 V</option></select></div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vab campaña (V)</div>'+inp('vf-cp-lec1',valForm.cpLec1,'Ej: 247')+'</div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vbc campaña (V)</div>'+inp('vf-cp-lec2',valForm.cpLec2,'Ej: 245')+'</div>';
           html += '</div>';
@@ -2931,7 +2931,7 @@ if (inventarioSearch) {
           html += '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:10px">Transformador campaña (trifásico)</div>';
           html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Secundario campaña</div>'+tSel('vf-cp-vs',tVS('cpVS'))+'</div>';
-          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Primario campaña</div><select id="vf-cp-vp" onchange="autoFillTapsTri()" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;background:var(--white);outline:none">'+tVP+'</select></div>';
+          html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Primario campaña (auto-llena TAPs)</div><select id="vf-cp-vp" onchange="autoFillTapsTri()" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;background:var(--white);color:var(--text);outline:none"><option value="">Seleccionar para auto-llenar TAPs...</option><option value="23000" '+(valForm.cpVP==23000?'selected':'')+'>23000 V</option><option value="13200" '+(valForm.cpVP==13200?'selected':'')+'>13200 V</option><option value="4160" '+(valForm.cpVP==4160?'selected':'')+'>4160 V</option></select></div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vab campaña (V)</div>'+tInp('vf-cp-lec1',valForm.cpLec1,'Ej: 247')+'</div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vbc campaña (V)</div>'+tInp('vf-cp-lec2',valForm.cpLec2,'Ej: 245')+'</div>';
           html += '<div style="grid-column:1/-1"><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vca campaña (V)</div>'+tInp('vf-cp-lec3',valForm.cpLec3,'Ej: 246')+'</div>';
@@ -5121,15 +5121,4 @@ window.emailMemo = (eqId, movIdx) => {
     'Modelo: ' + (eq.modelo||''),
     '',
     'Movimiento: ' + (mov.de||'') + ' -> ' + (mov.a||''),
-    mov.nota ? 'Nota: ' + mov.nota : '',
-    '',
-    'Documento generado por CPT INNOVA - Sistema de Gestion de Analizadores de Red'
-  ].filter(Boolean).join('\n');
-  window.location.href = 'mailto:?subject=' + asunto + '&body=' + encodeURIComponent(lineas);
-};
-
-</script>
-<body>
-  <div id="app"><div class="loading"><div class="spinner"></div><div class="loading-text">Cargando...</div></div></div>
-</body>
-</html>
+    mov.nota ? 'Nota: ' + mov
