@@ -2832,6 +2832,7 @@ if (inventarioSearch) {
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Medidor referencia</div><input id="vf-ref-med" type="text" value="'+(valForm.refMed||'')+'" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:13px;outline:none"></div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Primario</div>'+sel('vf-ref-vp',bVP)+'</div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Secundario</div>'+sel('vf-ref-vs',bVS('refVS'))+'</div>';
+          if (valForm.refVS === 'otro') html += '<input id="vf-ref-vs-otro" type="number" step="0.1" placeholder="Voltaje en V" value="'+(valForm.refVSOtro||'')+'" style="width:100%;padding:9px;border:1.5px solid #7c3aed;border-radius:8px;font-family:var(--mono);font-size:13px;outline:none;margin-top:4px">';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vab ref (V)</div>'+inp('vf-ref-lec1',valForm.refLec1,'Ej: 236')+'</div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vbc ref (V)</div>'+inp('vf-ref-lec2',valForm.refLec2,'Ej: 238')+'</div>';
           html += '<div style="grid-column:1/-1"><div style="font-size:10px;color:var(--text3);margin-bottom:4px">TAP visible</div>'+sel('vf-ref-tap',bTap)+'</div>';
@@ -2841,6 +2842,7 @@ if (inventarioSearch) {
           html += '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:10px">Transformador campaña (bifásico)</div>';
           html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Secundario campaña</div>'+sel('vf-cp-vs',bVS('cpVS'))+'</div>';
+          if (valForm.cpVS === 'otro') html += '<input id="vf-cp-vs-otro" type="number" step="0.1" placeholder="Voltaje en V" value="'+(valForm.cpVSOtro||'')+'" style="width:100%;padding:9px;border:1.5px solid #7c3aed;border-radius:8px;font-family:var(--mono);font-size:13px;outline:none;margin-top:4px">';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Primario campaña</div><select id="vf-cp-vp" onchange="autoFillTaps()" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;background:var(--white);outline:none"><option value="">Seleccionar VP para auto-llenar TAPs…</option><option value="13200" '+(valForm.cpVP==13200?'selected':'')+'>13,200 V</option><option value="7620" '+(valForm.cpVP==7620?'selected':'')+'>7,620 V</option><option value="2400" '+(valForm.cpVP==2400?'selected':'')+'>2,400 V</option></select></div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vab campaña (V)</div>'+inp('vf-cp-lec1',valForm.cpLec1,'Ej: 247')+'</div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vbc campaña (V)</div>'+inp('vf-cp-lec2',valForm.cpLec2,'Ej: 245')+'</div>';
@@ -2886,6 +2888,7 @@ if (inventarioSearch) {
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Medidor referencia</div><input id="vf-ref-med" type="text" value="'+(valForm.refMed||'')+'" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:13px;outline:none"></div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Primario</div>'+tSel('vf-ref-vp',tVP)+'</div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Secundario</div>'+tSel('vf-ref-vs',tVS('refVS'))+'</div>';
+          if (valForm.refVS === 'otro') html += '<input id="vf-ref-vs-otro" type="number" step="0.1" placeholder="Voltaje en V" value="'+(valForm.refVSOtro||'')+'" style="width:100%;padding:9px;border:1.5px solid #7c3aed;border-radius:8px;font-family:var(--mono);font-size:13px;outline:none;margin-top:4px">';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vab ref (V)</div>'+tInp('vf-ref-lec1',valForm.refLec1,'Ej: 236')+'</div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vbc ref (V)</div>'+tInp('vf-ref-lec2',valForm.refLec2,'Ej: 238')+'</div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vca ref (V)</div>'+tInp('vf-ref-lec3',valForm.refLec3,'Ej: 237')+'</div>';
@@ -2896,6 +2899,7 @@ if (inventarioSearch) {
           html += '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:10px">Transformador campaña (trifásico)</div>';
           html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Secundario campaña</div>'+tSel('vf-cp-vs',tVS('cpVS'))+'</div>';
+          if (valForm.cpVS === 'otro') html += '<input id="vf-cp-vs-otro" type="number" step="0.1" placeholder="Voltaje en V" value="'+(valForm.cpVSOtro||'')+'" style="width:100%;padding:9px;border:1.5px solid #7c3aed;border-radius:8px;font-family:var(--mono);font-size:13px;outline:none;margin-top:4px">';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Volt. Primario campaña</div><select id="vf-cp-vp" onchange="autoFillTapsTri()" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;background:var(--white);outline:none"><option value="">Seleccionar VP para auto-llenar TAPs…</option><option value="23000" '+(valForm.cpVP==23000?'selected':'')+'>23,000 V</option><option value="13200" '+(valForm.cpVP==13200?'selected':'')+'>13,200 V</option><option value="4160" '+(valForm.cpVP==4160?'selected':'')+'>4,160 V</option></select></div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vab campaña (V)</div>'+tInp('vf-cp-lec1',valForm.cpLec1,'Ej: 247')+'</div>';
           html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Lectura Vbc campaña (V)</div>'+tInp('vf-cp-lec2',valForm.cpLec2,'Ej: 245')+'</div>';
@@ -3644,10 +3648,12 @@ window.calcularValidacion = () => {
   const tipo = valTipoUsuario;
   const refCt = g('vf-ref-ct'), refMed = g('vf-ref-med');
   const refVP = parseFloat(g('vf-ref-vp'));
-  const refVS = parseFloat(g('vf-ref-vs'));
+  const _refVSraw = g('vf-ref-vs');
+  const refVS = _refVSraw === 'otro' ? parseFloat(document.getElementById('vf-ref-vs-otro')?.value||'0') : parseFloat(_refVSraw);
   const refTap = parseInt(g('vf-ref-tap'));
   const cpVP = parseFloat(g('vf-cp-vp') || g('vf-ref-vp')); // trifasico uses vf-cp-vp
-  const cpVS = parseFloat(g('vf-cp-vs'));
+  const _cpVSraw = g('vf-cp-vs');
+  const cpVS = _cpVSraw === 'otro' ? parseFloat(document.getElementById('vf-cp-vs-otro')?.value||'0') : parseFloat(_cpVSraw);
   const tapsStr = g('vf-taps');
 
   if (!refVP || !refVS || isNaN(refTap) || !cpVS || !tapsStr) {
