@@ -498,7 +498,7 @@ export function generateMemoRevision(eq, envio) {
   </div>
 
   <div class="footer">
-    Documento generado por CPT INNOVA · Sistema de Gestión de Analizadores de Red · ${new Date().toLocaleDateString('es-SV')}
+    Documento generado por CPT INNOVA · Sistema de Gestión de Analizadores de Red · ${new Date().toLocaleDateString('es-SV')}${envio.editadoPor ? ' · Última edición: ' + fmtDate(envio.fechaEdicion) + ' por ' + e(envio.editadoPor) : ''}
   </div>
 </body>
 </html>`;
@@ -633,7 +633,7 @@ export function generateMemoDanio(m) {
   </div>
 
   <div class="footer">
-    Documento generado por CPT INNOVA · Sistema de Gestión de Analizadores de Red · ${new Date().toLocaleDateString('es-SV')}
+    Documento generado por CPT INNOVA · Sistema de Gestión de Analizadores de Red · ${new Date().toLocaleDateString('es-SV')}${m.editadoPor ? ' · Última edición: ' + fmtDate(m.fechaEdicion) + ' por ' + e(m.editadoPor) : ''}
   </div>
 </body>
 </html>`;

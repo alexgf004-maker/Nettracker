@@ -5,7 +5,7 @@ import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { emptyForm, eqSt } from '../utils.js';
 import { render } from '../views/render.js';
-import { closeDanioModal, confirmDanio, openDanioModal, reimprimirMemoDanio } from '../actions/danio.js';
+import { closeDanioModal, confirmDanio, editarDanio, openDanioModal, reimprimirMemoDanio } from '../actions/danio.js';
 
 window.setFilter = f => { state.filterStatus = f; render(); };
 window.setInstTab = t => { state.instTab = t; state.filterStatus = 'TODOS'; state.camposFiltro = 'TODOS'; render(); };
@@ -97,4 +97,5 @@ window.closeDanioModal = closeDanioModal;
 window.setDanioField = (k, v) => { state.danioForm[k] = v; if (k === 'condicion') render(); };
 window.doMemoDanio = confirmDanio;
 window.memoDanio = reimprimirMemoDanio;
+window.editarDanio = editarDanio;
 

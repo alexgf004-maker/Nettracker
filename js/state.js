@@ -51,9 +51,11 @@ export const state = {
   condicionForm: { condicion: 'bueno', nota: '' },
   showRevisionModal: false, // envío de equipo a revisión en Cucumacayán
   revisionEqId: null,
+  revisionFichaIdx: null, // índice de la ficha cuando se edita un envío ya registrado
   revisionForm: { motivo: '', descripcion: '', fechaIncidente: '' },
   showDanioModal: false, // memo de equipo dañado en campo (Campos y Servicios)
   danioId: null,
+  danioEditando: false,
   danioForm: { fechaDanio: '', descripcion: '', condicion: 'detalles', tecnicoCampos: '' },
   prestamoId: null,
   prestamoForm: { de: 'CPT BT', a: 'CPT MT', nota: '', tipo: 'prestamo' },
