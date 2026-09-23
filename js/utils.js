@@ -1,6 +1,13 @@
 // Utilidades puras: fechas, formularios vacíos y cálculo de estados
 import { state } from './state.js';
 
+// Sede donde queda un equipo después de un préstamo/devolución.
+// Campos y Servicios regresa los equipos a la Cucumacayán, aunque el despacho haya sido de CPT MT.
+export function sedeDestinoMovimiento({ tipo, de, a }) {
+  if (tipo === 'devolucion' && de === 'Campos y Servicios') return 'Subestación Cucumacayán';
+  return areaToSede(a);
+}
+
 export function areaToSede(area) {
   if (area === 'CPT BT') return 'Subestación Cucumacayán';
   if (area === 'Campos y Servicios') return 'Con Campos y Servicios';

@@ -2,7 +2,7 @@
 import { AREAS, CONDICIONES, FALLAS_GRAVES, FALLAS_RETIRO, SEDES, userArea } from '../config.js';
 import { state } from '../state.js';
 import { badgeSt } from '../ui.js';
-import { areaToSede, calcSt, daysUntil, eqSt, escapeHtml } from '../utils.js';
+import { calcSt, daysUntil, eqSt, escapeHtml, sedeDestinoMovimiento } from '../utils.js';
 
 export function renderRetiroModal() {
   let html = '';
@@ -228,7 +228,7 @@ export function renderPrestamoModal() {
           </div>
         </div>
         <div style="font-size:11px;color:var(--text3);text-align:center;margin-bottom:14px">
-          Sede destino: <strong style="color:var(--primary)">${areaToSede(state.prestamoForm.a)}</strong>
+          Sede destino: <strong style="color:var(--primary)">${sedeDestinoMovimiento(state.prestamoForm)}</strong>
         </div>
         <div style="margin-bottom:16px">
           <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px">NOTA (OPCIONAL)</div>
