@@ -69,6 +69,9 @@ function guardarEdicionRevision(eq, idx) {
     motivo: f.motivo.trim() || MOTIVO_DEFAULT,
     descripcion: f.descripcion.trim(),
     fechaIncidente: f.fechaIncidente,
+    // Firma "Entrega" quien genera esta versión del memo
+    creadoPor: ficha.envioRevision.creadoPor || ficha.envioRevision.entregadoPor,
+    entregadoPor: state.sesionUsuario?.nombre || 'Desconocido',
     editadoPor: state.sesionUsuario?.nombre || 'Desconocido',
     fechaEdicion: today(),
   };

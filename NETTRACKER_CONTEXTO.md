@@ -173,7 +173,7 @@ Cada mes Campos y Servicios saca equipos de la **Subestación Cucumacayán**, lo
   - Prellenado con las fallas del retiro y su fecha; se elige la condición (Fuera de servicio / Con detalles) y opcionalmente el técnico de Campos y Servicios
   - Genera el memo (`generateMemoDanio`) con la fecha de retiro programado y firmas de CPT (nombre de quien lo genera), Subestación Cucumacayán y Campos y Servicios (en blanco)
   - Guarda los datos en `analizadores/{id}/memoDanio` (el botón pasa a "📄 Ver memo de equipo dañado" para reimprimir) y deja el equipo en la Cucumacayán con la condición elegida
-  - "✏️ Editar" corrige el memo; si cambia la condición, también la del equipo (queda en su historial). El memo muestra la última edición
+  - "✏️ Editar" corrige el memo; si cambia la condición, también la del equipo (queda en su historial). La firma de CPT pasa a ser de quien edita (el autor original queda en `creadoPor`) y el memo muestra la última edición
 
 ## Área: Inventario
 Catálogo de equipos físicos del equipo.
