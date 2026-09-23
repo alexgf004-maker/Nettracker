@@ -35,3 +35,8 @@ export function eqSt(eq) {
 
 export function eqEnCampo(eq) { return !!state.records.find(r => r.equipoId === eq.id && !r.retirado); }
 export function eqPrestado(eq) { return !!eq.prestado; }
+
+// Escapa texto escrito por el usuario antes de meterlo en HTML
+export function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}

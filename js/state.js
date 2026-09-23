@@ -49,6 +49,9 @@ export const state = {
   mantForm: { descripcion: '', accion: '', resultado: 'pendiente', fechaInicio: '', fechaResolucion: '', observaciones: '' },
   condicionEqId: null,
   condicionForm: { condicion: 'bueno', nota: '' },
+  showRevisionModal: false, // envío de equipo a revisión en Cucumacayán
+  revisionEqId: null,
+  revisionForm: { motivo: '', descripcion: '', fechaIncidente: '' },
   prestamoId: null,
   prestamoForm: { de: 'CPT BT', a: 'CPT MT', nota: '', tipo: 'prestamo' },
   modoSeleccionLote: false,

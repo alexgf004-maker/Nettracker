@@ -2,7 +2,7 @@
 import { AREAS, CONDICIONES, SEDES, userArea } from '../config.js';
 import { state } from '../state.js';
 import { badgeSt } from '../ui.js';
-import { areaToSede, calcSt, daysUntil, eqSt } from '../utils.js';
+import { areaToSede, calcSt, daysUntil, eqSt, escapeHtml } from '../utils.js';
 
 export function renderRetiroModal() {
   let html = '';
@@ -349,4 +349,39 @@ export function renderAlertaRetiros() {
   html += '<button onclick="verRetiros()" style="flex:1;padding:12px;border:none;border-radius:10px;background:var(--primary);font-family:var(--font);font-size:14px;font-weight:700;color:#fff;cursor:pointer">Ver retiros</button>';
   html += '</div></div></div>';
   return html;
+}
+
+export function renderRevisionModal() {
+  const eq = state.equipos.find(x => x.id === state.revisionEqId);
+  if (!eq) return '';
+  const f = state.revisionForm;
+  const campo = 'width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none;background:var(--white);color:var(--text)';
+  const etiqueta = 'font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px';
+  return `<div style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
+      <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:90vh;overflow-y:auto;padding:20px;font-family:var(--font)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div style="font-size:17px;font-weight:700;color:var(--text)">Enviar a revisión</div>
+          <button onclick="closeRevisionModal()" style="background:none;border:none;font-size:24px;color:var(--text3);cursor:pointer">✕</button>
+        </div>
+        <div style="font-size:13px;color:var(--text3);margin-bottom:16px"><b style="font-family:var(--mono);color:var(--text)">${escapeHtml(eq.serie)}</b> · ${escapeHtml(eq.sede || 'Plantel Central')} → Subestación Cucumacayán</div>
+        <div style="margin-bottom:12px">
+          <div style="${etiqueta}">MOTIVO DE LA ENTREGA</div>
+          <input id="rev-motivo" value="${escapeHtml(f.motivo)}" oninput="setRevisionField('motivo', this.value)" style="${campo}">
+        </div>
+        <div style="margin-bottom:12px">
+          <div style="${etiqueta}">¿QUÉ LE PASÓ AL EQUIPO? *</div>
+          <textarea id="rev-descripcion" placeholder="Ej: No enciende desde el retiro del caso C-001, LED intermitente..." oninput="setRevisionField('descripcion', this.value)" style="${campo};min-height:90px">${escapeHtml(f.descripcion)}</textarea>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px">Prellenado con lo último registrado del equipo. Puedes corregirlo.</div>
+        </div>
+        <div style="margin-bottom:16px">
+          <div style="${etiqueta}">FECHA DEL INCIDENTE *</div>
+          <input id="rev-fecha" type="date" value="${escapeHtml(f.fechaIncidente)}" onchange="setRevisionField('fechaIncidente', this.value)" style="${campo}">
+        </div>
+        <div style="background:#f3f0ff;border-radius:10px;padding:10px 12px;font-size:12px;color:#5b21b6;margin-bottom:14px;line-height:1.5">
+          Al confirmar se genera el memo y el equipo pasa a <b>Subestación Cucumacayán</b> con condición <b>En mantenimiento</b> y una ficha pendiente.
+        </div>
+        <button onclick="doEnvioRevision()" style="width:100%;background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">📤 Enviar y generar memo</button>
+        <button onclick="closeRevisionModal()" style="width:100%;background:#fff;color:var(--text3);border:1px solid var(--border);border-radius:10px;padding:13px;font-family:var(--font);font-size:15px;cursor:pointer">Cancelar</button>
+      </div>
+    </div>`;
 }

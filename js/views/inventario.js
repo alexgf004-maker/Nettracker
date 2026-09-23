@@ -245,6 +245,7 @@ if (state.inventarioSearch) {
       html += `<button class="btn" style="background:${(()=>{const c=CONDICIONES.find(x=>x.key===(eq.condicion||'bueno'));return c?c.bg:'var(--green-light)';})()};color:${(()=>{const c=CONDICIONES.find(x=>x.key===(eq.condicion||'bueno'));return c?c.color:'var(--green)';})()};border:1px solid ${(()=>{const c=CONDICIONES.find(x=>x.key===(eq.condicion||'bueno'));return c?c.color:'var(--green)';})()}" onclick="openCondicionModal('${eq.id}')">⚙️ Actualizar condición</button>`;
       if (!eq.prestado && !eqEnCampo(eq) && (eq.condicion||'bueno') !== 'fuera') html += `<button class="btn" style="background:var(--primary-light);color:var(--primary);border:1px solid var(--primary)" onclick="registrarPrestamo('${eq.id}')">🔄 Registrar préstamo</button>`;
       if (eq.prestado) html += `<button class="btn" style="background:var(--green-light);color:var(--green);border:1px solid var(--green)" onclick="registrarDevolucion('${eq.id}')">✅ Registrar devolución</button>`;
+      if (!eqEnCampo(eq) && !(eq.sede === 'Subestación Cucumacayán' && eq.condicion === 'mantenimiento')) html += `<button class="btn" style="background:#f3f0ff;color:#7c3aed;border:1px solid #7c3aed" onclick="openRevisionModal('${eq.id}')">📤 Enviar a revisión (Cucumacayán)</button>`;
       html += `<button class="btn" style="background:var(--primary-light);color:var(--primary);border:1px solid var(--primary)" onclick="exportHojaVida('${eq.id}')">📄 Exportar hoja de vida</button>`;
       if (isAdmin()) html += `<button class="btn btn-secondary" style="color:var(--red)" onclick="delEquipo('${eq.id}')">Eliminar del inventario</button>`;
     }
@@ -274,7 +275,8 @@ if (state.inventarioSearch) {
       if (eq.historialMantenimiento && eq.historialMantenimiento.length > 0) {
         html += '<div class="section-title">Fichas de mantenimiento</div>';
         html += '<div class="list" style="margin-bottom:16px">';
-        eq.historialMantenimiento.slice().reverse().forEach(m => {
+        eq.historialMantenimiento.slice().reverse().forEach((m, mIdx) => {
+          const fichaIdx = eq.historialMantenimiento.length - 1 - mIdx;
           const resColor = m.resultado==='resuelto'?'var(--green)':m.resultado==='sin_solucion'?'var(--red)':'#f59e0b';
           const resLabel = m.resultado==='resuelto'?'✅ Resuelto':m.resultado==='sin_solucion'?'❌ Sin solución':'⏳ Pendiente';
           html += '<div class="historial-card"><div class="historial-row"><div>';
@@ -283,6 +285,7 @@ if (state.inventarioSearch) {
           if (m.observaciones) html += '<div style="font-size:11px;color:var(--text3);margin-top:2px">📋 ' + m.observaciones + '</div>';
           html += '<div style="margin-top:4px"><span style="font-size:10px;font-weight:700;color:'+resColor+'">'+resLabel+'</span></div>';
           if (m.registradoPor) html += '<div style="font-size:10px;color:var(--text3);margin-top:2px">👤 '+m.registradoPor+'</div>';
+          if (m.envioRevision) html += '<button onclick="memoRevision(\'' + eq.id + '\',' + fichaIdx + ')" style="margin-top:6px;background:#f3f0ff;color:#7c3aed;border:1px solid #7c3aed;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font)">📄 Memo de envío</button>';
           html += '</div><div class="historial-fecha">' + fmtDate(m.fechaInicio) + (m.fechaResolucion?'<br>→ '+fmtDate(m.fechaResolucion):'') + '</div></div></div>';
         });
         html += '</div>';
