@@ -32,6 +32,7 @@ export function openRevisionModal(id) {
   if (!eq) return;
   const ultimo = antecedentesRevision(eq)[0];
   state.revisionEqId = id;
+  state.revisionFichaIdx = null;
   state.revisionForm = {
     motivo: MOTIVO_DEFAULT,
     descripcion: ultimo ? ultimo.texto + (ultimo.origen ? ' — ' + ultimo.origen + '.' : '') : '',
@@ -41,9 +42,41 @@ export function openRevisionModal(id) {
   render();
 }
 
-export function closeRevisionModal() {
-  state.showRevisionModal = false; state.revisionEqId = null;
+// Abre el formulario con los datos de un envío ya registrado para corregirlos
+export function editarRevision(eqId, fichaIdx) {
+  const envio = state.equipos.find(x => x.id === eqId)?.historialMantenimiento?.[fichaIdx]?.envioRevision;
+  if (!envio) return;
+  state.revisionEqId = eqId;
+  state.revisionFichaIdx = fichaIdx;
+  state.revisionForm = { motivo: envio.motivo || '', descripcion: envio.descripcion || '', fechaIncidente: envio.fechaIncidente || '' };
+  state.showRevisionModal = true;
   render();
+}
+
+export function closeRevisionModal() {
+  state.showRevisionModal = false; state.revisionEqId = null; state.revisionFichaIdx = null;
+  render();
+}
+
+// Guarda la corrección de un envío: solo cambia los datos del memo y de su ficha
+function guardarEdicionRevision(eq, idx) {
+  const f = state.revisionForm;
+  const fichas = [...(eq.historialMantenimiento || [])];
+  const ficha = fichas[idx];
+  if (!ficha?.envioRevision) return;
+  const envio = {
+    ...ficha.envioRevision,
+    motivo: f.motivo.trim() || MOTIVO_DEFAULT,
+    descripcion: f.descripcion.trim(),
+    fechaIncidente: f.fechaIncidente,
+    editadoPor: state.sesionUsuario?.nombre || 'Desconocido',
+    fechaEdicion: today(),
+  };
+  fichas[idx] = { ...ficha, descripcion: envio.descripcion, observaciones: envio.motivo, envioRevision: envio };
+  state.showRevisionModal = false; state.revisionEqId = null; state.revisionFichaIdx = null;
+  render();
+  generateMemoRevision(eq, envio);
+  update(ref(db, 'equipos/' + eq.id), { historialMantenimiento: fichas }).then(() => showToast('✏️ Memo de envío actualizado'));
 }
 
 export function confirmRevision() {
@@ -52,6 +85,7 @@ export function confirmRevision() {
   const f = state.revisionForm;
   if (!f.descripcion.trim()) return showToast('Describe qué le pasó al equipo');
   if (!f.fechaIncidente) return showToast('Indica la fecha del incidente');
+  if (state.revisionFichaIdx !== null) return guardarEdicionRevision(eq, state.revisionFichaIdx);
 
   const usuario = state.sesionUsuario?.nombre || 'Desconocido';
   const envio = {

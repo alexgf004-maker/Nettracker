@@ -17,6 +17,7 @@ export function openDanioModal(id) {
   if (!r) return;
   const fallas = r.fallas || [];
   state.danioId = id;
+  state.danioEditando = false;
   state.danioForm = {
     fechaDanio: r.fechaRetiroReal || today(),
     descripcion: [fallas.join(', '), r.descripcionFalla].filter(Boolean).join('. '),
@@ -27,9 +28,53 @@ export function openDanioModal(id) {
   render();
 }
 
-export function closeDanioModal() {
-  state.showDanioModal = false; state.danioId = null;
+// Abre el formulario con los datos del memo ya generado para corregirlos
+export function editarDanio(id) {
+  const m = state.records.find(x => x.id === id)?.memoDanio;
+  if (!m) return;
+  state.danioId = id;
+  state.danioEditando = true;
+  state.danioForm = { fechaDanio: m.fechaDanio || '', descripcion: m.descripcion || '', condicion: m.condicion || 'detalles', tecnicoCampos: m.tecnicoCampos || '' };
+  state.showDanioModal = true;
   render();
+}
+
+export function closeDanioModal() {
+  state.showDanioModal = false; state.danioId = null; state.danioEditando = false;
+  render();
+}
+
+// Guarda la corrección del memo. Si cambió la condición, también la del equipo.
+function guardarEdicionDanio(r) {
+  const f = state.danioForm;
+  const usuario = state.sesionUsuario?.nombre || 'Desconocido';
+  const anterior = r.memoDanio;
+  const memo = {
+    ...anterior,
+    fechaDanio: f.fechaDanio,
+    descripcion: f.descripcion.trim(),
+    condicion: f.condicion,
+    tecnicoCampos: f.tecnicoCampos.trim(),
+    fechaRetiro: r.fechaRetiro || anterior.fechaRetiro || '',
+    editadoPor: usuario,
+    fechaEdicion: today(),
+  };
+  state.showDanioModal = false; state.danioId = null; state.danioEditando = false;
+  render();
+  generateMemoDanio(memo);
+  update(ref(db, 'analizadores/' + r.id), { memoDanio: memo });
+
+  const eq = state.equipos.find(x => x.id === r.equipoId);
+  if (eq && memo.condicion !== anterior.condicion && (eq.condicion || 'bueno') !== memo.condicion) {
+    update(ref(db, 'equipos/' + eq.id), {
+      condicion: memo.condicion,
+      historialCondicion: [...(eq.historialCondicion || []), {
+        fecha: today(), condicionAnterior: eq.condicion || 'bueno', condicionNueva: memo.condicion,
+        nota: 'Corrección del memo de equipo dañado (caso ' + memo.caso + ')', registradoPor: usuario,
+      }],
+    });
+  }
+  showToast('✏️ Memo actualizado');
 }
 
 export function confirmDanio() {
@@ -38,6 +83,7 @@ export function confirmDanio() {
   const f = state.danioForm;
   if (!f.descripcion.trim()) return showToast('Describe qué le pasó al equipo');
   if (!f.fechaDanio) return showToast('Indica la fecha del daño');
+  if (state.danioEditando && r.memoDanio) return guardarEdicionDanio(r);
 
   const eq = state.equipos.find(x => x.id === r.equipoId);
   const usuario = state.sesionUsuario?.nombre || 'Desconocido';

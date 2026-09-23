@@ -424,3 +424,77 @@ test.describe('Campos y Servicios', () => {
     await expect(app$(page)).not.toContainText('Memo de equipo dañado');
   });
 });
+
+test.describe('Editar memos', () => {
+  async function capturarDocs(page) {
+    await page.evaluate(() => {
+      window.__docs = [];
+      const crear = URL.createObjectURL.bind(URL);
+      URL.createObjectURL = b => { b.text().then(t => window.__docs.push(t)); return crear(b); };
+    });
+    return () => page.evaluate(() => window.__docs);
+  }
+
+  test.beforeEach(async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+  });
+
+  test('memo de equipo dañado: se corrige y el cambio de condición llega al equipo', async ({ page }) => {
+    const docs = await capturarDocs(page);
+    await app.ejecutar(() => { switchTab('instalaciones'); setInstTab('campos'); openDetail('r6'); });
+    await page.getByText('Memo de equipo dañado').click();
+    await page.getByText('Generar memo').click();
+    await expect(page.getByText('Ver memo de equipo dañado')).toBeVisible();
+
+    await page.getByRole('button', { name: '✏️ Editar' }).click();
+    await expect(page.getByText('Editar memo de equipo dañado')).toBeVisible();
+    await expect(page.locator('#danio-descripcion')).toHaveValue('No enciende / Sin señales de vida. Carcasa quebrada');
+    await page.locator('#danio-descripcion').fill('Pantalla rota');
+    await page.locator(`div[onclick="setDanioField('condicion','detalles')"]`).click();
+    await page.getByText('Guardar cambios').click();
+
+    await expect.poll(async () => (await docs()).length).toBe(2);
+    const memo = (await docs())[1];
+    expect(memo).toContain('Pantalla rota');
+    expect(memo).toContain('Con detalles');
+    expect(memo).toContain('Última edición: 23/09/2026 por David García');
+
+    const escrituras = await app.escrituras();
+    const memos = escrituras.filter(([, ruta]) => ruta === 'analizadores/r6').map(w => w[2].memoDanio);
+    expect(memos).toHaveLength(2);
+    expect(memos[1]).toMatchObject({ descripcion: 'Pantalla rota', condicion: 'detalles', editadoPor: 'David García', caso: 'C-006' });
+    expect(memos[1].fecha).toBe(memos[0].fecha); // conserva la fecha original del memo
+    const eq = escrituras.filter(([, ruta]) => ruta === 'equipos/e7').at(-1)[2];
+    expect(eq.condicion).toBe('detalles');
+    expect(eq.historialCondicion.at(-1)).toMatchObject({ condicionAnterior: 'fuera', condicionNueva: 'detalles' });
+    expect(eq.sede).toBeUndefined(); // editar no mueve el equipo
+  });
+
+  test('memo de envío a revisión: se corrige sin cambiar sede ni condición', async ({ page }) => {
+    const docs = await capturarDocs(page);
+    await app.ejecutar(() => { switchTab('inventario'); openEqDetalle('e6'); });
+    await page.getByText('Enviar a revisión (Cucumacayán)').click();
+    await page.locator('#rev-descripcion').fill('No enciende');
+    await page.getByText('Enviar y generar memo').click();
+    await app.ejecutar(() => setEqDetalleTab('mantenimiento'));
+
+    await page.getByRole('button', { name: '✏️ Editar' }).click();
+    await expect(page.getByText('Editar envío a revisión')).toBeVisible();
+    await expect(page.locator('#rev-descripcion')).toHaveValue('No enciende');
+    await page.locator('#rev-descripcion').fill('No enciende y huele a quemado');
+    await page.locator('#rev-fecha').fill('2026-09-20');
+    await page.getByText('Guardar cambios').click();
+
+    await expect.poll(async () => (await docs()).length).toBe(2);
+    expect((await docs())[1]).toContain('No enciende y huele a quemado');
+    expect((await docs())[1]).toContain('Última edición: 23/09/2026 por David García');
+
+    const [, ruta, datos] = (await app.escrituras()).at(-1);
+    expect(ruta).toBe('equipos/e6');
+    expect(Object.keys(datos)).toEqual(['historialMantenimiento']);
+    const ficha = datos.historialMantenimiento.at(-1);
+    expect(ficha.descripcion).toBe('No enciende y huele a quemado');
+    expect(ficha.envioRevision).toMatchObject({ descripcion: 'No enciende y huele a quemado', fechaIncidente: '2026-09-20', editadoPor: 'David García', entregadoPor: 'David García' });
+  });
+});

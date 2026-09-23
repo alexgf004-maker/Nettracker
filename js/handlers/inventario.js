@@ -7,7 +7,7 @@ import { state } from '../state.js';
 import { abrirDoc, showToast } from '../ui.js';
 import { calcSt, emptyEF, eqPrestado, fmtDate, today } from '../utils.js';
 import { render } from '../views/render.js';
-import { closeRevisionModal, confirmRevision, openRevisionModal, reimprimirMemoRevision } from '../actions/revision.js';
+import { closeRevisionModal, confirmRevision, editarRevision, openRevisionModal, reimprimirMemoRevision } from '../actions/revision.js';
 
 window.exportHojaVida = eqId => {
   const eq = state.equipos.find(x => x.id === eqId);
@@ -355,3 +355,4 @@ window.closeRevisionModal = closeRevisionModal;
 window.setRevisionField = (k, v) => { state.revisionForm[k] = v; };
 window.doEnvioRevision = confirmRevision;
 window.memoRevision = reimprimirMemoRevision;
+window.editarRevision = editarRevision;

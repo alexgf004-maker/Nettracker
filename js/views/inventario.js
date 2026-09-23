@@ -285,7 +285,7 @@ if (state.inventarioSearch) {
           if (m.observaciones) html += '<div style="font-size:11px;color:var(--text3);margin-top:2px">📋 ' + m.observaciones + '</div>';
           html += '<div style="margin-top:4px"><span style="font-size:10px;font-weight:700;color:'+resColor+'">'+resLabel+'</span></div>';
           if (m.registradoPor) html += '<div style="font-size:10px;color:var(--text3);margin-top:2px">👤 '+m.registradoPor+'</div>';
-          if (m.envioRevision) html += '<button onclick="memoRevision(\'' + eq.id + '\',' + fichaIdx + ')" style="margin-top:6px;background:#f3f0ff;color:#7c3aed;border:1px solid #7c3aed;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font)">📄 Memo de envío</button>';
+          if (m.envioRevision) html += '<button onclick="memoRevision(\'' + eq.id + '\',' + fichaIdx + ')" style="margin-top:6px;background:#f3f0ff;color:#7c3aed;border:1px solid #7c3aed;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font)">📄 Memo de envío</button> <button onclick="editarRevision(\'' + eq.id + '\',' + fichaIdx + ')" style="margin-top:6px;background:none;color:#7c3aed;border:1px solid #7c3aed;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font)">✏️ Editar</button>';
           html += '</div><div class="historial-fecha">' + fmtDate(m.fechaInicio) + (m.fechaResolucion?'<br>→ '+fmtDate(m.fechaResolucion):'') + '</div></div></div>';
         });
         html += '</div>';

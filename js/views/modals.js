@@ -355,12 +355,13 @@ export function renderRevisionModal() {
   const eq = state.equipos.find(x => x.id === state.revisionEqId);
   if (!eq) return '';
   const f = state.revisionForm;
+  const editando = state.revisionFichaIdx !== null;
   const campo = 'width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none;background:var(--white);color:var(--text)';
   const etiqueta = 'font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px';
   return `<div style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
       <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:90vh;overflow-y:auto;padding:20px;font-family:var(--font)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <div style="font-size:17px;font-weight:700;color:var(--text)">Enviar a revisión</div>
+          <div style="font-size:17px;font-weight:700;color:var(--text)">${editando ? 'Editar envío a revisión' : 'Enviar a revisión'}</div>
           <button onclick="closeRevisionModal()" style="background:none;border:none;font-size:24px;color:var(--text3);cursor:pointer">✕</button>
         </div>
         <div style="font-size:13px;color:var(--text3);margin-bottom:16px"><b style="font-family:var(--mono);color:var(--text)">${escapeHtml(eq.serie)}</b> · ${escapeHtml(eq.sede || 'Plantel Central')} → Subestación Cucumacayán</div>
@@ -378,9 +379,9 @@ export function renderRevisionModal() {
           <input id="rev-fecha" type="date" value="${escapeHtml(f.fechaIncidente)}" onchange="setRevisionField('fechaIncidente', this.value)" style="${campo}">
         </div>
         <div style="background:#f3f0ff;border-radius:10px;padding:10px 12px;font-size:12px;color:#5b21b6;margin-bottom:14px;line-height:1.5">
-          Al confirmar se genera el memo y el equipo pasa a <b>Subestación Cucumacayán</b> con condición <b>En mantenimiento</b> y una ficha pendiente.
+          ${editando ? 'Se corrigen los datos del memo y de su ficha de mantenimiento. La sede y la condición del equipo no cambian.' : 'Al confirmar se genera el memo y el equipo pasa a <b>Subestación Cucumacayán</b> con condición <b>En mantenimiento</b> y una ficha pendiente.'}
         </div>
-        <button onclick="doEnvioRevision()" style="width:100%;background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">📤 Enviar y generar memo</button>
+        <button onclick="doEnvioRevision()" style="width:100%;background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">${editando ? '💾 Guardar cambios' : '📤 Enviar y generar memo'}</button>
         <button onclick="closeRevisionModal()" style="width:100%;background:#fff;color:var(--text3);border:1px solid var(--border);border-radius:10px;padding:13px;font-family:var(--font);font-size:15px;cursor:pointer">Cancelar</button>
       </div>
     </div>`;
@@ -396,7 +397,7 @@ export function renderDanioModal() {
   return `<div style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
       <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:90vh;overflow-y:auto;padding:20px;font-family:var(--font)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <div style="font-size:17px;font-weight:700;color:var(--text)">Equipo dañado en campo</div>
+          <div style="font-size:17px;font-weight:700;color:var(--text)">${state.danioEditando ? 'Editar memo de equipo dañado' : 'Equipo dañado en campo'}</div>
           <button onclick="closeDanioModal()" style="background:none;border:none;font-size:24px;color:var(--text3);cursor:pointer">✕</button>
         </div>
         <div style="font-size:13px;color:var(--text3);margin-bottom:16px"><b style="font-family:var(--mono);color:var(--text)">${escapeHtml(r.serie)}</b> · Caso #${escapeHtml(r.caso)} · Campos y Servicios</div>
@@ -420,9 +421,9 @@ export function renderDanioModal() {
           <input id="danio-tecnico" value="${escapeHtml(f.tecnicoCampos)}" placeholder="Quién reportó o tenía el equipo" oninput="setDanioField('tecnicoCampos', this.value)" style="${campo}">
         </div>
         <div style="background:#fef2f2;border-radius:10px;padding:10px 12px;font-size:12px;color:#991b1b;margin-bottom:14px;line-height:1.5">
-          Al confirmar se genera el memo con firmas de CPT, Subestación Cucumacayán y Campos y Servicios. El equipo queda en la <b>Cucumacayán</b> con la condición elegida.
+          ${state.danioEditando ? 'Se corrige el memo. Si cambias la condición, el equipo también cambia y queda en su historial.' : 'Al confirmar se genera el memo con firmas de CPT, Subestación Cucumacayán y Campos y Servicios. El equipo queda en la <b>Cucumacayán</b> con la condición elegida.'}
         </div>
-        <button onclick="doMemoDanio()" style="width:100%;background:#dc2626;color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">📝 Generar memo</button>
+        <button onclick="doMemoDanio()" style="width:100%;background:#dc2626;color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">${state.danioEditando ? '💾 Guardar cambios' : '📝 Generar memo'}</button>
         <button onclick="closeDanioModal()" style="width:100%;background:#fff;color:var(--text3);border:1px solid var(--border);border-radius:10px;padding:13px;font-family:var(--font);font-size:15px;cursor:pointer">Cancelar</button>
       </div>
     </div>`;
