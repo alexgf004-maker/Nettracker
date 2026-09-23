@@ -42,6 +42,9 @@ js/
     general.js · instalaciones.js · inventario.js · validaciones.js · carga.js
 ```
 
+### Pruebas automáticas
+`npm test` recorre la app con datos de ejemplo y una Firebase falsa (detalles en `tests/README.md`). GitHub las corre en cada pull request.
+
 ### Probar en local
 Los ES modules **no funcionan abriendo el archivo con doble clic** (`file://`). Hay que servir la carpeta:
 ```
@@ -274,4 +277,5 @@ sesionUsuario = { nombre, pin, area }  // null = no logueado
 3. **Función nueva usada en otro archivo** → `export` donde se define e `import` donde se usa (rutas relativas con `.js` al final)
 4. **Handler para un `onclick`** → `window.nombre = ...` en `js/handlers/`
 5. **`render()` debe llamarse** al final de cualquier handler que cambie estado visible
-6. **Verificar sintaxis** con `node --check js/ruta/archivo.js` y probar en local con `python3 -m http.server`
+6. **Correr `npm test`** antes de publicar; si agregas una función importante, agrega su prueba en `tests/app.spec.js`
+7. Probar en local con `npm run serve` (o `python3 -m http.server`)
