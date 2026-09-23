@@ -191,6 +191,22 @@ test.describe('Validaciones de TAP', () => {
     await expect(app$(page)).toContainText('23,000 V'); // opciones trifásicas
   });
 
+  test('voltaje secundario "Otro" en monofásico (referencia y campaña)', async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { switchTab('validaciones'); abrirCampana('v1'); abrirFormVal('0'); setValTipoUsuario('monofasico'); });
+    await page.locator('#vf-ref-vs').selectOption('otro');
+    await page.locator('#vf-ref-vs-otro').fill('250');
+    // elegir "Otro" en campaña redibuja la pantalla: lo de referencia no debe perderse
+    await page.locator('#vf-cp-vs').selectOption('otro');
+    await expect(page.locator('#vf-ref-vs')).toHaveValue('otro');
+    await expect(page.locator('#vf-ref-vs-otro')).toHaveValue('250');
+    await expect(page.locator('#vf-cp-vs-otro')).toBeVisible();
+    // volver a un voltaje normal oculta el campo manual
+    await page.locator('#vf-cp-vs').selectOption('240');
+    await expect(page.locator('#vf-cp-vs-otro')).toHaveCount(0);
+  });
+
   test('voltaje secundario "Otro" muestra el campo manual (bifásico)', async ({ page }) => {
     app = await abrirApp(page);
     await cerrarAlerta(page);
