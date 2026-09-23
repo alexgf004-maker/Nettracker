@@ -1,5 +1,5 @@
 // Lógica de instalaciones: guardar, retiro, descarga, calendario
-import { isAdmin } from '../config.js';
+import { FALLAS_GRAVES, isAdmin } from '../config.js';
 import { db, installsRef, push, ref, remove, update } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
@@ -97,11 +97,10 @@ export function handleRetiro() {
     if (deployRec && deployRec.equipoId) {
       const eq = state.equipos.find(x => x.id === deployRec.equipoId);
       const fallas = state.retiroForm.fallas;
-      const GRAVES = ['Equipo no funciona', 'Daño total'];
       let nuevaCondicion = null;
       if (state.retiroForm.sinProblema) {
         nuevaCondicion = 'bueno';
-      } else if (fallas.some(f => GRAVES.includes(f))) {
+      } else if (fallas.some(f => FALLAS_GRAVES.includes(f))) {
         nuevaCondicion = 'fuera';
       } else if (fallas.length > 0) {
         nuevaCondicion = 'detalles';

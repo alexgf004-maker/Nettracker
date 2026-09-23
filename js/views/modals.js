@@ -1,13 +1,13 @@
 // Modales (retiro, descarga, importar, mantenimiento, condición, préstamo, selector, búsqueda, alerta)
-import { AREAS, CONDICIONES, SEDES, userArea } from '../config.js';
+import { AREAS, CONDICIONES, FALLAS_GRAVES, FALLAS_RETIRO, SEDES, userArea } from '../config.js';
 import { state } from '../state.js';
 import { badgeSt } from '../ui.js';
 import { areaToSede, calcSt, daysUntil, eqSt, escapeHtml } from '../utils.js';
 
 export function renderRetiroModal() {
   let html = '';
-  const FAULT_TYPES = ['Conector con falso','Falla batería (solo enciende energizado)','LED intermitente','No agarra WiFi','Tapadera no cierra'];
-  const FAULT_GRAVES = ['No enciende / Sin señales de vida','Equipo calcinado / Explosión'];
+  const FAULT_TYPES = FALLAS_RETIRO;
+  const FAULT_GRAVES = FALLAS_GRAVES;
   const allOpts = ['Sin problemas', ...FAULT_TYPES];
   html += `<div style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
       <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:90vh;overflow-y:auto;padding:20px;font-family:'DM Sans',sans-serif">
