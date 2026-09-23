@@ -9,7 +9,7 @@ export function renderRetiroModal() {
   const FAULT_TYPES = FALLAS_RETIRO;
   const FAULT_GRAVES = FALLAS_GRAVES;
   const allOpts = ['Sin problemas', ...FAULT_TYPES];
-  html += `<div style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
+  html += `<div class="modal-overlay" style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
       <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:90vh;overflow-y:auto;padding:20px;font-family:'DM Sans',sans-serif">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
           <div style="font-size:17px;font-weight:700;color:#1a1d27">Registrar retiro</div>
@@ -81,7 +81,7 @@ export function renderRetiroModal() {
 
 export function renderDescargaModal() {
   let html = '';
-  html += '<div style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">';
+  html += '<div class="modal-overlay" style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">';
   html += '<div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:90vh;overflow-y:auto;padding:20px;font-family:var(--font)">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:17px;font-weight:700;color:var(--text)">💾 Registrar descarga</div><button onclick="closeDescargaModal()" style="background:none;border:none;font-size:24px;color:var(--text3);cursor:pointer">✕</button></div>';
   html += '<div style="font-size:12px;font-weight:700;color:var(--text3);margin-bottom:10px">¿QUIÉN REALIZÓ LA DESCARGA?</div>';
@@ -115,7 +115,7 @@ export function renderImportModal() {
   const nuevos = state.importData.filter(r => r.status === 'ok').length;
   const dupes = state.importData.filter(r => r.status === 'duplicado').length;
   const errores = state.importData.filter(r => r.status === 'error').length;
-  html += `<div style="position:fixed;inset:0;background:#00000088;z-index:200;display:flex;align-items:flex-end">
+  html += `<div class="modal-overlay" style="position:fixed;inset:0;background:#00000088;z-index:200;display:flex;align-items:flex-end">
       <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:85vh;display:flex;flex-direction:column;padding:20px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-shrink:0">
           <div style="font-size:17px;font-weight:700;color:var(--text)">Importar inventario</div>
@@ -150,7 +150,7 @@ export function renderImportModal() {
 
 export function renderMantModal() {
   let html = '';
-  html += `<div style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
+  html += `<div class="modal-overlay" style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
       <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:90vh;overflow-y:auto;padding:20px;font-family:var(--font)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
           <div style="font-size:17px;font-weight:700;color:var(--text)">🔧 Ficha de mantenimiento</div>
@@ -185,7 +185,7 @@ export function renderMantModal() {
 
 export function renderCondicionModal() {
   let html = '';
-  html += `<div style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
+  html += `<div class="modal-overlay" style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
       <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;padding:20px;font-family:var(--font)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
           <div style="font-size:17px;font-weight:700;color:var(--text)">Actualizar condición</div>
@@ -210,7 +210,7 @@ export function renderCondicionModal() {
 export function renderPrestamoModal() {
   let html = '';
   const esPrestamo = state.prestamoForm.tipo === 'prestamo';
-  html += `<div style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
+  html += `<div class="modal-overlay" style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
       <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:85vh;overflow-y:auto;padding:20px;font-family:var(--font)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
           <div style="font-size:17px;font-weight:700;color:var(--text)">${esPrestamo ? '🔄 Registrar préstamo' : '✅ Registrar devolución'}</div>
@@ -281,7 +281,7 @@ export function renderGlobalSearch() {
   const q = state.globalSearch.toLowerCase().trim();
   const instRes = q.length >= 2 ? state.records.filter(r => (r.serie||'').toLowerCase().includes(q) || (r.caso||'').toLowerCase().includes(q) || (r.lugar||'').toLowerCase().includes(q)).slice(0,6) : [];
   const eqRes = q.length >= 2 ? state.equipos.filter(e => (e.serie||'').toLowerCase().includes(q) || (e.modelo||'').toLowerCase().includes(q) || (e.vineta||'').toLowerCase().includes(q)).slice(0,6) : [];
-  html += '<div style="position:fixed;inset:0;background:#00000088;z-index:300;display:flex;flex-direction:column;padding:60px 16px 16px">';
+  html += '<div class="modal-overlay" style="position:fixed;inset:0;background:#00000088;z-index:300;display:flex;flex-direction:column;padding:60px 16px 16px">';
   html += '<div style="background:var(--white);border-radius:16px;overflow:hidden;max-height:80vh;display:flex;flex-direction:column">';
   html += '<div style="padding:14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center">';
   html += '<input id="gsearch" autofocus placeholder="Buscar serie, caso, lugar, viñeta..." value="'+state.globalSearch+'" oninput="setGlobalSearch(this.value)" style="flex:1;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;font-family:var(--font);font-size:14px;outline:none">';
@@ -323,7 +323,7 @@ export function renderAlertaRetiros() {
   let html = '';
   const ua = userArea(); const proximos = state.records.filter(r => !r.retirado && daysUntil(r.fechaRetiro) <= 3 && daysUntil(r.fechaRetiro) >= 0 && (r.areaInstalacion||'CPT MT') === ua)
     .sort((a,b) => daysUntil(a.fechaRetiro) - daysUntil(b.fechaRetiro));
-  html += '<div style="position:fixed;inset:0;background:#00000088;z-index:300;display:flex;align-items:center;justify-content:center;padding:24px">';
+  html += '<div class="modal-overlay" style="position:fixed;inset:0;background:#00000088;z-index:300;display:flex;align-items:center;justify-content:center;padding:24px">';
   html += '<div style="background:#fff;border-radius:20px;width:100%;max-width:380px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">';
   html += '<div style="background:linear-gradient(135deg,#ff6b35,#f7c948);padding:20px 20px 16px">';
   html += '<div style="font-size:22px;margin-bottom:4px">🔔</div>';
@@ -358,7 +358,7 @@ export function renderRevisionModal() {
   const editando = state.revisionFichaIdx !== null;
   const campo = 'width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none;background:var(--white);color:var(--text)';
   const etiqueta = 'font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px';
-  return `<div style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
+  return `<div class="modal-overlay" style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
       <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:90vh;overflow-y:auto;padding:20px;font-family:var(--font)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
           <div style="font-size:17px;font-weight:700;color:var(--text)">${editando ? 'Editar envío a revisión' : 'Enviar a revisión'}</div>
@@ -394,7 +394,7 @@ export function renderDanioModal() {
   const campo = 'width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none;background:var(--white);color:var(--text)';
   const etiqueta = 'font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px';
   const condiciones = CONDICIONES.filter(c => c.key === 'fuera' || c.key === 'detalles');
-  return `<div style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
+  return `<div class="modal-overlay" style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
       <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:90vh;overflow-y:auto;padding:20px;font-family:var(--font)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
           <div style="font-size:17px;font-weight:700;color:var(--text)">${state.danioEditando ? 'Editar memo de equipo dañado' : 'Equipo dañado en campo'}</div>

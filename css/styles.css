@@ -253,3 +253,68 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
 @keyframes fadeSlide { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:translateY(0)} }
 .badge-vencido { animation: pulse-red 1.5s ease-in-out infinite; }
 @keyframes pulse-red { 0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.4)} 50%{box-shadow:0 0 0 5px rgba(220,38,38,0)} }
+
+/* MODALES
+   La mayoría trae sus estilos inline; estas clases completan el selector de equipo
+   (que no tenía estilos) y permiten centrar todos los modales en PC. */
+.modal-overlay { position: fixed; inset: 0; background: #00000066; z-index: 200; display: flex; align-items: flex-end; }
+.modal { background: var(--white); padding: 20px; width: 100%; box-shadow: var(--shadow-md); }
+
+/* ─────────────── VISTA DE ESCRITORIO (PC) ─────────────── */
+@media (min-width: 1024px) {
+  :root { --sidebar: 232px; --header-h: 64px; }
+
+  body { max-width: none; }
+  body:has(.bottom-nav) { padding-left: var(--sidebar); }
+
+  /* Header a todo el ancho, por encima del menú lateral */
+  header {
+    height: var(--header-h); padding: 0 28px;
+    margin-left: calc(-1 * var(--sidebar));
+    z-index: 70;
+  }
+
+  /* La barra inferior pasa a ser un menú lateral */
+  .bottom-nav {
+    top: var(--header-h); bottom: 0; left: 0; transform: none;
+    width: var(--sidebar); max-width: none;
+    flex-direction: column; gap: 4px;
+    padding: 16px 12px;
+    border-top: none; border-right: 1px solid var(--border);
+    box-shadow: none;
+  }
+  .nav-btn {
+    flex: none; flex-direction: row; justify-content: flex-start; gap: 12px;
+    padding: 11px 14px; border-radius: 10px; transition: background .15s;
+  }
+  .nav-btn:hover { background: var(--bg); }
+  .nav-btn.active { background: var(--primary-light); }
+  .nav-btn.active::after { top: 8px; bottom: 8px; left: 0; right: auto; width: 3px; height: auto; border-radius: 0 4px 4px 0; }
+  .nav-icon { font-size: 20px; }
+  .nav-label { font-size: 14px; letter-spacing: 0; }
+
+  /* Contenido más ancho y centrado */
+  .content { max-width: 1180px; margin: 0 auto; padding: 24px 32px 40px; }
+
+  /* Detalles y formularios: más angostos para que no se estiren */
+  #app[data-view="detalle"] .content, #app[data-view="equipo_detalle"] .content,
+  #app[data-view="form"] .content, #app[data-view="equipo_form"] .content,
+  #app[data-view="val-form"] .content { max-width: 860px; }
+
+  /* Listas de tarjetas en varias columnas */
+  .list { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+  .eq-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 0 12px; }
+  .eq-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)) !important; }
+  .card:active { transform: none; }
+  .card:hover { box-shadow: var(--shadow-md); }
+
+  /* Los modales se muestran como ventana centrada en vez de hoja inferior */
+  .modal-overlay { align-items: center !important; justify-content: center; padding: 24px !important; }
+  .modal-overlay > div {
+    width: 100% !important; max-width: 560px !important;
+    border-radius: 20px !important; max-height: 88vh; overflow-y: auto;
+  }
+
+  /* El aviso inferior no queda tapado por el menú */
+  .toast { left: calc(50% + var(--sidebar) / 2); bottom: 32px; }
+}

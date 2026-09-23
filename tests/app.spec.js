@@ -523,3 +523,41 @@ test.describe('Editar memos', () => {
     expect(ficha.envioRevision).toMatchObject({ descripcion: 'No enciende y huele a quemado', fechaIncidente: '2026-09-20', editadoPor: 'David García', entregadoPor: 'David García' });
   });
 });
+
+test.describe('Vista de PC', () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  test('menú lateral, listas en columnas y modales centrados', async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    // El menú queda a la izquierda, en vertical
+    const nav = await page.locator('nav.bottom-nav').boundingBox();
+    expect(nav.x).toBe(0);
+    expect(nav.height).toBeGreaterThan(nav.width);
+    // Las tarjetas del inventario se reparten en columnas
+    await page.locator('nav.bottom-nav button', { hasText: 'Inventario' }).click();
+    const [a, b] = await Promise.all(['SN-105', 'SN-106'].map(s => page.locator('.eq-lista > div', { hasText: s }).boundingBox()));
+    expect(Math.abs(a.y - b.y)).toBeLessThan(2);
+    // Los modales se muestran como ventana centrada
+    await app.ejecutar(() => { openEqDetalle('e6'); openRevisionModal('e6'); });
+    const modal = await page.locator('.modal-overlay > div').boundingBox();
+    expect(modal.width).toBeLessThanOrEqual(560);
+    expect(modal.y).toBeGreaterThan(20);
+  });
+
+  test('en celular el menú sigue abajo', async ({ page }) => {
+    await page.setViewportSize({ width: 400, height: 800 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    const nav = await page.locator('nav.bottom-nav').boundingBox();
+    expect(nav.y + nav.height).toBeCloseTo(800, 0);
+    expect(nav.width).toBe(400);
+  });
+});
+
+test('el selector de equipo se abre como ventana sobre el formulario', async ({ page }) => {
+  app = await abrirApp(page);
+  await cerrarAlerta(page);
+  await app.ejecutar(() => { switchTab('instalaciones'); newInstall(); openSelector(); });
+  await expect(page.locator('.modal-overlay')).toHaveCSS('position', 'fixed');
+});

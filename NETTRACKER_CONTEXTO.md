@@ -45,6 +45,14 @@ js/
 ### Pruebas automáticas
 `npm test` recorre la app con datos de ejemplo y una Firebase falsa (detalles en `tests/README.md`). GitHub las corre en cada pull request.
 
+### Vista de PC
+Pantallas de 1024px o más (todo en `css/styles.css`, bloque `@media (min-width: 1024px)`):
+- La barra inferior se convierte en menú lateral izquierdo; el header ocupa todo el ancho
+- El contenido se centra (máx. 1180px) y las listas (`.list`, `.eq-lista`) pasan a varias columnas
+- Los modales (`.modal-overlay`) se muestran como ventana centrada en vez de hoja inferior
+- Detalles y formularios se limitan a 860px; `render()` pone `data-view` en `#app` para eso
+- En celular no cambia nada
+
 ### Probar en local
 Los ES modules **no funcionan abriendo el archivo con doble clic** (`file://`). Hay que servir la carpeta:
 ```

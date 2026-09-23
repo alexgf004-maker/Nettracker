@@ -66,6 +66,7 @@ export function render() {
   html += renderBottomNav();
 
   el.innerHTML = html;
+  el.dataset.view = state.tab === 'validaciones' ? 'val-' + state.valView : state.view; // el CSS de PC ajusta el ancho según la vista
 
   // Restore focus to search input if one was active
   const activeSearch = el.querySelector('input.search-input[data-active="true"]');

@@ -28,7 +28,7 @@ export function renderValidaciones() {
       });
     }
     if (state.showValImport) {
-      html += '<div style="position:fixed;inset:0;background:#00000088;z-index:300;display:flex;align-items:flex-end">';
+      html += '<div class="modal-overlay" style="position:fixed;inset:0;background:#00000088;z-index:300;display:flex;align-items:flex-end">';
       html += '<div style="background:var(--white);border-radius:20px 20px 0 0;width:100%;padding:20px;font-family:var(--font);max-height:90vh;overflow-y:auto">';
       html += '<div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:6px">Nueva campaña de validación</div>';
       html += '<div style="font-size:12px;color:var(--text3);margin-bottom:14px">Sube el Excel con los usuarios a validar</div>';
