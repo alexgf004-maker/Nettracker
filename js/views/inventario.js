@@ -66,7 +66,7 @@ if (state.inventarioSearch) {
           if (grupo.items.length === 0) return;
           html += '<div style="margin-bottom:16px">';
           html += '<div style="font-size:11px;font-weight:700;color:'+grupo.color+';letter-spacing:.5px;margin-bottom:8px;padding:6px 10px;background:'+grupo.color+'18;border-radius:8px;border-left:3px solid '+grupo.color+'">' + grupo.label + ' <span style="font-weight:400;color:var(--text3)">(' + grupo.items.length + ')</span></div>';
-          if (state.vistaInventario === 'grid') html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+          html += state.vistaInventario === 'grid' ? '<div class="eq-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' : '<div class="eq-lista">';
           grupo.items.forEach(eq => {
             const isPrestado = eqPrestado(eq);
             const isEnCampo = eqEnCampo(eq);
@@ -141,7 +141,7 @@ if (state.inventarioSearch) {
             if (state.vistaInventario === 'grid') html += '</div>';
             } // end else grid
           });
-          if (state.vistaInventario === 'grid') html += '<\/div>';
+          html += '<\/div>';
           html += '<\/div>';
         });
       }
