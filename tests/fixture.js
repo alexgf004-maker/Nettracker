@@ -4,7 +4,9 @@ module.exports = {
     r2: { serie: 'SN-101', modelo: 'PQ-1', caso: 'C-002', lugar: 'Santa Tecla', lat: 13.67, lng: -89.28, fechaInstalacion: '2026-09-10', fechaRetiro: '2026-09-25', areaInstalacion: 'CPT MT', equipoId: 'e2', creadoPor: 'Bryan Francia', fechaRegistro: '2026-09-10T10:00' },
     r3: { serie: 'SN-102', modelo: 'PQ-2', caso: 'C-003', lugar: 'Soyapango', lat: 13.71, lng: -89.14, fechaInstalacion: '2026-08-01', fechaRetiro: '2026-09-01', areaInstalacion: 'CPT BT', equipoId: 'e3', creadoPor: 'Vicente Ramos', fechaRegistro: '2026-08-01T10:00' },
     r4: { serie: 'SN-103', modelo: 'PQ-2', caso: 'C-004', lugar: 'Apopa', fechaInstalacion: '2026-07-01', fechaRetiro: '2026-07-20', areaInstalacion: 'CPT MT', equipoId: 'e4', retirado: true, fechaRetiroReal: '2026-07-21', sinProblema: false, fallas: ['LED intermitente', 'No agarra WiFi'], descripcionFalla: 'Se apaga solo', retiradoPor: 'David García', fechaRegistro: '2026-07-01T10:00' },
-    r5: { serie: 'SN-104', modelo: 'PQ-1', caso: 'C-005', lugar: 'Ilopango', lat: 13.69, lng: -89.1, fechaInstalacion: '2026-10-01', fechaRetiro: '2026-10-20', areaInstalacion: 'Campos y Servicios', areaBeneficiaria: 'CPT BT', equipoId: 'e5', creadoPor: 'Francisco Chulo', fechaRegistro: '2026-09-20T10:00', despachoId: 'hc1' },
+    r5: { serie: 'SN-104', modelo: 'PQ-1', caso: 'C-005', lugar: 'Ilopango', lat: 13.69, lng: -89.1, fechaInstalacion: '2026-10-01', fechaRetiro: '2026-10-20', areaInstalacion: 'Campos y Servicios', areaBeneficiaria: 'CPT BT', equipoId: 'e5', creadoPor: 'Francisco Chulo', fechaRegistro: '2026-09-20', despachoId: 'hc1' },
+    r6: { serie: 'SN-106', modelo: 'PQ-1', caso: 'C-006', lugar: 'Zaragoza', fechaInstalacion: '2026-08-10', fechaRetiro: '2026-09-10', areaInstalacion: 'Campos y Servicios', areaBeneficiaria: 'CPT MT', equipoId: 'e7', creadoPor: 'David García', fechaRegistro: '2026-08-10T10:00',
+      retirado: true, fechaRetiroReal: '2026-09-12', sinProblema: false, fallas: ['No enciende / Sin señales de vida'], descripcionFalla: 'Carcasa quebrada', retiradoPor: 'Bryan Francia' },
   },
   equipos: {
     e1: { serie: 'SN-100', modelo: 'PQ-1', sede: 'Plantel Central', condicion: 'bueno', vineta: 'V1', fechaRegistro: '2026-01-01', creadoPor: 'David García',
@@ -16,6 +18,7 @@ module.exports = {
     e4: { serie: 'SN-103', modelo: 'PQ-2', sede: 'Plantel Central', condicion: 'malo', prestado: true, prestadoA: 'CPT BT' },
     e5: { serie: 'SN-104', modelo: 'PQ-1', sede: 'Con Campos y Servicios', condicion: 'bueno' },
     e6: { serie: 'SN-105', modelo: 'PQ-3', sede: 'Plantel Central', condicion: 'bueno' },
+    e7: { serie: 'SN-106', modelo: 'PQ-1', sede: 'Plantel Central', condicion: 'bueno', vineta: 'V7' },
   },
   validaciones: {
     v1: { nombre: 'Campaña Sept', fecha: '2026-09-15', tipo: 'monofasico', creadoPor: 'David García', usuarios: [
@@ -24,7 +27,7 @@ module.exports = {
       { nombre: 'Usuario C', medidor: 'M3', ct: 'CT3', siget: 'S3', estado: 'fallido', resultado: 'fail' } ] },
   },
   historialCargas: {
-    hc1: { fecha: '2026-09-20', hora: '09:00', areaOrigen: 'CPT BT', total: 1, realizadoPor: 'David García', instalacionIds: ['r5'], memoHtml: '<html><body>memo</body></html>' },
+    hc1: { fecha: '2026-09-20', hora: '09:00', areaOrigen: 'CPT MT', total: 1, realizadoPor: 'David García', instalacionIds: ['r5'], memoHtml: '<html><body>memo</body></html>' },
   },
   historialAccesorios: {
     ha1: { fecha: '2026-09-18', hora: '08:00', de: 'CPT MT', para: 'Campos y Servicios', items: [{ nombre: 'Candados', cantidad: 3, detalle: '' }] },

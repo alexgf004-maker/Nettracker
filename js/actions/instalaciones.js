@@ -1,5 +1,5 @@
 // Lógica de instalaciones: guardar, retiro, descarga, calendario
-import { FALLAS_GRAVES, isAdmin } from '../config.js';
+import { FALLAS_GRAVES, isAdmin, sedeRetorno } from '../config.js';
 import { db, installsRef, push, ref, remove, update } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
@@ -63,7 +63,7 @@ export function handleSave() {
 }
 
 // ── RETIRO ──
-export function openRetiroModal(id) { state.retiroId = id; state.retiroForm = { sinProblema: null, fallas: [], descripcion: '', sede: 'Plantel Central', energiaTipo: 'ninguna', energiaUna: '', energiaPunta: '', energiaResto: '', energiaValle: '', descargaConfirmada: null }; state.showRetiroModal = true; render(); }
+export function openRetiroModal(id) { state.retiroId = id; state.retiroForm = { sinProblema: null, fallas: [], descripcion: '', sede: sedeRetorno(state.records.find(x => x.id === id)), energiaTipo: 'ninguna', energiaUna: '', energiaPunta: '', energiaResto: '', energiaValle: '', descargaConfirmada: null }; state.showRetiroModal = true; render(); }
 
 export function closeRetiroModal() { state.showRetiroModal = false; state.retiroId = null; render(); }
 

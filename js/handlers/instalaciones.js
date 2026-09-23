@@ -5,6 +5,7 @@ import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { emptyForm, eqSt } from '../utils.js';
 import { render } from '../views/render.js';
+import { closeDanioModal, confirmDanio, openDanioModal, reimprimirMemoDanio } from '../actions/danio.js';
 
 window.setFilter = f => { state.filterStatus = f; render(); };
 window.setInstTab = t => { state.instTab = t; state.filterStatus = 'TODOS'; state.camposFiltro = 'TODOS'; render(); };
@@ -89,3 +90,11 @@ window.setDescargaNotas = v => { state.descargaForm.notas = v; };
 window.setDescargaMedicion = v => { state.descargaForm.medicionOk = v; if (!v) {} else { state.descargaForm.fallasMedicion = []; state.descargaForm.descripcionFalla = ''; } render(); };
 window.toggleFallaMedicion = f => { const i = state.descargaForm.fallasMedicion.indexOf(f); if (i>=0) state.descargaForm.fallasMedicion.splice(i,1); else state.descargaForm.fallasMedicion.push(f); render(); };
 window.setDescargaFallaDesc = v => { state.descargaForm.descripcionFalla = v; };
+
+// Memo de equipo dañado en campo (Campos y Servicios)
+window.openDanioModal = openDanioModal;
+window.closeDanioModal = closeDanioModal;
+window.setDanioField = (k, v) => { state.danioForm[k] = v; if (k === 'condicion') render(); };
+window.doMemoDanio = confirmDanio;
+window.memoDanio = reimprimirMemoDanio;
+

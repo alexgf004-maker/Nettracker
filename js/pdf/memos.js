@@ -505,3 +505,138 @@ export function generateMemoRevision(eq, envio) {
 
   abrirDoc(html, 'envio-revision-' + String(eq.serie || 'equipo').replace(/[^\w-]+/g, '_') + '.html');
 }
+
+// Memo de equipo dañado en campo por Campos y Servicios (tres firmas)
+export function generateMemoDanio(m) {
+  const e = escapeHtml;
+  const cond = CONDICIONES.find(c => c.key === m.condicion);
+  const dato = (label, valor, mono) => `<div class="info-item"><div class="info-label">${label}</div><div class="info-value${mono ? '' : ' normal'}">${valor || '—'}</div></div>`;
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Equipo dañado · ${e(m.serie)}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Arial', sans-serif; color: #0a1628; background: #fff; padding: 40px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 26px; border-bottom: 3px solid #0057b8; padding-bottom: 20px; }
+  .logo-area { display: flex; align-items: center; gap: 14px; }
+  .logo-box { width: 56px; height: 56px; background: linear-gradient(135deg, #003d8f, #0077cc); border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+  .logo-box svg { width: 32px; height: 32px; }
+  .company-name { font-size: 22px; font-weight: 800; color: #0057b8; letter-spacing: -.5px; }
+  .company-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .memo-title { text-align: right; }
+  .memo-label { font-size: 11px; font-weight: 700; color: #94a3b8; letter-spacing: 2px; text-transform: uppercase; }
+  .memo-type { font-size: 22px; font-weight: 800; color: #dc2626; margin-top: 4px; }
+  .memo-date { font-size: 12px; color: #64748b; margin-top: 4px; }
+  .section { margin-bottom: 22px; }
+  .section-title { font-size: 10px; font-weight: 700; color: #0057b8; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #e8f0fb; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .info-item { background: #f8fafc; border-radius: 8px; padding: 10px 14px; }
+  .info-label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .info-value { font-size: 14px; font-weight: 700; color: #0a1628; font-family: 'Courier New', monospace; }
+  .info-value.normal { font-family: Arial, sans-serif; font-size: 13px; }
+  .texto-box { background: #fef2f2; border-left: 3px solid #dc2626; border-radius: 6px; padding: 12px 16px; font-size: 13px; color: #1e293b; line-height: 1.5; white-space: pre-wrap; }
+  .intro { font-size: 13px; color: #334155; line-height: 1.6; }
+  .firma-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 28px; }
+  .firma-box { text-align: center; }
+  .firma-line { border-top: 1.5px solid #0a1628; margin-top: 64px; padding-top: 8px; }
+  .firma-label { font-size: 12px; font-weight: 700; color: #0a1628; }
+  .firma-name { font-size: 12px; color: #334155; margin-top: 3px; min-height: 15px; }
+  .firma-sub { font-size: 10px; color: #94a3b8; margin-top: 2px; }
+  .footer { margin-top: 34px; padding-top: 14px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 10px; color: #94a3b8; }
+  @media print { body { padding: 20px; } @page { margin: 12mm; } }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo-area">
+      <div class="logo-box">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="3" y="2" width="18" height="20" rx="2" stroke="white" stroke-width="1.8" fill="none"/>
+          <path d="M8 7h8M8 10h5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M12 14l-2 4h4l-2 4" stroke="#7dd3fc" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div>
+        <div class="company-name">CPT INNOVA</div>
+        <div class="company-sub">Analizadores de Red · Calidad de Energía</div>
+      </div>
+    </div>
+    <div class="memo-title">
+      <div class="memo-label">Memorándum de</div>
+      <div class="memo-type">EQUIPO DAÑADO EN CAMPO</div>
+      <div class="memo-date">${fmtDate(m.fecha)}${m.hora ? ' · ' + e(m.hora) : ''}</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <p class="intro">Por medio del presente se hace constar que el analizador de red detallado a continuación, despachado a
+    <b>Campos y Servicios</b> para su instalación en campo, resultó dañado. El equipo se entrega en la
+    <b>Subestación Cucumacayán</b> en la condición indicada.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Datos del equipo</div>
+    <div class="info-grid">
+      ${dato('Número de serie', e(m.serie), true)}
+      ${dato('Modelo / Marca', e(m.modelo))}
+      ${dato('Viñeta', e(m.vineta), true)}
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Datos de la instalación</div>
+    <div class="info-grid">
+      ${dato('Caso', m.caso ? '#' + e(m.caso) : '', true)}
+      ${dato('Lugar', e(m.lugar))}
+      ${dato('Área beneficiaria', e(m.areaBeneficiaria))}
+      ${dato('Fecha de instalación', fmtDate(m.fechaInstalacion))}
+      ${dato('Fecha de retiro', fmtDate(m.fechaRetiro))}
+      ${dato('Fecha del daño', fmtDate(m.fechaDanio))}
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">¿Qué le pasó al equipo?</div>
+    <div class="texto-box">${e(m.descripcion)}</div>
+  </div>
+
+  <div class="section">
+    <div class="info-grid">
+      ${dato('Condición en que se recibe', cond ? cond.label : e(m.condicion))}
+      ${dato('Se entrega en', 'Subestación Cucumacayán')}
+      ${dato('Técnico de Campos y Servicios', e(m.tecnicoCampos))}
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Firmas de conformidad</div>
+    <div class="firma-grid">
+      <div class="firma-box"><div class="firma-line">
+        <div class="firma-label">${e(m.areaGenera || 'CPT MT')}</div>
+        <div class="firma-name">${e(m.generadoPor)}</div>
+        <div class="firma-sub">CPT INNOVA</div>
+      </div></div>
+      <div class="firma-box"><div class="firma-line">
+        <div class="firma-label">Subestación Cucumacayán</div>
+        <div class="firma-name"></div>
+        <div class="firma-sub">Recibe el equipo</div>
+      </div></div>
+      <div class="firma-box"><div class="firma-line">
+        <div class="firma-label">Campos y Servicios</div>
+        <div class="firma-name"></div>
+        <div class="firma-sub">Contratista</div>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Documento generado por CPT INNOVA · Sistema de Gestión de Analizadores de Red · ${new Date().toLocaleDateString('es-SV')}
+  </div>
+</body>
+</html>`;
+
+  abrirDoc(html, 'equipo-danado-' + String(m.serie || 'equipo').replace(/[^\w-]+/g, '_') + '.html');
+}

@@ -385,3 +385,45 @@ export function renderRevisionModal() {
       </div>
     </div>`;
 }
+
+export function renderDanioModal() {
+  const r = state.records.find(x => x.id === state.danioId);
+  if (!r) return '';
+  const f = state.danioForm;
+  const campo = 'width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none;background:var(--white);color:var(--text)';
+  const etiqueta = 'font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px';
+  const condiciones = CONDICIONES.filter(c => c.key === 'fuera' || c.key === 'detalles');
+  return `<div style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
+      <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:90vh;overflow-y:auto;padding:20px;font-family:var(--font)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div style="font-size:17px;font-weight:700;color:var(--text)">Equipo dañado en campo</div>
+          <button onclick="closeDanioModal()" style="background:none;border:none;font-size:24px;color:var(--text3);cursor:pointer">✕</button>
+        </div>
+        <div style="font-size:13px;color:var(--text3);margin-bottom:16px"><b style="font-family:var(--mono);color:var(--text)">${escapeHtml(r.serie)}</b> · Caso #${escapeHtml(r.caso)} · Campos y Servicios</div>
+        <div style="margin-bottom:12px">
+          <div style="${etiqueta}">¿QUÉ LE PASÓ AL EQUIPO? *</div>
+          <textarea id="danio-descripcion" placeholder="Ej: El equipo se recibió golpeado y no enciende..." oninput="setDanioField('descripcion', this.value)" style="${campo};min-height:90px">${escapeHtml(f.descripcion)}</textarea>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px">Prellenado con las fallas marcadas al retirarlo. Puedes corregirlo.</div>
+        </div>
+        <div style="margin-bottom:12px">
+          <div style="${etiqueta}">FECHA DEL DAÑO *</div>
+          <input id="danio-fecha" type="date" value="${escapeHtml(f.fechaDanio)}" onchange="setDanioField('fechaDanio', this.value)" style="${campo}">
+        </div>
+        <div style="margin-bottom:12px">
+          <div style="${etiqueta}">¿EN QUÉ CONDICIÓN QUEDA EL EQUIPO?</div>
+          <div style="display:flex;gap:8px">
+            ${condiciones.map(c => `<div onclick="setDanioField('condicion','${c.key}')" style="flex:1;padding:11px;border:2px solid ${f.condicion === c.key ? c.color : 'var(--border)'};border-radius:10px;cursor:pointer;background:${f.condicion === c.key ? c.bg : '#fff'};text-align:center;font-size:14px;font-weight:700;color:${f.condicion === c.key ? c.color : 'var(--text2)'}">${c.icon} ${c.label}</div>`).join('')}
+          </div>
+        </div>
+        <div style="margin-bottom:16px">
+          <div style="${etiqueta}">TÉCNICO DE CAMPOS Y SERVICIOS (OPCIONAL)</div>
+          <input id="danio-tecnico" value="${escapeHtml(f.tecnicoCampos)}" placeholder="Quién reportó o tenía el equipo" oninput="setDanioField('tecnicoCampos', this.value)" style="${campo}">
+        </div>
+        <div style="background:#fef2f2;border-radius:10px;padding:10px 12px;font-size:12px;color:#991b1b;margin-bottom:14px;line-height:1.5">
+          Al confirmar se genera el memo con firmas de CPT, Subestación Cucumacayán y Campos y Servicios. El equipo queda en la <b>Cucumacayán</b> con la condición elegida.
+        </div>
+        <button onclick="doMemoDanio()" style="width:100%;background:#dc2626;color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">📝 Generar memo</button>
+        <button onclick="closeDanioModal()" style="width:100%;background:#fff;color:var(--text3);border:1px solid var(--border);border-radius:10px;padding:13px;font-family:var(--font);font-size:15px;cursor:pointer">Cancelar</button>
+      </div>
+    </div>`;
+}

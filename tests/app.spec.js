@@ -355,3 +355,69 @@ test.describe('Envío a revisión (Cucumacayán)', () => {
     await expect(app$(page)).not.toContainText('Enviar a revisión (Cucumacayán)');
   });
 });
+
+test.describe('Campos y Servicios', () => {
+  test.beforeEach(async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+  });
+
+  test('el retiro individual regresa el equipo a la Cucumacayán', async ({ page }) => {
+    await app.ejecutar(() => { switchTab('instalaciones'); openRetiroModal('r5'); });
+    await page.locator(`div[onclick="toggleSinProblema()"]`).click();
+    await page.getByText('Sí, ya descargué').click();
+    await page.getByText('Confirmar retiro').click();
+    await expect.poll(async () => (await app.escrituras()).length).toBe(2);
+    const [, equipo] = await app.escrituras();
+    expect(equipo.slice(0, 2)).toEqual(['update', 'equipos/e5']);
+    expect(equipo[2].sede).toBe('Subestación Cucumacayán');
+  });
+
+  test('el retiro masivo de un despacho de CPT MT regresa los equipos a la Cucumacayán', async ({ page }) => {
+    await app.ejecutar(() => retiroMasivo('hc1'));
+    expect(await app.escrituras()).toContainEqual(['update', 'equipos/e5', { sede: 'Subestación Cucumacayán' }]);
+  });
+
+  test('memo de equipo dañado: prellenado, tres firmas y trazabilidad', async ({ page }) => {
+    await page.evaluate(() => {
+      window.__docs = [];
+      const crear = URL.createObjectURL.bind(URL);
+      URL.createObjectURL = b => { b.text().then(t => window.__docs.push(t)); return crear(b); };
+    });
+    const docs = () => page.evaluate(() => window.__docs);
+    await app.ejecutar(() => { switchTab('instalaciones'); setInstTab('campos'); openDetail('r6'); });
+    await page.getByText('Memo de equipo dañado').click();
+    await expect(page.locator('#danio-descripcion')).toHaveValue('No enciende / Sin señales de vida. Carcasa quebrada');
+    await expect(page.locator('#danio-fecha')).toHaveValue('2026-09-12');
+    await expect(page.locator(`div[onclick="setDanioField('condicion','fuera')"]`)).toHaveCSS('border-top-color', 'rgb(220, 38, 38)');
+    await page.locator('#danio-tecnico').fill('Juan Pérez');
+    await page.getByText('Generar memo').click();
+
+    await expect.poll(async () => (await docs()).length).toBe(1);
+    const memo = (await docs())[0];
+    for (const texto of ['EQUIPO DAÑADO EN CAMPO', 'SN-106', '#C-006', 'Zaragoza', 'Carcasa quebrada', '12/09/2026', 'Fuera de servicio', 'Juan Pérez', 'David García']) {
+      expect(memo, texto).toContain(texto);
+    }
+    expect(memo.match(/class="firma-label"/g)).toHaveLength(3);
+    expect(memo).toContain('<div class="firma-label">Subestación Cucumacayán</div>');
+    expect(memo).toContain('<div class="firma-label">Campos y Servicios</div>');
+
+    const escrituras = await app.escrituras();
+    const inst = escrituras.find(([, ruta]) => ruta === 'analizadores/r6');
+    expect(inst[2].memoDanio).toMatchObject({ caso: 'C-006', condicion: 'fuera', tecnicoCampos: 'Juan Pérez', fechaDanio: '2026-09-12' });
+    const eq = escrituras.find(([, ruta]) => ruta === 'equipos/e7');
+    expect(eq[2]).toMatchObject({ sede: 'Subestación Cucumacayán', condicion: 'fuera' });
+    expect(eq[2].historialCondicion.at(-1)).toMatchObject({ condicionAnterior: 'bueno', condicionNueva: 'fuera' });
+
+    // Queda guardado y se puede reimprimir
+    await page.getByText('Ver memo de equipo dañado').click();
+    await expect.poll(async () => (await docs()).length).toBe(2);
+    expect((await docs())[1]).toContain('Carcasa quebrada');
+  });
+
+  test('no aparece en instalaciones de CPT MT', async ({ page }) => {
+    await app.ejecutar(() => { switchTab('instalaciones'); openDetail('r1'); });
+    await expect(app$(page)).toContainText('#C-001');
+    await expect(app$(page)).not.toContainText('Memo de equipo dañado');
+  });
+});

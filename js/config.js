@@ -28,3 +28,7 @@ export const CONDICIONES = [
 // Las graves dejan el equipo como "Fuera de servicio"; las demás, "Con detalles".
 export const FALLAS_RETIRO = ['Conector con falso', 'Falla batería (solo enciende energizado)', 'LED intermitente', 'No agarra WiFi', 'Tapadera no cierra'];
 export const FALLAS_GRAVES = ['No enciende / Sin señales de vida', 'Equipo calcinado / Explosión'];
+
+// Campos y Servicios saca los equipos de la Subestación Cucumacayán y los regresa ahí
+export const SEDE_CUCUMACAYAN = 'Subestación Cucumacayán';
+export const sedeRetorno = r => (r?.areaInstalacion === 'Campos y Servicios' ? SEDE_CUCUMACAYAN : 'Plantel Central');
