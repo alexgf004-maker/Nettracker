@@ -593,7 +593,7 @@ export function generateMemoDanio(m) {
       ${dato('Lugar', e(m.lugar))}
       ${dato('Área beneficiaria', e(m.areaBeneficiaria))}
       ${dato('Fecha de instalación', fmtDate(m.fechaInstalacion))}
-      ${dato('Fecha de retiro', fmtDate(m.fechaRetiro))}
+      ${dato('Retiro programado', fmtDate(m.fechaRetiro))}
       ${dato('Fecha del daño', fmtDate(m.fechaDanio))}
     </div>
   </div>

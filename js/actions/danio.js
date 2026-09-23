@@ -57,7 +57,7 @@ export function confirmDanio() {
     caso: r.caso || '',
     lugar: r.lugar || '',
     fechaInstalacion: r.fechaInstalacion || '',
-    fechaRetiro: r.fechaRetiroReal || r.fechaRetiro || '',
+    fechaRetiro: r.fechaRetiro || '', // retiro programado
     areaBeneficiaria: r.areaBeneficiaria || '',
   };
 
@@ -83,6 +83,7 @@ export function confirmDanio() {
 }
 
 export function reimprimirMemoDanio(id) {
-  const memo = state.records.find(x => x.id === id)?.memoDanio;
-  if (memo) generateMemoDanio(memo);
+  const r = state.records.find(x => x.id === id);
+  // fechaRetiro siempre es la programada (memos anteriores guardaban la real)
+  if (r?.memoDanio) generateMemoDanio({ ...r.memoDanio, fechaRetiro: r.fechaRetiro || r.memoDanio.fechaRetiro });
 }
