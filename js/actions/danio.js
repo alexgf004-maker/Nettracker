@@ -56,6 +56,10 @@ function guardarEdicionDanio(r) {
     condicion: f.condicion,
     tecnicoCampos: f.tecnicoCampos.trim(),
     fechaRetiro: r.fechaRetiro || anterior.fechaRetiro || '',
+    // La firma de CPT es de quien genera esta versión del memo
+    creadoPor: anterior.creadoPor || anterior.generadoPor,
+    generadoPor: usuario,
+    areaGenera: userArea() || anterior.areaGenera || 'CPT MT',
     editadoPor: usuario,
     fechaEdicion: today(),
   };

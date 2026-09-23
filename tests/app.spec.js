@@ -561,3 +561,47 @@ test('el selector de equipo se abre como ventana sobre el formulario', async ({ 
   await app.ejecutar(() => { switchTab('instalaciones'); newInstall(); openSelector(); });
   await expect(page.locator('.modal-overlay')).toHaveCSS('position', 'fixed');
 });
+
+test.describe('Firma de quien genera el memo', () => {
+  const conMemos = () => {
+    const d = JSON.parse(JSON.stringify(fixture));
+    d.analizadores.r6.memoDanio = { fecha: '2026-09-15', hora: '10:00', fechaDanio: '2026-09-12', descripcion: 'No enciende', condicion: 'fuera',
+      tecnicoCampos: '', generadoPor: 'David García', areaGenera: 'CPT MT', serie: 'SN-106', modelo: 'PQ-1', caso: 'C-006', lugar: 'Zaragoza', fechaRetiro: '2026-09-10' };
+    d.equipos.e6.historialMantenimiento = [{ descripcion: 'No enciende', accion: 'Enviado a revisión', resultado: 'pendiente', fechaInicio: '2026-09-15',
+      envioRevision: { fecha: '2026-09-15', hora: '10:00', fechaIncidente: '2026-09-14', motivo: 'Revisión', descripcion: 'No enciende',
+        sedeOrigen: 'Plantel Central', condicionAnterior: 'bueno', entregadoPor: 'David García', antecedentes: [] } }];
+    return d;
+  };
+  async function capturarDocs(page) {
+    await page.evaluate(() => {
+      window.__docs = [];
+      const crear = URL.createObjectURL.bind(URL);
+      URL.createObjectURL = b => { b.text().then(t => window.__docs.push(t)); return crear(b); };
+    });
+    return () => page.evaluate(() => window.__docs);
+  }
+
+  test('al editar el memo de equipo dañado firma quien lo edita', async ({ page }) => {
+    app = await abrirApp(page, { usuario: 'Bryan Francia', datos: conMemos() });
+    await cerrarAlerta(page);
+    const docs = await capturarDocs(page);
+    await app.ejecutar(() => editarDanio('r6'));
+    await page.getByText('Guardar cambios').click();
+    await expect.poll(async () => (await docs()).length).toBe(1);
+    expect((await docs())[0]).toMatch(/firma-label">CPT MT<\/div>\s*<div class="firma-name">Bryan Francia/);
+    const memo = (await app.escrituras()).find(([, ruta]) => ruta === 'analizadores/r6')[2].memoDanio;
+    expect(memo).toMatchObject({ generadoPor: 'Bryan Francia', areaGenera: 'CPT MT', creadoPor: 'David García', fecha: '2026-09-15' });
+  });
+
+  test('al editar el memo de envío a revisión firma quien lo edita', async ({ page }) => {
+    app = await abrirApp(page, { usuario: 'Francisco Chulo', datos: conMemos() });
+    await cerrarAlerta(page);
+    const docs = await capturarDocs(page);
+    await app.ejecutar(() => editarRevision('e6', 0));
+    await page.getByText('Guardar cambios').click();
+    await expect.poll(async () => (await docs()).length).toBe(1);
+    expect((await docs())[0]).toMatch(/firma-name">Francisco Chulo<\/div>\s*<div class="firma-sub">CPT BT/);
+    const envio = (await app.escrituras()).at(-1)[2].historialMantenimiento[0].envioRevision;
+    expect(envio).toMatchObject({ entregadoPor: 'Francisco Chulo', creadoPor: 'David García' });
+  });
+});
