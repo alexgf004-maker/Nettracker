@@ -126,6 +126,27 @@ test.describe('Instalaciones', () => {
     await expect(app$(page)).not.toContainText('Registrar retiro');
   });
 
+  // Al retirar, la falla marcada define la nueva condición del equipo
+  for (const [falla, condicion] of [
+    ['No enciende / Sin señales de vida', 'fuera'],
+    ['Equipo calcinado / Explosión', 'fuera'],
+    ['LED intermitente', 'detalles'],
+  ]) {
+    test(`retiro con "${falla}" deja el equipo como ${condicion}`, async ({ page }) => {
+      await app.ejecutar(() => openRetiroModal('r2')); // SN-101, equipo e2 en condición "bueno"
+      await page.locator(`div[onclick="toggleFalla('${falla}')"]`).click();
+      await page.getByText('Sí, ya descargué').click();
+      await page.getByText('Confirmar retiro').click();
+      await expect.poll(async () => (await app.escrituras()).length).toBe(2);
+      const [retiro, equipo] = await app.escrituras();
+      expect(retiro.slice(0, 2)).toEqual(['update', 'analizadores/r2']);
+      expect(retiro[2].fallas).toEqual([falla]);
+      expect(equipo.slice(0, 2)).toEqual(['update', 'equipos/e2']);
+      expect(equipo[2].condicion).toBe(condicion);
+      expect(equipo[2].historialCondicion.at(-1)).toMatchObject({ condicionAnterior: 'bueno', condicionNueva: condicion });
+    });
+  }
+
   test('eliminar una instalación', async ({ page }) => {
     await app.ejecutar(() => delInstall('r2'));
     expect(await app.escrituras()).toContainEqual(['remove', 'analizadores/r2']);

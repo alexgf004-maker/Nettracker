@@ -23,3 +23,8 @@ export const CONDICIONES = [
   { key: 'mantenimiento', label: 'En mantenimiento', icon: '🔧', color: '#7c3aed', bg: '#f3f0ff' },
   { key: 'fuera', label: 'Fuera de servicio', icon: '🔴', color: 'var(--red)', bg: 'var(--red-light)' },
 ];
+
+// Fallas que se pueden marcar al retirar un equipo de campo.
+// Las graves dejan el equipo como "Fuera de servicio"; las demás, "Con detalles".
+export const FALLAS_RETIRO = ['Conector con falso', 'Falla batería (solo enciende energizado)', 'LED intermitente', 'No agarra WiFi', 'Tapadera no cierra'];
+export const FALLAS_GRAVES = ['No enciende / Sin señales de vida', 'Equipo calcinado / Explosión'];
