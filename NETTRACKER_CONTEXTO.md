@@ -177,6 +177,14 @@ Catálogo de equipos físicos del equipo.
 - `guardarMant()` — registrar mantenimiento
 - `doRetiro()` / `doDescarga()` — retiro/descarga de campo
 
+**Envío a revisión (Cucumacayán)** (`js/actions/revision.js`):
+Cuando un equipo asignado falla, la Subestación Cucumacayán es el primer filtro que lo revisa.
+- Botón "📤 Enviar a revisión (Cucumacayán)" en la pestaña General del equipo (no aparece si está instalado en campo o ya está en revisión)
+- Formulario prellenado con lo último registrado (fallas del último retiro de campo o la última nota de condición): motivo, qué le pasó y fecha del incidente, todo editable
+- Al confirmar: genera el memo (`generateMemoRevision`), cambia la sede a Subestación Cucumacayán, la condición a "En mantenimiento" y agrega una ficha de mantenimiento pendiente con los datos del envío en `envioRevision`
+- El memo se puede reimprimir desde esa ficha (pestaña Mant., botón "📄 Memo de envío")
+- En el memo, la caja "Recibe" queda en blanco para firma
+
 **Memo de movimiento** (`generateMemoPDF`):
 - Caja "Entrega": muestra nombre de quien registró el movimiento (`registradoPor`)
 - Caja "Recibe": queda en blanco para firma manual del receptor

@@ -259,3 +259,78 @@ test.describe('Modo mantenimiento', () => {
     expect(await app.escrituras()).toContainEqual(['set', 'config/mantenimiento', true]);
   });
 });
+
+test.describe('Envío a revisión (Cucumacayán)', () => {
+  // Guarda el HTML de cada documento que la app abre (memos) para poder revisarlo
+  async function capturarDocs(page) {
+    await page.evaluate(() => {
+      window.__docs = [];
+      const crear = URL.createObjectURL.bind(URL);
+      URL.createObjectURL = b => { b.text().then(t => window.__docs.push(t)); return crear(b); };
+    });
+    return () => page.evaluate(() => window.__docs);
+  }
+
+  test.beforeEach(async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await nav(page, 'Inventario');
+  });
+
+  test('prellena con las fallas del último retiro, genera el memo y registra la entrega', async ({ page }) => {
+    const docs = await capturarDocs(page);
+    await app.ejecutar(() => openEqDetalle('e4'));
+    await page.getByText('Enviar a revisión (Cucumacayán)').click();
+    await expect(page.locator('#rev-descripcion')).toHaveValue(/LED intermitente, No agarra WiFi\. Se apaga solo/);
+    await expect(page.locator('#rev-descripcion')).toHaveValue(/caso C-004, Apopa/);
+    await expect(page.locator('#rev-fecha')).toHaveValue('2026-07-21');
+
+    await page.locator('#rev-motivo').fill('Diagnóstico de batería');
+    await page.locator('#rev-descripcion').fill('No enciende <sin batería>');
+    await page.getByText('Enviar y generar memo').click();
+
+    // Memo
+    await expect.poll(async () => (await docs()).length).toBe(1);
+    const memo = (await docs())[0];
+    expect(memo).toContain('ENVÍO A REVISIÓN');
+    expect(memo).toContain('SN-103');
+    expect(memo).toContain('Diagnóstico de batería');
+    expect(memo).toContain('No enciende &lt;sin batería&gt;'); // el texto del usuario se escapa
+    expect(memo).toContain('21/07/2026'); // fecha del incidente
+    expect(memo).toContain('Subestación Cucumacayán');
+    expect(memo).toContain('David García');
+
+    // Trazabilidad en Firebase
+    const [op, ruta, datos] = (await app.escrituras()).at(-1);
+    expect([op, ruta]).toEqual(['update', 'equipos/e4']);
+    expect(datos).toMatchObject({ sede: 'Subestación Cucumacayán', condicion: 'mantenimiento' });
+    expect(datos.historialCondicion.at(-1)).toMatchObject({ condicionAnterior: 'malo', condicionNueva: 'mantenimiento' });
+    expect(datos.historialMantenimiento.at(-1)).toMatchObject({
+      resultado: 'pendiente', descripcion: 'No enciende <sin batería>', observaciones: 'Diagnóstico de batería',
+      envioRevision: { fechaIncidente: '2026-07-21', sedeOrigen: 'Plantel Central', entregadoPor: 'David García' },
+    });
+
+    // Ya no ofrece enviarlo otra vez, y el memo se puede reimprimir desde su ficha
+    await expect(app$(page)).not.toContainText('Enviar a revisión (Cucumacayán)');
+    await app.ejecutar(() => setEqDetalleTab('mantenimiento'));
+    await page.getByText('Memo de envío').click();
+    await expect.poll(async () => (await docs()).length).toBe(2);
+    expect((await docs())[1]).toContain('No enciende &lt;sin batería&gt;');
+  });
+
+  test('sin historial queda en blanco y exige describir la falla', async ({ page }) => {
+    await app.ejecutar(() => openEqDetalle('e6'));
+    await page.getByText('Enviar a revisión (Cucumacayán)').click();
+    await expect(page.locator('#rev-descripcion')).toHaveValue('');
+    await expect(page.locator('#rev-fecha')).toHaveValue('2026-09-23');
+    await page.getByText('Enviar y generar memo').click();
+    await expect(page.locator('#toast')).toHaveText('Describe qué le pasó al equipo');
+    expect(await app.escrituras()).toEqual([]);
+  });
+
+  test('no se ofrece para equipos instalados en campo', async ({ page }) => {
+    await app.ejecutar(() => openEqDetalle('e1'));
+    await expect(app$(page)).toContainText('SN-100');
+    await expect(app$(page)).not.toContainText('Enviar a revisión (Cucumacayán)');
+  });
+});
