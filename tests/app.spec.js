@@ -395,9 +395,12 @@ test.describe('Campos y Servicios', () => {
 
     await expect.poll(async () => (await docs()).length).toBe(1);
     const memo = (await docs())[0];
-    for (const texto of ['EQUIPO DAÑADO EN CAMPO', 'SN-106', '#C-006', 'Zaragoza', 'Carcasa quebrada', '12/09/2026', 'Fuera de servicio', 'Juan Pérez', 'David García']) {
+    for (const texto of ['EQUIPO DAÑADO EN CAMPO', 'SN-106', '#C-006', 'Zaragoza', 'Carcasa quebrada', 'Fuera de servicio', 'Juan Pérez', 'David García']) {
       expect(memo, texto).toContain(texto);
     }
+    // Retiro programado (10/09) y fecha del daño (retiro real, 12/09)
+    expect(memo).toMatch(/Retiro programado<\/div><div class="info-value normal">10\/09\/2026/);
+    expect(memo).toMatch(/Fecha del daño<\/div><div class="info-value normal">12\/09\/2026/);
     expect(memo.match(/class="firma-label"/g)).toHaveLength(3);
     expect(memo).toContain('<div class="firma-label">Subestación Cucumacayán</div>');
     expect(memo).toContain('<div class="firma-label">Campos y Servicios</div>');

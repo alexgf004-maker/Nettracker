@@ -162,7 +162,7 @@ Cada mes Campos y Servicios saca equipos de la **Subestación Cucumacayán**, lo
 - Al retirar una instalación de Campos y Servicios (individual o masivo desde Despachos), el equipo regresa a **Subestación Cucumacayán** (`sedeRetorno()` en `config.js`)
 - **Memo de equipo dañado** (`js/actions/danio.js`): botón "📝 Memo de equipo dañado" en el detalle de una instalación de Campos y Servicios
   - Prellenado con las fallas del retiro y su fecha; se elige la condición (Fuera de servicio / Con detalles) y opcionalmente el técnico de Campos y Servicios
-  - Genera el memo (`generateMemoDanio`) con firmas de CPT (nombre de quien lo genera), Subestación Cucumacayán y Campos y Servicios (en blanco)
+  - Genera el memo (`generateMemoDanio`) con la fecha de retiro programado y firmas de CPT (nombre de quien lo genera), Subestación Cucumacayán y Campos y Servicios (en blanco)
   - Guarda los datos en `analizadores/{id}/memoDanio` (el botón pasa a "📄 Ver memo de equipo dañado" para reimprimir) y deja el equipo en la Cucumacayán con la condición elegida
 
 ## Área: Inventario
