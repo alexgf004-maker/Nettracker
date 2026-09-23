@@ -42,6 +42,9 @@ js/
     general.js · instalaciones.js · inventario.js · validaciones.js · carga.js
 ```
 
+### Pruebas automáticas
+`npm test` recorre la app con datos de ejemplo y una Firebase falsa (detalles en `tests/README.md`). GitHub las corre en cada pull request.
+
 ### Probar en local
 Los ES modules **no funcionan abriendo el archivo con doble clic** (`file://`). Hay que servir la carpeta:
 ```
@@ -112,7 +115,7 @@ const inp  = (id, val, ph) => `<input id="${id}" value="${val}" placeholder="${p
 const sel  = (id, opts)    => `<select id="${id}" ...>${opts}</select>`   // bifasico
 const tSel = (id, opts)    => `<select id="${id}" ...>${opts}</select>`   // trifasico
 ```
-**Importante**: `sel()` y `tSel()` tienen `onchange="valVSOtro(this)"` en su definición — se usan para los selectores de Voltaje Secundario (VS). Si se usan para otros selectores (VP, TAP) el handler tiene un guard que los ignora.
+**Importante**: los selectores de Voltaje Secundario (`vf-ref-vs`, `vf-cp-vs`) llevan `onchange="valVSOtro(this)"`. El handler tiene un guard que ignora cualquier otro selector.
 
 ---
 
@@ -213,10 +216,10 @@ Flujo para validar el tap de un transformador comparando lecturas de referencia 
 | 4160 V  | 4364, 4260, 4157, 4054, 3950 |
 
 ### Voltaje Secundario "Otro"
-Cuando el usuario selecciona "Otro..." en el select de VS (ref o campaña):
-- `valVSOtro(this)` guarda `valForm.refVS = 'otro'` y llama `render()`
-- `render()` dibuja un `<input>` morado para ingresar el voltaje manualmente
-- `valVSOtroVal(this)` guarda el valor en `valForm.refVSOtro` o `valForm.cpVSOtro`
+Cuando el usuario selecciona "Otro..." en el select de VS (ref o campaña), en los tres tipos de conexión:
+- El `<input>` morado (`vf-ref-vs-otro` / `vf-cp-vs-otro`) siempre está en el HTML, oculto con `display:none` si VS no es "otro"
+- `valVSOtro(this)` guarda `state.valForm.refVS` / `cpVS` y **solo muestra u oculta ese input, sin llamar `render()`**, para no borrar lecturas ya escritas
+- `valVSOtroVal(this)` guarda el valor en `state.valForm.refVSOtro` o `state.valForm.cpVSOtro`
 - `calcularValidacion()` lee esos valores cuando VS === 'otro'
 
 ### Campos del formulario (`valForm`)
@@ -274,4 +277,5 @@ sesionUsuario = { nombre, pin, area }  // null = no logueado
 3. **Función nueva usada en otro archivo** → `export` donde se define e `import` donde se usa (rutas relativas con `.js` al final)
 4. **Handler para un `onclick`** → `window.nombre = ...` en `js/handlers/`
 5. **`render()` debe llamarse** al final de cualquier handler que cambie estado visible
-6. **Verificar sintaxis** con `node --check js/ruta/archivo.js` y probar en local con `python3 -m http.server`
+6. **Correr `npm test`** antes de publicar; si agregas una función importante, agrega su prueba en `tests/app.spec.js`
+7. Probar en local con `npm run serve` (o `python3 -m http.server`)

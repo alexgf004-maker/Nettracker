@@ -213,7 +213,9 @@ window.valVSOtro = sel => {
   if (sel.id !== 'vf-ref-vs' && sel.id !== 'vf-cp-vs') return;
   const key = sel.id === 'vf-ref-vs' ? 'refVS' : 'cpVS';
   state.valForm[key] = sel.value;
-  render();
+  // Solo muestra u oculta el campo manual: redibujar borraría lo ya escrito
+  const otro = document.getElementById(sel.id + '-otro');
+  if (otro) otro.style.display = sel.value === 'otro' ? '' : 'none';
 };
 
 window.valVSOtroVal = inp => {

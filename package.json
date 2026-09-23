@@ -1,0 +1,12 @@
+{
+  "name": "nettracker",
+  "private": true,
+  "description": "Pruebas automáticas de NetTracker (la app no necesita build ni npm para funcionar)",
+  "scripts": {
+    "test": "playwright test",
+    "serve": "node tests/server.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0"
+  }
+}
