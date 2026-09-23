@@ -1,0 +1,17 @@
+{
+  "name": "CPT INNOVA",
+  "short_name": "CPT INNOVA",
+  "display": "standalone",
+  "background_color": "#f0f4f8",
+  "theme_color": "#0057b8",
+  "start_url": "./",
+  "scope": "./",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
