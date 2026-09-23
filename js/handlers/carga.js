@@ -1,6 +1,6 @@
 // Handlers (onclick) de despachos y accesorios
 import { confirmarCargaMasiva, generarMemoCargaMasiva, procesarExcel } from '../actions/carga.js';
-import { isAdmin } from '../config.js';
+import { SEDE_CUCUMACAYAN, isAdmin } from '../config.js';
 import { db, get, ref, remove, update } from '../firebase.js';
 import { state } from '../state.js';
 import { abrirDoc, abrirMemo, showToast } from '../ui.js';
@@ -233,7 +233,7 @@ window.retiroMasivo = id => {
     // Return equipo to sede
     if (r.equipoId) {
       const eq = state.equipos.find(x => x.id === r.equipoId);
-      if (eq) update(ref(db, 'equipos/' + r.equipoId), { sede: c.areaOrigen === 'CPT BT' ? 'Subestación Cucumacayán' : 'Plantel Central' });
+      if (eq) update(ref(db, 'equipos/' + r.equipoId), { sede: SEDE_CUCUMACAYAN }); // Campos y Servicios los regresa a la Cucumacayán
     }
   });
   showToast('✅ ' + instDespacho.length + ' equipos marcados como retirados · Descarga pendiente');

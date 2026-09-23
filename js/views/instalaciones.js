@@ -272,6 +272,9 @@ export function renderInstalaciones() {
           </div>
           <button class="btn btn-danger" onclick="openRetiroModal('${r.id}')">Marcar como retirado</button>
         ` : ''}
+        ${r.areaInstalacion === 'Campos y Servicios' && r.equipoId ? (r.memoDanio
+          ? `<button class="btn" style="background:#fef2f2;color:#dc2626;border:1px solid #dc2626" onclick="memoDanio('${r.id}')">📄 Ver memo de equipo dañado</button>`
+          : `<button class="btn" style="background:#fef2f2;color:#dc2626;border:1px solid #dc2626" onclick="openDanioModal('${r.id}')">📝 Memo de equipo dañado</button>`) : ''}
         ${isAdmin() ? `<div style="text-align:center;margin-top:4px">
           <button onclick="delInstall('${r.id}')" style="background:none;border:none;font-family:var(--font);font-size:12px;color:var(--text3);cursor:pointer;padding:6px 12px;text-decoration:underline">Eliminar registro</button>
         </div>` : ''}

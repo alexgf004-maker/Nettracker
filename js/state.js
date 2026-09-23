@@ -52,6 +52,9 @@ export const state = {
   showRevisionModal: false, // envío de equipo a revisión en Cucumacayán
   revisionEqId: null,
   revisionForm: { motivo: '', descripcion: '', fechaIncidente: '' },
+  showDanioModal: false, // memo de equipo dañado en campo (Campos y Servicios)
+  danioId: null,
+  danioForm: { fechaDanio: '', descripcion: '', condicion: 'detalles', tecnicoCampos: '' },
   prestamoId: null,
   prestamoForm: { de: 'CPT BT', a: 'CPT MT', nota: '', tipo: 'prestamo' },
   modoSeleccionLote: false,
