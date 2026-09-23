@@ -378,6 +378,31 @@ test.describe('Campos y Servicios', () => {
     expect(await app.escrituras()).toContainEqual(['update', 'equipos/e5', { sede: 'Subestación Cucumacayán' }]);
   });
 
+  test('la devolución de Campos y Servicios a CPT MT deja el equipo en la Cucumacayán', async ({ page }) => {
+    await app.ejecutar(() => { switchTab('inventario'); openEqDetalle('e5'); });
+    await page.getByText('Registrar devolución').click();
+    await expect(app$(page)).toContainText('Sede destino: Subestación Cucumacayán');
+    await app.ejecutar(() => doMovimiento());
+    const [op, ruta, datos] = (await app.escrituras()).at(-1);
+    expect([op, ruta]).toEqual(['update', 'equipos/e5']);
+    expect(datos).toMatchObject({ prestado: false, sede: 'Subestación Cucumacayán' });
+    expect(datos.movimientos.at(-1)).toMatchObject({ tipo: 'devolucion', de: 'Campos y Servicios', a: 'CPT MT' });
+  });
+
+  test('eliminar el préstamo a Campos y Servicios devuelve el equipo a la Cucumacayán', async ({ page }) => {
+    await app.ejecutar(() => eliminarMovimiento('e5', 0));
+    const [, ruta, datos] = (await app.escrituras()).at(-1);
+    expect(ruta).toBe('equipos/e5');
+    expect(datos).toMatchObject({ prestado: false, sede: 'Subestación Cucumacayán' });
+  });
+
+  test('una devolución normal a CPT MT sigue yendo a Plantel Central', async ({ page }) => {
+    await app.ejecutar(() => { switchTab('inventario'); registrarDevolucion('e4'); setPrestamoField('de', 'CPT BT'); setPrestamoField('a', 'CPT MT'); });
+    await expect(app$(page)).toContainText('Sede destino: Plantel Central');
+    await app.ejecutar(() => doMovimiento());
+    expect((await app.escrituras()).at(-1)[2].sede).toBe('Plantel Central');
+  });
+
   test('memo de equipo dañado: prellenado, tres firmas y trazabilidad', async ({ page }) => {
     await page.evaluate(() => {
       window.__docs = [];

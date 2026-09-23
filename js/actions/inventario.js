@@ -3,7 +3,7 @@ import { isAdmin } from '../config.js';
 import { db, equiposRef, push, ref, remove, update } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
-import { areaToSede, emptyEF, today } from '../utils.js';
+import { emptyEF, sedeDestinoMovimiento, today } from '../utils.js';
 import { render } from '../views/render.js';
 
 // ── SAVE EQUIPO ──
@@ -60,7 +60,7 @@ export function confirmMovimiento() {
     return showToast('⚠️ Ya se registró este movimiento hoy');
   }
   const esPrestamo = state.prestamoForm.tipo === 'prestamo';
-  const sedeDest = areaToSede(state.prestamoForm.a);
+  const sedeDest = sedeDestinoMovimiento(state.prestamoForm);
   const movimiento = { tipo: state.prestamoForm.tipo, de: state.prestamoForm.de, a: state.prestamoForm.a, fecha: today(), nota: state.prestamoForm.nota, registradoPor: state.sesionUsuario?.nombre || 'Desconocido' };
   const movimientos = [...(eq.movimientos||[]), movimiento];
   const updateData = esPrestamo
@@ -158,7 +158,8 @@ export function eliminarMovimientoFn(eqId, movIdx) {
   if (deleted && deleted.tipo === 'prestamo' && (!lastAfter || lastAfter.tipo === 'devolucion')) {
     updates.prestado = false;
     updates.prestadoFecha = null;
-    updates.sede = deleted.de === 'CPT BT' ? 'Subestación Cucumacayán' : 'Plantel Central';
+    // Deshacer el préstamo: vuelve a donde estaba (lo despachado a Campos y Servicios sale de la Cucumacayán)
+    updates.sede = deleted.de === 'CPT BT' || deleted.a === 'Campos y Servicios' ? 'Subestación Cucumacayán' : 'Plantel Central';
   }
   update(ref(db, 'equipos/' + eqId), updates).then(() => showToast('🗑 Movimiento eliminado'));
 }
