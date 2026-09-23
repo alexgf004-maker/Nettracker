@@ -9,10 +9,44 @@ Herramienta interna del equipo CPT INNOVA / DELSUR para gestión de analizadores
 ---
 
 ## Stack técnico
-- **Un solo archivo**: todo el código vive en `index.html` — HTML, CSS y JS en un `<script type="module">` al final
+- **Sin build**: HTML + CSS + JS con ES modules nativos. GitHub Pages sirve los archivos tal cual (no hay npm, bundler ni paso de compilación)
 - **Firebase Realtime Database**: proyecto `pqfind`, toda la data persiste ahí
-- **Sin frameworks**: JS puro con ES modules, sin React ni Vue
-- **PWA**: manifest y service worker para uso offline/móvil
+- **Sin frameworks**: JS puro, sin React ni Vue
+- **PWA**: `manifest.webmanifest` + `icons/icon.svg`
+- **Librerías por CDN** (en `index.html`): `xlsx` (leer/escribir Excel) y `html2pdf.js`
+
+### Estructura de archivos
+```
+index.html               Solo el <head>, el <div id="app"> y la carga de js/main.js
+manifest.webmanifest     Manifest de la PWA
+icons/icon.svg           Ícono de la app
+css/styles.css           Todos los estilos (variables de tema claro/oscuro incluidas)
+js/
+  main.js                Punto de entrada: registra handlers y arranca (sesión, sync, tema)
+  firebase.js            Config de Firebase, `db` y las refs a cada nodo
+  state.js               Objeto `state` con TODO el estado de la app
+  config.js              Constantes: SEDES, TECNICOS, AREAS, USUARIOS, CONDICIONES, isAdmin()
+  utils.js               Funciones puras: fechas, calcSt(), eqSt(), formularios vacíos
+  ui.js                  showToast(), badges, abrirDoc()/descargarDoc(), tema, monitor de conexión
+  data/sync.js           Listeners onValue() de Firebase → actualizan `state` y llaman render()
+  actions/               Lógica de negocio (guardar, retirar, préstamos, carga Excel, login)
+    auth.js · instalaciones.js · inventario.js · carga.js
+  pdf/memos.js           Plantillas HTML de memorándums (movimiento, lote, carga masiva)
+  views/                 Funciones que devuelven HTML (string) según el estado
+    render.js            render(): arma header + modales + pestaña activa + nav
+    layout.js            Header y barra de navegación inferior
+    login.js             Pantalla de login y de mantenimiento
+    modals.js            Todos los modales
+    dashboard.js · instalaciones.js · inventario.js · validaciones.js · mapa.js · carga.js
+  handlers/              Funciones `window.*` que llaman los onclick/onchange del HTML
+    general.js · instalaciones.js · inventario.js · validaciones.js · carga.js
+```
+
+### Probar en local
+Los ES modules **no funcionan abriendo el archivo con doble clic** (`file://`). Hay que servir la carpeta:
+```
+python3 -m http.server 8000     # y abrir http://localhost:8000
+```
 
 ### Firebase config
 ```js
@@ -50,20 +84,29 @@ USUARIOS = [
 ---
 
 ## Cómo funciona el renderizado
-**No hay framework reactivo.** Existe una función `render()` que regenera `innerHTML` del `div#app` cada vez que cambia el estado. Todos los cambios de estado deben llamar `render()` al final.
+**No hay framework reactivo.** `render()` (en `js/views/render.js`) regenera el `innerHTML` de `div#app` cada vez que cambia el estado. Cada pestaña tiene su propia función en `js/views/` que devuelve un string de HTML.
+
+**Todo el estado vive en `state`** (`js/state.js`). Siempre se lee y escribe como `state.tab`, `state.valForm`, etc. (no existen variables sueltas). Después de cambiarlo hay que llamar `render()`.
 
 ```js
-// Patrón estándar de handler
+// Patrón estándar de handler (en js/handlers/<área>.js)
+import { state } from '../state.js';
+import { render } from '../views/render.js';
+
 window.miHandler = (val) => {
-  miEstado = val;
+  state.miEstado = val;
   render();
 };
 ```
 
-Los `onValue()` de Firebase también llaman `render()` cuando llegan datos nuevos.
+Los `onValue()` de Firebase (`js/data/sync.js`) también llaman `render()` cuando llegan datos nuevos.
 
-### Helpers de HTML dentro de render()
-Dentro del bloque de cada formulario existen helpers locales:
+Si una vista necesita abortar y redibujar (p. ej. el registro que se estaba viendo ya no existe), cambia el estado y devuelve `null`; `render()` vuelve a dibujar.
+
+**Los `onclick="..."` del HTML solo ven funciones asignadas a `window`.** Si agregas un botón nuevo, su handler va en `js/handlers/` como `window.nombre = ...`.
+
+### Helpers de HTML dentro de las vistas
+Dentro del bloque de cada formulario (p. ej. `js/views/validaciones.js`) existen helpers locales:
 ```js
 const inp  = (id, val, ph) => `<input id="${id}" value="${val}" placeholder="${ph}" ...>`
 const sel  = (id, opts)    => `<select id="${id}" ...>${opts}</select>`   // bifasico
@@ -224,17 +267,11 @@ sesionUsuario = { nombre, pin, area }  // null = no logueado
 
 ---
 
-## Reglas críticas al editar el código
+## Reglas al editar el código
 
-1. **Siempre restaurar desde el último archivo subido** antes de hacer cambios
-2. **Contar líneas antes y después** — si bajan, algo se borró
-3. **Editar por índice de línea**, nunca con `str.replace` sobre bloques grandes
-4. **Aplicar cambios de abajo hacia arriba** cuando se insertan líneas (para no correr índices)
-5. **Verificar sintaxis** con `node --check` antes de entregar
-6. **Nunca usar python -c para strings complejos** — siempre escribir a un archivo `.py` y ejecutarlo
-7. **`render()` debe llamarse** al final de cualquier handler que cambie estado visible
-
----
-
-## Archivos de referencia
-El usuario sube versiones numeradas: `index__N_.html`. Siempre trabajar sobre el más reciente subido. El archivo de salida se llama `nettracker.html` en `/mnt/user-data/outputs/`.
+1. **Buscar el archivo del área** (tabla de estructura arriba): vista en `js/views/`, lógica en `js/actions/`, botones en `js/handlers/`
+2. **Estado nuevo** → agregarlo en `js/state.js` y usarlo como `state.x`
+3. **Función nueva usada en otro archivo** → `export` donde se define e `import` donde se usa (rutas relativas con `.js` al final)
+4. **Handler para un `onclick`** → `window.nombre = ...` en `js/handlers/`
+5. **`render()` debe llamarse** al final de cualquier handler que cambie estado visible
+6. **Verificar sintaxis** con `node --check js/ruta/archivo.js` y probar en local con `python3 -m http.server`
