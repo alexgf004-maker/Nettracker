@@ -115,7 +115,7 @@ const inp  = (id, val, ph) => `<input id="${id}" value="${val}" placeholder="${p
 const sel  = (id, opts)    => `<select id="${id}" ...>${opts}</select>`   // bifasico
 const tSel = (id, opts)    => `<select id="${id}" ...>${opts}</select>`   // trifasico
 ```
-**Importante**: `sel()` y `tSel()` tienen `onchange="valVSOtro(this)"` en su definición — se usan para los selectores de Voltaje Secundario (VS). Si se usan para otros selectores (VP, TAP) el handler tiene un guard que los ignora.
+**Importante**: los selectores de Voltaje Secundario (`vf-ref-vs`, `vf-cp-vs`) llevan `onchange="valVSOtro(this)"`. El handler tiene un guard que ignora cualquier otro selector.
 
 ---
 
@@ -216,10 +216,10 @@ Flujo para validar el tap de un transformador comparando lecturas de referencia 
 | 4160 V  | 4364, 4260, 4157, 4054, 3950 |
 
 ### Voltaje Secundario "Otro"
-Cuando el usuario selecciona "Otro..." en el select de VS (ref o campaña):
-- `valVSOtro(this)` guarda `valForm.refVS = 'otro'` y llama `render()`
-- `render()` dibuja un `<input>` morado para ingresar el voltaje manualmente
-- `valVSOtroVal(this)` guarda el valor en `valForm.refVSOtro` o `valForm.cpVSOtro`
+Cuando el usuario selecciona "Otro..." en el select de VS (ref o campaña), en los tres tipos de conexión:
+- El `<input>` morado (`vf-ref-vs-otro` / `vf-cp-vs-otro`) siempre está en el HTML, oculto con `display:none` si VS no es "otro"
+- `valVSOtro(this)` guarda `state.valForm.refVS` / `cpVS` y **solo muestra u oculta ese input, sin llamar `render()`**, para no borrar lecturas ya escritas
+- `valVSOtroVal(this)` guarda el valor en `state.valForm.refVSOtro` o `state.valForm.cpVSOtro`
 - `calcularValidacion()` lee esos valores cuando VS === 'otro'
 
 ### Campos del formulario (`valForm`)
