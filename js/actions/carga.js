@@ -1,7 +1,8 @@
 // Carga masiva / despachos desde Excel
-import { db, historialCargasRef, push, ref, update } from '../firebase.js';
+import { historialCargasRef, push } from '../firebase.js';
 import { buildMemoCargaMasiva } from '../pdf/memos.js';
 import { state } from '../state.js';
+import { saveInstallationWithTrace } from '../services/traceability.js';
 import { abrirMemo, showToast } from '../ui.js';
 import { eqEnCampo, today } from '../utils.js';
 import { render } from '../views/render.js';
@@ -83,7 +84,7 @@ export function procesarExcel(file) {
   reader.readAsArrayBuffer(file);
 }
 
-export function confirmarCargaMasiva() {
+export async function confirmarCargaMasiva() {
   const validos = state.cargaData.filter(r => r.status === 'ok' || r.status === 'warning');
   if (validos.length === 0) return showToast('No hay registros válidos para importar');
 
@@ -97,9 +98,10 @@ export function confirmarCargaMasiva() {
 
   let count = 0;
   const instalacionIds = [];
-  validos.forEach(r => {
+  const importados = [];
+  for (const r of validos) {
     const eq = state.equipos.find(e => e.id === r.equipoId);
-    if (!eq) return;
+    if (!eq) continue;
 
     // Parse date - handle DD/MM/YYYY or YYYY-MM-DD
     const parseDate = d => {
@@ -117,41 +119,65 @@ export function confirmarCargaMasiva() {
       notas: r.notas, sede: 'Subestación Cucumacayán',
       areaInstalacion: 'Campos y Servicios',
       areaBeneficiaria: state.cargaAreaOrigen,
+      idUsuario: r.idUsuario || '',
+      direccion: r.direccion || '',
+      accesorios: r.accesorios || '',
+      multiplicador: r.multiplicador || '',
+      corrientes: r.corrientes || '',
+      conexion: r.conexion || '',
       retirado: false, fechaRegistro: today()
     };
 
-    // Register installation
-    const newRef = push(ref(db, 'analizadores'), payload);
-    procesados++;
-    if (progressBar) { progressBar.style.width = Math.round(procesados/total*100)+'%'; }
-    if (progressTxt) { progressTxt.textContent = procesados + ' / ' + total; }
-    instalacionIds.push(newRef.key);
-
     // Register prestamo movement (avoid duplicate if already prestado today to same area)
     const existeMov = (eq.movimientos||[]).some(m => m.tipo==='prestamo' && m.a==='Campos y Servicios' && m.fecha===today() && m.nota && m.nota.includes(r.caso));
-    if (existeMov) { return; } // skip duplicate, don't decrement
-    const mov = { tipo: 'prestamo', de: state.cargaAreaOrigen, a: 'Campos y Servicios', fecha: today(), nota: 'Asignación carga masiva - Caso #' + r.caso };
-    const movimientos = [...(eq.movimientos||[]), mov];
-    update(ref(db, 'equipos/' + r.equipoId), { prestado: true, prestadoFecha: today(), sede: 'Subestación Cucumacayán', movimientos });
-    count++;
-  });
+    const mov = { tipo: 'prestamo', de: state.cargaAreaOrigen, a: 'Campos y Servicios', fecha: today(), nota: 'Asignación carga masiva - Caso #' + r.caso, registradoPor: state.sesionUsuario?.nombre || 'Desconocido' };
+    const equipmentUpdates = {
+      prestado: true,
+      prestadoFecha: today(),
+      sede: 'Subestación Cucumacayán',
+      movimientos: existeMov ? (eq.movimientos || []) : [...(eq.movimientos || []), mov],
+    };
+    try {
+      const saved = await saveInstallationWithTrace({
+        payload,
+        eventType: 'dispatched',
+        eventContext: {
+          eventDate: today(),
+          location: 'Campos y Servicios',
+          to: { state: 'loaned', location: 'Campos y Servicios' },
+          notes: `Despacho para instalación del caso #${r.caso}`,
+        },
+        equipmentUpdates,
+      });
+      instalacionIds.push(saved.id);
+      importados.push(r);
+      count++;
+    } catch (error) {
+      showToast('❌ No se pudo importar el caso ' + r.caso + ': ' + error.message);
+    }
+    procesados++;
+    if (progressBar) progressBar.style.width = Math.round(procesados/total*100)+'%';
+    if (progressTxt) progressTxt.textContent = procesados + ' / ' + total;
+  }
+
+  if (importados.length === 0) return showToast('❌ No se pudo importar ninguna instalación');
 
   // Save to historial
   const registroCarga = {
     fecha: today(),
     hora: new Date().toLocaleTimeString('es-SV', {hour:'2-digit', minute:'2-digit'}),
     areaOrigen: state.cargaAreaOrigen,
-    total: validos.length,
+    total: instalacionIds.length,
     realizadoPor: state.sesionUsuario?.nombre || 'Desconocido',
-    equipos: validos.map(r => ({ s: r.serie, v: r.vineta||'', c: r.caso, l: r.lugar, fi: r.fechaInst, fr: r.fechaRetiro, n: r.notas||'', iu: r.idUsuario||'', d: r.direccion||'', ac: r.accesorios||'', m: r.multiplicador||'', co: r.corrientes||'', cx: r.conexion||'' }))
+    equipos: importados.map(r => ({ s: r.serie, v: r.vineta||'', c: r.caso, l: r.lugar, fi: r.fechaInst, fr: r.fechaRetiro, n: r.notas||'', iu: r.idUsuario||'', d: r.direccion||'', ac: r.accesorios||'', m: r.multiplicador||'', co: r.corrientes||'', cx: r.conexion||'' }))
   };
   showToast('✅ ' + count + ' instalaciones registradas');
-  const memoHtml = buildMemoCargaMasiva(validos);
+  const memoHtml = buildMemoCargaMasiva(importados);
   push(historialCargasRef, {
     fecha: today(),
     hora: new Date().toLocaleTimeString('es-SV', {hour:'2-digit', minute:'2-digit'}),
     areaOrigen: state.cargaAreaOrigen,
-    total: validos.length,
+    total: instalacionIds.length,
     realizadoPor: state.sesionUsuario?.nombre || 'Desconocido',
     instalacionIds: instalacionIds,
     memo: memoHtml

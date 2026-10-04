@@ -29,6 +29,8 @@ js/
   utils.js               Funciones puras: fechas, calcSt(), eqSt(), formularios vacíos
   ui.js                  showToast(), badges, abrirDoc()/descargarDoc(), tema, monitor de conexión
   data/sync.js           Listeners onValue() de Firebase → actualizan `state` y llaman render()
+  domain/cases.js        Normalización, clasificación CR/DA/DF/RE y creación de expedientes
+  services/traceability.js Escrituras atómicas caso–instalación–equipo y bitácora
   actions/               Lógica de negocio (guardar, retirar, préstamos, carga Excel, login)
     auth.js · instalaciones.js · inventario.js · carga.js
   pdf/memos.js           Plantillas HTML de memorándums (movimiento, lote, carga masiva)
@@ -76,6 +78,13 @@ projectId: "pqfind"
 | `historialAccesoriosRef` | `historialAccesorios` | Historial de despachos de accesorios |
 | `validacionesRef` | `validaciones` | Validaciones de tap guardadas |
 | `mantenimientoRef` | `config/mantenimiento` | Flag de modo mantenimiento (bool) |
+| `casesRef` | `cases` | Expedientes de campaña, reclamo o requerimiento especial |
+| `caseCodeIndexRef` | `caseCodeIndex` | Índice código normalizado → `caseId` |
+| `equipmentEventsRef` | `equipmentEvents` | Bitácora inmutable de eventos caso–equipo |
+
+Índices relacionados: `caseCodeIndex`, `installationIdsByCase`, `eventIdsByEquipment` y `eventIdsByCase`.
+
+Las instalaciones nuevas continúan guardándose en `analizadores`, pero ahora incluyen `caseId`. Crear, editar, retirar, descargar, reportar daño, enviar a revisión o registrar mantenimiento también genera eventos de trazabilidad mediante una actualización multipath.
 
 ---
 
@@ -85,10 +94,10 @@ SEDES    = ['Plantel Central', 'Subestación Cucumacayán']
 TECNICOS = ['David García', 'Bryan Francia', 'Francisco Chulo', 'Vicente Ramos']
 ADMIN    = 'David García'
 USUARIOS = [
-  { nombre: 'David García',    pin: '2442', area: 'CPT MT' },
-  { nombre: 'Bryan Francia',   pin: '8250', area: 'CPT MT' },
-  { nombre: 'Francisco Chulo', pin: '0177', area: 'CPT BT' },
-  { nombre: 'Vicente Ramos',   pin: '1190', area: 'CPT BT' },
+  { nombre: 'David García',    area: 'CPT MT' },
+  { nombre: 'Bryan Francia',   area: 'CPT MT' },
+  { nombre: 'Francisco Chulo', area: 'CPT BT' },
+  { nombre: 'Vicente Ramos',   area: 'CPT BT' },
 ]
 ```
 
@@ -287,7 +296,7 @@ Permite:
 ---
 
 ## Autenticación
-Login por PIN, sin Firebase Auth (solo local en `sesionUsuario`).
+Selección local de perfil, sin Firebase Auth. No debe considerarse un control de seguridad.
 ```js
 sesionUsuario = { nombre, pin, area }  // null = no logueado
 ```

@@ -6,6 +6,7 @@ import { showToast } from '../ui.js';
 import { today } from '../utils.js';
 import { render } from '../views/render.js';
 import { generateMemoRevision } from '../pdf/memos.js';
+import { buildEquipmentEvent, writeTraceUpdate } from '../services/traceability.js';
 
 export const SEDE_REVISION = 'Subestación Cucumacayán';
 const MOTIVO_DEFAULT = 'Revisión y diagnóstico del equipo por falla reportada';
@@ -82,7 +83,7 @@ function guardarEdicionRevision(eq, idx) {
   update(ref(db, 'equipos/' + eq.id), { historialMantenimiento: fichas }).then(() => showToast('✏️ Memo de envío actualizado'));
 }
 
-export function confirmRevision() {
+export async function confirmRevision() {
   const eq = state.equipos.find(x => x.id === state.revisionEqId);
   if (!eq) return;
   const f = state.revisionForm;
@@ -127,7 +128,23 @@ export function confirmRevision() {
   state.showRevisionModal = false; state.revisionEqId = null;
   render();
   generateMemoRevision(eq, envio);
-  update(ref(db, 'equipos/' + eq.id), updates).then(() => showToast('📤 Enviado a revisión · Memo generado'));
+  const related = state.records
+    .filter(r => r.equipoId === eq.id)
+    .sort((a, b) => (b.fechaRetiroReal || b.fechaRetiro || b.fechaRegistro || '').localeCompare(a.fechaRetiroReal || a.fechaRetiro || a.fechaRegistro || ''))[0];
+  const writes = {};
+  Object.entries(updates).forEach(([key, value]) => { writes[`equipos/${eq.id}/${key}`] = value; });
+  writes[`equipos/${eq.id}/operationalState`] = 'maintenance';
+  const event = buildEquipmentEvent({
+    type: 'sent_to_review', equipmentId: eq.id, caseId: related?.caseId || null,
+    caseCode: related?.caso || '', installationId: related?.id || null,
+    eventDate: envio.fecha, location: SEDE_REVISION,
+    from: { state: eq.operationalState || 'available', location: envio.sedeOrigen, condition: envio.condicionAnterior },
+    to: { state: 'maintenance', location: SEDE_REVISION, condition: 'mantenimiento' },
+    failure: { category: 'equipment', description: envio.descripcion, causedMeasurementFailure: null },
+    notes: envio.motivo,
+  });
+  await writeTraceUpdate({ writes, event });
+  showToast('📤 Enviado a revisión · Memo generado');
 }
 
 // Vuelve a generar el memo de un envío ya registrado (desde su ficha de mantenimiento)

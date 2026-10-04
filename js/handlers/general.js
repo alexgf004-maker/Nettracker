@@ -40,6 +40,15 @@ window.goToEquipo = el => {
   state.showGlobalSearch = false; state.tab = 'inventario'; state.view = 'equipo_detalle'; state.editEqId = id; state.eqDetalleTab = 'general'; render();
 };
 
+window.openCase = id => {
+  state.showGlobalSearch = false;
+  state.tab = 'instalaciones';
+  state.view = 'caso_detalle';
+  state.selectedCaseId = id;
+  state.editId = null;
+  render();
+};
+
 window.newInstallFromDash = () => {
   state.tab = 'instalaciones'; state.instTab = userInstTab();
   if (state.equipos.filter(e => (eqSt(e)==='disponible'||eqSt(e)==='prestado') && (e.condicion||'bueno')!=='fuera' && (e.condicion||'bueno')!=='mantenimiento').length===0) return showToast('No hay equipos disponibles');
@@ -96,10 +105,11 @@ window.generarReporteMensual = () => {
   state.showReporteModal=false;showToast('📊 Reporte generado');render();
 };
 
-window.goBack = () => { state.view = 'lista'; state.editId = null; state.editEqId = null; state.form = emptyForm(); state.equipoForm = emptyEF(); state.showSelector = false; render(); };
+window.goBack = () => { state.view = 'lista'; state.editId = null; state.editEqId = null; state.selectedCaseId = null; state.form = emptyForm(); state.equipoForm = emptyEF(); state.showSelector = false; render(); };
 
 window.switchTab = t => {
   state.tab = t; state.view = 'lista'; state.editId = null; state.editEqId = null;
+  state.selectedCaseId = null;
   if (t === 'instalaciones') state.filterStatus = 'TODOS';
   if (t === 'validaciones') { state.valView = 'lista'; state.valCampanaId = null; state.valUsuarioIdx = null; }
   state.showGlobalSearch = false; state.globalSearch = '';
@@ -109,7 +119,6 @@ window.switchTab = t => {
 window.cerrarAlerta = () => { state.showAlertaRetiros = false; render(); };
 window.setMapaFiltro = f => { state.mapaFiltro = f; render(); };
 window.verRetiros = () => { state.showAlertaRetiros = false; state.tab = 'instalaciones'; state.filterStatus = 'PROXIMO'; render(); };
-window.selectLoginUser = n => { state.loginForm.nombre = n; state.loginForm.pin = ''; state.loginForm.error = ''; render(); };
-window.setLoginPin = v => { state.loginForm.pin = v; state.loginForm.error = ''; };
+window.selectLoginUser = n => { state.loginForm.nombre = n; state.loginForm.error = ''; render(); };
 window.doLogin = doLogin;
 window.cerrarSesion = cerrarSesion;

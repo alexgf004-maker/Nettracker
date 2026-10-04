@@ -5,6 +5,9 @@ import { emptyEF, emptyForm } from './utils.js';
 export const state = {
   records: [],
   equipos: [],
+  cases: [],
+  equipmentEvents: [],
+  selectedCaseId: null,
   historialAccesorios: [],
   validaciones: [], // { id, nombre, fecha, tipo, usuarios: [{...datos, estado, resultado}] }
   valView: 'lista', // lista | detalle | form
@@ -25,8 +28,8 @@ export const state = {
   valImportData: [],
   valTipo: 'monofasico',
   // ── SESSION ──
-  sesionUsuario: null, // { nombre, pin }
-  loginForm: { nombre: '', pin: '', error: '' },
+  sesionUsuario: null, // { nombre }
+  loginForm: { nombre: '', error: '' },
   tab: 'dashboard',
   globalSearch: '',
   showGlobalSearch: false,

@@ -26,24 +26,11 @@ export function renderLogin(el) {
           ${USUARIOS.map(u => `<div onclick="selectLoginUser('${u.nombre}')" style="padding:12px 16px;border:2px solid ${state.loginForm.nombre===u.nombre?'var(--primary)':'var(--border)'};border-radius:12px;cursor:pointer;background:${state.loginForm.nombre===u.nombre?'var(--primary-light)':'#fff'};font-size:15px;font-weight:600;color:${state.loginForm.nombre===u.nombre?'var(--primary)':'var(--text2)'};transition:all .15s">${u.nombre}</div>`).join('')}
         </div>
         ${state.loginForm.nombre ? `
-          <div style="margin-bottom:16px">
-            <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:8px;letter-spacing:.5px">PIN DE ACCESO</div>
-            <input id="pin-input" type="password" inputmode="numeric" maxlength="4" placeholder="• • • •"
-              value="${state.loginForm.pin}"
-              oninput="setLoginPin(this.value)"
-              onkeydown="if(event.key==='Enter')doLogin()"
-              style="width:100%;padding:14px;border:2px solid ${state.loginForm.error?'var(--red)':'var(--border)'};border-radius:12px;font-size:24px;font-family:var(--mono);text-align:center;outline:none;letter-spacing:8px;background:var(--bg)">
-            ${state.loginForm.error ? `<div style="color:var(--red);font-size:12px;font-weight:600;margin-top:6px;text-align:center">${state.loginForm.error}</div>` : ''}
-          </div>
+          ${state.loginForm.error ? `<div style="color:var(--red);font-size:12px;font-weight:600;margin-bottom:10px;text-align:center">${state.loginForm.error}</div>` : ''}
           <button onclick="doLogin()" style="width:100%;background:linear-gradient(135deg,var(--primary),#0077cc);color:#fff;border:none;border-radius:12px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;box-shadow:var(--shadow-blue)">Entrar</button>
         ` : ''}
         <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
       </div>
     </div>`;
   el.innerHTML = html;
-  // Focus PIN input if user selected
-  if (state.loginForm.nombre) {
-    const pinEl = document.getElementById('pin-input');
-    if (pinEl) pinEl.focus();
-  }
 }

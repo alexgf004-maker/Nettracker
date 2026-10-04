@@ -11,7 +11,7 @@ const fire = () => setTimeout(() => listeners.forEach(l => l.cb(snap(parts(l.pat
 export function getDatabase() { return {}; }
 export function ref(db, path) { return { path: path || '' }; }
 export function onValue(r, cb) { listeners.push({ path: r.path, cb }); setTimeout(() => cb(snap(parts(r.path).at(-1), getAt(r.path))), 0); return () => {}; }
-export function push(r, v) { const key = 'k' + String(++seq).padStart(4, '0'); window.__WRITES__.push(['push', r.path, v]); if (v !== undefined) { setAt(r.path + '/' + key, v); fire(); } return Object.assign(Promise.resolve({ key }), { key }); }
+export function push(r, v) { const key = 'k' + String(++seq).padStart(4, '0'); if (v !== undefined) { window.__WRITES__.push(['push', r.path, v]); setAt(r.path + '/' + key, v); fire(); } return Object.assign(Promise.resolve({ key }), { key }); }
 export function set(r, v) { window.__WRITES__.push(['set', r.path, v]); setAt(r.path, v); fire(); return Promise.resolve(); }
 export function update(r, v) { window.__WRITES__.push(['update', r.path, v]); for (const [k, x] of Object.entries(v)) setAt(r.path + '/' + k, x); fire(); return Promise.resolve(); }
 export function remove(r) { window.__WRITES__.push(['remove', r.path]); setAt(r.path, null); fire(); return Promise.resolve(); }

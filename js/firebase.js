@@ -20,4 +20,7 @@ export const historialCargasRef = ref(db, 'historialCargas');
 export const historialAccesoriosRef = ref(db, 'historialAccesorios');
 export const validacionesRef = ref(db, 'validaciones');
 export const mantenimientoRef = ref(db, 'config/mantenimiento');
+export const casesRef = ref(db, 'cases');
+export const caseCodeIndexRef = ref(db, 'caseCodeIndex');
+export const equipmentEventsRef = ref(db, 'equipmentEvents');
 export { ref, onValue, push, update, remove, get, set };

@@ -1,10 +1,24 @@
 // Sincronización en tiempo real con Firebase
-import { equiposRef, historialAccesoriosRef, historialCargasRef, installsRef, mantenimientoRef, onValue, validacionesRef } from '../firebase.js';
+import { casesRef, equipmentEventsRef, equiposRef, historialAccesoriosRef, historialCargasRef, installsRef, mantenimientoRef, onValue, validacionesRef } from '../firebase.js';
 import { state } from '../state.js';
 import { render } from '../views/render.js';
 
 // Cada listener actualiza su arreglo en el estado y vuelve a renderizar
 export function iniciarSync() {
+  onValue(casesRef, snap => {
+    state.cases = [];
+    snap.forEach(child => state.cases.push({ id: child.key, ...child.val() }));
+    state.cases.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    render();
+  });
+
+  onValue(equipmentEventsRef, snap => {
+    state.equipmentEvents = [];
+    snap.forEach(child => state.equipmentEvents.push({ id: child.key, ...child.val() }));
+    state.equipmentEvents.sort((a, b) => (b.occurredAt || 0) - (a.occurredAt || 0));
+    render();
+  });
+
   onValue(installsRef, snap => {
     state.records = [];
     snap.forEach(child => {
