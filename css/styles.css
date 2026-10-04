@@ -144,6 +144,23 @@ header {
 .work-import-row.needs-review { background: var(--primary-light); cursor: default; }
 .work-import-row.needs-review em, .work-import-errors { color: var(--red); }
 .work-import-errors { font-size: 11px; line-height: 1.6; padding-left: 20px; overflow-wrap: anywhere; }
+.work-pre-missing { border: 1px solid #fbbf24; border-radius: 10px; background: var(--yellow-light); padding: 10px; max-height: 250px; overflow: auto; }
+.work-pre-missing > strong { display: block; font-size: 11px; color: var(--yellow); margin-bottom: 8px; }
+.work-pre-missing button { display: grid; width: 100%; gap: 3px; text-align: left; background: var(--white); border: 1px solid var(--border); border-radius: 7px; padding: 8px; margin-top: 5px; color: var(--text); cursor: pointer; }
+.work-pre-missing span { font: 700 11px var(--mono); }
+.work-pre-missing small { font-size: 10px; color: var(--yellow); }
+.work-pre-ready, .work-pre-estimate { background: var(--green-light); border-radius: 8px; padding: 10px; color: var(--green); font-size: 11px; line-height: 1.5; }
+.work-pre-estimate { background: var(--yellow-light); color: var(--yellow); }
+.work-pre-link { display: block; color: var(--primary); font-size: 12px; font-weight: 700; text-align: center; padding: 8px; }
+.work-pre-entry { width: 100%; display: flex; justify-content: space-between; gap: 12px; align-items: center; text-align: left; padding: 13px 15px; margin-bottom: 15px; border: 1px solid var(--border); border-left: 4px solid var(--primary); border-radius: 11px; background: var(--white); color: var(--primary); font: 700 12px var(--font); cursor: pointer; }
+.work-pre-entry > span:first-child { display: grid; gap: 4px; color: var(--text); }
+.work-pre-entry small { font-size: 11px; font-weight: 400; color: var(--text3); }
+.work-pre-map { display: block; width: 100%; height: min(65vh, 560px); border: 1px solid var(--border); border-radius: 12px; background: var(--white); }
+.work-pre-map-list { margin-top: 12px; display: grid; gap: 7px; }
+.work-pre-map-list > div { display: grid; gap: 3px; background: var(--white); border: 1px solid var(--border); border-radius: 9px; padding: 10px; font-size: 11px; }
+.work-pre-map-list strong { font-family: var(--mono); }
+.work-pre-map-list span { color: var(--text3); }
+.work-pre-map-list a { color: var(--primary); font-weight: 700; }
 .work-campaign-card { min-width: 0; display: flex; flex-direction: column; gap: 5px; text-align: left; padding: 15px; color: var(--text); background: var(--white); border: 1px solid var(--border); border-radius: 13px; box-shadow: var(--shadow); font-family: var(--font); cursor: pointer; }
 .work-campaign-card strong { font-size: 17px; }
 .work-campaign-card .work-stage { color: var(--primary); font-size: 12px; font-weight: 700; }

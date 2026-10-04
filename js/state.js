@@ -10,6 +10,7 @@ export const state = {
   campaigns: [],
   selectedCampaignId: null,
   campaignImport: null,
+  preCampaignDraft: null,
   campaignForm: { year: new Date().getFullYear(), month: new Date().getMonth() + 1, ownerArea: 'CPT MT', receivedAt: '' },
   servicePoints: [],
   equipmentEvents: [],

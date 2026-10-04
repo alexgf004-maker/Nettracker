@@ -7,6 +7,7 @@ import { normalizeCaseCode } from '../domain/cases.js';
 import { campaignLabel } from '../domain/campaigns.js';
 import { renderCaseForm, renderCaseList, renderInstallSectionSwitch } from './cases.js';
 import { renderCampaignDetail, renderCampaignForm, renderCampaignList, renderCampaignImport } from './campaigns.js';
+import { renderPreCampaign, renderPreCampaignMap } from './pre-campaign.js';
 import { renderTraceTimeline } from './traceability.js';
 
 export function renderInstalaciones() {
@@ -14,6 +15,8 @@ export function renderInstalaciones() {
   if (state.view === 'campaign_form') return renderCampaignForm();
   if (state.view === 'campaign_detail') return renderCampaignDetail();
   if (state.view === 'campaign_import') return renderCampaignImport();
+  if (state.view === 'campaign_preparation') return renderPreCampaign();
+  if (state.view === 'campaign_map') return renderPreCampaignMap();
   if (state.view === 'lista' && state.instSection === 'cases') return renderCaseList();
   if (state.view === 'case_form') return renderCaseForm();
   let html = '';

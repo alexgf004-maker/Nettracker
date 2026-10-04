@@ -727,4 +727,12 @@ Esta arquitectura es el mapa de destino; no autoriza una reescritura masiva ni u
 - El código determina CR/DA/DF y debe coincidir con el mes y año de la campaña. Las perturbaciones de los archivos oficiales compartidos con BT se incluyen en MT solo si su NC coincide con un CR del mismo período.
 - Los códigos y contratos en conflicto quedan visibles para revisión. La carga es idempotente para expedientes ya asociados; un expediente sin campaña se asocia si es compatible. Los datos de expedientes y puntos existentes no se sobrescriben.
 - Varios casos con el mismo NC nuevo comparten el punto de servicio. Solo se escriben los datos seleccionados al confirmar; no se conservan los archivos originales.
-- Sigue pendiente generar cartas, hojas de inspección, mapas, multiplicadores y demás salidas de precampaña.
+- En la siguiente etapa se conectarán multiplicadores, fechas de instalación, validaciones y evidencias de campo.
+
+## 17. Precampaña conectada con los casos
+
+- Los expedientes de un mes se agrupan por NC para una visita física por suministro. Si un NC tiene CR, DA y DF, el listado de Excel conserva tres filas y la visita, carta, hoja y marcador de mapa reúnen los tres códigos.
+- La pantalla identifica NC, cliente, dirección, medidor, CT/DS, alimentador y coordenadas faltantes. Los datos se corrigen desde el expediente antes de entregar documentos.
+- Se generan en el navegador un listado Excel, un mapa KML para el contratista y hojas de inspección HTML listas para imprimir o guardar como PDF. Las cartas son borradores: requieren fecha, contratista, firmante y contacto; carecen de firma digital y se revisan antes de solicitar la firma real.
+- `campaigns/{id}/preCampaign` conserva fechas y enlace a la carpeta externa de evidencias. A los diez días calendario de entregar al contratista se calcula una fecha orientativa, visible como pendiente en Inicio desde tres días antes y hasta registrar la recepción.
+- No se almacenan PDF, fotos ni hojas escaneadas en Firebase. El enlace permite llegar a la carpeta externa; integrar almacenamiento y trazabilidad de cada archivo queda pendiente.

@@ -1,5 +1,6 @@
 import { openNewCampaign, saveCampaign, setCampaignStage } from '../actions/campaigns.js';
 import { openCampaignImport, readCampaignFiles, saveCampaignImport, toggleCampaignImportRow } from '../actions/campaign-import.js';
+import { downloadPreCampaignMap, exportPreCampaignList, openPreCampaign, printPreCampaignInspections, printPreCampaignLetters, savePreCampaign, setPreCampaignField } from '../actions/pre-campaign.js';
 import { state } from '../state.js';
 import { render } from '../views/render.js';
 
@@ -10,6 +11,14 @@ window.openCampaignImport = openCampaignImport;
 window.readCampaignFiles = readCampaignFiles;
 window.saveCampaignImport = saveCampaignImport;
 window.toggleCampaignImportRow = toggleCampaignImportRow;
+window.openPreCampaign = openPreCampaign;
+window.setPreCampaignField = setPreCampaignField;
+window.savePreCampaign = savePreCampaign;
+window.exportPreCampaignList = exportPreCampaignList;
+window.downloadPreCampaignMap = downloadPreCampaignMap;
+window.printPreCampaignInspections = printPreCampaignInspections;
+window.printPreCampaignLetters = printPreCampaignLetters;
+window.openPreCampaignMap = () => { state.view = 'campaign_map'; render(); };
 window.setCampaignField = (key, value) => { state.campaignForm[key] = value; };
 window.setCampaignAreaView = value => { state.campaignAreaView = value; render(); };
 window.openCampaign = id => {

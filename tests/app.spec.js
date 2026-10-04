@@ -165,3 +165,19 @@ test('revisa un listado antes de importar y vincula perturbaciones por contrato'
   expect(saved?.[2]['caseCodeIndex/DF142026031O00']).toBeUndefined();
   expect(app.errores).toEqual([]);
 });
+
+test('abre la precampaña mensual y guarda la recepción estimada del contratista', async ({ page }) => {
+  const app = await abrirApp(page);
+  await cerrarAlerta(page);
+  await app.ejecutar(() => openCampaign('MT_2026_04'));
+  await page.getByRole('button', { name: /Preparar precampaña/ }).click();
+  await expect(page.locator('#app')).toContainText('Puntos incompletos');
+  await expect(page.locator('#app')).toContainText('Descargar listado Excel');
+  await app.ejecutar(() => setPreCampaignField('contractorDeliveredAt', '2026-04-02'));
+  await page.getByRole('button', { name: 'Guardar seguimiento' }).click();
+  const writes = await app.escrituras();
+  expect(writes.some(([operation, path, value]) => operation === 'update' && path === '' && value['campaigns/MT_2026_04/preCampaign']?.contractorDeliveredAt === '2026-04-02')).toBe(true);
+  await page.getByRole('button', { name: /Ver mapa/i }).click();
+  await expect(page.locator('#app')).toContainText('Mapa de precampaña');
+  expect(app.errores).toEqual([]);
+});

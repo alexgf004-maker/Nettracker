@@ -5,6 +5,7 @@
   "scripts": {
     "test": "playwright test",
     "test:import": "node tests/campaign-import.mjs",
+    "test:pre-campaign": "node tests/pre-campaign.mjs",
     "serve": "node tests/server.js"
   },
   "devDependencies": {

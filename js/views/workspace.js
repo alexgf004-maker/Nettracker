@@ -1,6 +1,7 @@
 // Inicio y espacios de trabajo orientados a los procesos de CPT.
 import { userArea } from '../config.js';
 import { campaignLabel, CAMPAIGN_STAGES } from '../domain/campaigns.js';
+import { estimatedFieldReturn } from '../domain/pre-campaign.js';
 import { state } from '../state.js';
 import { daysUntil, escapeHtml, fmtDate } from '../utils.js';
 import { renderInstalaciones } from './instalaciones.js';
@@ -20,6 +21,8 @@ export function renderWorkHome() {
   const overdue = state.records.filter(item => !item.retirado && daysUntil(item.fechaRetiro) < 0 && (item.areaBeneficiaria || item.areaInstalacion || 'CPT MT') === area);
   const downloads = state.records.filter(item => item.retirado && item.descargaPendiente && (item.areaBeneficiaria || item.areaInstalacion || 'CPT MT') === area);
   const dueCampaigns = campaigns.filter(item => daysUntil(item.submissionDueAt) <= 10).sort((a, b) => (a.submissionDueAt || '').localeCompare(b.submissionDueAt || ''));
+  const awaitingField = campaigns.map(item => ({ item, due: estimatedFieldReturn(item.preCampaign?.contractorDeliveredAt) }))
+    .filter(({ item, due }) => due && !item.preCampaign?.fieldReturnedAt && daysUntil(due) <= 3);
   const name = escapeHtml(state.sesionUsuario?.nombre?.split(' ')[0] || 'equipo');
 
   return `<main class="content work-home">
@@ -29,10 +32,11 @@ export function renderWorkHome() {
       <button class="work-path complaint" onclick="switchTab('complaints')"><span class="work-path-icon">📋</span><span class="work-path-text"><strong>Reclamos</strong><small>${complaints.length} abiertos · medición e informe</small></span><span class="work-path-arrow">→</span></button>
       <button class="work-path operations" onclick="switchTab('operations')"><span class="work-path-icon">⚡</span><span class="work-path-text"><strong>Trabajo de campo</strong><small>Instalaciones, retiros, validaciones y despachos</small></span><span class="work-path-arrow">→</span></button>
     </div>
-    <div class="work-section-head"><h2>Atención pendiente</h2><span>${overdue.length + downloads.length + dueCampaigns.length}</span></div>
-    ${overdue.length || downloads.length || dueCampaigns.length ? `<div class="work-alert-list">
+    <div class="work-section-head"><h2>Atención pendiente</h2><span>${overdue.length + downloads.length + dueCampaigns.length + awaitingField.length}</span></div>
+    ${overdue.length || downloads.length || dueCampaigns.length || awaitingField.length ? `<div class="work-alert-list">
       ${overdue.length ? `<button onclick="switchTab('instalaciones')" class="work-alert danger"><strong>${overdue.length} retiro${overdue.length === 1 ? '' : 's'} vencido${overdue.length === 1 ? '' : 's'}</strong><small>Revisar equipos en campo</small><span>→</span></button>` : ''}
       ${downloads.length ? `<button onclick="switchTab('instalaciones')" class="work-alert warning"><strong>${downloads.length} descarga${downloads.length === 1 ? '' : 's'} pendiente${downloads.length === 1 ? '' : 's'}</strong><small>Archivos de mediciones retiradas</small><span>→</span></button>` : ''}
+      ${awaitingField.map(({ item, due }) => `<button onclick="openCampaign('${escapeHtml(item.id)}');openPreCampaign()" class="work-alert ${daysUntil(due) < 0 ? 'danger' : 'warning'}"><strong>Hojas y fotos pendientes: ${escapeHtml(campaignLabel(item))}</strong><small>Recepción estimada ${fmtDate(due)} · consulta al contratista</small><span>→</span></button>`).join('')}
       ${dueCampaigns.map(item => `<button onclick="openCampaign('${escapeHtml(item.id)}')" class="work-alert ${daysUntil(item.submissionDueAt) < 0 ? 'danger' : 'warning'}"><strong>${daysUntil(item.submissionDueAt) < 0 ? 'Entrega vencida' : 'Entrega próxima'}: ${escapeHtml(campaignLabel(item))}</strong><small>${fmtDate(item.submissionDueAt)} · ${escapeHtml(stageLabel(item.stage))}</small><span>→</span></button>`).join('')}
     </div>` : '<div class="work-empty">No hay retiros vencidos, descargas pendientes ni entregas de campaña próximas.</div>'}
     <div class="work-section-head"><h2>Campañas en curso</h2><button onclick="switchTab('campaigns')">Ver todas →</button></div>
