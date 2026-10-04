@@ -34,3 +34,14 @@ test('abre la trazabilidad sintética de una instalación', async ({ page }) => 
   await expect(page.locator('#app')).toContainText('Sitio de prueba A');
   expect(app.errores).toEqual([]);
 });
+
+test('muestra la bandeja y el expediente de casos', async ({ page }) => {
+  const app = await abrirApp(page);
+  await cerrarAlerta(page);
+  await page.locator('nav.bottom-nav button', { hasText: 'Instalac.' }).click();
+  await page.getByRole('button', { name: /Casos/ }).click();
+  await expect(page.locator('#app')).toContainText('Cliente de prueba A');
+  await page.getByText('#C-001').click();
+  await expect(page.locator('#app')).toContainText('NC-TEST-001');
+  expect(app.errores).toEqual([]);
+});

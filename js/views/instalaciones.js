@@ -2,11 +2,14 @@
 import { SEDES, USUARIOS, isAdmin, userArea } from '../config.js';
 import { state } from '../state.js';
 import { badgeSt } from '../ui.js';
-import { calcSt, daysUntil, fmtDate, today } from '../utils.js';
+import { calcSt, daysUntil, escapeHtml, fmtDate, today } from '../utils.js';
 import { normalizeCaseCode } from '../domain/cases.js';
+import { renderCaseForm, renderCaseList, renderInstallSectionSwitch } from './cases.js';
 import { renderTraceTimeline } from './traceability.js';
 
 export function renderInstalaciones() {
+  if (state.view === 'lista' && state.instSection === 'cases') return renderCaseList();
+  if (state.view === 'case_form') return renderCaseForm();
   let html = '';
   const counts = {
     TODOS: state.records.length,
@@ -42,6 +45,7 @@ export function renderInstalaciones() {
       if (state.search) { const q = state.search.toLowerCase(); return (r.serie||'').toLowerCase().includes(q) || (r.caso||'').toLowerCase().includes(q) || (r.lugar||'').toLowerCase().includes(q); }
       return true;
     });
+    html += renderInstallSectionSwitch();
     // Sub-tabs
     const subTabs = [{key:'cpt_mt',label:'⚡ CPT MT'},{key:'cpt_bt',label:'⚡ CPT BT'},{key:'campos',label:'🏗 Campos y Serv.'}];
     html += '<div style="display:flex;background:var(--white);border-bottom:1px solid var(--border);padding:0 16px">';
@@ -290,6 +294,7 @@ export function renderInstalaciones() {
       .filter(r => r.caseId === c.id || (!r.caseId && normalizeCaseCode(r.caso) === c.normalizedCode))
       .sort((a, b) => (b.fechaInstalacion || '').localeCompare(a.fechaInstalacion || ''));
     const events = state.equipmentEvents.filter(e => e.caseId === c.id);
+    const point = state.servicePoints.find(item => item.id === c.servicePointId);
     const typeLabel = c.caseType === 'CR' ? 'Regulación de tensión' : c.caseType === 'DA' ? 'Armónicos' : c.caseType === 'DF' ? 'Flicker' : c.caseType === 'RE' ? 'Reclamo' : 'Requerimiento especial';
     const statusLabels = { scheduled: 'Programado', measuring: 'En medición', pending_download: 'Descarga pendiente', analysis: 'En análisis', pending_submission: 'Pendiente de entrega', closed: 'Cerrado' };
     html += `<div class="content">
@@ -308,7 +313,14 @@ export function renderInstalaciones() {
         <div class="detail-row"><div class="detail-label">Estado del expediente</div><div class="detail-value">${statusLabels[c.lifecycleStatus] || c.lifecycleStatus || 'Programado'}</div></div>
         <div class="detail-row"><div class="detail-label">Lugar inicial</div><div class="detail-value">${c.placeSnapshot || caseRecords[0]?.lugar || '—'}</div></div>
         <div class="detail-row"><div class="detail-label">Responsable de creación</div><div class="detail-value">${c.createdBy || '—'}</div></div>
+        ${point?.customerName ? `<div class="detail-row"><div class="detail-label">Cliente / usuario</div><div class="detail-value">${escapeHtml(point.customerName)}</div></div>` : ''}
+        ${point?.contractNumber ? `<div class="detail-row"><div class="detail-label">Número de contrato</div><div class="detail-value">${escapeHtml(point.contractNumber)}</div></div>` : ''}
+        ${point?.meterNumber ? `<div class="detail-row"><div class="detail-label">Medidor</div><div class="detail-value">${escapeHtml(point.meterNumber)}</div></div>` : ''}
+        ${point?.electricalReference ? `<div class="detail-row"><div class="detail-label">CT / DS</div><div class="detail-value">${escapeHtml(point.electricalReference)}</div></div>` : ''}
+        ${point?.address ? `<div class="detail-row"><div class="detail-label">Dirección</div><div class="detail-value">${escapeHtml(point.address)}</div></div>` : ''}
+        ${point?.feeder || point?.networkVoltageLL ? `<div class="detail-row"><div class="detail-label">Red</div><div class="detail-value">${escapeHtml(point.feeder || '—')}${point.networkVoltageLL ? ' · ' + escapeHtml(point.networkVoltageLL) + ' V L-L' : ''}${point.urbanity ? ' · ' + (point.urbanity === 'R' ? 'Rural' : 'Urbano') : ''}</div></div>` : ''}
       </div>
+      <div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn btn-secondary" style="flex:1" onclick="editCase('${c.id}')">✏️ Editar expediente</button><button class="btn btn-primary" style="flex:1" onclick="newInstallForCase('${c.id}')">⚡ Registrar medición</button></div>
       <div class="section-title">Intentos e instalaciones (${caseRecords.length})</div>
       ${caseRecords.length ? '<div class="list" style="margin-bottom:16px">' + caseRecords.map((r, idx) => `<div class="historial-card" onclick="openDetail('${r.id}')" style="cursor:pointer"><div class="historial-row"><div><div class="historial-lugar">${idx === caseRecords.length - 1 ? 'Medición original' : 'Intento / remedición'} · ${r.serie || 'Sin equipo'}</div><div class="historial-caso">📍 ${r.lugar || 'Sin lugar'}${r.fallas?.length ? ' · ⚠️ ' + r.fallas.join(', ') : ''}</div></div><div class="historial-fecha">${fmtDate(r.fechaInstalacion)}<br>→ ${fmtDate(r.fechaRetiroReal || r.fechaRetiro)}</div></div></div>`).join('') + '</div>' : '<div class="empty"><div class="empty-text">El caso todavía no tiene mediciones vinculadas</div></div>'}
       <div class="section-title">Bitácora caso–equipo (${events.length})</div>

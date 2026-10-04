@@ -10,8 +10,12 @@ module.exports = {
       retirado: true, fechaRetiroReal: '2026-09-12', sinProblema: false, fallas: ['No enciende / Sin señales de vida'], descripcionFalla: 'Carcasa quebrada', retiradoPor: 'Usuario de prueba' },
   },
   cases: {
-    c1: { code: 'C-001', normalizedCode: 'C-001', workflowType: 'special', caseType: 'SPECIAL', ownerArea: 'CPT MT', lifecycleStatus: 'measuring', placeSnapshot: 'Sitio de prueba A', createdBy: 'Usuario de prueba', updatedAt: 1 },
-    c2: { code: 'C-002', normalizedCode: 'C-002', workflowType: 'special', caseType: 'SPECIAL', ownerArea: 'CPT MT', lifecycleStatus: 'measuring', placeSnapshot: 'Sitio de prueba B', createdBy: 'Usuario de prueba', updatedAt: 2 },
+    c1: { code: 'C-001', normalizedCode: 'C-001', workflowType: 'special', caseType: 'SPECIAL', ownerArea: 'CPT MT', lifecycleStatus: 'measuring', placeSnapshot: 'Sitio de prueba A', servicePointId: 'sp1', createdBy: 'Usuario de prueba', updatedAt: 1 },
+    c2: { code: 'C-002', normalizedCode: 'C-002', workflowType: 'special', caseType: 'SPECIAL', ownerArea: 'CPT MT', lifecycleStatus: 'measuring', placeSnapshot: 'Sitio de prueba B', servicePointId: 'sp2', createdBy: 'Usuario de prueba', updatedAt: 2 },
+  },
+  servicePoints: {
+    sp1: { contractNumber: 'NC-TEST-001', customerName: 'Cliente de prueba A', address: 'Sitio de prueba A', meterNumber: 'M-TEST-001', electricalReference: 'CT-TEST-001', feeder: 'AL-TEST', networkVoltageLL: 23000, urbanity: 'U', active: true },
+    sp2: { contractNumber: 'NC-TEST-002', customerName: 'Cliente de prueba B', address: 'Sitio de prueba B', meterNumber: 'M-TEST-002', electricalReference: 'CT-TEST-002', feeder: 'AL-TEST', networkVoltageLL: 13200, urbanity: 'R', active: true },
   },
   caseCodeIndex: { 'C-001': 'c1', 'C-002': 'c2' },
   equipmentEvents: {

@@ -1,3 +1,4 @@
+import { emptyCaseForm } from './domain/cases.js';
 import { emptyEF, emptyForm } from './utils.js';
 
 // Estado global de la app. Todo lo que cambia en pantalla vive aquí;
@@ -6,8 +7,15 @@ export const state = {
   records: [],
   equipos: [],
   cases: [],
+  servicePoints: [],
   equipmentEvents: [],
   selectedCaseId: null,
+  instSection: 'installations', // installations | cases
+  caseFilter: 'ALL', // ALL | campaign | complaint | special
+  caseAreaFilter: 'TODOS',
+  caseSearch: '',
+  caseForm: emptyCaseForm(),
+  editCaseId: null,
   historialAccesorios: [],
   validaciones: [], // { id, nombre, fecha, tipo, usuarios: [{...datos, estado, resultado}] }
   valView: 'lista', // lista | detalle | form

@@ -1,6 +1,7 @@
 // Punto de entrada: registra los handlers globales (window.*) y arranca la app.
 import './handlers/general.js';
 import './handlers/instalaciones.js';
+import './handlers/cases.js';
 import './handlers/inventario.js';
 import './handlers/validaciones.js';
 import './handlers/carga.js';

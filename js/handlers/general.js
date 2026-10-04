@@ -43,6 +43,7 @@ window.goToEquipo = el => {
 window.openCase = id => {
   state.showGlobalSearch = false;
   state.tab = 'instalaciones';
+  state.instSection = 'cases';
   state.view = 'caso_detalle';
   state.selectedCaseId = id;
   state.editId = null;
@@ -105,11 +106,12 @@ window.generarReporteMensual = () => {
   state.showReporteModal=false;showToast('📊 Reporte generado');render();
 };
 
-window.goBack = () => { state.view = 'lista'; state.editId = null; state.editEqId = null; state.selectedCaseId = null; state.form = emptyForm(); state.equipoForm = emptyEF(); state.showSelector = false; render(); };
+window.goBack = () => { state.view = 'lista'; state.editId = null; state.editEqId = null; state.editCaseId = null; state.selectedCaseId = null; state.form = emptyForm(); state.equipoForm = emptyEF(); state.showSelector = false; render(); };
 
 window.switchTab = t => {
   state.tab = t; state.view = 'lista'; state.editId = null; state.editEqId = null;
   state.selectedCaseId = null;
+  state.editCaseId = null;
   if (t === 'instalaciones') state.filterStatus = 'TODOS';
   if (t === 'validaciones') { state.valView = 'lista'; state.valCampanaId = null; state.valUsuarioIdx = null; }
   state.showGlobalSearch = false; state.globalSearch = '';

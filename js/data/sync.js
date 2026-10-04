@@ -1,5 +1,5 @@
 // Sincronización en tiempo real con Firebase
-import { casesRef, equipmentEventsRef, equiposRef, historialAccesoriosRef, historialCargasRef, installsRef, mantenimientoRef, onValue, validacionesRef } from '../firebase.js';
+import { casesRef, equipmentEventsRef, equiposRef, historialAccesoriosRef, historialCargasRef, installsRef, mantenimientoRef, onValue, servicePointsRef, validacionesRef } from '../firebase.js';
 import { state } from '../state.js';
 import { render } from '../views/render.js';
 
@@ -9,6 +9,12 @@ export function iniciarSync() {
     state.cases = [];
     snap.forEach(child => state.cases.push({ id: child.key, ...child.val() }));
     state.cases.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    render();
+  });
+
+  onValue(servicePointsRef, snap => {
+    state.servicePoints = [];
+    snap.forEach(child => state.servicePoints.push({ id: child.key, ...child.val() }));
     render();
   });
 

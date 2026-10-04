@@ -25,7 +25,25 @@ export function classifyCase(value) {
   return { workflowType: 'special', caseType: 'SPECIAL' };
 }
 
-export function buildCaseRecord({ code, ownerArea, place, actor, lifecycleStatus = 'scheduled', measurementStatus = 'not_measured', now = Date.now() }) {
+export function emptyCaseForm() {
+  return {
+    code: '',
+    ownerArea: 'CPT MT',
+    source: '',
+    contractNumber: '',
+    customerName: '',
+    address: '',
+    meterNumber: '',
+    electricalReference: '',
+    feeder: '',
+    networkVoltageLL: '',
+    urbanity: 'U',
+    lat: '',
+    lng: '',
+  };
+}
+
+export function buildCaseRecord({ code, ownerArea, place, actor, source = '', servicePointId = null, lifecycleStatus = 'scheduled', measurementStatus = 'not_measured', now = Date.now() }) {
   const normalizedCode = normalizeCaseCode(code);
   const classification = classifyCase(normalizedCode);
   return {
@@ -33,6 +51,8 @@ export function buildCaseRecord({ code, ownerArea, place, actor, lifecycleStatus
     normalizedCode,
     ...classification,
     ownerArea: ownerArea || 'CPT MT',
+    source,
+    servicePointId,
     lifecycleStatus,
     multiplierStatus: 'not_started',
     measurementStatus,

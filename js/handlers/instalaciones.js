@@ -40,6 +40,22 @@ window.newInstall = () => {
   state.editId = null; state.view = 'form'; render();
 };
 
+window.newInstallForCase = id => {
+  if (state.equipos.filter(e => (eqSt(e) === 'disponible' || eqSt(e) === 'prestado') && (e.condicion||'bueno') !== 'fuera' && (e.condicion||'bueno') !== 'mantenimiento').length === 0) return showToast('⚠️ No hay equipos disponibles en inventario');
+  const caseRecord = state.cases.find(item => item.id === id);
+  if (!caseRecord) return;
+  const point = state.servicePoints.find(item => item.id === caseRecord.servicePointId);
+  state.form = emptyForm();
+  state.form.caso = caseRecord.code || '';
+  state.form.lugar = point?.address || caseRecord.placeSnapshot || '';
+  state.form.lat = point?.coordinates?.lat ?? null;
+  state.form.lng = point?.coordinates?.lng ?? null;
+  state.form.areaInstalacion = caseRecord.ownerArea || 'CPT MT';
+  state.editId = null;
+  state.view = 'form';
+  render();
+};
+
 window.saveInstall = handleSave;
 window.openDetail = id => { state.editId = id; state.view = 'detalle'; render(); };
 
@@ -98,4 +114,3 @@ window.setDanioField = (k, v) => { state.danioForm[k] = v; if (k === 'condicion'
 window.doMemoDanio = confirmDanio;
 window.memoDanio = reimprimirMemoDanio;
 window.editarDanio = editarDanio;
-

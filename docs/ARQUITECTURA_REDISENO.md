@@ -1,6 +1,6 @@
 # Arquitectura propuesta para el rediseño de NetTracker
 
-Estado: propuesta inicial para discusión  
+Estado: arquitectura evolutiva; Fase 1 en implementación
 Fecha: 2026-10-04  
 Alcance: CPT MT y CPT BT, empezando por trazabilidad caso–equipo
 
@@ -605,6 +605,16 @@ Es la primera fase recomendada porque resuelve la necesidad inmediata.
 - Convertir instalación, retiro, devolución, daño, revisión y mantenimiento en eventos.
 - Mostrar la línea de tiempo desde el caso y desde el equipo.
 - Mantener los historiales actuales en paralelo hasta verificar la migración.
+
+Avance al 2026-10-04:
+
+- Implementados `cases`, `caseCodeIndex`, `servicePoints` y `equipmentEvents`.
+- Las instalaciones nuevas crean o reutilizan el expediente según el código normalizado.
+- Existe bandeja de casos con filtros por flujo y área.
+- El expediente puede crearse antes de asignar equipo y guarda NC, cliente, dirección, medidor, CT/DS, alimentador, nivel de red, urbanidad y coordenadas.
+- Desde el expediente se puede iniciar una medición con el código y ubicación precargados.
+- Instalación, retiro, descarga, daño, revisión y movimientos del equipo generan trazabilidad.
+- Pendiente: migración controlada de instalaciones históricas y modelo explícito de intentos de medición.
 
 ### Fase 2 — Campañas y precampaña
 
