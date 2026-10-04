@@ -17,6 +17,9 @@ export const state = {
   caseFilter: 'ALL', // ALL | campaign | complaint | special
   caseAreaFilter: 'TODOS',
   caseSearch: '',
+  complaintSearch: '',
+  campaignAreaView: 'mine',
+  caseEntryMode: null,
   caseForm: emptyCaseForm(),
   editCaseId: null,
   historialAccesorios: [],

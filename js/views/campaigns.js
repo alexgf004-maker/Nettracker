@@ -1,6 +1,7 @@
 import { CAMPAIGN_STAGES, campaignDueDate, campaignLabel, campaignPeriodFromCode } from '../domain/campaigns.js';
 import { normalizeCaseCode } from '../domain/cases.js';
 import { state } from '../state.js';
+import { userArea } from '../config.js';
 import { escapeHtml, fmtDate } from '../utils.js';
 import { renderInstallSectionSwitch } from './cases.js';
 
@@ -21,25 +22,24 @@ function stageLabel(stage) {
 }
 
 export function renderCampaignList() {
-  let html = renderInstallSectionSwitch();
-  html += `<div class="content"><div class="page-title">Campañas regulatorias</div>
-    <div style="font-size:12px;color:var(--text3);margin:-8px 0 14px">Cada mes conserva sus casos CR, DA y DF, etapa y fecha de entrega.</div>`;
-  if (!state.campaigns.length) {
+  let html = state.tab === 'instalaciones' ? renderInstallSectionSwitch() : '';
+  const visible = state.campaignAreaView === 'all' ? state.campaigns : state.campaigns.filter(item => item.ownerArea === userArea());
+  html += `<main class="content work-list-page"><div class="work-page-heading"><div><div class="work-eyebrow">Control regulatorio</div><h1>Campañas</h1><p>Un espacio de trabajo por mes, con casos y entrega propios.</p></div><button class="work-primary-action" onclick="newCampaign()">+ Nueva campaña</button></div>
+    <div class="work-summary-row"><div><strong>${visible.length}</strong><span>Campañas</span></div><div><strong>${visible.filter(item => item.stage !== 'completed').length}</strong><span>En curso</span></div><div><strong>${visible.reduce((total, item) => total + linkedCases(item).length, 0)}</strong><span>Casos vinculados</span></div></div>
+    <div class="work-filter-row"><button class="${state.campaignAreaView === 'mine' ? 'active' : ''}" onclick="setCampaignAreaView('mine')">Mi área · ${escapeHtml(userArea())}</button><button class="${state.campaignAreaView === 'all' ? 'active' : ''}" onclick="setCampaignAreaView('all')">Todas</button></div>`;
+  if (!visible.length) {
     html += '<div class="empty"><div class="empty-icon">🗓</div><div class="empty-text">Todavía no hay campañas mensuales</div><button class="btn btn-primary" style="max-width:240px;margin:12px auto 0" onclick="newCampaign()">+ Crear campaña</button></div>';
   } else {
-    html += '<div class="list">';
-    state.campaigns.forEach(campaign => {
+    html += '<div class="work-campaign-grid">';
+    visible.forEach(campaign => {
       const cases = linkedCases(campaign);
       const pending = unlinkedCases(campaign).length;
-      html += `<div onclick="openCampaign('${escapeHtml(campaign.id)}')" style="background:var(--white);border:1px solid var(--border);border-left:3px solid var(--primary);border-radius:12px;padding:14px;cursor:pointer;box-shadow:var(--shadow);margin-bottom:9px">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div style="font-size:16px;font-weight:800;color:var(--text)">${escapeHtml(campaignLabel(campaign))}</div><span style="font-size:11px;color:var(--primary);font-weight:700">${escapeHtml(campaign.ownerArea)}</span></div>
-        <div style="font-size:12px;color:var(--text2);margin-top:7px">${escapeHtml(stageLabel(campaign.stage))} · Entrega: ${fmtDate(campaign.submissionDueAt || campaignDueDate(campaign.year, campaign.month))}</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:8px">${cases.length} casos · ${cases.filter(item => item.caseType === 'CR').length} CR · ${cases.filter(item => item.caseType === 'DA').length} DA · ${cases.filter(item => item.caseType === 'DF').length} DF${pending ? ` · ${pending} por asociar` : ''}</div>
-      </div>`;
+      const stageIndex = Math.max(0, CAMPAIGN_STAGES.findIndex(([key]) => key === campaign.stage));
+      html += `<button class="work-campaign-card" onclick="openCampaign('${escapeHtml(campaign.id)}')"><span class="work-eyebrow">${escapeHtml(campaign.ownerArea)} · ${cases.length} casos</span><strong>${escapeHtml(campaignLabel(campaign))}</strong><span class="work-stage">${escapeHtml(stageLabel(campaign.stage))}</span><span class="work-progress"><span style="width:${Math.round((stageIndex + 1) / CAMPAIGN_STAGES.length * 100)}%"></span></span><small>${cases.filter(item => item.caseType === 'CR').length} CR · ${cases.filter(item => item.caseType === 'DA').length} DA · ${cases.filter(item => item.caseType === 'DF').length} DF${pending ? ` · ${pending} por asociar` : ''}</small><small>Entrega al sistema: ${fmtDate(campaign.submissionDueAt || campaignDueDate(campaign.year, campaign.month))}</small></button>`;
     });
     html += '</div>';
   }
-  return html + '</div>';
+  return html + '</main>';
 }
 
 export function renderCampaignForm() {
@@ -65,13 +65,18 @@ export function renderCampaignDetail() {
     DA: cases.filter(item => item.caseType === 'DA').length,
     DF: cases.filter(item => item.caseType === 'DF').length,
   };
+  const stageIndex = Math.max(0, CAMPAIGN_STAGES.findIndex(([key]) => key === campaign.stage));
+  const installationCount = cases.reduce((total, item) => total + state.records.filter(record => record.caseId === item.id).length, 0);
+  const removedCount = cases.reduce((total, item) => total + state.records.filter(record => record.caseId === item.id && record.retirado).length, 0);
+  const stageDescriptions = ['Listado, cartas e inspección', 'Configuración y validaciones', 'Asignación de fechas y equipos', 'Instalación y retiro', 'Descarga y resultados', 'Cuadro resumen y carga', 'Entrega registrada'];
   return `<div class="content">
     <div class="detail-hero"><div style="font-size:10px;color:rgba(255,255,255,.7);font-weight:700;letter-spacing:1px;text-transform:uppercase">Campaña regulatoria · ${escapeHtml(campaign.ownerArea)}</div>
       <div class="detail-serie" style="margin-top:4px">${escapeHtml(campaignLabel(campaign))}</div><div class="detail-modelo">${escapeHtml(stageLabel(campaign.stage))}</div>
       <div style="display:flex;gap:16px;margin-top:14px"><div><div style="font-size:18px;font-weight:800">${counts.CR}</div><div style="font-size:9px;color:rgba(255,255,255,.7)">REGULACIÓN</div></div><div><div style="font-size:18px;font-weight:800">${counts.DA}</div><div style="font-size:9px;color:rgba(255,255,255,.7)">ARMÓNICOS</div></div><div><div style="font-size:18px;font-weight:800">${counts.DF}</div><div style="font-size:9px;color:rgba(255,255,255,.7)">FLICKER</div></div></div>
     </div>
     <div class="detail-grid"><div class="detail-row"><div class="detail-label">Listado recibido</div><div class="detail-value">${fmtDate(campaign.receivedAt)}</div></div><div class="detail-row"><div class="detail-label">Entrega al sistema</div><div class="detail-value">${fmtDate(campaign.submissionDueAt || campaignDueDate(campaign.year, campaign.month))}</div></div></div>
-    <div class="form-section"><div class="form-section-title">Etapa de trabajo</div><div class="field"><select oninput="setCampaignStage(this.value)">${CAMPAIGN_STAGES.map(([key, label]) => `<option value="${key}" ${campaign.stage === key ? 'selected' : ''}>${label}</option>`).join('')}</select></div></div>
+    <div class="work-summary-row"><div><strong>${cases.length}</strong><span>Casos registrados</span></div><div><strong>${installationCount}</strong><span>Instalaciones</span></div><div><strong>${removedCount}</strong><span>Retiros</span></div></div>
+    <div class="form-section"><div class="form-section-title">Ruta de la campaña</div><div class="work-steps">${CAMPAIGN_STAGES.map(([key, label], index) => `<div class="work-step ${index === stageIndex ? 'current' : index < stageIndex ? 'passed' : ''}"><span>${index + 1}</span><div><strong>${escapeHtml(label)}</strong><small>${stageDescriptions[index]}</small></div></div>`).join('')}</div><div class="field" style="margin-top:15px"><label>Etapa actual</label><select oninput="setCampaignStage(this.value)">${CAMPAIGN_STAGES.map(([key, label]) => `<option value="${key}" ${campaign.stage === key ? 'selected' : ''}>${label}</option>`).join('')}</select></div></div>
     ${campaign.stageHistory ? `<div class="section-title">Cambios de etapa</div><div class="list" style="margin-bottom:16px">${Object.values(campaign.stageHistory).sort((a, b) => b.at - a.at).map(event => `<div class="historial-card"><div class="historial-row"><div><div class="historial-lugar">${escapeHtml(stageLabel(event.from))} → ${escapeHtml(stageLabel(event.to))}</div><div class="historial-caso">${escapeHtml(event.by || '')}</div></div><span class="historial-fecha">${new Date(event.at).toLocaleDateString('es-SV')}</span></div></div>`).join('')}</div>` : ''}
     <div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn btn-primary" onclick="newCase('${escapeHtml(campaign.id)}')">+ Agregar caso</button></div>
     <div class="section-title">Casos vinculados (${cases.length})</div>

@@ -22,6 +22,9 @@ export function renderHeader() {
       ${state.view === 'lista' && state.tab === 'instalaciones' && state.instSection === 'installations' ? `<button class="btn-small" onclick="newInstall()">+ Nuevo</button>` : ''}
       ${state.view === 'lista' && state.tab === 'instalaciones' && state.instSection === 'cases' ? `<button class="btn-small" onclick="newCase()">+ Caso</button>` : ''}
       ${state.view === 'lista' && state.tab === 'instalaciones' && state.instSection === 'campaigns' ? `<button class="btn-small" onclick="newCampaign()">+ Campaña</button>` : ''}
+      ${state.view === 'lista' && state.tab === 'campaigns' ? `<button class="btn-small" onclick="newCampaign()">+ Campaña</button>` : ''}
+      ${state.view === 'lista' && state.tab === 'complaints' ? `<button class="btn-small" onclick="newComplaint()">+ Reclamo</button>` : ''}
+      ${state.view === 'lista' && state.tab === 'case_archive' ? `<button class="btn-small" onclick="newCase()">+ Caso</button>` : ''}
       ${state.view === 'lista' && state.tab === 'inventario' && !state.modoSeleccionLote ? `<button class="btn-small" onclick="newEquipo()">+ Equipo</button>` : ''}
       ${state.view === 'lista' && state.tab === 'inventario' && state.modoSeleccionLote ? `<button class="btn-small" style="background:rgba(255,255,255,.3)" onclick="cancelarLote()">✕ Cancelar</button>` : ''}
       <button onclick="toggleGlobalSearch()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:10px;width:32px;height:32px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center">🔍</button>
@@ -37,17 +40,17 @@ export function renderBottomNav() {
     <button class="nav-btn ${state.tab==='dashboard'?'active':''}" onclick="switchTab('dashboard')">
       <span class="nav-icon">🏠</span><span class="nav-label">Inicio</span>
     </button>
-    <button class="nav-btn ${state.tab==='instalaciones'?'active':''}" onclick="switchTab('instalaciones')">
-      <span class="nav-icon">⚡</span><span class="nav-label">Instalac.</span>
+    <button class="nav-btn ${state.tab==='campaigns'?'active':''}" onclick="switchTab('campaigns')">
+      <span class="nav-icon">🗓</span><span class="nav-label">Campañas</span>
+    </button>
+    <button class="nav-btn ${state.tab==='complaints'?'active':''}" onclick="switchTab('complaints')">
+      <span class="nav-icon">📋</span><span class="nav-label">Reclamos</span>
     </button>
     <button class="nav-btn ${state.tab==='inventario'?'active':''}" onclick="switchTab('inventario')">
-      <span class="nav-icon">📦</span><span class="nav-label">Inventario</span>
+      <span class="nav-icon">📦</span><span class="nav-label">Equipos</span>
     </button>
-    <button class="nav-btn ${state.tab==='carga'?'active':''}" onclick="switchTab('carga')">
-      <span class="nav-icon">📤</span><span class="nav-label">Despachos</span>
-    </button>
-    <button class="nav-btn ${state.tab==='mapa'?'active':''}" onclick="switchTab('mapa')">
-      <span class="nav-icon">📍</span><span class="nav-label">Mapa</span>
+    <button class="nav-btn ${['operations','instalaciones','validaciones','carga','mapa','case_archive','operational_dashboard'].includes(state.tab)?'active':''}" onclick="switchTab('operations')">
+      <span class="nav-icon">⚡</span><span class="nav-label">Operación</span>
     </button>
   </nav>`;
   return html;

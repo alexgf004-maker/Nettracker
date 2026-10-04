@@ -6,8 +6,9 @@ window.newCampaign = openNewCampaign;
 window.saveCampaign = saveCampaign;
 window.setCampaignStage = setCampaignStage;
 window.setCampaignField = (key, value) => { state.campaignForm[key] = value; };
+window.setCampaignAreaView = value => { state.campaignAreaView = value; render(); };
 window.openCampaign = id => {
-  state.tab = 'instalaciones';
+  state.tab = 'campaigns';
   state.instSection = 'campaigns';
   state.selectedCampaignId = id;
   state.view = 'campaign_detail';

@@ -46,7 +46,7 @@ export function renderCaseList() {
     special: state.cases.filter(item => item.workflowType === 'special').length,
   };
 
-  let html = renderInstallSectionSwitch();
+  let html = state.tab === 'instalaciones' ? renderInstallSectionSwitch() : '';
   html += `<div class="content">
     <div class="page-title">Expedientes</div>
     <div style="font-size:12px;color:var(--text3);margin:-8px 0 14px">Cada caso conserva sus mediciones, equipos, incidencias y entregas.</div>
@@ -92,7 +92,7 @@ export function renderCaseForm() {
   const period = campaignPeriodFromCode(form.code);
   const campaigns = state.campaigns.filter(item => item.ownerArea === form.ownerArea && (!period || (item.year === period.year && item.month === period.month)));
   return `<div class="content">
-    <div class="page-title">${state.editCaseId ? 'Editar expediente' : 'Nuevo expediente'}</div>
+    <div class="page-title">${state.editCaseId ? 'Editar expediente' : state.caseEntryMode === 'complaint' ? 'Nuevo reclamo' : 'Nuevo expediente'}</div>
     <div class="form-section">
       <div class="form-section-title">Identificación</div>
       <div class="field"><label>Código del caso *</label><input placeholder="CR112026201, DA..., DF..., RE..." value="${escapeHtml(form.code)}" oninput="setCaseField('code',this.value)" onblur="refreshCaseForm()"></div>

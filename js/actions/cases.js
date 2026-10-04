@@ -3,6 +3,7 @@ import { casesRef, db, get, push, ref, servicePointsRef, update } from '../fireb
 import { buildCaseRecord, caseIndexKey, classifyCase, emptyCaseForm, normalizeCaseCode } from '../domain/cases.js';
 import { campaignPeriodFromCode } from '../domain/campaigns.js';
 import { state } from '../state.js';
+import { userArea } from '../config.js';
 import { showToast } from '../ui.js';
 import { render } from '../views/render.js';
 
@@ -26,8 +27,10 @@ function defaultSource(code) {
 export function openNewCase(campaignId = '') {
   state.caseForm = emptyCaseForm();
   const campaign = state.campaigns.find(item => item.id === campaignId);
-  state.caseForm.ownerArea = campaign?.ownerArea || (state.instTab === 'cpt_bt' ? 'CPT BT' : 'CPT MT');
+  state.caseForm.ownerArea = campaign?.ownerArea || userArea();
   state.caseForm.campaignId = campaign?.id || '';
+  state.caseEntryMode = campaign ? 'campaign' : state.tab === 'complaints' ? 'complaint' : null;
+  if (state.caseEntryMode === 'complaint') state.caseForm.source = 'Reclamo de usuario';
   state.editCaseId = null;
   state.view = 'case_form';
   render();
@@ -36,6 +39,7 @@ export function openNewCase(campaignId = '') {
 export function openEditCase(id) {
   const caseRecord = state.cases.find(item => item.id === id);
   if (!caseRecord) return;
+  state.caseEntryMode = caseRecord.workflowType;
   const point = state.servicePoints.find(item => item.id === caseRecord.servicePointId) || {};
   state.caseForm = {
     ...emptyCaseForm(),
@@ -70,6 +74,8 @@ export async function saveCase() {
     return showToast('No se puede cambiar el código de un caso con mediciones vinculadas');
   }
   const classification = classifyCase(code);
+  if (state.caseEntryMode === 'complaint' && classification.workflowType !== 'complaint') return showToast('El código del reclamo debe iniciar con RE');
+  if (code === 'RE') return showToast('Completa el correlativo del reclamo');
   const campaign = state.campaigns.find(item => item.id === form.campaignId);
   if (classification.workflowType === 'campaign') {
     const period = campaignPeriodFromCode(code);

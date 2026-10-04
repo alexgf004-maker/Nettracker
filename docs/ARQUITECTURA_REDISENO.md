@@ -616,6 +616,7 @@ Avance al 2026-10-04:
 - Instalación, retiro, descarga, daño, revisión y movimientos del equipo generan trazabilidad.
 - Pendiente: migración controlada de instalaciones históricas y modelo explícito de intentos de medición.
 - Se añadió la campaña mensual como agrupador real: `campaigns/{área_año_mes}`, `campaignId` en cada caso y vista separada por mes. Las etapas se cambian manualmente y conservan un historial; el vencimiento de entrega se calcula para el día 10 del mes siguiente. Los casos anteriores sin campaña vinculada aparecen como pendientes de asociar.
+- La navegación se reordenó alrededor de Campañas y Reclamos. Inicio muestra pendientes y campañas en curso; Operación agrupa las herramientas de campo existentes. El expediente de reclamo señala el siguiente paso según el estado de sus instalaciones.
 
 ### Fase 2 — Campañas y precampaña
 

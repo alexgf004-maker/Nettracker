@@ -3,6 +3,7 @@ import { openEditCase, openNewCase, saveCase } from '../actions/cases.js';
 import { classifyCase } from '../domain/cases.js';
 import { campaignPeriodFromCode } from '../domain/campaigns.js';
 import { state } from '../state.js';
+import { userArea } from '../config.js';
 import { render } from '../views/render.js';
 
 window.setInstSection = section => {
@@ -15,6 +16,7 @@ window.setInstSection = section => {
 };
 
 window.setCaseFilter = filter => { state.caseFilter = filter; render(); };
+window.openCaseArchive = () => { switchTab('case_archive'); state.caseFilter = 'special'; render(); };
 window.setCaseAreaFilter = area => { state.caseAreaFilter = area; render(); };
 window.setCaseSearch = value => {
   state.caseSearch = value;
@@ -29,6 +31,19 @@ window.setCaseSearch = value => {
 };
 
 window.newCase = campaignId => openNewCase(typeof campaignId === 'string' ? campaignId : '');
+window.newComplaint = () => {
+  state.tab = 'complaints';
+  openNewCase();
+  state.caseForm.ownerArea = userArea();
+  render();
+};
+window.setComplaintSearch = value => {
+  state.complaintSearch = value;
+  const position = document.getElementById('complaint-search')?.selectionStart;
+  render();
+  const input = document.getElementById('complaint-search');
+  if (input && position !== undefined) { input.focus(); input.setSelectionRange(position, position); }
+};
 window.editCase = openEditCase;
 window.saveCase = saveCase;
 window.refreshCaseForm = () => {

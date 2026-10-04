@@ -15,6 +15,7 @@ module.exports = {
     c3: { code: 'CR142026201', normalizedCode: 'CR142026201', workflowType: 'campaign', caseType: 'CR', ownerArea: 'CPT MT', campaignId: 'MT_2026_04', lifecycleStatus: 'preparation', placeSnapshot: 'Sitio de prueba C', createdBy: 'Usuario de prueba', updatedAt: 3 },
     c4: { code: 'CR162026201', normalizedCode: 'CR162026201', workflowType: 'campaign', caseType: 'CR', ownerArea: 'CPT MT', campaignId: 'MT_2026_06', lifecycleStatus: 'preparation', placeSnapshot: 'Sitio de prueba D', createdBy: 'Usuario de prueba', updatedAt: 4 },
     c5: { code: 'DA142026011O00', normalizedCode: 'DA142026011O00', workflowType: 'campaign', caseType: 'DA', ownerArea: 'CPT MT', campaignId: 'MT_2026_04', lifecycleStatus: 'preparation', placeSnapshot: 'Sitio de prueba E', createdBy: 'Usuario de prueba', updatedAt: 5 },
+    c6: { code: 'RE172026201', normalizedCode: 'RE172026201', workflowType: 'complaint', caseType: 'RE', ownerArea: 'CPT MT', lifecycleStatus: 'preparation', placeSnapshot: 'Sitio de prueba G', servicePointId: 'sp3', createdBy: 'Usuario de prueba', updatedAt: 6 },
   },
   campaigns: {
     MT_2026_04: { year: 2026, month: 4, ownerArea: 'CPT MT', stage: 'analysis', submissionDueAt: '2026-05-10' },
@@ -23,8 +24,9 @@ module.exports = {
   servicePoints: {
     sp1: { contractNumber: 'NC-TEST-001', customerName: 'Cliente de prueba A', address: 'Sitio de prueba A', meterNumber: 'M-TEST-001', electricalReference: 'CT-TEST-001', feeder: 'AL-TEST', networkVoltageLL: 23000, urbanity: 'U', active: true },
     sp2: { contractNumber: 'NC-TEST-002', customerName: 'Cliente de prueba B', address: 'Sitio de prueba B', meterNumber: 'M-TEST-002', electricalReference: 'CT-TEST-002', feeder: 'AL-TEST', networkVoltageLL: 13200, urbanity: 'R', active: true },
+    sp3: { contractNumber: 'NC-TEST-003', customerName: 'Cliente de prueba G', address: 'Sitio de prueba G', meterNumber: 'M-TEST-003', electricalReference: 'CT-TEST-003', feeder: 'AL-TEST', networkVoltageLL: 23000, urbanity: 'U', active: true },
   },
-  caseCodeIndex: { 'C-001': 'c1', 'C-002': 'c2', CR142026201: 'c3', CR162026201: 'c4', DA142026011O00: 'c5' },
+  caseCodeIndex: { 'C-001': 'c1', 'C-002': 'c2', CR142026201: 'c3', CR162026201: 'c4', DA142026011O00: 'c5', RE172026201: 'c6' },
   equipmentEvents: {
     ev1: { type: 'installed', equipmentId: 'e1', caseId: 'c1', caseCode: 'C-001', installationId: 'r1', eventDate: '2026-09-01', occurredAt: 1, actorName: 'Usuario de prueba', location: 'Sitio de prueba A', notes: 'Instalación registrada' },
   },

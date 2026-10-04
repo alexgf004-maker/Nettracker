@@ -50,7 +50,7 @@ export function renderInstalaciones() {
       if (state.search) { const q = state.search.toLowerCase(); return (r.serie||'').toLowerCase().includes(q) || (r.caso||'').toLowerCase().includes(q) || (r.lugar||'').toLowerCase().includes(q); }
       return true;
     });
-    html += renderInstallSectionSwitch();
+    if (state.tab !== 'instalaciones') html += renderInstallSectionSwitch();
     // Sub-tabs
     const subTabs = [{key:'cpt_mt',label:'⚡ CPT MT'},{key:'cpt_bt',label:'⚡ CPT BT'},{key:'campos',label:'🏗 Campos y Serv.'}];
     html += '<div style="display:flex;background:var(--white);border-bottom:1px solid var(--border);padding:0 16px">';
@@ -301,6 +301,12 @@ export function renderInstalaciones() {
     const events = state.equipmentEvents.filter(e => e.caseId === c.id);
     const point = state.servicePoints.find(item => item.id === c.servicePointId);
     const campaign = state.campaigns.find(item => item.id === c.campaignId);
+    const complaintNext = c.workflowType !== 'complaint' ? '' : c.complianceStatus === 'outside'
+      ? 'Dar seguimiento al caso fuera de tolerancia y programar remedición.'
+      : !caseRecords.length ? 'Programar la visita e instalar el analizador.'
+      : caseRecords.some(r => !r.retirado) ? 'Registrar el retiro y descargar la medición.'
+      : caseRecords.some(r => r.descargaPendiente) ? 'Descargar los archivos del analizador.'
+      : 'Revisar los resultados, preparar el informe y registrar la entrega.';
     const typeLabel = c.caseType === 'CR' ? 'Regulación de tensión' : c.caseType === 'DA' ? 'Armónicos' : c.caseType === 'DF' ? 'Flicker' : c.caseType === 'RE' ? 'Reclamo' : 'Requerimiento especial';
     const statusLabels = { scheduled: 'Programado', measuring: 'En medición', pending_download: 'Descarga pendiente', analysis: 'En análisis', pending_submission: 'Pendiente de entrega', closed: 'Cerrado' };
     html += `<div class="content">
@@ -314,6 +320,7 @@ export function renderInstalaciones() {
           <div><div style="font-size:18px;font-weight:800">${events.filter(e => e.failure).length}</div><div style="font-size:9px;color:rgba(255,255,255,.7)">INCIDENCIAS</div></div>
         </div>
       </div>
+      ${complaintNext ? `<div class="work-next-card"><span>Próximo paso · Reclamo</span><strong>${escapeHtml(complaintNext)}</strong></div>` : ''}
       <div class="detail-grid">
         <div class="detail-row"><div class="detail-label">Flujo</div><div class="detail-value">${c.workflowType === 'campaign' ? 'Campaña regulatoria' : c.workflowType === 'complaint' ? 'Reclamo de usuario' : 'Requerimiento especial'}</div></div>
         ${campaign ? `<div class="detail-row"><div class="detail-label">Campaña</div><div class="detail-value"><button onclick="openCampaign('${escapeHtml(campaign.id)}')" style="border:none;background:none;padding:0;color:var(--primary);font-weight:700;cursor:pointer">${escapeHtml(campaignLabel(campaign))} · ${escapeHtml(campaign.ownerArea)} →</button></div></div>` : c.workflowType === 'campaign' ? '<div class="detail-row"><div class="detail-label">Campaña</div><div class="detail-value">Sin asociar · Edita el expediente</div></div>' : ''}

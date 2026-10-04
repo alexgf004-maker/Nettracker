@@ -6,7 +6,8 @@ test('permite seleccionar un perfil y entrar', async ({ page }) => {
   const app = await abrirApp(page, { usuario: null });
   await page.locator('#app [onclick^="selectLoginUser"]').first().click();
   await page.getByRole('button', { name: 'Entrar' }).click();
-  await expect(page.locator('#app')).toContainText(/acciones rápidas/i);
+  await expect(page.locator('#app')).toContainText('Mi espacio de trabajo');
+  await expect(page.locator('#app')).toContainText('Campañas en curso');
   expect(app.errores).toEqual([]);
 });
 
@@ -14,7 +15,7 @@ test('carga las vistas principales', async ({ page }) => {
   const app = await abrirApp(page);
   await cerrarAlerta(page);
 
-  for (const vista of ['Instalac.', 'Inventario', 'Despachos', 'Mapa', 'Inicio']) {
+  for (const vista of ['Campañas', 'Reclamos', 'Equipos', 'Operación', 'Inicio']) {
     await page.locator('nav.bottom-nav button', { hasText: vista }).click();
     await expect(page.locator('#app .loading')).toHaveCount(0);
   }
@@ -38,8 +39,8 @@ test('abre la trazabilidad sintética de una instalación', async ({ page }) => 
 test('muestra la bandeja y el expediente de casos', async ({ page }) => {
   const app = await abrirApp(page);
   await cerrarAlerta(page);
-  await page.locator('nav.bottom-nav button', { hasText: 'Instalac.' }).click();
-  await page.getByRole('button', { name: /Casos/ }).click();
+  await page.locator('nav.bottom-nav button', { hasText: 'Operación' }).click();
+  await page.getByRole('button', { name: /Otros expedientes/ }).click();
   await expect(page.locator('#app')).toContainText('Cliente de prueba A');
   await page.getByText('#C-001').click();
   await expect(page.locator('#app')).toContainText('NC-TEST-001');
@@ -49,8 +50,7 @@ test('muestra la bandeja y el expediente de casos', async ({ page }) => {
 test('separa campañas mensuales y sus casos', async ({ page }) => {
   const app = await abrirApp(page);
   await cerrarAlerta(page);
-  await page.locator('nav.bottom-nav button', { hasText: 'Instalac.' }).click();
-  await page.getByRole('button', { name: /Campañas/ }).click();
+  await page.locator('nav.bottom-nav button', { hasText: 'Campañas' }).click();
   await expect(page.locator('#app')).toContainText('Abril 2026');
   await expect(page.locator('#app')).toContainText('Junio 2026');
   await page.getByText('Abril 2026').click();
@@ -58,6 +58,29 @@ test('separa campañas mensuales y sus casos', async ({ page }) => {
   await expect(page.locator('#app')).toContainText('#DA142026011O00');
   await expect(page.locator('#app')).not.toContainText('#CR162026201');
   await expect(page.locator('#app')).toContainText('10/05/2026');
+  expect(app.errores).toEqual([]);
+});
+
+test('abre reclamos desde su espacio propio', async ({ page }) => {
+  const app = await abrirApp(page);
+  await cerrarAlerta(page);
+  await page.locator('nav.bottom-nav button', { hasText: 'Reclamos' }).click();
+  await expect(page.locator('#app')).toContainText('#RE172026201');
+  await page.getByText('#RE172026201').click();
+  await expect(page.locator('#app')).toContainText('Próximo paso · Reclamo');
+  await expect(page.locator('#app')).toContainText('Programar la visita');
+  expect(app.errores).toEqual([]);
+});
+
+test('mantiene instalaciones, mapa y despachos en Operación', async ({ page }) => {
+  const app = await abrirApp(page);
+  await cerrarAlerta(page);
+  await page.locator('nav.bottom-nav button', { hasText: 'Operación' }).click();
+  await page.getByRole('button', { name: /Instalaciones y retiros/ }).click();
+  await expect(page.locator('#app')).toContainText('SN-100');
+  await page.locator('nav.bottom-nav button', { hasText: 'Operación' }).click();
+  await page.getByRole('button', { name: /Despachos/ }).click();
+  await expect(page.locator('#app')).toContainText('Subir archivo');
   expect(app.errores).toEqual([]);
 });
 

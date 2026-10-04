@@ -11,9 +11,16 @@ import { renderLogin, renderMantenimiento } from './login.js';
 import { renderMapa } from './mapa.js';
 import { renderAlertaRetiros, renderCondicionModal, renderDescargaModal, renderGlobalSearch, renderImportModal, renderMantModal, renderPrestamoModal, renderDanioModal, renderRetiroModal, renderRevisionModal, renderSelectorModal } from './modals.js';
 import { renderValidaciones } from './validaciones.js';
+import { renderComplaints, renderOperationsHub, renderWorkHome } from './workspace.js';
+import { renderCaseList } from './cases.js';
 
 export const TAB_VIEWS = {
-  dashboard: renderDashboard,
+  dashboard: renderWorkHome,
+  campaigns: renderInstalaciones,
+  complaints: renderComplaints,
+  operations: renderOperationsHub,
+  case_archive: () => state.view === 'lista' ? renderCaseList() : renderInstalaciones(),
+  operational_dashboard: renderDashboard,
   instalaciones: renderInstalaciones,
   inventario: renderInventario,
   validaciones: renderValidaciones,
