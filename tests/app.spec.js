@@ -45,3 +45,69 @@ test('muestra la bandeja y el expediente de casos', async ({ page }) => {
   await expect(page.locator('#app')).toContainText('NC-TEST-001');
   expect(app.errores).toEqual([]);
 });
+
+test('separa campañas mensuales y sus casos', async ({ page }) => {
+  const app = await abrirApp(page);
+  await cerrarAlerta(page);
+  await page.locator('nav.bottom-nav button', { hasText: 'Instalac.' }).click();
+  await page.getByRole('button', { name: /Campañas/ }).click();
+  await expect(page.locator('#app')).toContainText('Abril 2026');
+  await expect(page.locator('#app')).toContainText('Junio 2026');
+  await page.getByText('Abril 2026').click();
+  await expect(page.locator('#app')).toContainText('#CR142026201');
+  await expect(page.locator('#app')).toContainText('#DA142026011O00');
+  await expect(page.locator('#app')).not.toContainText('#CR162026201');
+  await expect(page.locator('#app')).toContainText('10/05/2026');
+  expect(app.errores).toEqual([]);
+});
+
+test('valida el período al agregar un caso a una campaña', async ({ page }) => {
+  const app = await abrirApp(page);
+  await cerrarAlerta(page);
+  await app.ejecutar(() => { openCampaign('MT_2026_04'); newCase('MT_2026_04'); });
+  await app.ejecutar(() => {
+    setCaseField('code', 'CR162026202');
+    setCaseField('customerName', 'Cliente de prueba');
+  });
+  await page.getByRole('button', { name: 'Crear expediente' }).click();
+  await expect(page.locator('#toast')).toContainText('deben coincidir');
+  expect(await app.escrituras()).toEqual([]);
+  expect(app.errores).toEqual([]);
+});
+
+test('crea una campaña independiente con entrega el mes siguiente', async ({ page }) => {
+  const app = await abrirApp(page);
+  await cerrarAlerta(page);
+  await app.ejecutar(() => {
+    switchTab('instalaciones');
+    setInstSection('campaigns');
+    newCampaign();
+    setCampaignField('year', 2026);
+    setCampaignField('month', 8);
+  });
+  await page.getByRole('button', { name: 'Crear campaña' }).click();
+  await expect(page.locator('#app')).toContainText('Agosto 2026');
+  const writes = await app.escrituras();
+  const saved = writes.find(([operation, path, values]) => operation === 'update' && path === '' && values['campaigns/MT_2026_08']);
+  expect(saved?.[2]['campaigns/MT_2026_08']).toMatchObject({ year: 2026, month: 8, ownerArea: 'CPT MT', submissionDueAt: '2026-09-10' });
+  expect(app.errores).toEqual([]);
+});
+
+test('vincula el caso creado dentro de su campaña', async ({ page }) => {
+  const app = await abrirApp(page);
+  await cerrarAlerta(page);
+  await app.ejecutar(() => {
+    openCampaign('MT_2026_04');
+    newCase('MT_2026_04');
+    setCaseField('code', 'CR142026202');
+    setCaseField('customerName', 'Cliente de prueba');
+  });
+  await page.getByRole('button', { name: 'Crear expediente' }).click();
+  await expect(page.locator('#app')).toContainText('#CR142026202');
+  const writes = await app.escrituras();
+  const saved = writes.find(([operation, path, values]) => operation === 'update' && path === '' && values['caseCodeIndex/CR142026202']);
+  const caseId = saved?.[2]['caseCodeIndex/CR142026202'];
+  expect(saved?.[2][`cases/${caseId}`]).toMatchObject({ campaignId: 'MT_2026_04', caseType: 'CR' });
+  expect(saved?.[2][`caseIdsByCampaign/MT_2026_04/${caseId}`]).toBe(true);
+  expect(app.errores).toEqual([]);
+});

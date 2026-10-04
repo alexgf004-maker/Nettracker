@@ -30,6 +30,7 @@ export function emptyCaseForm() {
     code: '',
     ownerArea: 'CPT MT',
     source: '',
+    campaignId: '',
     contractNumber: '',
     customerName: '',
     address: '',
@@ -43,7 +44,7 @@ export function emptyCaseForm() {
   };
 }
 
-export function buildCaseRecord({ code, ownerArea, place, actor, source = '', servicePointId = null, lifecycleStatus = 'scheduled', measurementStatus = 'not_measured', now = Date.now() }) {
+export function buildCaseRecord({ code, ownerArea, place, actor, source = '', campaignId = null, servicePointId = null, lifecycleStatus = 'scheduled', measurementStatus = 'not_measured', now = Date.now() }) {
   const normalizedCode = normalizeCaseCode(code);
   const classification = classifyCase(normalizedCode);
   return {
@@ -52,6 +53,7 @@ export function buildCaseRecord({ code, ownerArea, place, actor, source = '', se
     ...classification,
     ownerArea: ownerArea || 'CPT MT',
     source,
+    campaignId,
     servicePointId,
     lifecycleStatus,
     multiplierStatus: 'not_started',

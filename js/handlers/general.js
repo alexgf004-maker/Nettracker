@@ -106,11 +106,12 @@ window.generarReporteMensual = () => {
   state.showReporteModal=false;showToast('📊 Reporte generado');render();
 };
 
-window.goBack = () => { state.view = 'lista'; state.editId = null; state.editEqId = null; state.editCaseId = null; state.selectedCaseId = null; state.form = emptyForm(); state.equipoForm = emptyEF(); state.showSelector = false; render(); };
+window.goBack = () => { state.view = 'lista'; state.editId = null; state.editEqId = null; state.editCaseId = null; state.selectedCaseId = null; state.selectedCampaignId = null; state.form = emptyForm(); state.equipoForm = emptyEF(); state.showSelector = false; render(); };
 
 window.switchTab = t => {
   state.tab = t; state.view = 'lista'; state.editId = null; state.editEqId = null;
   state.selectedCaseId = null;
+  state.selectedCampaignId = null;
   state.editCaseId = null;
   if (t === 'instalaciones') state.filterStatus = 'TODOS';
   if (t === 'validaciones') { state.valView = 'lista'; state.valCampanaId = null; state.valUsuarioIdx = null; }

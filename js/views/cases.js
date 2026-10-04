@@ -1,5 +1,6 @@
 // Bandeja y formulario de expedientes de campaña, reclamo y requerimiento especial.
 import { classifyCase } from '../domain/cases.js';
+import { campaignLabel, campaignPeriodFromCode } from '../domain/campaigns.js';
 import { state } from '../state.js';
 import { escapeHtml } from '../utils.js';
 
@@ -24,8 +25,7 @@ const STATUS_LABELS = {
 
 export function renderInstallSectionSwitch() {
   return `<div style="display:flex;gap:6px;padding:10px 16px;background:var(--white);border-bottom:1px solid var(--border)">
-    <button onclick="setInstSection('installations')" style="flex:1;padding:9px;border-radius:10px;border:1.5px solid ${state.instSection === 'installations' ? 'var(--primary)' : 'var(--border)'};background:${state.instSection === 'installations' ? 'var(--primary)' : '#fff'};color:${state.instSection === 'installations' ? '#fff' : 'var(--text3)'};font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">⚡ Instalaciones</button>
-    <button onclick="setInstSection('cases')" style="flex:1;padding:9px;border-radius:10px;border:1.5px solid ${state.instSection === 'cases' ? 'var(--primary)' : 'var(--border)'};background:${state.instSection === 'cases' ? 'var(--primary)' : '#fff'};color:${state.instSection === 'cases' ? '#fff' : 'var(--text3)'};font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">📁 Casos</button>
+    ${[['installations', '⚡ Instalaciones'], ['campaigns', '🗓 Campañas'], ['cases', '📁 Casos']].map(([key, label]) => `<button onclick="setInstSection('${key}')" style="flex:1;padding:9px 4px;border-radius:10px;border:1.5px solid ${state.instSection === key ? 'var(--primary)' : 'var(--border)'};background:${state.instSection === key ? 'var(--primary)' : '#fff'};color:${state.instSection === key ? '#fff' : 'var(--text3)'};font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer">${label}</button>`).join('')}
   </div>`;
 }
 
@@ -89,6 +89,8 @@ export function renderCaseForm() {
   const form = state.caseForm;
   const classification = classifyCase(form.code);
   const typeLabel = TYPE_LABELS[classification.caseType];
+  const period = campaignPeriodFromCode(form.code);
+  const campaigns = state.campaigns.filter(item => item.ownerArea === form.ownerArea && (!period || (item.year === period.year && item.month === period.month)));
   return `<div class="content">
     <div class="page-title">${state.editCaseId ? 'Editar expediente' : 'Nuevo expediente'}</div>
     <div class="form-section">
@@ -97,6 +99,7 @@ export function renderCaseForm() {
       ${form.code ? `<div style="margin:-4px 0 12px;padding:9px 10px;background:var(--primary-light);border-radius:9px;font-size:11px;color:var(--primary);font-weight:700">Detectado: ${escapeHtml(typeLabel)}</div>` : ''}
       <div class="field"><label>Origen</label><input placeholder="DGEHM, reclamo, solicitud interna..." value="${escapeHtml(form.source)}" oninput="setCaseField('source',this.value)"></div>
       <div class="field"><label>Área responsable</label><div style="display:flex;gap:8px">${['CPT MT', 'CPT BT'].map(area => `<div onclick="setCaseField('ownerArea','${area}')" style="flex:1;padding:9px;border-radius:10px;border:2px solid ${form.ownerArea === area ? 'var(--primary)' : 'var(--border)'};background:${form.ownerArea === area ? 'var(--primary-light)' : '#fff'};text-align:center;cursor:pointer;font-size:12px;font-weight:700;color:${form.ownerArea === area ? 'var(--primary)' : 'var(--text3)'}">${area}</div>`).join('')}</div></div>
+      ${classification.workflowType === 'campaign' ? `<div class="field"><label>Campaña mensual *</label><select oninput="setCaseField('campaignId',this.value)"><option value="">Seleccionar campaña...</option>${campaigns.map(item => `<option value="${escapeHtml(item.id)}" ${form.campaignId === item.id ? 'selected' : ''}>${escapeHtml(campaignLabel(item))} · ${escapeHtml(item.ownerArea)}</option>`).join('')}</select><div style="font-size:11px;color:var(--text3);margin-top:5px">${campaigns.length ? 'El código debe corresponder al mes y año de la campaña.' : 'Primero crea la campaña desde la pestaña Campañas.'}</div></div>` : ''}
     </div>
     <div class="form-section">
       <div class="form-section-title">Punto de servicio</div>

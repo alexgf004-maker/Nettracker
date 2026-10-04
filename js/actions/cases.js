@@ -1,6 +1,7 @@
 // Alta y edición de expedientes antes de que exista una instalación física.
 import { casesRef, db, get, push, ref, servicePointsRef, update } from '../firebase.js';
 import { buildCaseRecord, caseIndexKey, classifyCase, emptyCaseForm, normalizeCaseCode } from '../domain/cases.js';
+import { campaignPeriodFromCode } from '../domain/campaigns.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { render } from '../views/render.js';
@@ -22,9 +23,11 @@ function defaultSource(code) {
   return 'Requerimiento interno';
 }
 
-export function openNewCase() {
+export function openNewCase(campaignId = '') {
   state.caseForm = emptyCaseForm();
-  state.caseForm.ownerArea = state.instTab === 'cpt_bt' ? 'CPT BT' : 'CPT MT';
+  const campaign = state.campaigns.find(item => item.id === campaignId);
+  state.caseForm.ownerArea = campaign?.ownerArea || (state.instTab === 'cpt_bt' ? 'CPT BT' : 'CPT MT');
+  state.caseForm.campaignId = campaign?.id || '';
   state.editCaseId = null;
   state.view = 'case_form';
   render();
@@ -39,6 +42,7 @@ export function openEditCase(id) {
     code: caseRecord.code || '',
     ownerArea: caseRecord.ownerArea || 'CPT MT',
     source: caseRecord.source || '',
+    campaignId: caseRecord.campaignId || '',
     contractNumber: point.contractNumber || '',
     customerName: point.customerName || '',
     address: point.address || '',
@@ -65,6 +69,16 @@ export async function saveCase() {
   if (current && normalizeCaseCode(current.code) !== code && state.records.some(record => record.caseId === current.id)) {
     return showToast('No se puede cambiar el código de un caso con mediciones vinculadas');
   }
+  const classification = classifyCase(code);
+  const campaign = state.campaigns.find(item => item.id === form.campaignId);
+  if (classification.workflowType === 'campaign') {
+    const period = campaignPeriodFromCode(code);
+    if (!period) return showToast('Revisa el mes y año del código regulatorio');
+    if (!campaign) return showToast('Selecciona o crea la campaña mensual');
+    if (campaign.year !== period.year || campaign.month !== period.month || campaign.ownerArea !== form.ownerArea) {
+      return showToast('El código, mes y área deben coincidir con la campaña');
+    }
+  }
   const indexKey = caseIndexKey(code);
   const indexed = await get(ref(db, `caseCodeIndex/${indexKey}`));
   if (indexed.exists() && indexed.val() !== current?.id) {
@@ -88,6 +102,7 @@ export async function saveCase() {
     place,
     actor,
     source,
+    campaignId: campaign?.id || null,
     servicePointId,
     lifecycleStatus: 'preparation',
     measurementStatus: 'not_measured',
@@ -104,6 +119,7 @@ export async function saveCase() {
         normalizedCode: code,
         ownerArea: form.ownerArea,
         source,
+        campaignId: classification.workflowType === 'campaign' ? campaign.id : null,
         servicePointId,
         placeSnapshot: place,
         updatedAt: now,
@@ -128,11 +144,24 @@ export async function saveCase() {
     updatedBy: actor,
   };
   writes[`caseCodeIndex/${indexKey}`] = caseId;
+  const newCampaignId = classification.workflowType === 'campaign' ? campaign.id : null;
+  if (newCampaignId) writes[`caseIdsByCampaign/${newCampaignId}/${caseId}`] = true;
+  if (current?.campaignId && current.campaignId !== newCampaignId) {
+    writes[`caseIdsByCampaign/${current.campaignId}/${caseId}`] = null;
+  }
   if (current && current.normalizedCode !== code) {
     writes[`caseCodeIndex/${caseIndexKey(current.normalizedCode || current.code)}`] = null;
   }
 
-  await update(ref(db), writes);
+  try {
+    await update(ref(db), writes);
+  } catch (error) {
+    return showToast('No se pudo guardar el expediente: ' + error.message);
+  }
+  const caseRecord = { id: caseId, ...writes[`cases/${caseId}`] };
+  const pointRecord = { id: servicePointId, ...writes[`servicePoints/${servicePointId}`] };
+  state.cases = [caseRecord, ...state.cases.filter(item => item.id !== caseId)];
+  state.servicePoints = [pointRecord, ...state.servicePoints.filter(item => item.id !== servicePointId)];
   state.selectedCaseId = caseId;
   state.editCaseId = null;
   state.caseForm = emptyCaseForm();

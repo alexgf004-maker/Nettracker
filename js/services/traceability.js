@@ -2,6 +2,7 @@
 import { casesRef, db, equipmentEventsRef, get, installsRef, push, ref, update } from '../firebase.js';
 import { state } from '../state.js';
 import { buildCaseRecord, caseIndexKey, normalizeCaseCode } from '../domain/cases.js';
+import { campaignPeriodFromCode } from '../domain/campaigns.js';
 import { today } from '../utils.js';
 
 function actorName() {
@@ -23,9 +24,11 @@ export async function resolveCaseForWrite({ code, ownerArea, place, installation
   if (indexed.exists()) return { caseId: indexed.val(), code: normalizedCode, writes: {}, isNew: false };
 
   const caseId = push(casesRef).key;
+  const period = campaignPeriodFromCode(normalizedCode);
+  const campaign = period && state.campaigns.find(item => item.year === period.year && item.month === period.month && item.ownerArea === ownerArea);
   const isFuture = installationDate && installationDate > today();
   const record = buildCaseRecord({
-    code: normalizedCode, ownerArea, place, actor: actorName(),
+    code: normalizedCode, ownerArea, place, actor: actorName(), campaignId: campaign?.id || null,
     lifecycleStatus: isFuture ? 'scheduled' : 'measuring',
     measurementStatus: isFuture ? 'not_measured' : 'measuring',
   });
@@ -36,6 +39,7 @@ export async function resolveCaseForWrite({ code, ownerArea, place, installation
     writes: {
       [`cases/${caseId}`]: record,
       [`caseCodeIndex/${indexKey}`]: caseId,
+      ...(campaign ? { [`caseIdsByCampaign/${campaign.id}/${caseId}`]: true } : {}),
     },
   };
 }

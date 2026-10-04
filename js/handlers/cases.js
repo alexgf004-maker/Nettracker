@@ -1,12 +1,14 @@
 // Handlers globales del módulo de expedientes.
 import { openEditCase, openNewCase, saveCase } from '../actions/cases.js';
 import { classifyCase } from '../domain/cases.js';
+import { campaignPeriodFromCode } from '../domain/campaigns.js';
 import { state } from '../state.js';
 import { render } from '../views/render.js';
 
 window.setInstSection = section => {
   state.instSection = section;
   state.view = 'lista';
+  state.selectedCampaignId = null;
   state.search = '';
   state.caseSearch = '';
   render();
@@ -26,10 +28,15 @@ window.setCaseSearch = value => {
   }
 };
 
-window.newCase = openNewCase;
+window.newCase = campaignId => openNewCase(typeof campaignId === 'string' ? campaignId : '');
 window.editCase = openEditCase;
 window.saveCase = saveCase;
-window.refreshCaseForm = () => render();
+window.refreshCaseForm = () => {
+  const period = campaignPeriodFromCode(state.caseForm.code);
+  const matches = period && state.campaigns.filter(item => item.year === period.year && item.month === period.month && item.ownerArea === state.caseForm.ownerArea);
+  if (matches?.length === 1) state.caseForm.campaignId = matches[0].id;
+  render();
+};
 window.setCaseField = (key, value) => {
   state.caseForm[key] = value;
   if (key === 'code') {
@@ -41,5 +48,6 @@ window.setCaseField = (key, value) => {
         : classification.workflowType === 'complaint' ? 'Reclamo de usuario' : 'Requerimiento interno';
     }
   }
-  if (['ownerArea', 'urbanity'].includes(key)) render();
+  if (key === 'ownerArea' && state.campaigns.find(item => item.id === state.caseForm.campaignId)?.ownerArea !== value) state.caseForm.campaignId = '';
+  if (['ownerArea', 'urbanity', 'campaignId'].includes(key)) render();
 };

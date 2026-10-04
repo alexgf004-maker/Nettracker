@@ -21,6 +21,7 @@ export function renderHeader() {
     <div style="display:flex;align-items:center;gap:8px">
       ${state.view === 'lista' && state.tab === 'instalaciones' && state.instSection === 'installations' ? `<button class="btn-small" onclick="newInstall()">+ Nuevo</button>` : ''}
       ${state.view === 'lista' && state.tab === 'instalaciones' && state.instSection === 'cases' ? `<button class="btn-small" onclick="newCase()">+ Caso</button>` : ''}
+      ${state.view === 'lista' && state.tab === 'instalaciones' && state.instSection === 'campaigns' ? `<button class="btn-small" onclick="newCampaign()">+ Campaña</button>` : ''}
       ${state.view === 'lista' && state.tab === 'inventario' && !state.modoSeleccionLote ? `<button class="btn-small" onclick="newEquipo()">+ Equipo</button>` : ''}
       ${state.view === 'lista' && state.tab === 'inventario' && state.modoSeleccionLote ? `<button class="btn-small" style="background:rgba(255,255,255,.3)" onclick="cancelarLote()">✕ Cancelar</button>` : ''}
       <button onclick="toggleGlobalSearch()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:10px;width:32px;height:32px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center">🔍</button>

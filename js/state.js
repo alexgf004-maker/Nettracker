@@ -7,10 +7,13 @@ export const state = {
   records: [],
   equipos: [],
   cases: [],
+  campaigns: [],
+  selectedCampaignId: null,
+  campaignForm: { year: new Date().getFullYear(), month: new Date().getMonth() + 1, ownerArea: 'CPT MT', receivedAt: '' },
   servicePoints: [],
   equipmentEvents: [],
   selectedCaseId: null,
-  instSection: 'installations', // installations | cases
+  instSection: 'installations', // installations | campaigns | cases
   caseFilter: 'ALL', // ALL | campaign | complaint | special
   caseAreaFilter: 'TODOS',
   caseSearch: '',

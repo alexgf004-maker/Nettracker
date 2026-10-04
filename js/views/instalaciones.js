@@ -4,10 +4,15 @@ import { state } from '../state.js';
 import { badgeSt } from '../ui.js';
 import { calcSt, daysUntil, escapeHtml, fmtDate, today } from '../utils.js';
 import { normalizeCaseCode } from '../domain/cases.js';
+import { campaignLabel } from '../domain/campaigns.js';
 import { renderCaseForm, renderCaseList, renderInstallSectionSwitch } from './cases.js';
+import { renderCampaignDetail, renderCampaignForm, renderCampaignList } from './campaigns.js';
 import { renderTraceTimeline } from './traceability.js';
 
 export function renderInstalaciones() {
+  if (state.view === 'lista' && state.instSection === 'campaigns') return renderCampaignList();
+  if (state.view === 'campaign_form') return renderCampaignForm();
+  if (state.view === 'campaign_detail') return renderCampaignDetail();
   if (state.view === 'lista' && state.instSection === 'cases') return renderCaseList();
   if (state.view === 'case_form') return renderCaseForm();
   let html = '';
@@ -295,6 +300,7 @@ export function renderInstalaciones() {
       .sort((a, b) => (b.fechaInstalacion || '').localeCompare(a.fechaInstalacion || ''));
     const events = state.equipmentEvents.filter(e => e.caseId === c.id);
     const point = state.servicePoints.find(item => item.id === c.servicePointId);
+    const campaign = state.campaigns.find(item => item.id === c.campaignId);
     const typeLabel = c.caseType === 'CR' ? 'Regulación de tensión' : c.caseType === 'DA' ? 'Armónicos' : c.caseType === 'DF' ? 'Flicker' : c.caseType === 'RE' ? 'Reclamo' : 'Requerimiento especial';
     const statusLabels = { scheduled: 'Programado', measuring: 'En medición', pending_download: 'Descarga pendiente', analysis: 'En análisis', pending_submission: 'Pendiente de entrega', closed: 'Cerrado' };
     html += `<div class="content">
@@ -310,6 +316,7 @@ export function renderInstalaciones() {
       </div>
       <div class="detail-grid">
         <div class="detail-row"><div class="detail-label">Flujo</div><div class="detail-value">${c.workflowType === 'campaign' ? 'Campaña regulatoria' : c.workflowType === 'complaint' ? 'Reclamo de usuario' : 'Requerimiento especial'}</div></div>
+        ${campaign ? `<div class="detail-row"><div class="detail-label">Campaña</div><div class="detail-value"><button onclick="openCampaign('${escapeHtml(campaign.id)}')" style="border:none;background:none;padding:0;color:var(--primary);font-weight:700;cursor:pointer">${escapeHtml(campaignLabel(campaign))} · ${escapeHtml(campaign.ownerArea)} →</button></div></div>` : c.workflowType === 'campaign' ? '<div class="detail-row"><div class="detail-label">Campaña</div><div class="detail-value">Sin asociar · Edita el expediente</div></div>' : ''}
         <div class="detail-row"><div class="detail-label">Estado del expediente</div><div class="detail-value">${statusLabels[c.lifecycleStatus] || c.lifecycleStatus || 'Programado'}</div></div>
         <div class="detail-row"><div class="detail-label">Lugar inicial</div><div class="detail-value">${c.placeSnapshot || caseRecords[0]?.lugar || '—'}</div></div>
         <div class="detail-row"><div class="detail-label">Responsable de creación</div><div class="detail-value">${c.createdBy || '—'}</div></div>
