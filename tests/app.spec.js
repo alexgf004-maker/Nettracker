@@ -134,3 +134,34 @@ test('vincula el caso creado dentro de su campaña', async ({ page }) => {
   expect(saved?.[2][`caseIdsByCampaign/MT_2026_04/${caseId}`]).toBe(true);
   expect(app.errores).toEqual([]);
 });
+
+test('revisa un listado antes de importar y vincula perturbaciones por contrato', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.XLSX = {
+      read: () => ({ SheetNames: ['Listado'], Sheets: { Listado: {} } }),
+      utils: { sheet_to_json: () => [
+        ['NC', 'CÓDIGO SIGET', 'NOMBRE', 'DIRECCIÓN', 'CORTE', 'MEDIDOR', 'LATITUD', 'LONGITUD', 'UBICACIÓN', 'ALIMENTADOR', 'URBANIDAD'],
+        ['NC-PRUEBA-1', 'CR142026202', 'Cliente ficticio', 'Lugar ficticio', 'CT-PRUEBA', 'M-PRUEBA', 13.7, -89.2, '', 'AL013-23000', 'U'],
+        ['NC-PRUEBA-1', 'DA142026021O00', 'Cliente ficticio', 'Lugar ficticio'],
+        ['NC-AJENO', 'DF142026031O00', 'Cliente ajeno', 'Lugar ajeno'],
+      ] },
+    };
+  });
+  const app = await abrirApp(page);
+  await cerrarAlerta(page);
+  await app.ejecutar(() => openCampaign('MT_2026_04'));
+  await page.getByRole('button', { name: /Importar listado Excel/ }).click();
+  await page.locator('input[type=file][multiple]').setInputFiles({ name: 'Sintetico.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from('fixture') });
+  await expect(page.locator('#app')).toContainText('Perturbación sin CR de esta campaña');
+  await page.getByRole('button', { name: 'Importar 2 casos' }).click();
+  await expect(page.locator('#app')).toContainText('#CR142026202');
+  await expect(page.locator('#app')).toContainText('#DA142026021O00');
+  const writes = await app.escrituras();
+  const saved = writes.find(([operation, path, values]) => operation === 'update' && path === '' && values['caseCodeIndex/CR142026202']);
+  const crId = saved?.[2]['caseCodeIndex/CR142026202'];
+  const daId = saved?.[2]['caseCodeIndex/DA142026021O00'];
+  expect(saved?.[2][`cases/${crId}`].servicePointId).toBe(saved?.[2][`cases/${daId}`].servicePointId);
+  expect(saved?.[2][`servicePoints/${saved[2][`cases/${crId}`].servicePointId}`].networkVoltageLL).toBe(23000);
+  expect(saved?.[2]['caseCodeIndex/DF142026031O00']).toBeUndefined();
+  expect(app.errores).toEqual([]);
+});

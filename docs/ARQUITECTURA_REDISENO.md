@@ -719,3 +719,12 @@ Cada fase se dividirá en cambios pequeños. Antes de programar cada uno se acor
 - forma de reversión o migración.
 
 Esta arquitectura es el mapa de destino; no autoriza una reescritura masiva ni una migración automática de la base real sin revisión previa.
+
+## 16. Primer flujo de importación de campañas
+
+- La pantalla de una campaña permite cargar uno o varios Excel y revisar los casos antes de escribir en Firebase.
+- Se leen únicamente las hojas `Listado` y `DetaSorteoCPT`; las hojas derivadas de multiplicadores o Fecha1/2/3 no se vuelven a importar.
+- El código determina CR/DA/DF y debe coincidir con el mes y año de la campaña. Las perturbaciones de los archivos oficiales compartidos con BT se incluyen en MT solo si su NC coincide con un CR del mismo período.
+- Los códigos y contratos en conflicto quedan visibles para revisión. La carga es idempotente para expedientes ya asociados; un expediente sin campaña se asocia si es compatible. Los datos de expedientes y puntos existentes no se sobrescriben.
+- Varios casos con el mismo NC nuevo comparten el punto de servicio. Solo se escriben los datos seleccionados al confirmar; no se conservan los archivos originales.
+- Sigue pendiente generar cartas, hojas de inspección, mapas, multiplicadores y demás salidas de precampaña.

@@ -6,9 +6,12 @@ El rediseño incorpora una bandeja de expedientes para registrar casos de campa�
 
 En **Campañas** se crea un período por mes, año y área. Por ejemplo, abril y junio de 2026 son campañas distintas, con sus casos CR, DA y DF, etapa de trabajo y fecha de entrega propios. Los reclamos y requerimientos especiales permanecen como expedientes independientes.
 
+Dentro de cada campaña, **Importar listado Excel** acepta el listado preparado (`Listado`) o los archivos oficiales (`DetaSorteoCPT`) de CR, DA y DF juntos. Muestra una vista previa, vincula perturbaciones al contrato de un CR del período y deja fuera las filas de otra área o con conflictos. Al confirmar, crea solo los expedientes nuevos, asocia los existentes compatibles y conserva sus datos operativos. El Excel original no se guarda en la base de datos.
+
 La navegación principal sigue el trabajo de CPT: **Inicio, Campañas, Reclamos, Equipos y Operación**. Inicio muestra pendientes reales y campañas en curso; Campañas y Reclamos tienen sus propias bandejas. Instalaciones, validaciones de TAP, despachos, mapa, otros expedientes, reportes y calendario están en Operación.
 
 - Estructura y reglas de desarrollo: [NETTRACKER_CONTEXTO.md](NETTRACKER_CONTEXTO.md)
 - Arquitectura propuesta del rediseño: [docs/ARQUITECTURA_REDISENO.md](docs/ARQUITECTURA_REDISENO.md)
 - Probar en local: `python3 -m http.server 8000` y abrir http://localhost:8000 (no funciona abriendo `index.html` directo)
 - Pruebas automáticas: `npm install` y `npm test` (ver [tests/README.md](tests/README.md))
+- Verificar reglas de importación sin navegador: `npm run test:import`

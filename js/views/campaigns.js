@@ -78,9 +78,35 @@ export function renderCampaignDetail() {
     <div class="work-summary-row"><div><strong>${cases.length}</strong><span>Casos registrados</span></div><div><strong>${installationCount}</strong><span>Instalaciones</span></div><div><strong>${removedCount}</strong><span>Retiros</span></div></div>
     <div class="form-section"><div class="form-section-title">Ruta de la campaña</div><div class="work-steps">${CAMPAIGN_STAGES.map(([key, label], index) => `<div class="work-step ${index === stageIndex ? 'current' : index < stageIndex ? 'passed' : ''}"><span>${index + 1}</span><div><strong>${escapeHtml(label)}</strong><small>${stageDescriptions[index]}</small></div></div>`).join('')}</div><div class="field" style="margin-top:15px"><label>Etapa actual</label><select oninput="setCampaignStage(this.value)">${CAMPAIGN_STAGES.map(([key, label]) => `<option value="${key}" ${campaign.stage === key ? 'selected' : ''}>${label}</option>`).join('')}</select></div></div>
     ${campaign.stageHistory ? `<div class="section-title">Cambios de etapa</div><div class="list" style="margin-bottom:16px">${Object.values(campaign.stageHistory).sort((a, b) => b.at - a.at).map(event => `<div class="historial-card"><div class="historial-row"><div><div class="historial-lugar">${escapeHtml(stageLabel(event.from))} → ${escapeHtml(stageLabel(event.to))}</div><div class="historial-caso">${escapeHtml(event.by || '')}</div></div><span class="historial-fecha">${new Date(event.at).toLocaleDateString('es-SV')}</span></div></div>`).join('')}</div>` : ''}
-    <div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn btn-primary" onclick="newCase('${escapeHtml(campaign.id)}')">+ Agregar caso</button></div>
+    <div class="work-campaign-actions"><button class="btn btn-primary" onclick="openCampaignImport()">📥 Importar listado Excel</button><button class="btn" onclick="newCase('${escapeHtml(campaign.id)}')">+ Agregar caso</button></div>
     <div class="section-title">Casos vinculados (${cases.length})</div>
     ${cases.length ? `<div class="list" style="margin-bottom:16px">${cases.map(item => `<div class="historial-card" onclick="openCase('${escapeHtml(item.id)}')" style="cursor:pointer"><div class="historial-row"><div><div class="historial-lugar">#${escapeHtml(item.code)}</div><div class="historial-caso">${item.caseType === 'CR' ? 'Regulación' : item.caseType === 'DA' ? 'Armónicos' : 'Flicker'} · ${escapeHtml(item.placeSnapshot || 'Sin ubicación')}</div></div><div style="font-size:11px;color:var(--primary);font-weight:700">Ver →</div></div></div>`).join('')}</div>` : '<div class="empty"><div class="empty-text">Aún no hay casos en esta campaña</div></div>'}
     ${pending.length ? `<div class="section-title">Casos anteriores por asociar (${pending.length})</div><div style="font-size:11px;color:var(--text3);margin-bottom:8px">Abre y edita cada expediente para asignarlo a esta campaña.</div><div class="list">${pending.map(item => `<div class="historial-card" onclick="openCase('${escapeHtml(item.id)}')" style="cursor:pointer"><div class="historial-row"><div class="historial-lugar">#${escapeHtml(item.code)}</div><span style="font-size:11px;color:var(--primary)">Asociar →</span></div></div>`).join('')}</div>` : ''}
   </div>`;
+}
+
+export function renderCampaignImport() {
+  const campaign = state.campaigns.find(item => item.id === state.selectedCampaignId);
+  if (!campaign) { state.view = 'lista'; return null; }
+  const preview = state.campaignImport || { rows: [], errors: [], files: [], busy: false };
+  const selected = preview.rows.filter(row => row.selected && !row.issue);
+  const rejected = preview.rows.filter(row => row.issue);
+  const existing = selected.filter(row => row.existingId).length;
+  return `<main class="content work-list-page">
+    <div class="work-page-heading"><div><div class="work-eyebrow">${escapeHtml(campaign.ownerArea)} · ${escapeHtml(campaignLabel(campaign))}</div><h1>Importar listado</h1><p>Revisa los casos antes de agregarlos a esta campaña.</p></div><button class="btn" onclick="openCampaign('${escapeHtml(campaign.id)}')">Volver a la campaña</button></div>
+    <div class="form-section"><div class="form-section-title">Archivos de origen</div>
+      <p class="work-import-help">Selecciona el listado preparado o, juntos, los tres listados oficiales (regulación, armónicos y flicker). Puedes elegir varios Excel a la vez. El archivo permanece en este dispositivo; solo se guardan los datos de los casos que confirmes.</p>
+      <label class="work-import-picker">📂 Elegir archivos Excel<input type="file" accept=".xlsx,.xls" multiple onchange="readCampaignFiles(event)" hidden></label>
+      ${preview.files.length ? `<p class="work-import-help">Leídos: ${preview.files.map(escapeHtml).join(' · ')}</p>` : ''}
+    </div>
+    ${preview.rows.length || preview.errors.length ? `<div class="work-summary-row"><div><strong>${selected.length}</strong><span>Seleccionados</span></div><div><strong>${existing}</strong><span>Ya registrados</span></div><div><strong>${rejected.length + preview.errors.length}</strong><span>Por revisar</span></div></div>` : ''}
+    ${preview.rows.length ? `<div class="form-section"><div class="form-section-title">Vista previa (${preview.rows.length})</div>
+      <p class="work-import-help">Las perturbaciones se incluyen cuando su contrato figura en un CR del mismo mes. Los casos existentes se asocian sin sobrescribir sus datos.</p>
+      <div class="work-import-list">${preview.rows.map((row, index) => `<label class="work-import-row ${row.issue ? 'needs-review' : ''}">
+        <input type="checkbox" ${row.selected && !row.issue ? 'checked' : ''} ${row.issue || preview.busy ? 'disabled' : ''} onchange="toggleCampaignImportRow(${index},this.checked)">
+        <span><strong>${escapeHtml(row.code)}</strong><small>NC ${escapeHtml(row.contractNumber)} · ${escapeHtml(row.customerName || 'Nombre pendiente')}</small>${row.issue ? `<em>${escapeHtml(row.issue)}</em>` : row.existingId ? '<em>Expediente existente: asociar o conservar</em>' : ''}</span>
+      </label>`).join('')}</div></div>` : ''}
+    ${preview.errors.length ? `<div class="form-section"><div class="form-section-title">Filas y archivos por revisar (${preview.errors.length})</div><ul class="work-import-errors">${preview.errors.map(error => `<li>${escapeHtml(error)}</li>`).join('')}</ul></div>` : ''}
+    ${preview.rows.length ? `<button class="btn btn-primary" ${preview.busy || !selected.length ? 'disabled' : ''} onclick="saveCampaignImport()">${preview.busy ? 'Guardando…' : `Importar ${selected.length} casos`}</button>` : ''}
+  </main>`;
 }

@@ -9,6 +9,7 @@ export const state = {
   cases: [],
   campaigns: [],
   selectedCampaignId: null,
+  campaignImport: null,
   campaignForm: { year: new Date().getFullYear(), month: new Date().getMonth() + 1, ownerArea: 'CPT MT', receivedAt: '' },
   servicePoints: [],
   equipmentEvents: [],
