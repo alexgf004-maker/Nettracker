@@ -10,7 +10,7 @@ import { renderBottomNav, renderHeader } from './layout.js';
 import { renderLogin, renderMantenimiento } from './login.js';
 import { renderMapa } from './mapa.js';
 import { renderAlertaRetiros, renderCondicionModal, renderDescargaModal, renderGlobalSearch, renderImportModal, renderMantModal, renderPrestamoModal, renderDanioModal, renderRetiroModal, renderRevisionModal, renderSelectorModal } from './modals.js';
-import { renderCasoModal, renderImportListados } from './casos.js';
+import { renderCasoModal, renderConfigCartas, renderDocsModal, renderImportListados } from './casos.js';
 import { renderCampanas, renderFT, renderReclamos, renderRequerimientos } from './trabajo.js';
 import { renderValidaciones } from './validaciones.js';
 
@@ -62,6 +62,8 @@ export function render() {
   if (state.showGlobalSearch) html += renderGlobalSearch();
   if (state.showImportListados) html += renderImportListados();
   if (state.casoEdit) html += renderCasoModal();
+  if (state.docsModal) html += renderDocsModal();
+  if (state.showConfigCartas) html += renderConfigCartas();
 
   const tabView = TAB_VIEWS[state.tab];
   if (tabView) {

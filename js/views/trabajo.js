@@ -7,7 +7,7 @@ import {
 } from '../domain/trabajo.js';
 import { state } from '../state.js';
 import { escapeHtml, fmtDate } from '../utils.js';
-import { renderCasosCampana } from './casos.js';
+import { renderCasosCampana, renderPrecampana } from './casos.js';
 
 const esc = s => escapeHtml(s ?? '');
 
@@ -111,7 +111,7 @@ function renderCampanaDetalle(c, hoy) {
     html += `<button class="btn btn-primary" onclick="marcarCampanaEntregada('${c.clave}')"><i class="ic ic-check"></i> Marcar como cargada en CPT DELSUR</button>`;
   }
   html += '</div>';
-  if (c.casos.length) html += renderCasosCampana(c);
+  if (c.casos.length) html += renderPrecampana(c) + renderCasosCampana(c);
   if (!c.registros.length) return html + '</div>';
   html += '<div class="section-title" style="margin-top:16px">Mediciones</div>';
   html += barraEtapas(c.resumen);

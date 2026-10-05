@@ -38,6 +38,11 @@ export const state = {
   casosBusqueda: '',
   casoEdit: null, // { clave, id }
   casoForm: {},
+  configCartas: null, // config/cartas: firmante, contacto, contratista y logo
+  showConfigCartas: false,
+  configCartasForm: {},
+  docsModal: null, // { clave, tipo: 'cartas' | 'hojas' }
+  docsForm: { fecha: '', periodo: '', excluidos: {} },
   volverA: null, // { tab, campanaClave } para regresar desde el detalle de una instalación
   globalSearch: '',
   showGlobalSearch: false,

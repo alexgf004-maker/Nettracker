@@ -34,10 +34,12 @@ js/
     trabajo.js           Tipo de caso (campaña/reclamo/requerimiento), periodo, plazos, urgencia
     pendientes.js        Lista de pendientes del Inicio (vencido / hoy / próximos días / por hacer)
     listados.js          Lectura de listados del ente, control de puntos y base de coordenadas; códigos DA/DF
+    documentos.js        Cartas al cliente y hojas de inspección (HTML tamaño carta, una página por caso)
   actions/               Lógica de negocio (guardar, retirar, préstamos, carga Excel, login)
     auth.js · instalaciones.js · inventario.js · carga.js · revision.js · danio.js
     trabajo.js           Marcar entregas: campaña, informe de reclamo, requerimiento
     campanas.js          Precampaña: importar listados, completar datos, editar casos, exportar listado
+    documentos.js        Generar cartas y hojas, pasos de la precampaña, datos de las cartas (config/cartas)
   pdf/memos.js           Plantillas HTML de memorándums (movimiento, lote, carga masiva)
   views/                 Funciones que devuelven HTML (string) según el estado
     render.js            render(): arma header + modales + pestaña activa + nav
@@ -179,7 +181,14 @@ En el detalle de la campaña:
 - **Editar un caso**: lo que se cambia a mano queda en `manual/{campo}` y ya no lo pisan los archivos. En DA/DF se corrige el tipo de sistema verificado en campo (dígito después del correlativo: 1 monofásico, 2 bifásico, 3 trifásico), lo que cambia el código; el ente no lo deja fijo.
 - **Exportar listado**: Excel con las columnas del equipo (NC, CÓDIGO SIGET, NOMBRE, DIRECCIÓN, CORTE, MEDIDOR, LATITUD, LONGITUD, UBICACIÓN, ALIMENTADOR, URBANIDAD).
 
-Pendiente para las siguientes partes de la etapa 2: multiplicadores con sus estados y Fechas 1, 2 y 3.
+**Cartas y hojas de inspección** (panel "Precampaña" de la campaña):
+- Las cartas usan el mismo texto que el equipo, con diseño nuevo. Se elige la fecha, el texto de la visita de instalación (por defecto "la primera semana del mes de {mes de la campaña} del {año}") y qué casos llevan carta. Salen sin firma: se piden por correo a la jefa.
+- Firmante, cargo, contacto, contratista, ciudad, acuerdo, pie y logo se guardan en `config/cartas` desde la app ("Datos de las cartas"); no van en el código porque el repositorio es público.
+- Las hojas de inspección tienen los mismos campos que la hoja del contratista, con los datos de cada caso arriba.
+- Se abren como página para imprimir o guardar como PDF (`abrirDoc`).
+- Seguimiento en `campanas/{clave}/precampana/{paso}` = `{ fecha, por }`: cartas y hojas se marcan al generarlas (con `total`); firma solicitada, cartas firmadas, entrega al contratista y evidencias recibidas se marcan a mano. "Listados importados" y "Datos completos" se calculan solos.
+
+Pendiente para las siguientes partes de la etapa 2: mapa para el contratista, multiplicadores con sus estados y Fechas 1, 2 y 3.
 
 ## Área: Inicio (dashboard)
 `calcularPendientes()` (`js/domain/pendientes.js`) arma la lista; avisa desde 3 días antes (`DIAS_AVISO`):

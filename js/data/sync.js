@@ -1,5 +1,5 @@
 // Sincronización en tiempo real con Firebase
-import { campanasRef, equiposRef, historialAccesoriosRef, historialCargasRef, installsRef, mantenimientoRef, onValue, validacionesRef } from '../firebase.js';
+import { campanasRef, configCartasRef, equiposRef, historialAccesoriosRef, historialCargasRef, installsRef, mantenimientoRef, onValue, validacionesRef } from '../firebase.js';
 import { state } from '../state.js';
 import { render } from '../views/render.js';
 
@@ -39,6 +39,11 @@ export function iniciarSync() {
 
   onValue(campanasRef, snap => {
     state.campanas = snap.exists() ? snap.val() : {};
+    render();
+  });
+
+  onValue(configCartasRef, snap => {
+    state.configCartas = snap.exists() ? snap.val() : null;
     render();
   });
 

@@ -744,6 +744,15 @@ test.describe('Precampaña', () => {
   ];
   // Campaña ya importada, para probar completar, corregir y exportar
   const caso = (codigo, nc, extra = {}) => ({ codigoEnte: codigo, codigo, tipo: codigo.slice(0, 2), nc, nombre: 'USUARIO ' + nc, direccionEnte: 'COLONIA X, CALLE 1, 12, SANTA TECLA, LA LIBERTAD', ...extra });
+  // Guarda el HTML de los documentos que abre la app
+  async function capturarDocsPrecampana(page) {
+    await page.evaluate(() => {
+      window.__docs = [];
+      const crear = URL.createObjectURL.bind(URL);
+      URL.createObjectURL = b => { b.text().then(t => window.__docs.push(t)); return crear(b); };
+    });
+    return () => page.evaluate(() => window.__docs);
+  }
   const conCampana = () => ({ ...fixture, campanas: { '2026-10_CPT-MT': { anio: 2026, mes: 10, area: 'CPT MT', casos: {
     CR1O2026201: caso('CR1O2026201', '111'), CR1O2026202: caso('CR1O2026202', '222', { ct: 'CT1', manual: { ct: true } }),
     DA1O2026011O00: caso('DA1O2026011O00', '222', { crRelacionado: 'CR1O2026202' }),
@@ -793,7 +802,7 @@ test.describe('Precampaña', () => {
     await cerrarAlerta(page);
     await app.ejecutar(() => abrirCampanaTrabajo('2026-10_CPT-MT'));
     await expect(page.locator('.tabla-casos')).toContainText('CR1O2026201');
-    await expect(page.locator('.panel', { hasText: 'con datos faltantes' })).toContainText('3 con datos faltantes');
+    await expect(page.locator('.tag', { hasText: 'con datos faltantes' })).toHaveText('3 con datos faltantes');
 
     const control = excel('Puntos_Control_TOTAL.xlsx', [
       ['CONF', 'Punto de Control', 'NC', 'Tipo de punto de control', 'Nivel de Tensión', 'Fecha de Colocación', 'Fecha de Retiro', 'Tipo de Instalacion', 'Tipo de Medicion', 'comprobacion bdth', 'TARIFA', 'URBANIDAD', 'CENTROMTBT', 'POTENCIA INSTALADA', 'AL', 'NOMBRE', 'DIRECCION', 'ENERGIA', 'TENSION', 'MEDIDOR', 'FASES', 'PERIODO', 'X', 'PERIODO', 'NC'],
@@ -848,5 +857,54 @@ test.describe('Precampaña', () => {
     expect(filas[0]).toEqual(['NC', 'CÓDIGO SIGET', 'NOMBRE', 'DIRECCIÓN', 'CORTE', 'MEDIDOR', 'LATITUD', 'LONGITUD', 'UBICACIÓN', 'ALIMENTADOR', 'URBANIDAD']);
     expect(filas.map(f => f[1])).toEqual(['CÓDIGO SIGET', 'CR1O2026201', 'CR1O2026202', 'DA1O2026011O00']);
     expect(filas[2].slice(0, 5)).toEqual([222, 'CR1O2026202', 'USUARIO 222', 'COLONIA X, CALLE 1, 12, SANTA TECLA, LA LIBERTAD', 'CT1']);
+  });
+
+  test('cartas: piden los datos del firmante la primera vez y se generan con el texto del equipo', async ({ page }) => {
+    app = await abrirApp(page, { datos: conCampana() });
+    await cerrarAlerta(page);
+    const docs = await capturarDocsPrecampana(page);
+    await app.ejecutar(() => abrirCampanaTrabajo('2026-10_CPT-MT'));
+    await expect(page.locator('.panel', { hasText: 'pasos' })).toContainText('0 de 8 pasos');
+    await page.getByRole('button', { name: 'Generar cartas' }).click();
+    await expect(page.locator('.modal-titulo')).toHaveText('Datos de las cartas');
+    await page.locator('#cfg-firmante').fill('Persona Firmante');
+    await page.locator('#cfg-cargo').fill('Coordinadora');
+    await page.locator('#cfg-contratista').fill('CONTRATISTA S.A. DE C.V.');
+    await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+    expect((await app.escrituras()).at(-1)).toEqual(['set', 'config/cartas', expect.objectContaining({ firmante: 'Persona Firmante', cargo: 'Coordinadora', distribuidora: 'DELSUR', ciudad: 'La Libertad', acuerdo: 'N°38-E-2015' })]);
+
+    await page.getByRole('button', { name: 'Generar cartas' }).click();
+    await expect(page.locator('.modal input[type=text], .modal input:not([type])').first()).toHaveValue('la primera semana del mes de octubre del 2026');
+    await page.locator('.caso-check', { hasText: 'DA1O2026011O00' }).locator('input').uncheck();
+    await page.getByRole('button', { name: 'Generar 2 cartas' }).click();
+    await expect.poll(async () => (await docs()).length).toBe(1);
+    const html = (await docs())[0];
+    expect(html.match(/class="pagina"/g)).toHaveLength(2);
+    for (const t of ['Extendida en La Libertad, 23 de septiembre de 2026', 'Código DGEHM', 'CR1O2026201', 'USUARIO 111', 'acuerdo N°38-E-2015',
+      'COLONIA X, CALLE 1, 12, SANTA TECLA, LA LIBERTAD', 'la primera semana del mes de octubre del 2026', 'CONTRATISTA S.A. DE C.V.', 'Persona Firmante']) expect(html).toContain(t);
+    expect(html).not.toContain('DA1O2026011O00');
+    expect((await app.escrituras()).at(-1)).toEqual(['set', 'campanas/2026-10_CPT-MT/precampana/cartas', { fecha: '2026-09-23', por: 'David García', total: 2 }]);
+    await expect(page.locator('.paso', { hasText: 'Cartas generadas' })).toContainText('23/09/2026 · David García · 2 casos');
+  });
+
+  test('hojas de inspección y pasos manuales de la precampaña', async ({ page }) => {
+    const datos = conCampana();
+    datos.campanas['2026-10_CPT-MT'].casos.CR1O2026201 = caso('CR1O2026201', '111', { ct: 'DS108258', alimentador: 'AL091-23000', medidor: '1453689', lat: 13.7, lng: -89.2 });
+    app = await abrirApp(page, { datos });
+    await cerrarAlerta(page);
+    const docs = await capturarDocsPrecampana(page);
+    await app.ejecutar(() => abrirCampanaTrabajo('2026-10_CPT-MT'));
+    await page.getByRole('button', { name: 'Generar hojas' }).click();
+    await page.getByRole('button', { name: 'Generar 3 hojas' }).click();
+    await expect.poll(async () => (await docs()).length).toBe(1);
+    const html = (await docs())[0];
+    expect(html.match(/class="pagina"/g)).toHaveLength(3);
+    for (const t of ['Hoja de inspección', 'DS108258', 'AL091-23000', '1453689', '13.7, -89.2', 'Medición auxiliar', 'Multiplicador ECAMEC', 'Parámetro 17:', 'Carta entregada a:']) expect(html).toContain(t);
+
+    await page.locator('.paso', { hasText: 'Firma de las cartas' }).getByRole('button', { name: 'Marcar' }).click();
+    expect((await app.escrituras()).at(-1)).toEqual(['set', 'campanas/2026-10_CPT-MT/precampana/firma', { fecha: '2026-09-23', por: 'David García' }]);
+    await expect(page.locator('.panel', { hasText: 'pasos' })).toContainText('2 de 8 pasos');
+    await page.locator('.paso', { hasText: 'Firma de las cartas' }).getByRole('button', { name: 'Deshacer' }).click();
+    expect((await app.escrituras()).at(-1)).toEqual(['remove', 'campanas/2026-10_CPT-MT/precampana/firma']);
   });
 });
