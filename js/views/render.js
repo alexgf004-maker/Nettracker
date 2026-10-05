@@ -14,6 +14,7 @@ import { renderCasoModal, renderConfigCartas, renderDocsModal, renderImportLista
 import { renderProgramacionModal } from './fechas.js';
 import { renderImportMultModal, renderMultModal } from './multiplicadores.js';
 import { renderGraficasModal } from './graficas.js';
+import { renderAnalisisReclamo } from './analisis-reclamo.js';
 import { renderAnalisisModal, renderResultadoModal } from './resultados.js';
 import { renderFT, renderFTModal } from './ft.js';
 import { renderCampanas, renderReclamos, renderRequerimientos } from './trabajo.js';
@@ -75,6 +76,7 @@ export function render() {
   if (state.analisisTXT) html += renderAnalisisModal();
   if (state.ftEdit) html += renderFTModal();
   if (state.showConfigCartas) html += renderConfigCartas();
+  if (state.analisisReclamo) html += renderAnalisisReclamo();
   if (state.graficas) html += renderGraficasModal(); // encima de los demás (se abre desde Resultados o Seguimiento FT)
 
   const tabView = TAB_VIEWS[state.tab];

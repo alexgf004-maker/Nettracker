@@ -211,13 +211,26 @@ export function renderReclamos() {
 
   html += seccion('Informe pendiente', informe.length, informe.map(r => {
     const limite = fechaInformeReclamo(r.fechaRetiroReal);
-    return filaConAccion(r, hoy, limite ? `Informe para el ${fmtDate(limite)} ${tagPlazo(limite, hoy)}` : 'Sin fecha de retiro registrada',
-      `<button class="btn-accion" onclick="marcarInformeEntregado('${r.id}')"><i class="ic ic-check"></i> Informe entregado</button>`);
+    return filaConAccion(r, hoy, (limite ? `Informe para el ${fmtDate(limite)} ${tagPlazo(limite, hoy)}` : 'Sin fecha de retiro registrada') + tagsAnalisis(r),
+      btnAnalisis(r) + `<button class="btn-accion" onclick="marcarInformeEntregado('${r.id}')"><i class="ic ic-check"></i> Informe entregado</button>`);
   }));
   html += seccion('En campo', enCampo.length, enCampo.map(r => filaConAccion(r, hoy, r.fechaRetiro ? `Retiro programado ${fmtDate(r.fechaRetiro)}` : '', '')));
-  html += seccion('Informe entregado', entregados.length, entregados.map(r => filaConAccion(r, hoy, `Entregado ${firmado(r.informeEntregado)}`,
-    `<button class="btn-link" onclick="desmarcarInformeEntregado('${r.id}')">Deshacer</button>`)));
+  html += seccion('Informe entregado', entregados.length, entregados.map(r => filaConAccion(r, hoy, `Entregado ${firmado(r.informeEntregado)}` + tagsAnalisis(r),
+    btnAnalisis(r) + `<button class="btn-link" onclick="desmarcarInformeEntregado('${r.id}')">Deshacer</button>`)));
   return html + '</div>';
+}
+
+// Análisis del reclamo (gráficas y armónicos de los TXT): botón y resultado guardado
+const btnAnalisis = r => `<button class="btn-accion btn-sec" onclick="abrirAnalisisReclamo('${r.id}')"><i class="ic ic-grafica"></i> ${r.analisisReclamo ? 'Ver análisis' : 'Analizar TXT'}</button>`;
+function tagsAnalisis(r) {
+  const x = r.analisisReclamo?.resultado; if (!x) return '';
+  const tags = [];
+  if (x.tension) tags.push(`<span class="tag ${x.tension.estado === 'DENTRO DE TOLERANCIA' ? 'tag-verde' : 'tag-rojo'}">FebNoPer ${(x.tension.febNoPer * 100).toFixed(2)} %</span>`);
+  if (x.armonicos) {
+    const ok = x.armonicos.tension === 'CUMPLE' && x.armonicos.corriente === 'CUMPLE';
+    tags.push(`<span class="tag ${ok ? 'tag-verde' : 'tag-rojo'}">Armónicos ${ok ? 'cumplen' : `no cumplen (${[x.armonicos.tension !== 'CUMPLE' ? 'tensión' : '', x.armonicos.corriente !== 'CUMPLE' ? 'corriente' : ''].filter(Boolean).join(' y ')})`}</span>`);
+  }
+  return ` <span class="tags-analisis">${tags.join('')}</span>`;
 }
 
 function seccion(titulo, n, filas) {
