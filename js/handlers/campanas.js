@@ -8,6 +8,7 @@ import {
   guardarConfigCartas, marcarPaso, toggleExcluirCaso,
 } from '../actions/documentos.js';
 import { abrirMultiplicador, cerrarMultiplicador, exportarMultiplicadores, guardarMultiplicador, usarHistorico } from '../actions/multiplicadores.js';
+import { asignarEquipo, asignarFecha, enviarFechaADespachos, exportarFecha, setDatoFecha } from '../actions/fechas.js';
 import { codigoConSistema } from '../domain/listados.js';
 import { state } from '../state.js';
 import { htmlCalculo } from '../views/multiplicadores.js';
@@ -40,3 +41,6 @@ window.setMultField = (k, v) => {
   const el = document.getElementById('mult-calculo');
   if (el) el.innerHTML = htmlCalculo(state.multForm);
 };
+
+// Fechas 1, 2 y 3
+Object.assign(window, { asignarFecha, asignarEquipo, setDatoFecha, exportarFecha, enviarFechaADespachos });

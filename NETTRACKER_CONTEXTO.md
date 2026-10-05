@@ -36,12 +36,14 @@ js/
     listados.js          Lectura de listados del ente, control de puntos y base de coordenadas; códigos DA/DF
     documentos.js        Cartas al cliente y hojas de inspección (HTML tamaño carta, una página por caso)
     multiplicadores.js   Estados, opciones y fórmulas de la hoja Multiplicadores; histórico por NC
+    fechas.js            Fechas 1, 2 y 3: filas del Excel de cada fecha y revisión antes de despachar
   actions/               Lógica de negocio (guardar, retirar, préstamos, carga Excel, login)
     auth.js · instalaciones.js · inventario.js · carga.js · revision.js · danio.js
     trabajo.js           Marcar entregas: campaña, informe de reclamo, requerimiento
     campanas.js          Precampaña: importar listados, completar datos, editar casos, exportar listado
     documentos.js        Generar cartas y hojas, pasos de la precampaña, datos de las cartas (config/cartas)
     multiplicadores.js   Editar el multiplicador de un caso, usar el histórico y exportar la hoja
+    fechas.js            Asignar fecha y equipo a cada caso, exportar la fecha y enviarla a Despachos
   pdf/memos.js           Plantillas HTML de memorándums (movimiento, lote, carga masiva)
   views/                 Funciones que devuelven HTML (string) según el estado
     render.js            render(): arma header + modales + pestaña activa + nav
@@ -50,6 +52,7 @@ js/
     trabajo.js           Pestañas Campañas, Reclamos, Requerimientos y Seguimiento FT
     casos.js             Tabla de casos de una campaña, ventana de importación y edición de un caso
     multiplicadores.js   Pestaña Multiplicadores de la campaña y su editor
+    fechas.js            Pestaña Fechas de la campaña
     modals.js            Todos los modales
     dashboard.js · instalaciones.js · inventario.js · validaciones.js · mapa.js · carga.js
   handlers/              Funciones `window.*` que llaman los onclick/onchange del HTML
@@ -199,7 +202,14 @@ En el detalle de la campaña:
 - Histórico: si el mismo NC tuvo multiplicador en una campaña anterior registrada en la app, se ofrece "Usar", que copia la configuración y deja el estado "Validado con histórico".
 - Exportar: Excel con las columnas de la hoja Multiplicadores (las de fechas, equipo y elementos quedan vacías hasta Fechas 1, 2 y 3).
 
-Pendiente: verificar los cálculos con un Excel de multiplicadores ya lleno, importar el histórico que tiene el equipo, Fechas 1, 2 y 3 y el mapa para el contratista.
+**Fechas 1, 2 y 3** (pestaña de la campaña):
+- Cada caso se asigna a una fecha (`casos/{id}/programa = { fecha, equipo }`) y a un equipo del inventario que no esté instalado, fuera de servicio ni en mantenimiento.
+- Cada fecha tiene instalación, retiro y accesorios (`campanas/{clave}/fechas/{n}`); por defecto los accesorios son "3 pinzas de corriente, 4 caimanes, 4 alimentadores de voltaje tipo banana".
+- Avisa si faltan fechas, equipos o multiplicadores, si un equipo se repite y cuántos casos listos para medir no tienen fecha.
+- **Exportar Excel**: mismas columnas que las hojas Fecha1/2/3 (encabezado en la fila 3): Número SIGET, Equipo, Nombre del Usuario, Id del Usuario, Dirección, Multiplicador (ECAMEC), Corrientes (TI), Conexion (configuración), fechas, coordenadas y accesorios.
+- **Enviar a Despachos**: abre la vista previa de la carga masiva con esas filas y las mismas validaciones que el Excel (`validarFilaCarga` en `actions/carga.js`); al confirmar se crean las instalaciones y el memo como siempre.
+
+Pendiente: verificar los cálculos con un Excel de multiplicadores ya lleno, importar el histórico de multiplicadores que tiene el equipo y el mapa para el contratista.
 
 ## Área: Inicio (dashboard)
 `calcularPendientes()` (`js/domain/pendientes.js`) arma la lista; avisa desde 3 días antes (`DIAS_AVISO`):

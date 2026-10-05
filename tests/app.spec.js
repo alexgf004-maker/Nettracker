@@ -983,4 +983,42 @@ test.describe('Precampaña', () => {
     await page.getByRole('button', { name: 'Guardar', exact: true }).click();
     expect((await app.escrituras()).at(-1)[2]).toMatchObject({ estado: 'Validado con histórico', configuracion: 'Delta', tap: '2', tensionTap: 23900, tensionBT: 480, xMedidor: 40, testblock: 'Sí', historico: { clave: '2026-09_CPT-MT', codigo: 'CR192026210' } });
   });
+
+  test('fechas: asignar casos y equipos, exportar el Excel de la fecha y enviarla a Despachos', async ({ page }) => {
+    const datos = conCampana();
+    const mult = { estado: 'Realizado', configuracion: 'Estrella', tap: '3', tensionTap: 13200, tensionBT: 240, xMedidor: 80 };
+    Object.assign(datos.campanas['2026-10_CPT-MT'].casos.CR1O2026201, { mult, lat: 13.7, lng: -89.2 });
+    Object.assign(datos.campanas['2026-10_CPT-MT'].casos.CR1O2026202, { mult, programa: { fecha: '1', equipo: 'SN-101' } });
+    app = await abrirApp(page, { excel: true, datos });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('fechas'); });
+    await expect(page.locator('.aviso-azul')).toContainText('1 caso listo para medir no tiene fecha asignada');
+    await page.getByLabel('Fecha de CR1O2026201').selectOption('1');
+    expect((await app.escrituras()).at(-1)).toEqual(['update', 'campanas/2026-10_CPT-MT/casos/CR1O2026201/programa', { fecha: '1' }]);
+    await page.getByLabel('Equipo de CR1O2026201').selectOption('SN-105');
+    expect((await app.escrituras()).at(-1)).toEqual(['update', 'campanas/2026-10_CPT-MT/casos/CR1O2026201/programa', { equipo: 'SN-105' }]);
+    const tarjeta = page.locator('.fecha-card', { hasText: 'Fecha 1' });
+    await expect(tarjeta).toContainText('2 casos');
+    await expect(tarjeta).toContainText('Faltan las fechas de instalación o de retiro');
+    await tarjeta.locator('input[type=date]').nth(0).fill('2026-10-05');
+    await tarjeta.locator('input[type=date]').nth(1).fill('2026-10-13');
+    await expect.poll(async () => (await app.escrituras()).at(-1)).toEqual(['update', 'campanas/2026-10_CPT-MT/fechas/1', { retiro: '2026-10-13' }]);
+    await expect(tarjeta.locator('.aviso')).toHaveCount(0);
+
+    const descarga = page.waitForEvent('download');
+    await tarjeta.getByRole('button', { name: 'Exportar Excel' }).click();
+    const archivo = await descarga;
+    expect(archivo.suggestedFilename()).toBe('Fecha1_Octubre_2026_CPT_MT.xlsx');
+    const filas = XLSX.utils.sheet_to_json(XLSX.readFile(await archivo.path()).Sheets.Fecha1, { header: 1, defval: '', blankrows: true });
+    expect(filas[2]).toEqual(['Número SIGET', 'Equipo', 'Nombre del Usuario', 'Id del Usuario', 'Dirección', 'Multiplicador', 'Corrientes', 'Conexion', 'Fecha instalación', 'Fecha retiro', 'Latitud', 'Longitud', 'Accesorios']);
+    expect(filas[3]).toEqual(['CR1O2026201', 'SN-105', 'USUARIO 111', '111', 'COLONIA X, CALLE 1, 12, SANTA TECLA, LA LIBERTAD', '13200/240', '400/5', 'Estrella', '2026-10-05', '2026-10-13', 13.7, -89.2, '3 pinzas de corriente, 4 caimanes, 4 alimentadores de voltaje tipo banana']);
+
+    // En Despachos se valida igual que el Excel: SN-101 ya está instalado
+    await tarjeta.getByRole('button', { name: 'Enviar a Despachos' }).click();
+    await expect(app$(page)).toContainText('CR1O2026201');
+    await expect(app$(page)).toContainText('Ya está instalado');
+    await app.ejecutar(() => confirmarCarga());
+    const push = (await app.escrituras()).find(([op, ruta]) => op === 'push' && ruta === 'analizadores');
+    expect(push[2]).toMatchObject({ caso: 'CR1O2026201', serie: 'SN-105', fechaInstalacion: '2026-10-05', fechaRetiro: '2026-10-13', areaInstalacion: 'Campos y Servicios', areaBeneficiaria: 'CPT MT', lat: '13.7' });
+  });
 });
