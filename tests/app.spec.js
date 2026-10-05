@@ -816,7 +816,7 @@ test.describe('Precampaña', () => {
   test('completar con el control de puntos y la base de coordenadas, sin pisar lo corregido a mano', async ({ page }) => {
     app = await abrirApp(page, { excel: true, datos: conCampana() });
     await cerrarAlerta(page);
-    await app.ejecutar(() => abrirCampanaTrabajo('2026-10_CPT-MT'));
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('casos'); });
     await expect(page.locator('.tabla-casos')).toContainText('CR1O2026201');
     await expect(page.locator('.tag', { hasText: 'con datos faltantes' })).toHaveText('3 con datos faltantes');
 
@@ -844,7 +844,7 @@ test.describe('Precampaña', () => {
   test('corregir el tipo de sistema de un DA cambia su código y queda marcado como manual', async ({ page }) => {
     app = await abrirApp(page, { datos: conCampana() });
     await cerrarAlerta(page);
-    await app.ejecutar(() => abrirCampanaTrabajo('2026-10_CPT-MT'));
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('casos'); });
     await page.locator('.tabla-casos tr', { hasText: 'DA1O2026011O00' }).click();
     await page.locator('.modal').getByRole('button', { name: 'Trifásico' }).click();
     await expect(page.locator('.modal-titulo')).toHaveText('DA1O2026013O00');
@@ -859,7 +859,7 @@ test.describe('Precampaña', () => {
   test('filtros de la tabla y exportar el listado con las columnas del equipo', async ({ page }) => {
     app = await abrirApp(page, { excel: true, datos: conCampana() });
     await cerrarAlerta(page);
-    await app.ejecutar(() => abrirCampanaTrabajo('2026-10_CPT-MT'));
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('casos'); });
     await app.ejecutar(() => setCasosFiltro('DA'));
     await expect(page.locator('.tabla-casos tbody tr')).toHaveCount(1);
     await app.ejecutar(() => { setCasosFiltro('todos'); setCasosBusqueda('usuario 111'); });
@@ -922,5 +922,65 @@ test.describe('Precampaña', () => {
     await expect(page.locator('.panel', { hasText: 'pasos' })).toContainText('2 de 8 pasos');
     await page.locator('.paso', { hasText: 'Firma de las cartas' }).getByRole('button', { name: 'Deshacer' }).click();
     expect((await app.escrituras()).at(-1)).toEqual(['remove', 'campanas/2026-10_CPT-MT/precampana/firma']);
+  });
+
+  test('multiplicadores: estado, cálculo con las fórmulas del Excel y resumen', async ({ page }) => {
+    app = await abrirApp(page, { excel: true, datos: conCampana() });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('multiplicadores'); });
+    await expect(page.locator('.aviso')).toContainText('0 de 38 CR obligatorios listos para medir');
+    await page.locator('.tabla-casos tr', { hasText: 'CR1O2026201' }).click();
+    const modal = page.locator('.modal');
+    await modal.locator('select').nth(0).selectOption('Realizado');
+    await modal.locator('select').nth(1).selectOption('Estrella');
+    await modal.locator('select').nth(2).selectOption('3');
+    await page.locator('#mult-tensionTap').fill('13200');
+    await page.locator('#mult-tensionBT').fill('240');
+    await page.locator('#mult-xMedidor').fill('80');
+    await page.locator('#mult-vab').fill('241');
+    await expect(page.locator('#mult-calculo')).toContainText('13200/240');
+    await expect(page.locator('#mult-calculo')).toContainText('55');
+    await expect(page.locator('#mult-calculo')).toContainText('400/5');
+    await expect(page.locator('#mult-calculo')).toContainText('ab: 13255');
+    await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+    expect((await app.escrituras()).at(-1)).toEqual(['set', 'campanas/2026-10_CPT-MT/casos/CR1O2026201/mult',
+      { estado: 'Realizado', configuracion: 'Estrella', tap: '3', tensionTap: 13200, tensionBT: 240, xMedidor: 80, vab: 241, editadoPor: 'David García', fecha: '2026-09-23' }]);
+    await expect(page.locator('.resumen-estado', { hasText: 'Listos para medir' })).toContainText('1');
+    await expect(page.locator('.aviso')).toContainText('1 de 38 CR obligatorios');
+
+    // Medición primaria: TI = (X/120)·5/5
+    await page.locator('.tabla-casos tr', { hasText: 'CR1O2026202' }).click();
+    await modal.locator('select').nth(2).selectOption('MP');
+    await page.locator('#mult-xMedidor').fill('240');
+    await expect(page.locator('#mult-calculo')).toContainText('10/5');
+    await page.locator('#mult-xMedidor').fill('1');
+    await modal.locator('select').nth(2).selectOption('2');
+    await expect(page.locator('#mult-calculo')).toContainText('1/1');
+    await app.ejecutar(() => cerrarMultiplicador());
+
+    // Solo los DF pueden quedar como "Conexión no posible"
+    await page.locator('.tabla-casos tr', { hasText: 'DA1O2026011O00' }).click();
+    await expect(modal.locator('select').nth(0).locator('option', { hasText: 'Conexión no posible' })).toHaveCount(0);
+    await app.ejecutar(() => cerrarMultiplicador());
+
+    const descarga = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Exportar multiplicadores' }).click();
+    const wb = XLSX.readFile(await (await descarga).path());
+    const filas = XLSX.utils.sheet_to_json(wb.Sheets.Multiplicadores, { header: 1 });
+    expect(filas[0].slice(0, 13)).toEqual(['ESTADO', 'Código SIGET', 'NC', 'Alimentador', 'Configuración', 'Posición de TAP', 'Nivel de tensión según TAP (KV)', 'Nivel de Baja Tensión (V)', 'Multiplicador ECAMEC', 'Multiplicador DRANETZ', 'X medidor', 'TI', 'Testblock']);
+    expect(filas[1].slice(0, 12)).toEqual(['Realizado', 'CR1O2026201', 111, '', 'Estrella', '3', 13200, 240, '13200/240', 55, 80, '400/5']);
+  });
+
+  test('multiplicadores: usar el histórico del mismo usuario de una campaña anterior', async ({ page }) => {
+    const datos = conCampana();
+    datos.campanas['2026-09_CPT-MT'] = { anio: 2026, mes: 9, area: 'CPT MT', casos: { CR192026210: caso('CR192026210', '111', { mult: { estado: 'Realizado', configuracion: 'Delta', tap: '2', tensionTap: 23900, tensionBT: 480, xMedidor: 40, testblock: 'Sí' } }) } };
+    app = await abrirApp(page, { datos });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('multiplicadores'); abrirMultiplicador('2026-10_CPT-MT', 'CR1O2026201'); });
+    await expect(page.locator('.modal .aviso-azul')).toContainText('Histórico de Septiembre 2026 (CR192026210): Delta · TAP 2 · 23900/480 · X 40');
+    await page.locator('.modal').getByRole('button', { name: 'Usar' }).click();
+    await expect(page.locator('#mult-tensionTap')).toHaveValue('23900');
+    await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+    expect((await app.escrituras()).at(-1)[2]).toMatchObject({ estado: 'Validado con histórico', configuracion: 'Delta', tap: '2', tensionTap: 23900, tensionBT: 480, xMedidor: 40, testblock: 'Sí', historico: { clave: '2026-09_CPT-MT', codigo: 'CR192026210' } });
   });
 });

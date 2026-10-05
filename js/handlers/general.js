@@ -128,6 +128,6 @@ window.guardarSeguimientoDesde = fecha => {
   render();
 };
 window.setAreaFiltro = f => { state.areaFiltro = f; render(); };
-window.abrirCampanaTrabajo = clave => { state.casosFiltro = 'todos'; state.casosBusqueda = ''; state.tab = 'campanas'; state.view = 'lista'; state.campanaClave = clave; state.showMas = false; render(); };
+window.abrirCampanaTrabajo = clave => { state.campanaVista = 'precampana'; state.multFiltro = 'todos'; state.casosFiltro = 'todos'; state.casosBusqueda = ''; state.tab = 'campanas'; state.view = 'lista'; state.campanaClave = clave; state.showMas = false; render(); };
 Object.assign(window, { marcarCampanaEntregada, desmarcarCampanaEntregada, marcarInformeEntregado, desmarcarInformeEntregado, setEntregaLimite, marcarRequerimientoEntregado, desmarcarRequerimientoEntregado });
 window.cerrarSesion = cerrarSesion;
