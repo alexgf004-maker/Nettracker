@@ -2,19 +2,20 @@
 import { AREAS, isAdmin } from '../config.js';
 import { state } from '../state.js';
 import { fmtDate } from '../utils.js';
+import { heroSeccion } from './componentes.js';
 
 export function renderCarga() {
   let html = '';
   html += '<div class="content">';
-  // Toggle between subir and historial
-  html += '<div style="display:flex;gap:8px;margin-bottom:16px">';
-  html += '<button onclick="setCargaSubView(\'subir\')" style="flex:1;padding:10px;border-radius:10px;border:2px solid '+(state.cargaSubView==='subir'?'var(--primary)':'var(--border)')+';background:'+(state.cargaSubView==='subir'?'var(--primary-light)':'#fff')+';color:'+(state.cargaSubView==='subir'?'var(--primary)':'var(--text3)')+';font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer"><i class=ic-bandeja></i> Subir archivo</button>';
-  html += '<button onclick="setCargaSubView(\'historial\')" style="flex:1;padding:10px;border-radius:10px;border:2px solid '+(state.cargaSubView==='historial'?'var(--primary)':'var(--border)')+';background:'+(state.cargaSubView==='historial'?'var(--primary-light)':'#fff')+';color:'+(state.cargaSubView==='historial'?'var(--primary)':'var(--text3)')+';font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer"><i class=ic-clipboard></i> Historial '+(state.historialCargas.length>0?'('+state.historialCargas.length+')':'')+'</button>';
-  html += '<button onclick="setCargaSubView(\'accesorios\')" style="flex:1;padding:10px;border-radius:10px;border:2px solid '+(state.cargaSubView==='accesorios'?'var(--primary)':'var(--border)')+';background:'+(state.cargaSubView==='accesorios'?'var(--primary-light)':'#fff')+';color:'+(state.cargaSubView==='accesorios'?'var(--primary)':'var(--text3)')+';font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer"><i class=ic-candado></i> Accesorios</button>';
-  html += '</div>';
+  const sub = state.cargaSubView;
+  const pest = (k, icono, label) => `<button class="${sub === k ? 'active' : ''}" onclick="setCargaSubView('${k}')"><i class=ic-${icono}></i> ${label}</button>`;
+  html += heroSeccion({
+    eyebrow: 'Herramientas', titulo: sub === 'historial' ? 'Historial de despachos' : sub === 'accesorios' ? 'Memo de accesorios' : 'Despachos a C&S',
+    sub: sub === 'historial' ? 'Despachos enviados a Campos y Servicios.' : sub === 'accesorios' ? 'Genera un memo de entrega de accesorios.' : 'Importa instalaciones para Campos y Servicios desde un archivo Excel.',
+    acciones: `<div class="segmento">${pest('subir', 'bandeja', 'Subir archivo')}${pest('historial', 'clipboard', 'Historial' + (state.historialCargas.length ? ` (${state.historialCargas.length})` : ''))}${pest('accesorios', 'candado', 'Accesorios')}</div>`,
+  });
 
   if (state.cargaSubView === 'historial') {
-    html += '<div class="page-title"><i class=ic-clipboard></i> Historial de despachos</div>';
     if (state.historialCargas.length === 0) {
       html += '<div class="empty"><div class="empty-icon"><i class=ic-clipboard></i></div><div class="empty-text">Sin despachos registrados</div></div>';
     } else {
@@ -106,8 +107,6 @@ export function renderCarga() {
     }
   } else if (state.cargaSubView === 'accesorios') {
     // Static form - reads values from DOM on submit, no oninput render
-    html += '<div class="page-title"><i class=ic-candado></i> Memo de Accesorios</div>';
-    html += '<div style="font-size:12px;color:var(--text3);margin-bottom:16px">Genera un memo de entrega de accesorios</div>';
 
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">';
     html += '<div><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">DE</div>';
@@ -172,8 +171,6 @@ export function renderCarga() {
     }
 
   } else {
-  html += '<div class="page-title"><i class=ic-subir></i> Despachos a C&S</div>';
-  html += '<div style="font-size:13px;color:var(--text3);margin-bottom:20px">Importa instalaciones para <strong style="color:var(--primary)">Campos y Servicios</strong> desde un archivo Excel.</div>';
 
   if (state.cargaView === 'upload') {
     // Upload area

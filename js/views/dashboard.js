@@ -1,10 +1,11 @@
 // Pestaña Inicio: lo que hay que hacer (calculado de los datos), resumen del trabajo y de los equipos
-import { isAdmin } from '../config.js';
+import { isAdmin, userArea } from '../config.js';
 import { GRUPOS, calcularPendientes } from '../domain/pendientes.js';
 import { agruparCampanas, areaDeInstalacion, hoyLocal, registrosDeTipo } from '../domain/trabajo.js';
 import { state } from '../state.js';
 import { calcSt, escapeHtml, eqEnCampo, eqSt, fmtDate } from '../utils.js';
-import { areaVista, filtroArea, textoPlazo } from './trabajo.js';
+import { areaVista, textoPlazo } from './trabajo.js';
+import { areaHero, heroSeccion } from './componentes.js';
 
 const esc = s => escapeHtml(s ?? '');
 const ICONO_PENDIENTE = { ft: 'ft', retiro: 'ruta', descarga: 'descargar', informe: 'reclamos', requerimiento: 'requerimientos', campana: 'campanas' };
@@ -17,7 +18,14 @@ export function renderDashboard() {
   const fechaLarga = new Date().toLocaleDateString('es-SV', { weekday: 'long', day: 'numeric', month: 'long' }).replace(/^./, c => c.toUpperCase());
 
   let html = '<div class="content inicio">';
-  html += `<div class="page-head"><div><h1 class="page-title">Hola, ${esc(nombre)}</h1><div class="page-sub">${fechaLarga}</div></div>${filtroArea()}</div>`;
+  const pend = calcularPendientes({ registros: state.records, campanasGuardadas: state.campanas || {}, hoy, area, desde: state.seguimientoDesde });
+  const n = u => pend.filter(p => p.urgencia === u).length;
+  const ftAbiertos = pend.filter(p => p.clase === 'ft').length;
+  html += heroSeccion({
+    eyebrow: fechaLarga, titulo: `Hola, ${nombre}`, sub: pend.length ? 'Esto es lo que tienes pendiente.' : 'Todo al día.',
+    derecha: areaHero(state.areaFiltro !== 'todas', userArea()),
+    kpis: [{ v: n('vencido'), l: 'Vencidos', alerta: n('vencido') > 0 }, { v: n('hoy'), l: 'Para hoy' }, { v: n('proximo'), l: 'Próximos días' }, { v: ftAbiertos, l: 'Avisos FT', alerta: ftAbiertos > 0, onclick: "switchTab('ft')" }],
+  });
   html += '<div class="inicio-grid"><div class="inicio-col">';
   html += renderPendientes(hoy, area);
   html += '</div><div class="inicio-col">';

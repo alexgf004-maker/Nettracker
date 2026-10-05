@@ -3,6 +3,7 @@ import { CONDICIONES, SEDES, isAdmin } from '../config.js';
 import { state } from '../state.js';
 import { badgeSt } from '../ui.js';
 import { calcSt, eqEnCampo, eqPrestado, eqSt, fmtDate } from '../utils.js';
+import { heroSeccion } from './componentes.js';
 
 export function renderInventario() {
   let html = '';
@@ -14,7 +15,13 @@ export function renderInventario() {
     const enCucu = state.equipos.filter(e => eqSt(e) === 'disponible' && e.sede==='Subestación Cucumacayán' && e.sede !== 'Con Campos y Servicios').length;
     const prestados = state.equipos.filter(e => e.prestado).length;
     const enCampo = state.equipos.filter(e => eqSt(e) === 'instalado').length;
-    html += `<div class="content">
+    const enMant = state.equipos.filter(e => e.condicion === 'mantenimiento').length;
+    const fuera = state.equipos.filter(e => e.condicion === 'fuera').length;
+    html += `<div class="content">${heroSeccion({
+      eyebrow: 'Recursos', titulo: 'Equipos',
+      sub: `${state.equipos.length} analizadores · ${enPlantel} disponibles en Plantel Central · ${enCucu} en Cucumacayán`,
+      kpis: [{ v: enPlantel + enCucu, l: 'Disponibles' }, { v: enCampo, l: 'En campo' }, { v: enMant, l: 'En mantenimiento' }, { v: fuera, l: 'Fuera de servicio', alerta: fuera > 0 }],
+    })}
         <div class="stats-bar">
           <div class="stat-chip ${state.inventarioFiltro==='TODOS'?'active':''}" onclick="setInvFiltro('TODOS')" style="flex-shrink:0;color:var(--primary)"><span class="stat-num">${state.equipos.length}</span><span class="stat-label">Total</span></div>
           <div class="stat-chip ${state.inventarioFiltro==='disponible'?'active':''}" onclick="setInvFiltro('disponible')" style="flex-shrink:0;color:var(--green)"><span class="stat-num">${enPlantel+enCucu}</span><span class="stat-label">Disponibles</span></div>
