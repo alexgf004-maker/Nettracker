@@ -965,3 +965,21 @@ header { background-image: var(--onda), var(--degradado); background-repeat: rep
   .inicio .pendiente-fecha { flex: 1 1 100%; flex-direction: row; align-items: center; gap: 8px; padding-left: 50px; margin-top: -4px; }
 }
 @media (max-width: 520px) { .inicio .pendiente .pend-go { display: none; } }
+
+/* Pendientes como línea de tiempo: fecha, punto de color por urgencia y plazo en etiqueta */
+.pend-dia { display: none; }
+.pend-estilo-tiempo .pend-lista { border: none; border-radius: 0; background: none; overflow: visible; position: relative; padding-left: 4px; }
+.pend-estilo-tiempo .pendiente { position: relative; background: none; border-bottom: none; padding: 8px 0 14px 70px; }
+.pend-estilo-tiempo .pendiente:hover { background: none; }
+.pend-estilo-tiempo .pendiente:hover .pendiente-titulo { color: var(--primary); }
+.pend-estilo-tiempo .pendiente::before { content: ''; position: absolute; left: 58px; top: 0; bottom: 0; width: 2px; background: var(--border); }
+.pend-estilo-tiempo .pend-ic { position: absolute; left: 47px; top: 8px; width: 24px; height: 24px; border-radius: 50%; font-size: 12px; border: 3px solid var(--white); box-sizing: content-box; }
+.pend-estilo-tiempo .pend-rojo .pend-ic { background: #dc2626; color: #fff; }
+.pend-estilo-tiempo .pend-amarillo .pend-ic { background: #f59e0b; color: #fff; }
+.pend-estilo-tiempo .pend-gris .pend-ic { background: #94a3b8; color: #fff; }
+.pend-estilo-tiempo .pend-dia { display: flex; flex-direction: column; position: absolute; left: 0; top: 8px; width: 40px; text-align: right; line-height: 1.1; color: var(--text2); }
+.pend-estilo-tiempo .pend-dia b { font-size: 16px; font-weight: 800; }
+.pend-estilo-tiempo .pend-dia span { font-size: 9.5px; font-weight: 800; letter-spacing: .5px; color: var(--text3); }
+.pend-estilo-tiempo .pendiente-texto { padding-left: 22px; }
+.pend-estilo-tiempo .pendiente-fecha small, .pend-estilo-tiempo .pend-go { display: none; }
+@media (max-width: 520px) { .inicio .pend-estilo-tiempo .pendiente-fecha { padding-left: 22px; margin-top: 2px; } }

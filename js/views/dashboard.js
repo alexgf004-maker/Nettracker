@@ -53,7 +53,7 @@ export function renderDashboard() {
 
 function renderPendientes(hoy, lista) {
   const desde = state.seguimientoDesde;
-  let html = `<div class="bloque"><div class="bloque-head"><div class="bloque-titulo">Pendientes${lista.length ? ` <span class="cuenta">${lista.length}</span>` : ''}</div></div>`;
+  let html = `<div class="bloque pend-estilo-tiempo"><div class="bloque-head"><div class="bloque-titulo">Pendientes${lista.length ? ` <span class="cuenta">${lista.length}</span>` : ''}</div></div>`;
   if (!lista.length) {
     html += '<div class="todo-al-dia"><i class="ic ic-check"></i> Todo al día. No hay nada vencido ni por vencer en los próximos 3 días.</div>';
   } else {
@@ -63,7 +63,10 @@ function renderPendientes(hoy, lista) {
       html += `<div class="grupo grupo-${CLASE_GRUPO[clave]}"><div class="grupo-titulo"><i class="grupo-punto"></i>${titulo} <span>${items.length}</span></div><div class="pend-lista">`;
       items.forEach(p => {
         const tgClase = { vencido: 'rojo', hoy: 'rojo', proximo: 'ambar', sin_fecha: 'gris' }[clave];
+        const [, mm, dd] = (p.fecha || '').split('-');
+        const MES = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
         html += `<div class="pendiente pend-${CLASE_GRUPO[clave]}" onclick="${accionPendiente(p)}">
+          <span class="pend-dia">${dd ? `<b>${Number(dd)}</b><span>${MES[Number(mm) - 1]}</span>` : '<b>—</b><span>sin fecha</span>'}</span>
           <span class="pend-ic"><i class="ic ic-${ICONO_PENDIENTE[p.clase]}"></i></span>
           <div class="pendiente-texto"><div class="pendiente-titulo">${esc(p.titulo)}</div>${p.detalle ? `<div class="pendiente-detalle">${esc(p.detalle)}</div>` : ''}</div>
           ${p.fecha && clave !== 'sin_fecha' ? `<div class="pendiente-fecha"><span class="tg ${tgClase}">${textoPlazo(p.fecha, hoy)}</span><small>${fmtDate(p.fecha)}</small></div>` : ''}
