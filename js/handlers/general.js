@@ -7,6 +7,7 @@ import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { emptyEF, emptyForm, eqSt } from '../utils.js';
 import { render } from '../views/render.js';
+import { darEstilo } from '../excel.js';
 
 // ── GLOBAL HANDLERS ──
 window.toggleDarkMode = () => {
@@ -94,7 +95,7 @@ window.generarReporteMensual = () => {
   const dR=[['SIGET','Serie','Fecha','Técnico','OK','Fallos']];state.records.filter(r=>area==='TODOS'||enA(r)).forEach(r=>{(r.descargas||[]).filter(d=>enM(d.fecha)).forEach(d=>dR.push([r.caso||'',r.serie||'',d.fecha||'',d.tecnico||'',d.medicionOk===true?'Sí':d.medicionOk===false?'No':'—',(d.fallasMedicion||[]).join(', ')||'']));});
   const dpR=[['Fecha','Área','Total','Por']];state.historialCargas.filter(h=>enM(h.fecha)&&(area==='TODOS'||h.areaOrigen===area)).forEach(h=>dpR.push([h.fecha||'',h.areaOrigen||'',h.total||'',h.realizadoPor||'']));
   const vR=[['Campaña','SIGET','Nombre','Fecha','TAP','Mult']];state.validaciones.forEach(v=>{(v.usuarios||[]).filter(u=>u.estado==='validado'&&enM(u.fechaValidacion)).forEach(u=>vR.push([v.nombre||'',u.siget||'',u.nombre||'',u.fechaValidacion||'',u.resultado?'TAP '+u.resultado.tap:'',u.resultado?u.resultado.multiplicador:'']));});
-  const wb=XLSX.utils.book_new();const aS=(n,d)=>{const ws=XLSX.utils.aoa_to_sheet(d);ws['!cols']=Array(10).fill({wch:20});XLSX.utils.book_append_sheet(wb,ws,n);};
+  const wb=XLSX.utils.book_new();const aS=(n,d)=>{const ws=XLSX.utils.aoa_to_sheet(d);ws['!cols']=Array(10).fill({wch:20});darEstilo(ws,{encabezado:d===RES?2:0});XLSX.utils.book_append_sheet(wb,ws,n);};
   aS('Resumen',RES);aS('Instalaciones',iR);aS('Retiros',rtR);aS('Descargas',dR);aS('Despachos',dpR);aS('Validaciones',vR);
   XLSX.writeFile(wb,'Reporte_'+MN[mes-1]+'_'+anio+(area!=='TODOS'?'_'+area.replace(/ /g,'_'):'')+'.xlsx');
   state.showReporteModal=false;showToast('Reporte generado');render();

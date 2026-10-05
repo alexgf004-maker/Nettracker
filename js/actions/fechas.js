@@ -8,6 +8,7 @@ import { casosDeFecha, leerProgramacion, planificarFechas, filaFecha, filasFecha
 import { ordenarCasos } from '../domain/listados.js';
 import { MESES } from '../domain/trabajo.js';
 import { render } from '../views/render.js';
+import { darEstilo } from '../excel.js';
 
 const campana = clave => state.campanas?.[clave];
 const casosDe = clave => ordenarCasos(Object.entries(campana(clave)?.casos || {}).map(([id, c]) => ({ id, ...c })));
@@ -29,6 +30,7 @@ export function exportarFecha(clave, n) {
   const ws = XLSX.utils.aoa_to_sheet(filasFecha(casos, g.fechas?.[n]));
   const rango = XLSX.utils.decode_range(ws['!ref']); rango.s.r = 0; ws['!ref'] = XLSX.utils.encode_range(rango); // empieza en la fila 1, como sus hojas
   ws['!cols'] = [16, 12, 36, 12, 50, 14, 10, 12, 14, 14, 12, 12, 40].map(wch => ({ wch }));
+  darEstilo(ws, { encabezado: 2 });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Fecha' + n);
   XLSX.writeFile(wb, `Fecha${n}_${MESES[g.mes - 1]}_${g.anio}_${g.area.replace(/\s+/g, '_')}.xlsx`);

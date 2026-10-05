@@ -6,6 +6,7 @@ import { showToast } from '../ui.js';
 import { hoyLocal, MESES } from '../domain/trabajo.js';
 import { armarCampanas, coordenadaValida, filasListado, leerControlPuntos, leerCoordenadas, leerListadoEnte } from '../domain/listados.js';
 import { render } from '../views/render.js';
+import { hojaConEstilo } from '../excel.js';
 
 // Lee un Excel (o CSV) y devuelve { nombre, hojas: { nombreHoja: filas } }
 export function leerArchivo(file) {
@@ -212,8 +213,7 @@ export function exportarListado(clave) {
   const g = state.campanas?.[clave];
   const casos = Object.values(g?.casos || {});
   if (!casos.length) return;
-  const ws = XLSX.utils.aoa_to_sheet(filasListado(casos));
-  ws['!cols'] = [12, 18, 40, 60, 12, 12, 12, 12, 30, 14, 10].map(wch => ({ wch }));
+  const ws = hojaConEstilo(filasListado(casos), { anchos: [12, 18, 40, 60, 12, 12, 12, 12, 30, 14, 10] });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Listado');
   XLSX.writeFile(wb, `Listado_${MESES[g.mes - 1]}_${g.anio}_${g.area.replace(/\s+/g, '_')}.xlsx`);

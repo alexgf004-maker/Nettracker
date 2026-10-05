@@ -3,7 +3,9 @@ import { db, ref, set, update } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { analizarMedicion, filasResumenAnalisis, resultadoDeAnalisis } from '../domain/analisis.js';
-import { filasCuadroResumen } from '../domain/resultados.js';
+import { corteSubida, cuadroResumen, ESTADOS_CUADRO } from '../domain/resultados.js';
+import { CR_OBLIGATORIOS_MT } from '../domain/multiplicadores.js';
+import { BORDES, COLOR, ESTILO_ENCABEZADO, hojaConEstilo } from '../excel.js';
 import { agruparCampanas, hoyLocal, MESES } from '../domain/trabajo.js';
 import { filasResultados } from '../views/resultados.js';
 import { render } from '../views/render.js';
@@ -42,8 +44,45 @@ export function guardarResultado() {
 export function exportarCuadroResumen(clave) {
   const c = agruparCampanas(state.records, hoyLocal(), state.campanas).find(x => x.clave === clave);
   if (!c) return;
-  const ws = XLSX.utils.aoa_to_sheet(filasCuadroResumen(filasResultados(c)));
-  ws['!cols'] = [18, 12, 40, 28, 12, 24, 12, 40].map(wch => ({ wch }));
+  const filas = filasResultados(c);
+  const COLUMNAS = 6;
+  const { grilla, cuenta } = cuadroResumen(filas, COLUMNAS);
+  const corte = c.area === 'CPT MT' ? corteSubida(filas, CR_OBLIGATORIOS_MT) : null;
+  const aoa = [[`Cuadro resumen · ${MESES[c.mes - 1]} ${c.anio} · ${c.area}`]];
+  aoa.push([corte ? (corte.codigo ? `Se sube al sistema hasta ${corte.codigo} (${CR_OBLIGATORIOS_MT} CR con medición válida)` : `Faltan ${corte.faltan} CR con medición válida para llegar a ${CR_OBLIGATORIOS_MT} (van ${corte.contados})`) : '']);
+  aoa.push([]);
+  const inicio = aoa.length;
+  grilla.forEach(fila => aoa.push(fila.map(x => x.codigo)));
+  aoa.push([]);
+  const inicioLeyenda = aoa.length;
+  aoa.push(['Leyenda', 'Casos']);
+  Object.entries(ESTADOS_CUADRO).forEach(([k, e]) => aoa.push([e.texto, cuenta[k]]));
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = Array(COLUMNAS).fill({ wch: 19 });
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: COLUMNAS - 1 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: COLUMNAS - 1 } }];
+  const pinta = (r, col, color, extra = {}) => {
+    const celda = ws[XLSX.utils.encode_cell({ r, c: col })] || (ws[XLSX.utils.encode_cell({ r, c: col })] = { t: 's', v: '' });
+    celda.s = {
+      font: { bold: true, sz: 10, color: { rgb: color ? 'FFFFFF' : COLOR.texto } },
+      fill: color ? { patternType: 'solid', fgColor: { rgb: color } } : undefined,
+      alignment: { horizontal: 'center', vertical: 'center' }, border: BORDES, ...extra,
+    };
+  };
+  ws.A1.s = { font: { bold: true, sz: 14, color: { rgb: COLOR.oscuro } } };
+  if (ws.A2) ws.A2.s = { font: { bold: true, sz: 11, color: { rgb: corte?.codigo ? COLOR.petroleo : 'B45309' } } };
+  const gruesa = { style: 'medium', color: { rgb: COLOR.oscuro } };
+  grilla.forEach((fila, i) => fila.forEach((x, j) => {
+    const esCorte = corte?.codigo && x.codigo === corte.codigo;
+    pinta(inicio + i, j, ESTADOS_CUADRO[x.estado].color, esCorte ? { border: { top: gruesa, bottom: gruesa, left: gruesa, right: gruesa } } : {});
+  }));
+  ws['!rows'] = aoa.map((_, r) => (r >= inicio && r < inicio + grilla.length ? { hpt: 22 } : null));
+  ws[XLSX.utils.encode_cell({ r: inicioLeyenda, c: 0 })].s = ESTILO_ENCABEZADO;
+  ws[XLSX.utils.encode_cell({ r: inicioLeyenda, c: 1 })].s = ESTILO_ENCABEZADO;
+  Object.values(ESTADOS_CUADRO).forEach((e, i) => {
+    pinta(inicioLeyenda + 1 + i, 0, e.color);
+    pinta(inicioLeyenda + 1 + i, 1, null);
+  });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Cuadro resumen');
   XLSX.writeFile(wb, `Cuadro_resumen_${MESES[c.mes - 1]}_${c.anio}_${c.area.replace(/\s+/g, '_')}.xlsx`);
@@ -122,8 +161,7 @@ export function exportarAnalisis(clave) {
   const analisis = Object.values(g?.casos || {}).map(c => c.resultado?.origen === 'txt' ? c.resultado.analisis : null).filter(Boolean)
     .sort((a, b) => a.archivo.localeCompare(b.archivo));
   if (!analisis.length) return showToast('Todavía no hay mediciones analizadas');
-  const ws = XLSX.utils.aoa_to_sheet(filasResumenAnalisis(analisis));
-  ws['!cols'] = [22, 14, 12, 14, 16, 12, 10, 12, 14, 60, 18, 18].map(wch => ({ wch }));
+  const ws = hojaConEstilo(filasResumenAnalisis(analisis), { anchos: [22, 14, 12, 14, 16, 12, 10, 12, 14, 60, 18, 18] });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Resumen');
   XLSX.writeFile(wb, `Analisis_${MESES[g.mes - 1]}_${g.anio}_${g.area.replace(/\s+/g, '_')}.xlsx`);

@@ -983,3 +983,10 @@ header { background-image: var(--onda), var(--degradado); background-repeat: rep
 .pend-estilo-tiempo .pendiente-texto { padding-left: 22px; }
 .pend-estilo-tiempo .pendiente-fecha small, .pend-estilo-tiempo .pend-go { display: none; }
 @media (max-width: 520px) { .inicio .pend-estilo-tiempo .pendiente-fecha { padding-left: 22px; margin-top: 2px; } }
+/* Corte de subida al sistema (38 CR) */
+.txt-corte { color: var(--primary); }
+.tg-corte { margin-top: 5px; }
+.tabla-r tr.fila-corte td { border-bottom: 2px solid var(--primary); }
+.tabla-r tr.fila-corte td:first-child { box-shadow: inset 4px 0 0 var(--primary); }
+.tabla-r tr.fila-no-sube { opacity: .55; }
+@media (max-width: 760px) { .tabla-r tr.fila-corte { border: 2px solid var(--primary); } }

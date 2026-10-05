@@ -4,6 +4,7 @@ import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { today } from '../utils.js';
 import { render } from '../views/render.js';
+import { darEstilo } from '../excel.js';
 
 // ── VALIDACIONES HANDLERS ──
 window.abrirNuevaValidacion = () => { state.showValImport = true; state.valImportData = []; state.valTipo = 'monofasico'; render(); };
@@ -195,7 +196,8 @@ window.exportarValidaciones = el => {
     'Relación Calculada': u.resultado ? u.resultado.relacionCalc.toFixed(4) : '',
   }));
   const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.json_to_sheet(rows);
+  const ws = darEstilo(XLSX.utils.json_to_sheet(rows));
+  ws['!cols'] = Object.keys(rows[0] || {}).map(k => ({ wch: Math.max(12, k.length + 4) }));
   XLSX.utils.book_append_sheet(wb, ws, 'Validaciones');
   XLSX.writeFile(wb, 'validaciones_' + camp.nombre.replace(/\s+/g,'_') + '_' + today() + '.xlsx');
   showToast('Excel exportado');

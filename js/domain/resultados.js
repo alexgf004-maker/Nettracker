@@ -55,13 +55,40 @@ export function resumenResultados(filas) {
   return n;
 }
 
-// Excel del cuadro resumen: todos los casos del mes, también los que no se midieron
-export function filasCuadroResumen(filas) {
-  const out = [['Código SIGET', 'NC', 'Nombre', 'Situación', 'Medición', 'Tolerancia', 'FebNoPer (%)', 'Observaciones']];
+// Estado de cada caso en el cuadro resumen (lo que se pinta)
+export const ESTADOS_CUADRO = {
+  dt: { texto: 'Dentro de tolerancia (DT)', color: '22C55E' },
+  ft: { texto: 'Fuera de tolerancia (FT)', color: 'EF4444' },
+  fallida: { texto: 'Fallida', color: 'F97316' },
+  no_instalada: { texto: 'No instalada', color: '9CA3AF' },
+  '': { texto: 'Sin resultado', color: null },
+};
+export function estadoCuadro(f) {
+  const r = f.resultado;
+  if (r.medicion === 'valida') return r.tolerancia === 'fuera' ? 'ft' : 'dt';
+  if (r.medicion === 'fallida') return 'fallida';
+  if (r.medicion === 'revisar') return ''; // por revisar: todavía sin resultado final
+  if (r.medicion === 'no_medida' || f.situacion.clave === 'sin_instalar' || f.situacion.clave === 'sin_medir') return 'no_instalada';
+  return '';
+}
+
+// Hasta qué medición se sube al sistema: en orden de código, se cuentan los CR con medición válida
+// (DT o FT) hasta completar los obligatorios. Devuelve { codigo, contados, faltan }.
+export function corteSubida(filas, obligatorios) {
+  let n = 0;
   for (const f of filas) {
-    const r = f.resultado;
-    out.push([f.caso.codigo || f.caso.codigoEnte, /^\d+$/.test(f.caso.nc) ? Number(f.caso.nc) : f.caso.nc, f.caso.nombre || '', f.situacion.texto,
-      MEDICION[r.medicion] || (f.situacion.clave === 'sin_medir' ? 'No medida' : ''), TOLERANCIA[r.tolerancia] || '', r.febNoPer === '' ? '' : Number(r.febNoPer), r.nota || r.analisis?.detalle || '']);
+    if (f.caso.tipo !== 'CR' || f.resultado.medicion !== 'valida') continue;
+    n++;
+    if (n === obligatorios) return { codigo: f.caso.codigo || f.caso.codigoEnte, contados: n, faltan: 0 };
   }
-  return out;
+  return { codigo: null, contados: n, faltan: obligatorios - n };
+}
+
+// Cuadro resumen: los códigos en cuadrícula (columnas), cada uno con su estado
+export function cuadroResumen(filas, columnas = 6) {
+  const celdas = filas.map(f => ({ codigo: f.caso.codigo || f.caso.codigoEnte, estado: estadoCuadro(f) }));
+  const grilla = [];
+  for (let i = 0; i < celdas.length; i += columnas) grilla.push(celdas.slice(i, i + columnas));
+  const cuenta = Object.fromEntries(Object.keys(ESTADOS_CUADRO).map(k => [k, celdas.filter(c => c.estado === k).length]));
+  return { grilla, cuenta };
 }

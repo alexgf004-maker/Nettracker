@@ -1,7 +1,7 @@
 // Pestaña Resultados de una campaña (cuadro resumen) y su editor
 import { ordenarCasos } from '../domain/listados.js';
 import { CR_OBLIGATORIOS_MT } from '../domain/multiplicadores.js';
-import { instalacionDeCaso, MEDICION, resultadoCaso, resumenResultados, situacionCaso, TOLERANCIA } from '../domain/resultados.js';
+import { corteSubida, instalacionDeCaso, MEDICION, resultadoCaso, resumenResultados, situacionCaso } from '../domain/resultados.js';
 import { hoyLocal } from '../domain/trabajo.js';
 import { casosFT, DIAS_SOLUCION_FT } from '../domain/ft.js';
 import { state } from '../state.js';
@@ -80,9 +80,10 @@ export function renderResultados(c) {
     + tile('fallida', n.fallida, 'Fallidas', 't-morado', 'x')
     + tile('revisar', n.revisar, 'Por revisar', 't-ambar', 'alerta')
     + tile('pendiente', n.pendiente, 'Sin resultado', 't-azul', 'reloj') + '</div>';
+  const corte = c.area === 'CPT MT' ? corteSubida(filas, CR_OBLIGATORIOS_MT) : null;
   if (c.area === 'CPT MT') {
     const ok = n.crValidas >= CR_OBLIGATORIOS_MT;
-    html += `<div class="meta ${ok ? 'ok' : ''}"><div class="meta-tx">CR obligatorios con medición válida<small>${n.daValidas} DA y ${n.dfValidas} DF válidas${n.sinMedir ? ` · ${n.sinMedir} no se medirán` : ''}</small></div>
+    html += `<div class="meta ${ok ? 'ok' : ''}"><div class="meta-tx">CR obligatorios con medición válida<small>${corte.codigo ? `<b class="txt-corte">Se sube al sistema hasta ${esc(corte.codigo)}</b> · ` : `Faltan ${corte.faltan} CR válidas para saber hasta cuál se sube · `}${n.daValidas} DA y ${n.dfValidas} DF válidas${n.sinMedir ? ` · ${n.sinMedir} no se medirán` : ''}</small></div>
       <div class="meta-barra"><i style="width:${Math.min(100, Math.round(n.crValidas * 100 / CR_OBLIGATORIOS_MT))}%"></i></div><div class="meta-num">${n.crValidas}<small> / ${CR_OBLIGATORIOS_MT}</small></div></div>`;
   }
   html += `<div class="barra-acciones">
@@ -98,10 +99,16 @@ export function renderResultados(c) {
   if (filtro !== 'todos') html += `<div class="filtros"><span class="pildora active">${{ valida: 'Válidas', ft: 'Fuera de tolerancia', fallida: 'Fallidas', revisar: 'Por revisar', pendiente: 'Sin resultado' }[filtro]} <b>${visibles.length}</b></span><button class="b b-l" onclick="setResultadosFiltro('todos')">Ver todos</button></div>`;
 
   html += '<div class="tabla-caja"><div class="tabla-scroll"><table class="tabla-r tabla-casos"><thead><tr><th>Código</th><th>Situación</th><th>Instalación</th><th>Resultado</th><th>FebNoPer</th></tr></thead><tbody>';
+  // Después del corte, los CR ya no se suben al sistema
+  let pasoCorte = false;
+  const despuesDelCorte = new Set();
+  filas.forEach(f => { if (pasoCorte && f.caso.tipo === 'CR') despuesDelCorte.add(f.caso.id); if (corte?.codigo && (f.caso.codigo || f.caso.codigoEnte) === corte.codigo) pasoCorte = true; });
   visibles.forEach(({ caso, inst, situacion, resultado: r }) => {
     const ft = esFT(r);
-    html += `<tr class="${ft ? 'fila-ft' : ''}" onclick="abrirResultado('${c.clave}', '${caso.id}')">
-      <td class="cod"><b>${esc(caso.codigo || caso.codigoEnte)}</b><small>${esc(caso.nombre)}</small></td>
+    const esCorte = corte?.codigo && (caso.codigo || caso.codigoEnte) === corte.codigo;
+    const noSube = despuesDelCorte.has(caso.id);
+    html += `<tr class="${ft ? 'fila-ft' : ''} ${esCorte ? 'fila-corte' : ''} ${noSube ? 'fila-no-sube' : ''}" onclick="abrirResultado('${c.clave}', '${caso.id}')">
+      <td class="cod"><b>${esc(caso.codigo || caso.codigoEnte)}</b><small>${esc(caso.nombre)}</small>${esCorte ? '<span class="tg azul tg-corte"><i class="ic ic-bandera"></i> Hasta aquí se sube</span>' : ''}${noSube ? '<small>No se sube</small>' : ''}</td>
       <td data-l="Situación"><span class="tag ${CLASE_SITUACION[situacion.clave]}">${esc(situacion.texto)}</span></td>
       <td data-l="Instalación" class="${inst ? '' : 'vacio-m'}">${inst ? `${fmtDate(inst.fechaInstalacion)}<small>${esc(inst.serie)}${inst.fechaRetiroReal ? ' · retiro ' + fmtDate(inst.fechaRetiroReal) : ''}</small>` : '—'}</td>
       <td data-l="Resultado">${r.medicion ? `${ft ? '<span class="tg ft"><i class="ic ic-sirena"></i> Fuera de tolerancia</span>' : tagMedicion(r)}${r.tolerancia === 'dentro' ? ' <span class="tg verde">Dentro</span>' : ''}${r.desdeDescarga ? '<small>según la descarga</small>' : ''}${r.analisis ? `<small>${esc(r.analisis.detalle)}</small>` : ''}${r.nota ? `<small>${esc(r.nota)}</small>` : ''}` : situacion.clave === 'sin_medir' ? '<span class="tg gris">No medida</span>' : '<span class="falta">Pendiente</span>'}</td>
