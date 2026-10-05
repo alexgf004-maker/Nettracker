@@ -1,5 +1,7 @@
 // Pestaña Fechas de una campaña: grupos de instalación (Fecha 1, 2 y 3) con su equipo por caso
-import { ACCESORIOS_DEFECTO, casosDeFecha, FECHAS, revisarFecha } from '../domain/fechas.js';
+import { ACCESORIOS_DEFECTO, casosDeFecha, fechasDe, revisarFecha } from '../domain/fechas.js';
+import { MESES } from '../domain/trabajo.js';
+import { fmtDate } from '../utils.js';
 import { ordenarCasos } from '../domain/listados.js';
 import { calcularMultiplicador, grupoDeEstado } from '../domain/multiplicadores.js';
 import { state } from '../state.js';
@@ -17,7 +19,10 @@ export function renderFechas(c) {
   const g = state.campanas?.[c.clave] || {};
   const casos = ordenarCasos(c.casos);
   const disponibles = equiposDisponibles();
-  let html = '<div class="fechas-grid">';
+  const FECHAS = fechasDe(g);
+  let html = `<div class="panel fila-importar"><div><b>Programación de instalaciones</b><div class="page-sub">Sube el Excel de usuarios seleccionados con la fecha de instalación de cada caso: cada día queda como una Fecha.</div></div>
+    <label class="btn-accion"><i class="ic ic-subir"></i> Importar programación<input type="file" accept=".xlsx,.xls" hidden onchange="importarProgramacion(this.files)"></label></div>`;
+  html += '<div class="fechas-grid">';
   FECHAS.forEach(n => {
     const f = g.fechas?.[n] || {};
     const delGrupo = casosDeFecha(casos, n);
@@ -55,4 +60,27 @@ export function renderFechas(c) {
     </tr>`;
   });
   return html + '</tbody></table></div>';
+}
+
+// Vista previa de la programación importada
+export function renderProgramacionModal() {
+  const imp = state.importProgramacion;
+  let html = '<div class="modal-overlay"><div class="modal hoja">';
+  html += `<div class="modal-head"><div><div class="modal-titulo">Importar programación</div><div class="page-sub">${esc(imp.nombre)}</div></div><button class="modal-cerrar" onclick="cerrarProgramacion()" title="Cerrar">✕</button></div>`;
+  if (!imp.planes.length) html += '<div class="aviso aviso-amarillo"><i class="ic ic-alerta"></i> Ningún caso del archivo coincide con las campañas importadas. Primero importa los listados del ente.</div>';
+  imp.planes.forEach(p => {
+    const g = state.campanas?.[p.clave] || {};
+    const corregidos = p.asignaciones.filter(a => a.codigoNuevo);
+    html += `<div class="panel" style="margin-top:10px"><div class="panel-titulo">${MESES[(g.mes || 1) - 1]} ${g.anio} · ${esc(g.area)} <span class="chip-dato"><b>${p.asignaciones.length}</b> casos</span></div>`;
+    html += '<div class="filas">' + p.dias.map((d, i) => `<div class="panel-fila"><span>Fecha ${i + 1}</span><b>${fmtDate(d)} · ${p.asignaciones.filter(a => a.fecha === String(i + 1)).length} casos</b></div>`).join('') + '</div>';
+    if (corregidos.length) html += `<div class="aviso aviso-azul avisos-lista"><i class="ic ic-info"></i><div>Se actualiza el código (tipo de sistema verificado): ${corregidos.map(a => `${esc(a.codigo)} → ${esc(a.codigoNuevo)}`).join(', ')}</div></div>`;
+    const otroNC = p.asignaciones.filter(a => a.ncArchivo);
+    if (otroNC.length) html += `<div class="aviso aviso-amarillo avisos-lista"><i class="ic ic-alerta"></i><div>Mismo código con otro NC en el archivo (revisa si cambió el contrato): ${otroNC.map(a => `${esc(a.codigo)} (${esc(a.ncArchivo)})`).join(', ')}</div></div>`;
+    if (p.sinFecha.length) html += `<div class="aviso aviso-amarillo avisos-lista"><i class="ic ic-alerta"></i><div>No vienen en el archivo (quedan como están): ${p.sinFecha.map(esc).join(', ')}</div></div>`;
+    html += '</div>';
+  });
+  if (imp.sinCampana.length) html += `<div class="aviso aviso-amarillo avisos-lista"><i class="ic ic-alerta"></i><div>${imp.sinCampana.length} filas no coinciden con ningún caso importado: ${imp.sinCampana.slice(0, 12).map(f => esc(f.codigo)).join(', ')}${imp.sinCampana.length > 12 ? '…' : ''}</div></div>`;
+  html += `<button class="btn btn-primary" style="margin-top:12px" ${imp.planes.length ? '' : 'disabled'} onclick="guardarProgramacion()">Guardar programación</button>`;
+  html += '<button class="btn btn-secondary" onclick="cerrarProgramacion()">Cancelar</button>';
+  return html + '</div></div>';
 }

@@ -43,6 +43,7 @@ export const state = {
   multFiltro: 'todos', // todos | listos | por_resolver | no_se_miden
   multEdit: null, // { clave, id }
   multForm: {},
+  importProgramacion: null, // vista previa del Excel de programación de instalaciones
   casoForm: {},
   configCartas: null, // config/cartas: firmante, contacto, contratista y logo
   showConfigCartas: false,

@@ -466,6 +466,7 @@ label.btn-accion { cursor: pointer; }
 .calc small { display: block; font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: .5px; }
 .calc b { font-size: 15px; }
 .calc-ancho { grid-column: 1 / -1; }
+.fila-importar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .fechas-grid { display: grid; grid-template-columns: 1fr; gap: 0 12px; }
 .fecha-card .row { gap: 8px; }
 .fecha-card .field { margin-bottom: 8px; }

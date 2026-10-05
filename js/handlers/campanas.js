@@ -8,7 +8,7 @@ import {
   guardarConfigCartas, marcarPaso, toggleExcluirCaso,
 } from '../actions/documentos.js';
 import { abrirMultiplicador, cerrarMultiplicador, exportarMultiplicadores, guardarMultiplicador, usarHistorico } from '../actions/multiplicadores.js';
-import { asignarEquipo, asignarFecha, enviarFechaADespachos, exportarFecha, setDatoFecha } from '../actions/fechas.js';
+import { asignarEquipo, asignarFecha, cerrarProgramacion, enviarFechaADespachos, exportarFecha, guardarProgramacion, importarProgramacion, procesarProgramacion, setDatoFecha } from '../actions/fechas.js';
 import { codigoConSistema } from '../domain/listados.js';
 import { state } from '../state.js';
 import { htmlCalculo } from '../views/multiplicadores.js';
@@ -43,4 +43,4 @@ window.setMultField = (k, v) => {
 };
 
 // Fechas 1, 2 y 3
-Object.assign(window, { asignarFecha, asignarEquipo, setDatoFecha, exportarFecha, enviarFechaADespachos });
+Object.assign(window, { asignarFecha, asignarEquipo, setDatoFecha, exportarFecha, enviarFechaADespachos, importarProgramacion, procesarProgramacion, guardarProgramacion, cerrarProgramacion });
