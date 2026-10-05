@@ -717,3 +717,136 @@ test.describe('Firma de quien genera el memo', () => {
     expect(envio).toMatchObject({ entregadoPor: 'Francisco Chulo', creadoPor: 'David García' });
   });
 });
+
+test.describe('Precampaña', () => {
+  const XLSX = require('xlsx');
+  // Arma un Excel en memoria a partir de filas (arreglo de arreglos)
+  const excel = (nombre, filas, hoja = 'Hoja1') => {
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filas), hoja);
+    return { name: nombre, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) };
+  };
+  // Mismo formato que los listados del ente: título, periodo y datos debajo de "Número SIGET"
+  const listadoEnte = (nombre, titulo, casos) => {
+    const filas = Array.from({ length: 10 }, () => []);
+    filas[2] = [, , , , , , , 'CAMPAÑA DE CONTROL DEL PRODUCTO TECNICO - DATOS USUARIOS SELECCIONADOS'];
+    filas[4] = [, , , , , , , titulo];
+    filas[7] = [, , 'DISTRIBUIDORA', , , 'DELSUR', , , , , 'PERIODO', , , 'OCTUBRE- 2026'];
+    filas.push([, 'Número SIGET', , 'Id del Usuario', , , , , 'Nombre del  Usuario', , , 'Dirección', , , , , , 'Fecha Colocación', , 'Departamento', 'Municipio']);
+    casos.forEach(([codigo, nc, nombre]) => filas.push([, codigo, , nc, , , , , nombre + '  ', , , 'COLONIA X', , , 'CALLE 1', , '12', , , 'LA LIBERTAD', 'SANTA TECLA']));
+    return excel(nombre, filas, 'DetaSorteoCPT');
+  };
+  const LISTADOS = [
+    listadoEnte('Listado_MT_CPT_DELSUR_Octubre_2026.xlsx', 'MEDIA TENSION', [['CR1O2026201', '111', 'EMPRESA UNO'], ['CR1O2026202', '222', 'EMPRESA DOS'], ['CR1O2026203', '333', 'EMPRESA TRES']]),
+    listadoEnte('Listado_BT_CPT_DELSUR_Octubre_2026.xlsx', 'BAJA TENSION', [['CR1O2026001', '901', 'PERSONA UNO'], ['CR1O2026002', '902', 'PERSONA DOS']]),
+    listadoEnte('Listado_DA_CPT_DELSUR_Octubre_2026.xlsx', 'ARMONICO', [['DA1O2026011O00', '222', 'EMPRESA DOS'], ['DA1O2026041O00', '901', 'PERSONA UNO'], ['DA1O2026051O00', '999', 'NADIE']]),
+    listadoEnte('Listado_FK_CPT_DELSUR_Octubre_2026.xlsx', 'FLICKER', [['DF1O2026011O00', '333', 'EMPRESA TRES']]),
+  ];
+  // Campaña ya importada, para probar completar, corregir y exportar
+  const caso = (codigo, nc, extra = {}) => ({ codigoEnte: codigo, codigo, tipo: codigo.slice(0, 2), nc, nombre: 'USUARIO ' + nc, direccionEnte: 'COLONIA X, CALLE 1, 12, SANTA TECLA, LA LIBERTAD', ...extra });
+  const conCampana = () => ({ ...fixture, campanas: { '2026-10_CPT-MT': { anio: 2026, mes: 10, area: 'CPT MT', casos: {
+    CR1O2026201: caso('CR1O2026201', '111'), CR1O2026202: caso('CR1O2026202', '222', { ct: 'CT1', manual: { ct: true } }),
+    DA1O2026011O00: caso('DA1O2026011O00', '222', { crRelacionado: 'CR1O2026202' }),
+  } } } });
+
+  test('importar los listados del ente arma las campañas por área y liga DA/DF a su CR', async ({ page }) => {
+    app = await abrirApp(page, { excel: true });
+    await cerrarAlerta(page);
+    await nav(page, 'Campañas');
+    await page.getByRole('button', { name: 'Importar listados del ente' }).click();
+    await page.locator('.modal input[type=file]').setInputFiles(LISTADOS);
+    const modal = page.locator('.modal');
+    await expect(modal).toContainText('Media tensión (CR) · 3 casos');
+    await expect(modal).toContainText('Flicker (DF) · 1 casos');
+    await expect(modal.locator('.fila', { hasText: 'Octubre 2026 · CPT MT' })).toContainText('3 CR · 1 DA · 1 DF');
+    await expect(modal.locator('.fila', { hasText: 'Octubre 2026 · CPT BT' })).toContainText('2 CR · 1 DA');
+    await expect(modal).toContainText('DA1O2026051O00: el usuario 999 no está en los listados de CR');
+    await page.getByRole('button', { name: 'Guardar campañas' }).click();
+
+    const escrituras = await app.escrituras();
+    const mt = escrituras.find(([, ruta]) => ruta === 'campanas/2026-10_CPT-MT')[2];
+    expect(mt).toMatchObject({ anio: 2026, mes: 10, area: 'CPT MT', 'casos/CR1O2026201/codigo': 'CR1O2026201', 'casos/CR1O2026201/nc': '111',
+      'casos/CR1O2026201/nombre': 'EMPRESA UNO', 'casos/CR1O2026201/direccionEnte': 'COLONIA X, CALLE 1, 12, SANTA TECLA, LA LIBERTAD',
+      'casos/DA1O2026011O00/crRelacionado': 'CR1O2026202', 'casos/DF1O2026011O00/tipo': 'DF' });
+    expect(mt.importado).toMatchObject({ fecha: '2026-09-23', por: 'David García' });
+    const bt = escrituras.find(([, ruta]) => ruta === 'campanas/2026-10_CPT-BT')[2];
+    expect(bt['casos/DA1O2026041O00/crRelacionado']).toBe('CR1O2026001');
+    await expect(page.locator('.card', { hasText: 'Octubre 2026' })).toContainText('Precampaña · 5 casos importados');
+  });
+
+  test('volver a importar no cambia el código corregido', async ({ page }) => {
+    const datos = conCampana();
+    datos.campanas['2026-10_CPT-MT'].casos.DA1O2026011O00.codigo = 'DA1O2026013O00';
+    app = await abrirApp(page, { excel: true, datos });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { switchTab('campanas'); abrirImportListados(); });
+    await page.locator('.modal input[type=file]').setInputFiles(LISTADOS);
+    await expect(page.locator('.modal')).toContainText('Ya existe');
+    await page.getByRole('button', { name: 'Guardar campañas' }).click();
+    const mt = (await app.escrituras()).find(([, ruta]) => ruta === 'campanas/2026-10_CPT-MT')[2];
+    expect(mt['casos/DA1O2026011O00/codigo']).toBeUndefined();
+    expect(mt['casos/CR1O2026203/codigo']).toBe('CR1O2026203'); // caso nuevo
+  });
+
+  test('completar con el control de puntos y la base de coordenadas, sin pisar lo corregido a mano', async ({ page }) => {
+    app = await abrirApp(page, { excel: true, datos: conCampana() });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => abrirCampanaTrabajo('2026-10_CPT-MT'));
+    await expect(page.locator('.tabla-casos')).toContainText('CR1O2026201');
+    await expect(page.locator('.panel', { hasText: 'con datos faltantes' })).toContainText('3 con datos faltantes');
+
+    const control = excel('Puntos_Control_TOTAL.xlsx', [
+      ['CONF', 'Punto de Control', 'NC', 'Tipo de punto de control', 'Nivel de Tensión', 'Fecha de Colocación', 'Fecha de Retiro', 'Tipo de Instalacion', 'Tipo de Medicion', 'comprobacion bdth', 'TARIFA', 'URBANIDAD', 'CENTROMTBT', 'POTENCIA INSTALADA', 'AL', 'NOMBRE', 'DIRECCION', 'ENERGIA', 'TENSION', 'MEDIDOR', 'FASES', 'PERIODO', 'X', 'PERIODO', 'NC'],
+      [111, 'CR1O2026201', 111, 'B', 'MT', '', '', 'TRIFÁSICO', 'MEDICIONES', '', 212, 'U', 'DS108258', 37.5, 'AL091', 'USUARIO 111', 'COLONIA X, CALLE 1, 12, 0, SANTA TECLA, LA LIBERTAD', 231, 23000, 1453689, 'ABC', '', '', '', 555],
+      [222, 'CR1O2026202', 222, 'B', 'MT', '', '', 'MONOFÁSICO', 'MEDICIONES', '', 212, 'R', 'CT999', 10, 'AL013', 'USUARIO 222', 'DIR 222', 1, 13200, 777, 'A'],
+      ['Usuario', 'Punto', 111, 'basura', '', '', '', 'BASURA', '', '', '', '#N/A', '#N/A'],
+    ], 'LISTADO');
+    await page.locator('label', { hasText: 'Completar con control de puntos' }).locator('input').setInputFiles(control);
+    await expect.poll(async () => (await app.escrituras()).length).toBe(1);
+    const [op, ruta, datos] = (await app.escrituras())[0];
+    expect([op, ruta]).toEqual(['update', 'campanas/2026-10_CPT-MT']);
+    expect(datos).toMatchObject({ 'casos/CR1O2026201/ct': 'DS108258', 'casos/CR1O2026201/medidor': '1453689', 'casos/CR1O2026201/alimentador': 'AL091-23000',
+      'casos/CR1O2026201/urbanidad': 'U', 'casos/CR1O2026201/tipoInstalacion': 'TRIFÁSICO', 'casos/DA1O2026011O00/alimentador': 'AL013-13200' });
+    expect(datos['casos/CR1O2026202/ct']).toBeUndefined(); // se corrigió a mano
+
+    const coordenadas = excel('base_usuarios.csv.xlsx', [['NC', 'NOMBRE', 'LATITUD', 'LONGITUD'], [111, 'A', 13.7001, -89.21], [222, 'B', 506769.6, 264759.8], [444, 'C', 13.5, -89.0]]);
+    await page.locator('label', { hasText: 'Completar coordenadas' }).locator('input').setInputFiles(coordenadas);
+    await expect.poll(async () => (await app.escrituras()).length).toBe(2);
+    expect((await app.escrituras())[1][2]).toEqual({ 'casos/CR1O2026201/lat': 13.7001, 'casos/CR1O2026201/lng': -89.21 });
+    await expect(page.locator('.tabla-casos tr', { hasText: 'CR1O2026201' })).toContainText('13.70010, -89.21000');
+  });
+
+  test('corregir el tipo de sistema de un DA cambia su código y queda marcado como manual', async ({ page }) => {
+    app = await abrirApp(page, { datos: conCampana() });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => abrirCampanaTrabajo('2026-10_CPT-MT'));
+    await page.locator('.tabla-casos tr', { hasText: 'DA1O2026011O00' }).click();
+    await page.locator('.modal').getByRole('button', { name: 'Trifásico' }).click();
+    await expect(page.locator('.modal-titulo')).toHaveText('DA1O2026013O00');
+    await page.locator('#caso-ct').fill('CT555');
+    await page.getByRole('button', { name: 'Guardar cambios' }).click();
+    const [, ruta, datos] = (await app.escrituras()).at(-1);
+    expect(ruta).toBe('campanas/2026-10_CPT-MT/casos/DA1O2026011O00');
+    expect(datos).toMatchObject({ codigo: 'DA1O2026013O00', ct: 'CT555', 'manual/codigo': true, 'manual/ct': true, editadoPor: 'David García' });
+    await expect(page.locator('.tabla-casos tr', { hasText: 'DA1O2026013O00' })).toContainText('Ente: DA1O2026011O00');
+  });
+
+  test('filtros de la tabla y exportar el listado con las columnas del equipo', async ({ page }) => {
+    app = await abrirApp(page, { excel: true, datos: conCampana() });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => abrirCampanaTrabajo('2026-10_CPT-MT'));
+    await app.ejecutar(() => setCasosFiltro('DA'));
+    await expect(page.locator('.tabla-casos tbody tr')).toHaveCount(1);
+    await app.ejecutar(() => { setCasosFiltro('todos'); setCasosBusqueda('usuario 111'); });
+    await expect(page.locator('.tabla-casos tbody tr')).toHaveCount(1);
+    const descarga = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Exportar listado' }).click();
+    const archivo = await descarga;
+    expect(archivo.suggestedFilename()).toBe('Listado_Octubre_2026_CPT_MT.xlsx');
+    const wb = XLSX.readFile(await archivo.path());
+    const filas = XLSX.utils.sheet_to_json(wb.Sheets.Listado, { header: 1 });
+    expect(filas[0]).toEqual(['NC', 'CÓDIGO SIGET', 'NOMBRE', 'DIRECCIÓN', 'CORTE', 'MEDIDOR', 'LATITUD', 'LONGITUD', 'UBICACIÓN', 'ALIMENTADOR', 'URBANIDAD']);
+    expect(filas.map(f => f[1])).toEqual(['CÓDIGO SIGET', 'CR1O2026201', 'CR1O2026202', 'DA1O2026011O00']);
+    expect(filas[2].slice(0, 5)).toEqual([222, 'CR1O2026202', 'USUARIO 222', 'COLONIA X, CALLE 1, 12, SANTA TECLA, LA LIBERTAD', 'CT1']);
+  });
+});

@@ -4,6 +4,7 @@ import './handlers/instalaciones.js';
 import './handlers/inventario.js';
 import './handlers/validaciones.js';
 import './handlers/carga.js';
+import './handlers/campanas.js';
 import { initTheme, iniciarMonitorConexion } from './ui.js';
 import { restaurarSesion } from './actions/auth.js';
 import { iniciarSync } from './data/sync.js';

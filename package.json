@@ -9,6 +9,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
-    "lucide-static": "^1.52.0"
+    "lucide-static": "^1.52.0",
+    "xlsx": "^0.18.5"
   }
 }

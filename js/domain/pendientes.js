@@ -46,11 +46,11 @@ export function calcularPendientes({ registros, campanasGuardadas = {}, hoy, are
   }
 
   // Entrega de campaña: día 10 del mes siguiente
-  for (const c of agruparCampanas(registros, hoy)) {
+  for (const c of agruparCampanas(registros, hoy, campanasGuardadas)) {
     if (area && c.area !== area) continue;
     if (campanasGuardadas[c.clave]?.entrega) continue;
     const u = urgencia(c.fechaEntrega, hoy);
-    if (u !== 'ok') lista.push({ clase: 'campana', clave: c.clave, tipo: 'campana', urgencia: u, fecha: c.fechaEntrega, titulo: `Cargar la campaña ${nombreCampana(c)} en el sistema CPT DELSUR`, detalle: `${c.area} · ${c.resumen.total} ${c.resumen.total === 1 ? 'medición' : 'mediciones'}` });
+    if (u !== 'ok') lista.push({ clase: 'campana', clave: c.clave, tipo: 'campana', urgencia: u, fecha: c.fechaEntrega, titulo: `Cargar la campaña ${nombreCampana(c)} en el sistema CPT DELSUR`, detalle: `${c.area} · ${c.casos.length || c.resumen.total} ${(c.casos.length || c.resumen.total) === 1 ? 'caso' : 'casos'}` });
   }
 
   const orden = Object.fromEntries(GRUPOS.map(([k], i) => [k, i]));

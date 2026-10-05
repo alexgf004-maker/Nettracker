@@ -123,24 +123,37 @@ export const ETAPAS = {
   retirada: 'Retirada',
 };
 
-// Agrupa las instalaciones de campaña por mes/año y área.
+// Agrupa las instalaciones de campaña por mes/año y área, junto con las campañas importadas
+// de los listados del ente (guardadas en campanas/{clave} con sus casos).
 // La clave (p. ej. 2026-09_CPT-MT) sirve también como llave en Firebase (campanas/{clave}).
-export function agruparCampanas(registros, hoy) {
+export function agruparCampanas(registros, hoy, guardadas = {}) {
   const campanas = new Map();
+  const nueva = (clave, periodo, area) => {
+    if (!campanas.has(clave)) campanas.set(clave, { clave, ...periodo, area, nombre: nombreCampana(periodo), fechaEntrega: fechaEntregaCampana(periodo), registros: [] });
+    return campanas.get(clave);
+  };
+  for (const [clave, g] of Object.entries(guardadas || {})) {
+    if (g?.casos && g.anio && g.mes && g.area) nueva(clave, { anio: g.anio, mes: g.mes }, g.area);
+  }
   for (const r of registros) {
     if (tipoDeTrabajo(r.caso) !== 'campana') continue;
     const periodo = periodoCampana(r.caso);
     if (!periodo) continue;
     const area = areaDeInstalacion(r);
-    const clave = claveCampana(periodo) + '_' + area.replace(/\s+/g, '-');
-    if (!campanas.has(clave)) {
-      campanas.set(clave, { clave, ...periodo, area, nombre: nombreCampana(periodo), fechaEntrega: fechaEntregaCampana(periodo), registros: [] });
-    }
-    campanas.get(clave).registros.push(r);
+    nueva(claveCampana(periodo) + '_' + area.replace(/\s+/g, '-'), periodo, area).registros.push(r);
   }
   return [...campanas.values()]
-    .map(c => ({ ...c, resumen: resumenEtapas(c.registros, hoy), subtipos: contarSubtipos(c.registros) }))
+    .map(c => {
+      const casos = Object.entries(guardadas?.[c.clave]?.casos || {}).map(([id, x]) => ({ id, ...x }));
+      return { ...c, casos, resumen: resumenEtapas(c.registros, hoy), subtipos: casos.length ? contarSubtiposCasos(casos) : contarSubtipos(c.registros) };
+    })
     .sort((a, b) => b.anio - a.anio || b.mes - a.mes || a.area.localeCompare(b.area));
+}
+
+function contarSubtiposCasos(casos) {
+  const c = { CR: 0, DA: 0, DF: 0 };
+  casos.forEach(x => { const s = x.tipo || subtipoCampana(x.codigo); if (s) c[s]++; });
+  return c;
 }
 
 export function resumenEtapas(registros, hoy) {
