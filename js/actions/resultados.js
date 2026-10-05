@@ -1,11 +1,12 @@
 // Resultados de la campaña: anotar el de cada caso y exportar el cuadro resumen
-import { db, ref, set, update } from '../firebase.js';
+import { db, get, ref, set, update } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { analizarMedicion, filasResumenAnalisis, resultadoDeAnalisis } from '../domain/analisis.js';
 import { corteSubida, cuadroResumen, ESTADOS_CUADRO } from '../domain/resultados.js';
 import { CR_OBLIGATORIOS_MT } from '../domain/multiplicadores.js';
 import { hojaConEstilo } from '../excel.js';
+import { extraerSeries, fechaDePunto } from '../domain/series.js';
 import { agruparCampanas, hoyLocal, MESES } from '../domain/trabajo.js';
 import { filasResultados } from '../views/resultados.js';
 import { render } from '../views/render.js';
@@ -151,7 +152,7 @@ export function analizarArchivos(clave, archivos) {
     const [id, caso] = hit;
     (txtEnMemoria[clave] ??= {})[id] = a;
     const analisis = analizarMedicion(a.nombre, a.texto, { configuracion: caso.mult?.configuracion, alimentador: caso.alimentador, urbanidad: caso.urbanidad });
-    filas.push({ id, codigo: caso.codigo || caso.codigoEnte, analisis, resultado: resultadoDeAnalisis(analisis), manual: !!caso.resultado && caso.resultado.origen !== 'txt' });
+    filas.push({ id, codigo: caso.codigo || caso.codigoEnte, analisis, resultado: resultadoDeAnalisis(analisis), manual: !!caso.resultado && caso.resultado.origen !== 'txt', series: extraerSeries(a.texto) });
   }
   filas.sort((x, y) => x.codigo.localeCompare(y.codigo));
   state.analisisTXT = { clave, filas, sinCaso };
@@ -184,8 +185,12 @@ export function guardarAnalisis() {
   const datos = {};
   const firma = { por: state.sesionUsuario?.nombre || '', fecha: hoyLocal() };
   imp.filas.forEach(f => {
-    datos[`casos/${f.id}/resultado`] = { ...f.resultado, analisis: f.analisis, origen: 'txt', ...firma };
+    datos[`casos/${f.id}/resultado`] = { ...f.resultado, analisis: f.analisis, origen: 'txt', ...firma, ...(f.series ? { graficas: true } : {}) };
   });
+  // Las series van aparte (series/{campaña}/{caso}) para no cargarlas con la campaña; se leen al abrir las gráficas
+  const series = {};
+  imp.filas.forEach(f => { if (f.series) series[f.id] = { ...f.series, nominal: f.analisis.nominal ?? null, tolerancia: f.analisis.tolerancia ?? null, codigo: f.codigo }; });
+  if (Object.keys(series).length) update(ref(db, 'series/' + imp.clave), series);
   update(ref(db, 'campanas/' + imp.clave), datos).then(() => showToast(`${imp.filas.length} mediciones analizadas`));
   state.analisisTXT = null;
   render();
@@ -202,4 +207,33 @@ export function exportarAnalisis(clave) {
   XLSX.utils.book_append_sheet(wb, ws, 'Resumen');
   XLSX.writeFile(wb, `Analisis_${MESES[g.mes - 1]}_${g.anio}_${g.area.replace(/\s+/g, '_')}.xlsx`);
   showToast('Análisis exportado');
+}
+
+// ── GRÁFICAS DE VOLTAJE Y CORRIENTE ──
+
+export async function verGraficas(clave, id) {
+  state.graficas = { clave, id, cargando: true };
+  render();
+  try {
+    const snap = await get(ref(db, `series/${clave}/${id}`));
+    if (state.graficas?.id !== id) return;
+    state.graficas = { clave, id, datos: snap.exists() ? snap.val() : null };
+  } catch (err) {
+    state.graficas = { clave, id, error: err.message };
+  }
+  render();
+}
+export function cerrarGraficas() { state.graficas = null; render(); }
+
+// Datos de las gráficas en Excel (tabla con fecha y valores por fase)
+export function exportarSeries(clave, id) {
+  const d = state.graficas?.datos; if (!d) return;
+  const n = d.t.length;
+  const fU = Object.keys(d.U || {}); const fI = Object.keys(d.I || {});
+  const filas = [['Fecha y hora', ...fU.map(p => `U${p} [V]`), ...fI.map(p => `I${p} [A]`)]];
+  for (let i = 0; i < n; i++) filas.push([fechaDePunto(d.inicio, d.t[i] ?? 0), ...fU.map(p => d.U[p].v?.[i] ?? ''), ...fI.map(p => d.I[p].v?.[i] ?? '')]);
+  const ws = hojaConEstilo(filas, { anchos: [16, ...Array(fU.length + fI.length).fill(12)] });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Datos');
+  XLSX.writeFile(wb, `Graficas_${d.codigo || id}.xlsx`);
 }

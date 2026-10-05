@@ -1303,6 +1303,50 @@ test.describe('Precampaña', () => {
     expect(r.resultadoRevisar).toEqual({ medicion: 'revisar' });
   });
 
+  test('gráficas: al analizar el TXT se guardan voltaje y corriente y se ven con la banda de tolerancia', async ({ page }) => {
+    const datos = conCampana();
+    Object.assign(datos.campanas['2026-10_CPT-MT'].casos.CR1O2026201, { alimentador: 'AL013-13200', urbanidad: 'U', mult: { configuracion: 'Monofásico' } });
+    app = await abrirApp(page, { datos });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('resultados'); });
+    // Mismo formato que el TXT de ECAMEC: U1Max, U1, U1Min … I1Max, I1, I1Min …
+    const enc = ['Fecha y Hora', 'U1Max [V]', 'U1 [V]', 'U1Min [V]', 'U2Max [V]', 'U2 [V]', 'U2Min [V]', 'U3Max [V]', 'U3 [V]', 'U3Min [V]', 'I1Max [A]', 'I1 [A]', 'I1Min [A]', 'I2Max [A]', 'I2 [A]', 'I2Min [A]', 'I3Max [A]', 'I3 [A]', 'I3Min [A]'];
+    const f = x => String(x).padStart(2, '0');
+    const lineas = ['\ufeff' + [...enc, ...Array.from({ length: 74 - enc.length }, (_, i) => 'C' + i)].join(',')];
+    for (let i = 0; i < 700; i++) {
+      const d = new Date(Date.UTC(2026, 9, 1, 8, 0) + i * 15 * 60000);
+      const u = i % 10 === 0 ? 8300 : 7700; // 10 % de los registros arriba del +6 %
+      lineas.push([`${f(d.getUTCDate())}/${f(d.getUTCMonth() + 1)}/2026 ${f(d.getUTCHours())}:${f(d.getUTCMinutes())}:00`, u + 50, u, u - 50, 6, 5, 4, 2, 1, 1, 30, 25 + (i % 4), 20, 0, 0, 0, 0, 0, 0, ...Array(74 - enc.length).fill('1')].join(','));
+    }
+    await page.locator('label', { hasText: 'Analizar TXT' }).locator('input').setInputFiles([{ name: 'CR1O2026201.txt', mimeType: 'text/plain', buffer: Buffer.from(lineas.join('\r\n')) }]);
+    await page.getByRole('button', { name: 'Guardar resultados' }).click();
+    const escritas = await app.escrituras();
+    const serie = escritas.find(([op, ruta]) => op === 'update' && ruta === 'series/2026-10_CPT-MT')[2].CR1O2026201;
+    expect(serie).toMatchObject({ inicio: '01/10/2026 08:00:00', nominal: 7620, tolerancia: 0.06, codigo: 'CR1O2026201' });
+    expect(serie.t.length).toBe(700);
+    expect(serie.U['1'].v.slice(0, 2)).toEqual([8300, 7700]);
+    expect(serie.I['1'].v.slice(0, 2)).toEqual([25, 26]);
+    expect(escritas.find(([, ruta]) => ruta === 'campanas/2026-10_CPT-MT')[2]['casos/CR1O2026201/resultado']).toMatchObject({ graficas: true, tolerancia: 'fuera' });
+
+    // Botón en la fila: abre voltaje (solo V1, la única fase con tensión) y corriente
+    await page.locator('.tabla-casos tr', { hasText: 'CR1O2026201' }).locator('.b-graf').click();
+    const modal = page.locator('.graf-modal');
+    await expect(modal).toContainText('tolerancia ±6 % (7,163 a 8,077 V)');
+    await expect(modal.locator('.graf-dato')).toHaveCount(1);
+    await expect(modal.locator('.graf-dato')).toContainText('10.0 % fuera');
+    await expect(modal.locator('[data-graf="u"] .graf-linea')).toHaveCount(1);
+    await expect(modal.locator('[data-graf="u"] .graf-banda')).toHaveCount(1);
+    await expect(modal.locator('[data-graf="i"] .graf-linea')).toHaveCount(1);
+    // Al pasar el cursor se ven fecha, voltaje y corriente de ese momento
+    const area = modal.locator('[data-graf="u"]');
+    const caja = await area.boundingBox();
+    await page.mouse.move(caja.x + 0.2, caja.y + caja.height / 2);
+    await expect(page.locator('#graf-tooltip')).toContainText('01/10 08:00');
+    await expect(page.locator('#graf-tooltip')).toContainText('8,300 V');
+    await expect(page.locator('#graf-tooltip')).toContainText('25.0 A');
+    expect(app.errores).toEqual([]);
+  });
+
   test('resultados: subir los TXT llena los resultados y los FT pasan a seguimiento', async ({ page }) => {
     const datos = conCampana();
     const cs = datos.campanas['2026-10_CPT-MT'].casos;

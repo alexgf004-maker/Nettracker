@@ -251,6 +251,14 @@ En el detalle de la campaña:
 - Estado en el orden de la macro: vacío → FALLIDA; sin nivel ni urbanidad → ADVERTENCIA; columnas ≠ esperadas → ADVERTENCIA; registros válidos < mínimo → FALLIDA; intervalo predominante distinto → FALLIDA; fases inválidas → FALLIDA; intervalos sueltos fuera de lo esperado → ADVERTENCIA; tipo no reconocido → ADVERTENCIA; si no, VÁLIDA.
 - En la app: VÁLIDA → válida, con FT si el FebNoPer pasa de 5 % (confirmado); FALLIDA → fallida; ADVERTENCIA → "por revisar" (normalmente un dato mal puesto, como el nivel de tensión: se corrige y se recalcula).
 
+## Gráficas de voltaje y corriente
+
+- Al guardar el análisis de los TXT (Resultados → Analizar TXT → Guardar resultados) se guardan las series en `series/{campaña}/{caso}`: `inicio`, `fin`, `t` (minutos desde el inicio), `U.{1,2,3}.{v,min,max}` (V, 1 decimal), `I.{1,2,3}.{v,max}` (A, 2 decimales), `nominal`, `tolerancia` y `codigo` (~60 KB por caso). Van aparte de `campanas` para que la app no las cargue con la campaña; se leen con `get` al abrir las gráficas. El resultado del caso lleva `graficas: true`.
+- `js/domain/series.js` lee el TXT de ECAMEC por nombre de columna (`U1 [V]`, `U1Min [V]`, `U1Max [V]`, `I1 [A]`…); si no hay corriente con ese nombre se informa qué columnas `[A]` traía. `fasesActivas` descarta fases en cero o con ruido.
+- `js/views/graficas.js`: SVG propio sin librerías. Voltaje con la banda de tolerancia (nominal ±6 % U / ±7 % R, la misma del FebNoPer) y corriente en otra gráfica (nunca dos escalas en una). Colores de fase: azul, naranja, aqua. Cursor sincronizado en ambas con fecha y valor de cada fase; resumen por fase (promedio, mín, máx, % fuera) y "Descargar datos en Excel".
+- Se abren desde el ícono de la fila en Resultados, el bloque rojo de FT, el editor del resultado y el detalle en Seguimiento FT.
+- Ojo: el TXT real de ECAMEC (p. ej. CR122026234) trae los 74 encabezados repetidos dos veces (148 columnas); la macro y la app lo marcan "por revisar" por número de columnas.
+
 ## Seguimiento FT
 Pestaña Trabajo → Seguimiento FT (`js/domain/ft.js`, `casos/{id}/ft`). Los casos FT salen de Resultados (válida + fuera de tolerancia):
 - Plazo: 90 días calendario desde la instalación de la medición inicial (no desde el retiro ni la descarga).

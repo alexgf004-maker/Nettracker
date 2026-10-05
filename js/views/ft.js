@@ -58,6 +58,7 @@ export function renderFTModal() {
   const ft = x.ft; const rem = ft.remedicion || {};
   let html = '<div class="modal-overlay"><div class="modal hoja">';
   html += `<div class="modal-head"><div><div class="modal-titulo mono">${esc(x.codigo)}</div><div class="page-sub">${esc(x.caso.nombre)} · FebNoPer ${esc(x.caso.resultado?.febNoPer ?? '—')} %</div></div><button class="modal-cerrar" onclick="cerrarFT()" title="Cerrar">✕</button></div>`;
+  if (x.caso.resultado?.graficas) html += `<button class="btn btn-secondary" onclick="verGraficas('${clave}', '${id}')"><i class="ic ic-grafica"></i> Ver gráficas de voltaje y corriente</button>`;
   html += `<div class="panel-fila"><span>Instalación de la medición inicial</span><b>${fmtDate(x.inicio)}</b></div>`;
   html += `<div class="panel-fila"><span>Plazo de ${DIAS_SOLUCION_FT} días</span><b>${fmtDate(x.limite)}${x.dias !== null ? ` · día ${x.dias}` : ''}</b></div>`;
 

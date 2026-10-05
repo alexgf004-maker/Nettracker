@@ -57,6 +57,7 @@ function bloqueFT(c, hoy) {
           ${x.limite ? `<span class="tg ${x.vencido ? 'rojo' : 'gris'}"><i class="ic ic-reloj"></i> ${x.vencido ? 'Plazo vencido' : `Día ${x.dias} de ${DIAS_SOLUCION_FT} · hasta ${fmtDate(x.limite)}`}</span>` : '<span class="tg gris">Sin instalación registrada</span>'}
           ${x.ft.ruta ? `<span class="tg azul">${esc(x.ft.ruta)}</span>` : ''}</div>
         ${x.limite && !x.cerrado ? `<div class="ft-dias"><i class="${x.vencido || pct >= 80 ? 'mal' : ''}" style="width:${pct}%"></i></div>` : ''}</div>
+      ${x.caso.resultado?.graficas ? `<button class="b b-g" onclick="event.stopPropagation(); verGraficas('${c.clave}', '${x.id}')"><i class="ic ic-grafica"></i> Gráficas</button>` : ''}
       <i class="ic ic-chevron-right" style="color:var(--text3)"></i></div>`;
   });
   html += '<div class="ft-pie"><button class="b b-g" onclick="switchTab(\'ft\')"><i class="ic ic-ft"></i> Ir a Seguimiento FT</button></div>';
@@ -112,7 +113,7 @@ export function renderResultados(c) {
       <td data-l="Situación"><span class="tag ${CLASE_SITUACION[situacion.clave]}">${esc(situacion.texto)}</span></td>
       <td data-l="Instalación" class="${inst ? '' : 'vacio-m'}">${inst ? `${fmtDate(inst.fechaInstalacion)}<small>${esc(inst.serie)}${inst.fechaRetiroReal ? ' · retiro ' + fmtDate(inst.fechaRetiroReal) : ''}</small>` : '—'}</td>
       <td data-l="Resultado">${r.medicion ? `${ft ? '<span class="tg ft"><i class="ic ic-sirena"></i> Fuera de tolerancia</span>' : tagMedicion(r)}${r.tolerancia === 'dentro' ? ' <span class="tg verde">Dentro</span>' : ''}${r.desdeDescarga ? '<small>según la descarga</small>' : ''}${r.analisis ? `<small>${esc(r.analisis.detalle)}</small>` : ''}${r.nota ? `<small>${esc(r.nota)}</small>` : ''}` : situacion.clave === 'sin_medir' ? '<span class="tg gris">No medida</span>' : '<span class="falta">Pendiente</span>'}</td>
-      <td data-l="FebNoPer" class="num">${r.febNoPer === '' ? '—' : `<span class="${ft ? 'ft-valor' : ''}">${esc(r.febNoPer)} %</span>`}</td>
+      <td data-l="FebNoPer" class="num">${r.febNoPer === '' ? '—' : `<span class="${ft ? 'ft-valor' : ''}">${esc(r.febNoPer)} %</span>`}${caso.resultado?.graficas ? `<button class="b-graf" title="Ver gráficas de voltaje y corriente" onclick="event.stopPropagation(); verGraficas('${c.clave}', '${caso.id}')"><i class="ic ic-grafica"></i></button>` : ''}</td>
     </tr>`;
   });
   if (!visibles.length) html += '<tr><td colspan="5" class="vacia">No hay casos con ese filtro</td></tr>';
@@ -132,6 +133,7 @@ export function renderResultadoModal() {
     html += `<div class="field"><label>FebNoPer (%)</label><input id="res-febNoPer" inputmode="decimal" value="${esc(f.febNoPer)}" oninput="setResultadoField('febNoPer', this.value)"></div>`;
   }
   html += `<div class="field"><label>Observaciones</label><input id="res-nota" value="${esc(f.nota)}" oninput="setResultadoField('nota', this.value)" placeholder="Por qué falló, situación final, etc."></div>`;
+  if (caso.resultado?.graficas) html += `<button class="btn btn-secondary" onclick="cerrarResultado(); verGraficas('${clave}', '${id}')"><i class="ic ic-grafica"></i> Ver gráficas de voltaje y corriente</button>`;
   html += '<button class="btn btn-primary" onclick="guardarResultado()">Guardar</button>';
   html += '<button class="btn btn-secondary" onclick="cerrarResultado()">Cancelar</button>';
   return html + '</div></div>';
