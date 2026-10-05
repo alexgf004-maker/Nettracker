@@ -834,8 +834,9 @@ test.describe('Precampaña', () => {
       'casos/CR1O2026201/urbanidad': 'U', 'casos/CR1O2026201/tipoInstalacion': 'TRIFÁSICO', 'casos/DA1O2026011O00/alimentador': 'AL013-13200' });
     expect(datos['casos/CR1O2026202/ct']).toBeUndefined(); // se corrigió a mano
 
-    const coordenadas = excel('base_usuarios.csv.xlsx', [['NC', 'NOMBRE', 'LATITUD', 'LONGITUD'], [111, 'A', 13.7001, -89.21], [222, 'B', 506769.6, 264759.8], [444, 'C', 13.5, -89.0]]);
-    await page.locator('label', { hasText: 'Completar coordenadas' }).locator('input').setInputFiles(coordenadas);
+    // Mismo formato que la base del equipo: IDCLIENTE, COORDX (latitud), COORDY (longitud)
+    const coordenadas = excel('coor.xlsx', [['IDCLIENTE', 'COORDX', 'COORDY'], [111, 13.7001, -89.21], [222, 506769.6, 264759.8], [444, 13.5, -89.0]]);
+    await page.locator('label', { hasText: 'o desde un archivo' }).locator('input').setInputFiles(coordenadas);
     await expect.poll(async () => (await app.escrituras()).length).toBe(2);
     expect((await app.escrituras())[1][2]).toEqual({ 'casos/CR1O2026201/lat': 13.7001, 'casos/CR1O2026201/lng': -89.21 });
     await expect(page.locator('.tabla-casos tr', { hasText: 'CR1O2026201' })).toContainText('13.70010, -89.21000');
@@ -1234,5 +1235,29 @@ test.describe('Precampaña', () => {
     await app.ejecutar(() => cerrarAnalisis());
     await nav(page, 'Seguimiento FT');
     await expect(page.locator('.card', { hasText: 'CR1O2026201' })).toContainText('Falta avisar a DELSUR');
+  });
+
+  test('coordenadas desde la base en Firebase: al importar los listados y con el botón', async ({ page }) => {
+    const datos = conCampana();
+    datos.coordenadas = { 111: [13.7001, -89.21], 222: [13.6, -89.3], 333: [13.5, -88.9], 901: [13.65, -89.2] };
+    app = await abrirApp(page, { excel: true, datos });
+    await cerrarAlerta(page);
+    // Botón de la campaña: CR1O2026202 tiene el CT corregido a mano pero no coordenadas
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('casos'); });
+    await page.getByRole('button', { name: 'Completar coordenadas' }).click();
+    await expect.poll(async () => (await app.escrituras()).at(-1)?.[1]).toBe('campanas/2026-10_CPT-MT');
+    expect((await app.escrituras()).at(-1)[2]).toMatchObject({ 'casos/CR1O2026201/lat': 13.7001, 'casos/CR1O2026201/lng': -89.21, 'casos/CR1O2026202/lat': 13.6, 'casos/DA1O2026011O00/lat': 13.6 });
+
+    // Al importar listados nuevos, los casos traen sus coordenadas
+    await app.ejecutar(() => { switchTab('campanas'); abrirImportListados(); });
+    await page.locator('.modal input[type=file]').setInputFiles(LISTADOS);
+    await page.getByRole('button', { name: 'Guardar campañas' }).click();
+    await expect.poll(async () => (await app.escrituras()).filter(([, r]) => r === 'campanas/2026-10_CPT-BT').length).toBe(1);
+    const bt = (await app.escrituras()).find(([, r]) => r === 'campanas/2026-10_CPT-BT')[2];
+    expect(bt).toMatchObject({ 'casos/CR1O2026001/lat': 13.65, 'casos/CR1O2026001/lng': -89.2 });
+    expect(bt['casos/CR1O2026002/lat']).toBeUndefined();
+    const mt = (await app.escrituras()).filter(([, r]) => r === 'campanas/2026-10_CPT-MT').at(-1)[2];
+    expect(mt['casos/CR1O2026203/lat']).toBe(13.5); // caso nuevo
+    expect(mt['casos/CR1O2026201/lat']).toBeUndefined(); // ya las tenía (se completaron arriba con el botón)
   });
 });

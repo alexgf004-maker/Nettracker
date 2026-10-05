@@ -186,7 +186,7 @@ En **Campañas → Importar listados del ente** se suben los cuatro Excel del en
 
 En el detalle de la campaña:
 - **Completar con control de puntos** (hoja LISTADO): por NC toma CT/DS (CENTROMTBT), medidor, alimentador (AL + "-" + TENSION, p. ej. AL091-23000), urbanidad, dirección y tipo de instalación. Las coordenadas de ese archivo no sirven y no se usan. Solo cuentan las filas con código de caso; las tablas pegadas al final se ignoran.
-- **Completar coordenadas**: de la base de usuarios (columnas NC, latitud y longitud) se toman solo los NC de la campaña; se descartan las coordenadas fuera de El Salvador.
+- **Coordenadas**: la base de usuarios está en Firebase en `coordenadas/{NC} = [latitud, longitud]` (≈470 mil usuarios, se importa como JSON desde la consola de Firebase **en el nodo `coordenadas`**, nunca en la raíz). Al importar los listados, los casos sin coordenadas las toman de ahí; el botón "Completar coordenadas" hace lo mismo después. También se puede usar un archivo ("o desde un archivo"): columnas NC/IDCLIENTE y latitud/longitud o COORDX/COORDY; si vienen invertidas se acomodan por el rango de El Salvador, y se descartan las que caen fuera.
 - **Editar un caso**: lo que se cambia a mano queda en `manual/{campo}` y ya no lo pisan los archivos. En DA/DF se corrige el tipo de sistema verificado en campo (dígito después del correlativo: 1 monofásico, 2 bifásico, 3 trifásico), lo que cambia el código; el ente no lo deja fijo.
 - **Exportar listado**: Excel con las columnas del equipo (NC, CÓDIGO SIGET, NOMBRE, DIRECCIÓN, CORTE, MEDIDOR, LATITUD, LONGITUD, UBICACIÓN, ALIMENTADOR, URBANIDAD).
 

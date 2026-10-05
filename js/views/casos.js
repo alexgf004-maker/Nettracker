@@ -27,7 +27,8 @@ export function renderCasosCampana(c) {
   if (importado) html += `<div class="page-sub">Importado el ${fmtDate(importado.fecha)} por ${esc(importado.por)}</div>`;
   html += `<div class="acciones-casos">
     <label class="btn-accion"><i class="ic ic-excel"></i> Completar con control de puntos<input type="file" accept=".xlsx,.xls,.csv" hidden onchange="subirArchivoCampana('${c.clave}', 'control', this.files)"></label>
-    <label class="btn-accion"><i class="ic ic-map-pin"></i> Completar coordenadas<input type="file" accept=".xlsx,.xls,.csv" hidden onchange="subirArchivoCampana('${c.clave}', 'coordenadas', this.files)"></label>
+    <button class="btn-accion" onclick="completarCoordenadasBase('${c.clave}')"><i class="ic ic-map-pin"></i> Completar coordenadas</button>
+    <label class="btn-link" title="Desde un Excel o CSV con NC, latitud y longitud">o desde un archivo<input type="file" accept=".xlsx,.xls,.xlsm,.csv" hidden onchange="subirArchivoCampana('${c.clave}', 'coordenadas', this.files)"></label>
     <button class="btn-accion" onclick="exportarListado('${c.clave}')"><i class="ic ic-descargar"></i> Exportar listado</button>
   </div>`;
   html += '</div>';
