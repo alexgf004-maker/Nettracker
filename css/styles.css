@@ -795,97 +795,68 @@ label.b { cursor: pointer; }
 .ft-card .n { white-space: normal; }
 .ft-card .ft-info { overflow: hidden; }
 
-/* ─── Identidad propia de NetTracker (grafito + turquesa, onda de medición) ─── */
-:root { --grafito: #0f172a; --grafito2: #1e293b; --turq: #0891b2; --turq2: #06b6d4; --turq-claro: #ecfeff; --navy: #0f172a; --azul: #0891b2; --azul2: #06b6d4; }
-/* Onda tipo señal de voltaje en el fondo del encabezado */
-.hero, .camp-card-top {
-  background-color: var(--grafito);
-  background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='120' viewBox='0 0 240 120'%3E%3Cpath d='M0 60 Q30 10 60 60 T120 60 T180 60 T240 60' fill='none' stroke='%2306b6d4' stroke-opacity='.28' stroke-width='2'/%3E%3Cpath d='M0 75 Q30 35 60 75 T120 75 T180 75 T240 75' fill='none' stroke='%2306b6d4' stroke-opacity='.12' stroke-width='1.5'/%3E%3C/svg%3E"),
-    linear-gradient(180deg, var(--grafito2) 0%, var(--grafito) 100%);
-  background-repeat: repeat-x, no-repeat; background-position: right -20px bottom -18px, 0 0; background-size: 240px 120px, auto;
-  box-shadow: 0 8px 22px -12px rgba(15,23,42,.7);
+/* ─── Identidad propia de NetTracker: degradado petróleo → turquesa con onda de medición ─── */
+:root {
+  --petroleo: #0b2e3b; --turq: #0e7490; --turq2: #06b6d4; --turq-claro: #ecfeff;
+  --navy: #0b2e3b; --azul: #0e7490; --azul2: #06b6d4;
+  --degradado: linear-gradient(120deg, #0b2e3b 0%, #0e7490 60%, #0891b2 100%);
+  --onda: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='120' viewBox='0 0 240 120'%3E%3Cpath d='M0 60 Q30 10 60 60 T120 60 T180 60 T240 60' fill='none' stroke='%23ffffff' stroke-opacity='.16' stroke-width='2'/%3E%3Cpath d='M0 75 Q30 35 60 75 T120 75 T180 75 T240 75' fill='none' stroke='%23ffffff' stroke-opacity='.07' stroke-width='1.5'/%3E%3C/svg%3E");
 }
-.hero { border-top: 3px solid var(--turq2); border-radius: 14px; }
+.hero, .camp-card-top, .boleto-top {
+  background-image: var(--onda), var(--degradado);
+  background-repeat: repeat-x, no-repeat; background-position: right -20px bottom -18px, 0 0; background-size: 240px 120px, auto;
+}
+.hero { box-shadow: 0 10px 24px -12px rgba(14,116,144,.6); }
 .hero::after { display: none; }
-.hero-eyebrow { color: var(--turq2); }
-.hero-kpi { background: rgba(255,255,255,.05); border-color: rgba(148,163,184,.22); border-radius: 10px; border-left: 3px solid var(--turq2); }
-.hero-kpi.alerta { background: #dc2626; border-color: #ef4444; border-left-color: #fecaca; }
-.hero-btn.blanco { color: var(--grafito); }
-.hero.hero-rojo { background-color: #450a0a; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='120' viewBox='0 0 240 120'%3E%3Cpath d='M0 60 Q30 10 60 60 T120 60 T180 60 T240 60' fill='none' stroke='%23f87171' stroke-opacity='.35' stroke-width='2'/%3E%3C/svg%3E"), linear-gradient(180deg, #7f1d1d, #450a0a); border-top-color: #ef4444; }
-.hero.hero-rojo .hero-eyebrow { color: #fca5a5; }
-.hero.hero-rojo .hero-kpi { border-left-color: #fca5a5; }
+.hero-eyebrow { color: #a5f3fc; }
+.hero-kpi { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.16); }
+.hero-kpi.alerta { background: #dc2626; border-color: #f87171; }
+.hero-btn.blanco { color: var(--petroleo); }
+.hero.hero-rojo { background-image: var(--onda), linear-gradient(120deg, #7f1d1d 0%, #dc2626 100%); }
+.hero.hero-rojo .hero-eyebrow { color: #fecaca; }
 
-/* Pestañas: subrayado turquesa en vez de recuadro azul */
-.paso-tab { border-radius: 10px; border-width: 1px; }
-.paso-tab.active { border-color: var(--turq); box-shadow: inset 0 -3px 0 var(--turq); }
-.paso-tab.active .paso-tab-ic { background: var(--turq); }
-.paso-tab-ic { background: var(--turq-claro); color: var(--turq); border-radius: 50%; }
-.paso-tab.listo .paso-tab-ic { border-radius: 50%; }
-.paso-tab.active.listo .paso-tab-ic { background: #059669; }
-.paso-tab.active.alerta .paso-tab-ic { background: #dc2626; }
+/* Pestañas */
+.paso-tab.active { border-color: var(--turq); box-shadow: 0 6px 16px -10px rgba(14,116,144,.8); }
+.paso-tab-ic { background: var(--turq-claro); color: var(--turq); }
+.paso-tab.active .paso-tab-ic { background: var(--degradado); color: #fff; }
 
-/* Bloques: título normal con ícono de punto turquesa, sin barra lateral */
-.bloque { border-radius: 12px; }
-.bloque-titulo { font-size: 14px; letter-spacing: 0; text-transform: none; color: var(--text); font-weight: 800; }
-.bloque-titulo::before { width: 8px; height: 8px; border-radius: 50%; background: var(--turq2); box-shadow: 0 0 0 3px var(--turq-claro); }
-.bloque-titulo .cuenta { background: var(--turq-claro); color: var(--turq); }
+/* Bloques */
+.bloque-titulo::before { background: var(--turq2); }
+.bloque-titulo .cuenta { background: var(--turq); }
 
-/* Mosaicos blancos con acento de color (no rellenos) */
-.tile { background: var(--white) !important; color: var(--text); border: 1px solid var(--border); border-top: 3px solid var(--tile-c, var(--turq)); border-radius: 10px; }
-.tile::after { display: none; }
-.tile .v { color: var(--tile-c, var(--turq)); font-family: var(--mono); font-size: 24px; }
-.tile .l { color: var(--text2); opacity: 1; }
-.tile .ic { color: var(--tile-c, var(--turq)); opacity: 1; width: 26px; height: 26px; padding: 5px; border-radius: 50%; background: var(--bg); box-sizing: border-box; right: 10px; top: 10px; -webkit-mask-size: 15px; mask-size: 15px; background-color: var(--tile-c, var(--turq)); }
-.tile.t-azul { --tile-c: #0891b2; }
-.tile.t-gris { --tile-c: #64748b; }
-.tile.sel { box-shadow: 0 0 0 2px var(--tile-c, var(--turq)); background: var(--bg) !important; }
-.tile.t-rojo.pulso { background: #fef2f2 !important; border-color: #fca5a5; border-top-color: #dc2626; }
+/* Mosaicos rellenos con degradado (el azul pasa a turquesa) */
+.tile.t-azul { background: var(--degradado); --tile-c: var(--turq); }
+.tile.t-gris { background: linear-gradient(135deg, #475569, #94a3b8); }
 
-/* Botones: principal turquesa plano */
-.b-p { background: var(--turq); box-shadow: none; }
-.b-p:hover { background: #0e7490; filter: none; }
+/* Botones y filtros */
+.b-p { background: var(--degradado); box-shadow: 0 6px 14px -8px rgba(14,116,144,.8); }
 .b-g:hover { border-color: var(--turq2); color: var(--turq); background: var(--turq-claro); }
 .pildora.active { background: var(--turq); border-color: var(--turq); }
 .ayuda[open] summary { color: var(--turq); }
-.meta-barra i { background: #f59e0b; }
-.meta.ok .meta-barra i { background: #10b981; }
-.meta { border-left: 3px solid #f59e0b; border-radius: 8px; }
-.meta.ok { border-left-color: #10b981; }
+.tabla-r tbody tr:hover { background: var(--turq-claro); }
+.tl-paso.actual .tl-num { background: var(--turq-claro); border-color: var(--turq); color: var(--turq); }
+.camp-pasos i.en { background: var(--turq2); }
 
-/* Fechas: tarjeta blanca con cabecera grafito (sin forma de boleto) */
-.boleto { background: var(--white); color: var(--text); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; }
-.boleto.vacio { background: var(--white); opacity: .8; }
-.boleto-top { background: var(--grafito); color: #fff; padding: 12px 14px; border-bottom: 3px solid var(--turq2); }
-.boleto.vacio .boleto-top { background: #475569; border-bottom-color: #94a3b8; }
-.boleto-k { color: var(--turq2); }
+/* Fechas: tarjeta blanca con cabecera en degradado (sin forma de boleto) */
+.boleto { background: var(--white); color: var(--text); border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; }
+.boleto.vacio { background: var(--white); }
+.boleto-top { color: #fff; padding: 12px 14px; }
+.boleto.vacio .boleto-top { background-image: var(--onda), linear-gradient(120deg, #334155, #64748b); }
+.boleto-k { color: #a5f3fc; }
 .boleto-corte { display: none; }
 .boleto-campos label { color: var(--text3); }
 .boleto-campos input { background: var(--bg); border: 1px solid var(--border); color: var(--text); color-scheme: light; }
 .boleto-avisos { background: var(--yellow-light); border-color: #fde68a; color: #92400e; }
 .boleto-acciones .hero-btn { color: var(--text2); background: var(--white); border-color: var(--border); }
-.boleto-acciones .hero-btn.blanco { background: var(--turq); border-color: var(--turq); color: #fff; }
+.boleto-acciones .hero-btn.blanco { background: var(--degradado); border-color: transparent; color: #fff; }
+.camp-card-top.entregada { background-image: var(--onda), linear-gradient(120deg, #065f46, #10b981); }
 
-/* Tarjetas de campaña y tabla */
-.camp-card { border-radius: 12px; }
-.camp-card-top { border-bottom: 3px solid var(--turq2); }
-.camp-card-top.entregada { background-image: none; background-color: #065f46; border-bottom-color: #34d399; }
-.camp-pasos i.en { background: var(--turq2); }
-.camp-dato { border-left: 3px solid var(--border); border-radius: 6px; }
-.camp-dato b { font-family: var(--mono); }
-.tabla-r tbody tr:hover { background: var(--turq-claro); }
-.tabla-caja { border-radius: 12px; }
-.tl-paso.actual .tl-num { background: var(--turq-claro); border-color: var(--turq); color: var(--turq); }
-.hero-kpi b, .tile .v { letter-spacing: -.5px; }
-.meta-tx { white-space: normal; min-width: 0; }
-@media (max-width: 600px) { .meta { flex-wrap: wrap; } .meta-tx { flex: 1 1 100%; } }
-
-/* Barra superior y menú con la misma identidad */
-header { background: var(--grafito); border-bottom: 2px solid var(--turq2); }
-.logo-mark, .back-btn, .icon-btn { background: rgba(6,182,212,.12); border-color: rgba(6,182,212,.35); }
-.user-chip .user-avatar { background: var(--turq); }
+/* Barra superior y menú */
+header { background-image: var(--onda), var(--degradado); background-repeat: repeat-x, no-repeat; background-position: right 0 bottom -40px, 0 0; background-size: 240px 120px, auto; }
+.user-chip .user-avatar { background: rgba(255,255,255,.2); }
 .nav-btn.active .nav-icon, .nav-btn.active .nav-label { color: var(--turq); }
 .nav-btn.active::after { background: var(--turq2); }
-@media (min-width: 1024px) {
-  .nav-btn.active { background: var(--turq-claro); }
-}
+@media (min-width: 1024px) { .nav-btn.active { background: var(--turq-claro); } }
+.meta-tx { white-space: normal; min-width: 0; }
+@media (max-width: 600px) { .meta { flex-wrap: wrap; } .meta-tx { flex: 1 1 100%; } }
+.toast { background: var(--petroleo) !important; border-left: 3px solid var(--turq2); }
