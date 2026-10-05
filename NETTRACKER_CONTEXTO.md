@@ -37,6 +37,9 @@ js/
     documentos.js        Cartas al cliente y hojas de inspección (HTML tamaño carta, una página por caso)
     multiplicadores.js   Estados, opciones y fórmulas de la hoja Multiplicadores; histórico por NC
     fechas.js            Fechas 1, 2 y 3: filas del Excel de cada fecha y revisión antes de despachar
+    analisis.js          Análisis de los TXT (traslado de la macro CalidadEnergia_v1.bas)
+    resultados.js        Situación y resultado de cada caso; cuadro resumen
+    ft.js                Reglas del seguimiento de casos fuera de tolerancia
   actions/               Lógica de negocio (guardar, retirar, préstamos, carga Excel, login)
     auth.js · instalaciones.js · inventario.js · carga.js · revision.js · danio.js
     trabajo.js           Marcar entregas: campaña, informe de reclamo, requerimiento
@@ -212,9 +215,20 @@ En el detalle de la campaña:
 
 **Resultados** (pestaña de la campaña, base del cuadro resumen; `casos/{id}/resultado`):
 - Cada caso se liga a su instalación por código y muestra su situación: sin instalar / programado en Fecha n, en campo, retirado con descarga pendiente, descargado, o no medido (Cliente de baja, Conexión no posible, Acceso denegado).
-- El resultado (válida, fallida o no medida; dentro o fuera de tolerancia; FebNoPer) se anota a mano hasta integrar la macro. Si no hay resultado anotado, se toma lo marcado al descargar ("la medición salió bien").
+- **Analizar TXT**: se suben los TXT de ECAMEC (nombre del archivo = código del caso) y se calcula todo como la macro `CalidadEnergia_v1.bas` (ver abajo). El resultado se guarda en `casos/{id}/resultado` con `origen: 'txt'` y el `analisis` (estado, detalle, registros, intervalo, instalación, nivel, urbanidad, FebNoPer, inicio y fin). Los TXT quedan solo en memoria mientras la app está abierta: "Recalcular con los datos actuales" los vuelve a analizar después de corregir un dato del caso.
+- También se puede anotar a mano (válida, fallida, por revisar o no medida; tolerancia; FebNoPer). Si no hay nada, se toma lo marcado al descargar ("la medición salió bien").
+- "Exportar análisis" saca un Excel con las columnas de la hoja Resumen de la macro, para comparar.
 - Resumen de válidas, fallidas, FT y sin resultado; en CPT MT, CR válidas contra 38.
 - Exportar cuadro resumen con todos los casos del mes (también los no medidos). Formato provisional hasta tener uno ya entregado.
+
+## Análisis de las mediciones (macro CalidadEnergia integrada)
+`js/domain/analisis.js` reproduce `CargarMediciones` de `CalidadEnergia_v1.bas`:
+- Tipo por prefijo: CR → regulatorio (15 min, 74 columnas, mínimo 576 registros válidos); DA/DF → perturbación (10 min, 197 columnas, mínimo 1008). En DA/DF el tipo de instalación sale del dígito 11 del código (1 mono, 2 bi, 3 tri).
+- Datos del caso: configuración (multiplicadores), nivel de tensión del alimentador ("AL013-23000" → 23000) y urbanidad.
+- Fases (columnas `U1 [V]`, `U2 [V]`, `U3 [V]`; con tensión = más de 300 V en más del 30 % de los registros): monofásico sin V2/V3 **y con V1** (cambio confirmado por el equipo); bifásico sin V3; trifásico/estrella/delta con las tres.
+- FebNoPer: tolerancia U 6 % / R 7 %; nominal L-N para mono, bi y perturbaciones (46000→26600, 23000→13200, 13200→7620, 4160→2400, otro ÷√3) y L-L para tri/estrella/delta. Registro inválido si una fase activa está bajo el 70 % del nominal; FT si alguna fase activa sale de tolerancia. FebNoPer = FT ÷ (total − inválidos). Si todos son inválidos: "ERROR ALIM.".
+- Estado en el orden de la macro: vacío → FALLIDA; sin nivel ni urbanidad → ADVERTENCIA; columnas ≠ esperadas → ADVERTENCIA; registros válidos < mínimo → FALLIDA; intervalo predominante distinto → FALLIDA; fases inválidas → FALLIDA; intervalos sueltos fuera de lo esperado → ADVERTENCIA; tipo no reconocido → ADVERTENCIA; si no, VÁLIDA.
+- En la app: VÁLIDA → válida, con FT si el FebNoPer pasa de 5 % (confirmado); FALLIDA → fallida; ADVERTENCIA → "por revisar" (normalmente un dato mal puesto, como el nivel de tensión: se corrige y se recalcula).
 
 ## Seguimiento FT
 Pestaña Trabajo → Seguimiento FT (`js/domain/ft.js`, `casos/{id}/ft`). Los casos FT salen de Resultados (válida + fuera de tolerancia):

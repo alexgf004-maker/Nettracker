@@ -1129,4 +1129,110 @@ test.describe('Precampaña', () => {
     await nav(page, 'Seguimiento FT');
     await expect(page.locator('.card', { hasText: 'CR1O2026201' })).toContainText('Más de 90 días: se penalizan los 90 días y la compensación sigue');
   });
+
+  // TXT de prueba con el formato de ECAMEC: fecha + U1/U2/U3 + columnas de relleno
+  const hacerTXT = ({ n = 700, paso = 15, columnas = 74, v = () => [13200, 13200, 13200], saltos = [] } = {}) => {
+    const enc = ['Fecha/Hora', 'U1 [V]', 'U2 [V]', 'U3 [V]', ...Array.from({ length: columnas - 4 }, (_, i) => 'C' + (i + 5))];
+    const lineas = ['\ufeff' + enc.join(',')];
+    let t = Date.UTC(2026, 9, 1, 8, 0, 0);
+    const f = x => String(x).padStart(2, '0');
+    for (let i = 0; i < n; i++) {
+      const d = new Date(t);
+      const [a, b, c] = v(i);
+      lineas.push([`${f(d.getUTCDate())}/${f(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ${f(d.getUTCHours())}:${f(d.getUTCMinutes())}:00`, a, b, c, ...Array(columnas - 4).fill('1')].join(','));
+      t += (saltos.includes(i) ? paso * 2 : paso) * 60000;
+    }
+    return lineas.join('\r\n');
+  };
+
+  test('análisis de TXT: misma lógica que la macro CalidadEnergia', async ({ page }) => {
+    app = await abrirApp(page);
+    const txts = {
+      valida: hacerTXT(),
+      ft: hacerTXT({ v: i => (i % 10 === 0 ? [14500, 13200, 13200] : [13200, 13200, 13200]) }),
+      pocos: hacerTXT({ n: 500 }),
+      intervalo: hacerTXT({ paso: 30 }),
+      columnas: hacerTXT({ columnas: 73 }),
+      saltos: hacerTXT({ saltos: [100, 200] }),
+      monoSinV1: hacerTXT({ v: () => [0, 0, 0] }),
+      monoConV2: hacerTXT({ v: () => [7620, 7620, 0] }),
+      alim: hacerTXT({ v: () => [400, 400, 400] }),
+      perturb: hacerTXT({ n: 1100, paso: 10, columnas: 197, v: () => [7620, 7620, 7620] }),
+      vacio: '',
+    };
+    const r = await page.evaluate(async t => {
+      const m = await import('/js/domain/analisis.js');
+      const tri = { configuracion: 'Estrella', alimentador: 'AL013-13200', urbanidad: 'U' };
+      const mono = { configuracion: 'Monofásico', alimentador: 'AL013-13200', urbanidad: 'R' };
+      const a = (n, x, d = tri) => { const z = m.analizarMedicion(n, x, d); return [z.estado, z.detalle, typeof z.febNoPer === 'number' ? Math.round(z.febNoPer * 10000) / 10000 : z.febNoPer]; };
+      return {
+        valida: a('CR1O2026201.txt', t.valida),
+        ft: a('CR1O2026201.txt', t.ft),
+        pocos: a('CR1O2026201.txt', t.pocos),
+        intervalo: a('CR1O2026201.txt', t.intervalo),
+        columnas: a('CR1O2026201.txt', t.columnas),
+        saltos: a('CR1O2026201.txt', t.saltos),
+        monoSinV1: a('CR1O2026201.txt', t.monoSinV1, { configuracion: 'Monofásico', alimentador: 'AL013', urbanidad: 'U' }),
+        monoConV2: a('CR1O2026201.txt', t.monoConV2, mono),
+        alim: a('CR1O2026201.txt', t.alim),
+        sinDatos: a('CR1O2026201.txt', t.valida, {}),
+        perturb: a('DA1O2026013O00.txt', t.perturb, { configuracion: '', alimentador: 'AL013-13200', urbanidad: 'U' }),
+        vacio: a('CR1O2026201.txt', t.vacio),
+        resultadoFT: m.resultadoDeAnalisis(m.analizarMedicion('CR1O2026201.txt', t.ft, tri)),
+        resultadoOk: m.resultadoDeAnalisis(m.analizarMedicion('CR1O2026201.txt', t.valida, tri)),
+        resultadoRevisar: m.resultadoDeAnalisis(m.analizarMedicion('CR1O2026201.txt', t.columnas, tri)),
+      };
+    }, txts);
+    expect(r.valida).toEqual(['VALIDA', 'Registros: 700 | Estrella | Fases OK', 0]);
+    expect(r.ft).toEqual(['VALIDA', 'Registros: 700 | Estrella | Fases OK', 0.1]); // 70 de 700 registros por encima de +6 %
+    expect(r.pocos).toEqual(['FALLIDA', 'Insuficientes registros válidos: 500 (mínimo 576)', 0]);
+    expect(r.intervalo).toEqual(['FALLIDA', 'Intervalo predominante NO es de 15 min. Registros: 700', 0]);
+    expect(r.columnas).toEqual(['ADVERTENCIA', 'Número de columnas incorrecto: 73 (se esperan 74)', 0]);
+    expect(r.saltos).toEqual(['ADVERTENCIA', 'Registros OK (700) pero 2 intervalo(s) fuera de 15 min', 0]);
+    expect(r.monoSinV1).toEqual(['FALLIDA', 'Monofásico sin tensión en V1(0%)', 'N/D']);
+    expect(r.monoConV2).toEqual(['FALLIDA', 'Monofásico con tensión en V2(100%) o V3(0%)', 0]);
+    expect(r.alim).toEqual(['FALLIDA', 'Insuficientes registros válidos: 0 (mínimo 576)', 'ERROR ALIM.']);
+    expect(r.sinDatos[0]).toBe('ADVERTENCIA');
+    expect(r.perturb).toEqual(['VALIDA', 'Registros: 1100 | Trifásico | Fases OK', 0]);
+    expect(r.vacio).toEqual(['FALLIDA', 'Archivo TXT vacío o sin datos', 'N/D']);
+    expect(r.resultadoFT).toEqual({ medicion: 'valida', febNoPer: 10, tolerancia: 'fuera' });
+    expect(r.resultadoOk).toEqual({ medicion: 'valida', febNoPer: 0, tolerancia: 'dentro' });
+    expect(r.resultadoRevisar).toEqual({ medicion: 'revisar' });
+  });
+
+  test('resultados: subir los TXT llena los resultados y los FT pasan a seguimiento', async ({ page }) => {
+    const datos = conCampana();
+    const cs = datos.campanas['2026-10_CPT-MT'].casos;
+    Object.assign(cs.CR1O2026201, { alimentador: 'AL013-13200', urbanidad: 'U', mult: { configuracion: 'Estrella' } });
+    Object.assign(cs.CR1O2026202, { alimentador: 'AL013-13200', urbanidad: 'U', mult: { configuracion: 'Estrella' } });
+    app = await abrirApp(page, { datos });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('resultados'); });
+    const archivo = (name, texto) => ({ name, mimeType: 'text/plain', buffer: Buffer.from(texto) });
+    await page.locator('label', { hasText: 'Analizar TXT' }).locator('input').setInputFiles([
+      archivo('CR1O2026201.txt', hacerTXT({ v: i => (i % 10 === 0 ? [14500, 13200, 13200] : [13200, 13200, 13200]) })),
+      archivo('CR1O2026202.txt', hacerTXT({ columnas: 73 })),
+      archivo('CR1O2026999.txt', hacerTXT()),
+    ]);
+    const modal = page.locator('.modal');
+    await expect(modal).toContainText('Análisis de 2 mediciones');
+    await expect(modal).toContainText('1 fuera de tolerancia');
+    await expect(modal).toContainText('Sin caso con ese código (no se guardan): CR1O2026999.txt');
+    await expect(modal.locator('tr', { hasText: 'CR1O2026201' })).toContainText('10.00 %');
+    await expect(modal.locator('tr', { hasText: 'CR1O2026202' })).toContainText('POR REVISAR');
+    await page.getByRole('button', { name: 'Guardar resultados' }).click();
+    const [op, ruta, guardado] = (await app.escrituras()).at(-1);
+    expect([op, ruta]).toEqual(['update', 'campanas/2026-10_CPT-MT']);
+    expect(guardado['casos/CR1O2026201/resultado']).toMatchObject({ medicion: 'valida', febNoPer: 10, tolerancia: 'fuera', origen: 'txt', por: 'David García', analisis: { estado: 'VALIDA', registros: 700 } });
+    expect(guardado['casos/CR1O2026202/resultado']).toMatchObject({ medicion: 'revisar', analisis: { estado: 'ADVERTENCIA' } });
+    await expect(page.locator('.tabla-casos tr', { hasText: 'CR1O2026202' })).toContainText('Por revisar');
+    await expect(page.locator('.tabla-casos tr', { hasText: 'CR1O2026202' })).toContainText('Número de columnas incorrecto');
+
+    // Recalcular con los datos actuales (sin volver a subir los TXT)
+    await page.getByRole('button', { name: 'Recalcular con los datos actuales' }).click();
+    await expect(modal).toContainText('Análisis de 2 mediciones');
+    await app.ejecutar(() => cerrarAnalisis());
+    await nav(page, 'Seguimiento FT');
+    await expect(page.locator('.card', { hasText: 'CR1O2026201' })).toContainText('Falta avisar a DELSUR');
+  });
 });
