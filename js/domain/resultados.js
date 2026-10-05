@@ -55,13 +55,43 @@ export function resumenResultados(filas) {
   return n;
 }
 
-// Excel del cuadro resumen: todos los casos del mes, también los que no se midieron
-export function filasCuadroResumen(filas) {
-  const out = [['Código SIGET', 'NC', 'Nombre', 'Situación', 'Medición', 'Tolerancia', 'FebNoPer (%)', 'Observaciones']];
+// Estado de cada caso en el cuadro resumen (mismos textos y colores que el cuadro que entrega el equipo).
+// CR: DT / FT / Fallida / No instalada. DA y DF: Válida / Fallida / No instalada. '' = todavía sin resultado.
+export const ESTADOS_CUADRO = {
+  DT: { fill: '00B050' }, FT: { fill: 'FF0000' }, 'Válida': { fill: '00B050' },
+  Fallida: { fill: 'FFFF00' }, 'No instalada': { font: 'FF0000' },
+};
+export function estadoCuadro(f) {
+  const r = f.resultado;
+  if (r.medicion === 'valida') return f.caso.tipo === 'CR' ? (r.tolerancia === 'fuera' ? 'FT' : 'DT') : 'Válida';
+  if (r.medicion === 'fallida') return 'Fallida';
+  if (r.medicion === 'revisar') return '';
+  // No instalada: no se va a medir (acceso denegado, cliente de baja…) o se marcó como no medida.
+  // Lo programado que aún no tiene resultado queda en blanco.
+  if (r.medicion === 'no_medida' || f.situacion.clave === 'sin_medir') return 'No instalada';
+  return '';
+}
+// Comentario: por qué falló o por qué no se instaló
+export function comentarioCuadro(f, estado) {
+  if (estado === 'Fallida') return f.resultado.nota || f.resultado.analisis?.detalle || '';
+  if (estado === 'No instalada') return f.resultado.nota || (f.situacion.clave === 'sin_medir' ? f.situacion.texto : '');
+  return '';
+}
+
+// Hasta qué medición se sube al sistema: en orden de código, se cuentan los CR con medición válida
+// (DT o FT) hasta completar los obligatorios. Devuelve { codigo, contados, faltan }.
+export function corteSubida(filas, obligatorios) {
+  let n = 0;
   for (const f of filas) {
-    const r = f.resultado;
-    out.push([f.caso.codigo || f.caso.codigoEnte, /^\d+$/.test(f.caso.nc) ? Number(f.caso.nc) : f.caso.nc, f.caso.nombre || '', f.situacion.texto,
-      MEDICION[r.medicion] || (f.situacion.clave === 'sin_medir' ? 'No medida' : ''), TOLERANCIA[r.tolerancia] || '', r.febNoPer === '' ? '' : Number(r.febNoPer), r.nota || r.analisis?.detalle || '']);
+    if (f.caso.tipo !== 'CR' || f.resultado.medicion !== 'valida') continue;
+    n++;
+    if (n === obligatorios) return { codigo: f.caso.codigo || f.caso.codigoEnte, contados: n, faltan: 0 };
   }
-  return out;
+  return { codigo: null, contados: n, faltan: obligatorios - n };
+}
+
+// Filas del cuadro resumen: CR por un lado y DA/DF por otro
+export function cuadroResumen(filas) {
+  const fila = f => { const estado = estadoCuadro(f); return { codigo: f.caso.codigo || f.caso.codigoEnte, estado, comentario: comentarioCuadro(f, estado) }; };
+  return { cr: filas.filter(f => f.caso.tipo === 'CR').map(fila), otros: filas.filter(f => f.caso.tipo !== 'CR').map(fila) };
 }

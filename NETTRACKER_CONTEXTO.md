@@ -235,6 +235,13 @@ En el detalle de la campaña:
 - Resumen de válidas, fallidas, FT y sin resultado; en CPT MT, CR válidas contra 38.
 - Exportar cuadro resumen con todos los casos del mes (también los no medidos). Formato provisional hasta tener uno ya entregado.
 
+## Excel que genera la app
+
+- Librería: **xlsx-js-style** (SheetJS con estilos) desde jsDelivr; lee y escribe igual que SheetJS y además guarda formato. En las pruebas se carga desde `node_modules/xlsx-js-style`.
+- `js/excel.js`: `darEstilo(ws, { encabezado })` pinta la fila de encabezado en petróleo con letra blanca, bordes finos, filas alternadas y filtro; las filas de arriba del encabezado se tratan como título. `hojaConEstilo(filas, { encabezado, anchos })` es el atajo. Se usa en listado, multiplicadores (DRANETZ con 2 decimales), fechas (encabezado en la fila 3), análisis, validaciones y reporte mensual.
+- **Cuadro resumen** (mismo formato que el cuadro que entrega el equipo, p. ej. agosto 2026): CR en A:C (CASO, ESTADO, COMENTARIO) con ESTADO DT (verde 00B050), FT (rojo), Fallida (amarillo) o No instalada (letra roja); DA/DF en H:J con Válida / Fallida / No instalada. Conteos con fórmulas COUNTIFS (DT, FT, VÁLIDAS; Fallida, No instalada, NO VÁLIDAS; y Válidas/Fallida/No instalada/TOTAL de DA/DF). En MT: "Número de mediciones a subir" 38 y "Número de caso hasta que se cargará" con fórmula INDEX/MATCH sobre la columna K, que acumula las DT/FT (igual que su Excel). No instalada = no se va a medir (acceso denegado, cliente de baja…) o no medida; lo programado sin resultado queda en blanco. Los colores son fijos (la librería no escribe formato condicional): si cambian un estado a mano, los conteos se recalculan pero el color no.
+- **Hasta qué medición se sube** (`corteSubida`, solo CPT MT): en orden de código se cuentan los CR con medición válida (DT o FT) hasta llegar a los 38 obligatorios; ese CR es el último que se sube. Se muestra en el Excel (línea 2 y borde grueso en la celda) y en Resultados (en la barra de los 38 CR, etiqueta "Hasta aquí se sube" en la fila y los CR siguientes atenuados con "No se sube").
+
 ## Análisis de las mediciones (macro CalidadEnergia integrada)
 `js/domain/analisis.js` reproduce `CargarMediciones` de `CalidadEnergia_v1.bas`:
 - Tipo por prefijo: CR → regulatorio (15 min, 74 columnas, mínimo 576 registros válidos); DA/DF → perturbación (10 min, 197 columnas, mínimo 1008). En DA/DF el tipo de instalación sale del dígito 11 del código (1 mono, 2 bi, 3 tri).

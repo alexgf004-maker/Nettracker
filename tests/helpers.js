@@ -34,11 +34,11 @@ async function abrirApp(page, { usuario = 'David García', datos = fixture, exce
   // Leaflet falso: cualquier llamada (L.map(...).setView(...), etc.) devuelve el mismo objeto
   await page.route(/leaflet.*\.js$/, route => route.fulfill({ contentType: 'text/javascript',
     body: 'window.L = new Proxy(function () {}, { get: (t, k) => (k === "then" ? undefined : window.L), apply: () => window.L });' }));
-  await page.route(/cdnjs\.cloudflare\.com|fonts\.(googleapis|gstatic)\.com|unpkg\.com\/.*\.css|tile\.openstreetmap/, route => route.fulfill({ body: '' }));
-  // excel: true carga la librería de Excel real (SheetJS desde node_modules) para leer y generar archivos
+  await page.route(/cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net|fonts\.(googleapis|gstatic)\.com|unpkg\.com\/.*\.css|tile\.openstreetmap/, route => route.fulfill({ body: '' }));
+  // excel: true carga la librería de Excel real (xlsx-js-style, SheetJS con estilos, desde node_modules) para leer y generar archivos
   // (va después del bloqueo general porque Playwright aplica primero la última ruta registrada)
-  if (excel) await page.route(/cdnjs\.cloudflare\.com\/.*xlsx.*\.js$/, route =>
-    route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(require.resolve('xlsx/dist/xlsx.full.min.js')) }));
+  if (excel) await page.route(/cdn\.jsdelivr\.net\/npm\/xlsx-js-style.*\.js$/, route =>
+    route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(require.resolve('xlsx-js-style/dist/xlsx.bundle.js')) }));
   await page.clock.setFixedTime(HOY);
 
   await page.goto('/');

@@ -7,6 +7,7 @@ import { filasMultiplicadores, historicoDe, leerMultiplicadoresExcel, planificar
 import { leerArchivo } from './campanas.js';
 import { hoyLocal, MESES } from '../domain/trabajo.js';
 import { render } from '../views/render.js';
+import { hojaConEstilo } from '../excel.js';
 
 export const CAMPOS_MULT = ['estado', 'configuracion', 'tap', 'tensionTap', 'tensionBT', 'xMedidor', 'testblock', 'vab', 'vbc', 'vac', 'notas'];
 const caso = () => state.campanas?.[state.multEdit?.clave]?.casos?.[state.multEdit?.id];
@@ -55,8 +56,9 @@ export function exportarMultiplicadores(clave) {
   const g = state.campanas?.[clave];
   const casos = ordenarCasos(Object.values(g?.casos || {}));
   if (!casos.length) return;
-  const ws = XLSX.utils.aoa_to_sheet(filasMultiplicadores(casos));
-  ws['!cols'] = Array(24).fill({ wch: 16 });
+  const ws = hojaConEstilo(filasMultiplicadores(casos), { anchos: Array(24).fill(16) });
+  // DRANETZ y proyecciones con 2 decimales (el valor completo queda en la celda)
+  Object.keys(ws).filter(k => /^[JUVW]\d+$/.test(k) && typeof ws[k].v === 'number').forEach(k => { ws[k].z = '0.00'; });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Multiplicadores');
   XLSX.writeFile(wb, `Multiplicadores_${MESES[g.mes - 1]}_${g.anio}_${g.area.replace(/\s+/g, '_')}.xlsx`);

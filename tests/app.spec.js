@@ -1160,13 +1160,33 @@ test.describe('Precampaña', () => {
 
     const descarga = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Exportar cuadro resumen' }).click();
-    const filas = XLSX.utils.sheet_to_json(XLSX.readFile(await (await descarga).path()).Sheets['Cuadro resumen'], { header: 1, defval: '' });
-    expect(filas[0]).toEqual(['Código SIGET', 'NC', 'Nombre', 'Situación', 'Medición', 'Tolerancia', 'FebNoPer (%)', 'Observaciones']);
-    expect(filas.slice(1).map(f => [f[0], f[3], f[4], f[5], f[6]])).toEqual([
-      ['CR1O2026201', 'Descargado', 'Válida', '', ''],
-      ['CR1O2026202', 'Sin instalar', 'Válida', 'Fuera de tolerancia (FT)', 7.5],
-      ['DA1O2026011O00', 'Acceso denegado', 'No medida', '', ''],
-    ]);
+    const hoja = XLSX.readFile(await (await descarga).path(), { cellStyles: true, cellFormula: true }).Sheets['Cuadro resumen'];
+    const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: '', blankrows: true });
+    // Mismo formato que el cuadro del equipo: CR a la izquierda y DA/DF a la derecha
+    expect(filas[0].slice(0, 3)).toEqual(['CASO', 'ESTADO', 'COMENTARIO']);
+    expect(filas[0].slice(7, 10)).toEqual(['CASO', 'ESTADO', 'COMENTARIO']);
+    expect(filas.slice(1, 3).map(f => f.slice(0, 2))).toEqual([['CR1O2026201', 'DT'], ['CR1O2026202', 'FT']]);
+    expect(filas[1].slice(7, 10)).toEqual(['DA1O2026011O00', 'No instalada', 'Acceso denegado']);
+    expect([hoja.B2.s.fgColor.rgb, hoja.B3.s.fgColor.rgb]).toEqual(['00B050', 'FF0000']); // DT verde, FT rojo
+    // Conteos con fórmula (se recalculan si editan un estado)
+    expect([hoja.E2.v, hoja.F2.v, hoja.F2.f, hoja.E4.v, hoja.F4.v]).toEqual(['DT', 1, 'COUNTIFS(B2:B3,"DT")', 'VÁLIDAS', 2]);
+    // Caso hasta el que se carga: todavía faltan 36 CR válidas para llegar a 38
+    expect([hoja.E11.v, hoja.G11.v, hoja.E12.v, hoja.F12.v]).toEqual(['Número de mediciones a subir', 38, 'Número de caso hasta que se cargará', 'Faltan 36']);
+    expect(hoja.F12.f).toContain('MATCH(G11,K2:K3,0)');
+  });
+
+  test('hasta qué medición se sube: se cuentan los CR válidos en orden de código hasta 38', async ({ page }) => {
+    app = await abrirApp(page);
+    const r = await page.evaluate(async () => {
+      const { corteSubida } = await import('/js/domain/resultados.js');
+      const fila = (codigo, tipo, medicion) => ({ caso: { codigo, tipo }, resultado: { medicion } });
+      const filas = [];
+      for (let i = 1; i <= 42; i++) filas.push(fila('CR' + String(i).padStart(3, '0'), 'CR', i === 5 ? 'fallida' : 'valida'));
+      filas.splice(3, 0, fila('DA001', 'DA', 'valida')); // los DA no cuentan
+      return [corteSubida(filas, 38), corteSubida(filas.slice(0, 10), 38)];
+    });
+    expect(r[0]).toEqual({ codigo: 'CR039', contados: 38, faltan: 0 }); // CR005 fallida no cuenta
+    expect(r[1]).toEqual({ codigo: null, contados: 8, faltan: 30 });
   });
 
   test('seguimiento FT: plazo de 90 días desde la instalación, aviso, bitácora y cierre con remedición', async ({ page }) => {
