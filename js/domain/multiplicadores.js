@@ -1,5 +1,7 @@
 // Multiplicadores: cómo se programa el analizador en cada caso, según lo que se vio en campo.
 // Mismas opciones y fórmulas que la hoja "Multiplicadores" del Excel del equipo. Funciones puras.
+import { normalizar, normalizarNC } from './listados.js';
+import { buscarCasoImportado } from './trabajo.js';
 
 export const ESTADOS = ['Realizado', 'Pendiente de validar', 'Validado con histórico', 'Cliente de baja', 'Revisar', 'Validado con usuario', 'Acceso denegado'];
 // En el Excel, "Conexión no posible" solo aparece en las filas de flicker (DF)
@@ -83,4 +85,70 @@ export function filasMultiplicadores(casos) {
       n(m.vab), n(m.vbc), n(m.vac), r.proyeccion.ab ?? '-', r.proyeccion.bc ?? '-', r.proyeccion.ac ?? '-', c.urbanidad || '']);
   }
   return filas;
+}
+
+// ── IMPORTAR LA HOJA "Multiplicadores" DE UN EXCEL YA HECHO ──
+
+const NUMERICOS = ['tensionTap', 'tensionBT', 'xMedidor', 'vab', 'vbc', 'vac'];
+const enLista = (v, lista) => lista.find(x => normalizar(x) === normalizar(v)) || '';
+
+// filas: hoja con encabezados ESTADO, Código SIGET, NC, Configuración, Posición de TAP, ...
+// Las columnas calculadas (ECAMEC, DRANETZ, TI, proyecciones) no se leen: la app las calcula.
+export function leerMultiplicadoresExcel(filas) {
+  let h = -1;
+  for (let i = 0; i < Math.min(filas.length, 20) && h < 0; i++) {
+    const enc = (filas[i] || []).map(normalizar);
+    if (enc.includes('ESTADO') && enc.includes('CODIGO SIGET')) h = i;
+  }
+  if (h < 0) return { error: 'No se encontró la hoja de multiplicadores (columnas "ESTADO" y "Código SIGET")' };
+  const enc = filas[h].map(normalizar);
+  const busca = inicio => enc.findIndex(e => e.startsWith(inicio));
+  const proy = busca('PROYECCION PRIMARIO AB');
+  const col = {
+    estado: enc.indexOf('ESTADO'), codigo: enc.indexOf('CODIGO SIGET'), nc: enc.indexOf('NC'), configuracion: busca('CONFIGURACION'),
+    tap: busca('POSICION DE TAP'), tensionTap: busca('NIVEL DE TENSION SEGUN TAP'), tensionBT: busca('NIVEL DE BAJA TENSION'),
+    xMedidor: busca('X MEDIDOR'), testblock: busca('TESTBLOCK'),
+    // Vab, Vbc y Vac van justo antes de las proyecciones (en el Excel del equipo a veces sin título)
+    vab: enc.indexOf('VAB') >= 0 ? enc.indexOf('VAB') : (proy >= 3 ? proy - 3 : -1),
+    vbc: enc.indexOf('VBC') >= 0 ? enc.indexOf('VBC') : (proy >= 2 ? proy - 2 : -1),
+    vac: enc.indexOf('VAC') >= 0 ? enc.indexOf('VAC') : (proy >= 1 ? proy - 1 : -1),
+  };
+  const filasOk = []; const estadosRaros = new Set();
+  for (const f of filas.slice(h + 1)) {
+    const codigo = String(f?.[col.codigo] ?? '').replace(/[[\]#\s]/g, '').toUpperCase();
+    if (!/^(CR|DA|DF)/.test(codigo)) continue;
+    const celda = k => (col[k] >= 0 ? f[col[k]] : '');
+    const tipo = codigo.slice(0, 2);
+    const mult = {};
+    const estadoTxt = String(celda('estado') ?? '').trim();
+    if (estadoTxt) { mult.estado = enLista(estadoTxt, estadosDe(tipo)) || estadoTxt; if (!enLista(estadoTxt, estadosDe(tipo))) estadosRaros.add(estadoTxt); }
+    const conf = enLista(celda('configuracion'), CONFIGURACIONES); if (conf) mult.configuracion = conf;
+    const tap = String(celda('tap') ?? '').trim(); if (tap) mult.tap = enLista(tap, POSICIONES_TAP) || tap;
+    const tb = normalizar(celda('testblock')); if (tb === 'SI' || tb === 'NO') mult.testblock = tb === 'SI' ? 'Sí' : 'No';
+    // Vab/Vbc/Vac en 0 es la celda vacía del Excel
+    NUMERICOS.forEach(k => { const v = celda(k); const n = num(typeof v === 'string' ? v.replace(',', '.') : v); if (n !== null && !(k.startsWith('v') && n === 0)) mult[k] = n; });
+    if (!Object.keys(mult).length) continue; // fila sin nada que importar
+    filasOk.push({ codigo, nc: normalizarNC(celda('nc')), mult });
+  }
+  return { filas: filasOk, estadosRaros: [...estadosRaros] };
+}
+
+// Cruza las filas con los casos guardados (mismo criterio que la programación)
+export function planificarMultiplicadores(filas, campanas) {
+  const porCampana = {}; const sinCaso = [];
+  for (const p of filas) {
+    const hit = buscarCasoImportado(p, campanas);
+    if (!hit) { sinCaso.push(p); continue; }
+    const actual = hit.caso.codigo || hit.caso.codigoEnte;
+    (porCampana[hit.clave] ??= []).push({
+      id: hit.id, codigo: actual, mult: p.mult, reemplaza: !!hit.caso.mult?.estado || !!hit.caso.mult?.tensionTap, notas: hit.caso.mult?.notas,
+      codigoNuevo: p.codigo !== actual && !hit.caso.manual?.codigo ? p.codigo : null,
+    });
+  }
+  const planes = Object.entries(porCampana).map(([clave, asignaciones]) => {
+    const ids = new Set(asignaciones.map(a => a.id));
+    const faltan = Object.entries(campanas[clave].casos || {}).filter(([id]) => !ids.has(id)).map(([id, c]) => c.codigo || c.codigoEnte || id).sort();
+    return { clave, asignaciones, faltan };
+  });
+  return { planes: planes.sort((a, b) => a.clave.localeCompare(b.clave)), sinCaso };
 }

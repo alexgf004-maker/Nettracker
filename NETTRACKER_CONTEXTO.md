@@ -204,6 +204,7 @@ En el detalle de la campaña:
 - Resumen: listos para medir (Realizado, Validado con histórico, Validado con usuario), por resolver (Pendiente de validar, Revisar, Acceso denegado, sin estado) y no se medirán (Cliente de baja, Conexión no posible). En CPT MT muestra los CR listos contra los 38 obligatorios.
 - Histórico: si el mismo NC tuvo multiplicador en una campaña anterior registrada en la app, se ofrece "Usar", que copia la configuración y deja el estado "Validado con histórico".
 - Exportar: Excel con las columnas de la hoja Multiplicadores (las de fechas, equipo y elementos quedan vacías hasta Fechas 1, 2 y 3).
+- Importar desde Excel: lee la hoja "Multiplicadores" de un Excel ya hecho (encabezados ESTADO + Código SIGET). Toma estado, configuración, posición de TAP, tensión según TAP, BT, X medidor, testblock y Vab/Vbc/Vac (0 = vacío); lo calculado (ECAMEC, DRANETZ, TI, proyecciones) lo recalcula la app. Cruza con los casos igual que la programación (`buscarCasoImportado` en trabajo.js: código y, si no, NC + tipo; aplica el código corregido de DA/DF si no se corrigió a mano). Vista previa con estados, reemplazos, códigos corregidos y casos sin datos; al guardar reemplaza `mult` (conserva las notas) con `origen: 'excel'`. Filas sin ningún dato se ignoran.
 
 **Fechas 1, 2 y 3** (pestaña de la campaña):
 - Cada caso se asigna a una fecha (`casos/{id}/programa = { fecha, equipo }`) y a un equipo del inventario que no esté instalado, fuera de servicio ni en mantenimiento.
