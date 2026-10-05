@@ -2,6 +2,7 @@
 // Mismas opciones y fórmulas que la hoja "Multiplicadores" del Excel del equipo. Funciones puras.
 import { normalizar, normalizarNC } from './listados.js';
 import { buscarCasoImportado } from './trabajo.js';
+import { fechaExcel } from './fechas.js';
 
 export const ESTADOS = ['Realizado', 'Pendiente de validar', 'Validado con histórico', 'Cliente de baja', 'Revisar', 'Validado con usuario', 'Acceso denegado'];
 // En el Excel, "Conexión no posible" solo aparece en las filas de flicker (DF)
@@ -108,6 +109,7 @@ export function leerMultiplicadoresExcel(filas) {
     estado: enc.indexOf('ESTADO'), codigo: enc.indexOf('CODIGO SIGET'), nc: enc.indexOf('NC'), configuracion: busca('CONFIGURACION'),
     tap: busca('POSICION DE TAP'), tensionTap: busca('NIVEL DE TENSION SEGUN TAP'), tensionBT: busca('NIVEL DE BAJA TENSION'),
     xMedidor: busca('X MEDIDOR'), testblock: busca('TESTBLOCK'),
+    instalacion: busca('FECHA DE INSTALACION'), retiro: busca('FECHA DE RETIRO'), equipo: enc.indexOf('EQUIPO'),
     // Vab, Vbc y Vac van justo antes de las proyecciones (en el Excel del equipo a veces sin título)
     vab: enc.indexOf('VAB') >= 0 ? enc.indexOf('VAB') : (proy >= 3 ? proy - 3 : -1),
     vbc: enc.indexOf('VBC') >= 0 ? enc.indexOf('VBC') : (proy >= 2 ? proy - 2 : -1),
@@ -127,8 +129,11 @@ export function leerMultiplicadoresExcel(filas) {
     const tb = normalizar(celda('testblock')); if (tb === 'SI' || tb === 'NO') mult.testblock = tb === 'SI' ? 'Sí' : 'No';
     // Vab/Vbc/Vac en 0 es la celda vacía del Excel
     NUMERICOS.forEach(k => { const v = celda(k); const n = num(typeof v === 'string' ? v.replace(',', '.') : v); if (n !== null && !(k.startsWith('v') && n === 0)) mult[k] = n; });
-    if (!Object.keys(mult).length) continue; // fila sin nada que importar
-    filasOk.push({ codigo, nc: normalizarNC(celda('nc')), mult });
+    // Programación del caso: día de instalación, retiro y equipo (las hojas Fecha del Excel salen de aquí)
+    const instalacion = fechaExcel(celda('instalacion')); const retiro = fechaExcel(celda('retiro'));
+    const equipo = String(celda('equipo') ?? '').trim().replace(/^0$/, '');
+    if (!Object.keys(mult).length && !instalacion && !equipo) continue; // fila sin nada que importar
+    filasOk.push({ codigo, nc: normalizarNC(celda('nc')), mult, instalacion, retiro, equipo });
   }
   return { filas: filasOk, estadosRaros: [...estadosRaros] };
 }
@@ -141,14 +146,21 @@ export function planificarMultiplicadores(filas, campanas) {
     if (!hit) { sinCaso.push(p); continue; }
     const actual = hit.caso.codigo || hit.caso.codigoEnte;
     (porCampana[hit.clave] ??= []).push({
-      id: hit.id, codigo: actual, mult: p.mult, reemplaza: !!hit.caso.mult?.estado || !!hit.caso.mult?.tensionTap, notas: hit.caso.mult?.notas,
+      id: hit.id, codigo: actual, mult: p.mult, instalacion: p.instalacion, retiro: p.retiro, equipo: p.equipo, reemplaza: !!hit.caso.mult?.estado || !!hit.caso.mult?.tensionTap, notas: hit.caso.mult?.notas,
       codigoNuevo: p.codigo !== actual && !hit.caso.manual?.codigo ? p.codigo : null,
     });
   }
   const planes = Object.entries(porCampana).map(([clave, asignaciones]) => {
     const ids = new Set(asignaciones.map(a => a.id));
     const faltan = Object.entries(campanas[clave].casos || {}).filter(([id]) => !ids.has(id)).map(([id, c]) => c.codigo || c.codigoEnte || id).sort();
-    return { clave, asignaciones, faltan };
+    // Cada día de instalación es una Fecha (1, 2, 3…) en orden, igual que al importar la programación.
+    // El retiro de la Fecha se toma si viene en el archivo.
+    const dias = [...new Set(asignaciones.map(a => a.instalacion).filter(Boolean))].sort().map((instalacion, i) => {
+      const retiros = [...new Set(asignaciones.filter(a => a.instalacion === instalacion && a.retiro).map(a => a.retiro))].sort();
+      return { n: String(i + 1), instalacion, retiro: retiros.at(-1) || '', casos: asignaciones.filter(a => a.instalacion === instalacion).length };
+    });
+    asignaciones.forEach(a => { a.fecha = dias.find(d => d.instalacion === a.instalacion)?.n || ''; });
+    return { clave, asignaciones, faltan, dias };
   });
   return { planes: planes.sort((a, b) => a.clave.localeCompare(b.clave)), sinCaso };
 }
