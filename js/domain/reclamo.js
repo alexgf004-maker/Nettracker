@@ -129,8 +129,9 @@ export function resumenTension(U, nFases, nominal, tol) {
   return { total, invalidos, validos, ft, febNoPer, estado, limSup, limInf };
 }
 
-// Corriente máxima del trafo para la línea de la gráfica (macro: KVA × 1000 / V L-L)
-export const corrienteMaxTrafo = (kva, vll) => (kva > 0 && vll > 0 ? (kva * 1000) / vll : null);
+// Corriente máxima del trafo para la línea de la gráfica. Trifásico: kVA × 1000 / (√3 × V L-L)
+// (corregido; la macro no dividía entre √3). Monofásico y bifásico: kVA × 1000 / V L-L.
+export const corrienteMaxTrafo = (kva, vll, fases = 3) => (kva > 0 && vll > 0 ? (kva * 1000) / ((fases === 3 ? Math.sqrt(3) : 1) * vll) : null);
 
 // STOTAL viene en VA: la macro lo pasa a kVA
 export const cargabilidadKVA = S => (S ? S.map(x => (x === null ? null : x / 1000)) : null);
@@ -147,7 +148,7 @@ export function analizarTension(d, params) {
     U: { v: est(d.U, 'v'), max: est(d.U, 'max'), min: est(d.U, 'min') },
     I: { v: est(d.I, 'v'), max: est(d.I, 'max') },
     pstP95: Object.fromEntries(fases.filter(p => d.PST[p]).map(p => [p, percentil(d.PST[p], 0.95)])),
-    iMaxTrafo: corrienteMaxTrafo(params.kva, params.vll),
+    iMaxTrafo: corrienteMaxTrafo(params.kva, params.vll, params.fases),
     S, carga: S ? estadisticas(S) : null,
   };
 }

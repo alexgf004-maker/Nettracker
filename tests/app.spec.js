@@ -1473,7 +1473,7 @@ test.describe('Análisis de reclamos', () => {
     expect(r.carga.max).toBe(400); // STOTAL en VA → kVA
     expect(r.resumen).toMatchObject({ total: 144, invalidos: 0, validos: 144, ft: 10, estado: 'FUERA DE TOLERANCIA' });
     expect(r.resumen.febNoPer).toBeCloseTo(10 / 144, 6);
-    expect(r.iTrafo).toBeCloseTo(100 * 1000 / 240, 6); // KVA × 1000 / V L-L, como la macro
+    expect(r.iTrafo).toBeCloseTo(100 * 1000 / (Math.sqrt(3) * 240), 6); // trifásico: kVA × 1000 / (√3 × V L-L)
     expect(r.pst['1']).toBeCloseTo(0.5, 6);
     expect(r.n).toBe(144);
     expect(r.h5['1']).toMatchObject({ exc: 15, cumple: false });
