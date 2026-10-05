@@ -111,7 +111,13 @@ export function leerControlPuntos(filas) {
     tipoInstalacion: enc.indexOf('TIPO DE INSTALACION'), nivel: enc.indexOf('NIVEL DE TENSION'),
   };
   const datos = {}; const porCodigo = {};
+  let empezo = false;
   for (const f of filas.slice(h + 1)) {
+    // Al terminar la tabla principal el ente pega otras (p. ej. "Usuarios con cambios o de baja", con el NC anterior):
+    // se deja de leer en la primera fila vacía
+    const vacia = !f || f.every(v => v === '' || v === null || v === undefined);
+    if (vacia) { if (empezo) break; continue; }
+    empezo = true;
     const nc = normalizarNC(f?.[col.nc]);
     if (!/^\d+$/.test(nc)) continue;
     // Al final del archivo suele haber otras tablas pegadas: solo cuentan las filas con código de caso
@@ -125,7 +131,7 @@ export function leerControlPuntos(filas) {
     Object.keys(d).forEach(k => { if (!d[k]) delete d[k]; });
     if (!Object.keys(d).length) continue;
     datos[nc] = { ...d, ...datos[nc] }; // si el NC se repite (CR y DA), gana la primera fila
-    if (col.codigo >= 0) porCodigo[normalizar(f[col.codigo])] = { ...d, nc };
+    if (col.codigo >= 0) porCodigo[normalizar(f[col.codigo])] ??= { ...d, nc };
   }
   // porCodigo: el ente a veces cambia el usuario de un punto; el código manda y el NC del archivo se informa
   return { datos, porCodigo };

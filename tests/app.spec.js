@@ -851,11 +851,14 @@ test.describe('Precampaña', () => {
     const control = excel('Puntos_Control_TOTAL.xlsx', [
       ['CONF', 'Punto de Control', 'NC', 'Tipo de punto de control', 'Nivel de Tensión', 'Fecha de Colocación', 'Fecha de Retiro', 'Tipo de Instalacion', 'Tipo de Medicion', 'comprobacion bdth', 'TARIFA', 'URBANIDAD', 'CENTROMTBT', 'POTENCIA INSTALADA', 'AL', 'NOMBRE', 'DIRECCION', 'ENERGIA', 'TENSION', 'MEDIDOR', 'FASES'],
       [903857600, 'CR1O2026220', 903857600, 'B', 'MT', '', '', 'MONOFÁSICO', 'MEDICIONES', '', 212, 'R', 'CT3708', 50, 'AL181', 'ISRAEL CALDERON', 'CASERIO BARRIO NUEVO', 137, 13200, 1311583, 'C'],
+      ['', '', '', ''], ['', 'Usuarios con cambios o de baja'], ['', 'Punto de Control', 'IDCLIENTE', 'nombre', 'PERIODO', 'DIRECCION', 'IDCENTRO'],
+      ['', 'CR1O2026220', 500447201, 'ISRAEL CRUZ CALDERON', 45901, 'CASERIO BARRIO NUEVO', 'CT3708'], ['', '', 903857600, 'ISRAEL CALDERON', 46235, 'CASERIO BARRIO NUEVO', 'CT3708'],
     ], 'LISTADO');
     await page.locator('label', { hasText: 'Completar con control de puntos' }).locator('input').setInputFiles(control);
     await expect.poll(async () => (await app.escrituras()).length).toBe(1);
     const escrito = (await app.escrituras())[0][2];
     expect(escrito).toMatchObject({ 'casos/CR1O2026220/ct': 'CT3708', 'casos/CR1O2026220/alimentador': 'AL181-13200', 'casos/CR1O2026220/ncControl': '903857600' });
+    expect(escrito['casos/CR1O2026220/tipoInstalacion']).toBe('MONOFÁSICO'); // la tabla de cambios del final no se lee
     expect(escrito['casos/CR1O2026220/nc']).toBeUndefined(); // el NC del ente no se cambia
     await expect(page.locator('.toast')).toContainText('1 con otro NC en el control de puntos');
     await expect(page.locator('.tabla-casos tr', { hasText: 'CR1O2026220' })).toContainText('Control: 903857600');
