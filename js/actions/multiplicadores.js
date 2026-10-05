@@ -63,7 +63,7 @@ export function exportarMultiplicadores(clave) {
   showToast('Multiplicadores exportados');
 }
 
-// ── IMPORTAR UN EXCEL DE MULTIPLICADORES YA HECHO ──
+// ── IMPORTAR UN EXCEL DE MULTIPLICADORES YA HECHO (también trae las fechas y el equipo de cada caso) ──
 
 export async function importarMultiplicadores(files) {
   if (!files?.length) return;
@@ -91,8 +91,14 @@ export function guardarImportMultiplicadores() {
   const firma = { editadoPor: state.sesionUsuario?.nombre || '', fecha: hoyLocal(), origen: 'excel' };
   imp.planes.forEach(p => {
     const datos = {};
+    p.dias.forEach(d => {
+      datos[`fechas/${d.n}/instalacion`] = d.instalacion;
+      if (d.retiro) datos[`fechas/${d.n}/retiro`] = d.retiro;
+    });
     p.asignaciones.forEach(a => {
-      datos[`casos/${a.id}/mult`] = { ...a.mult, ...(a.notas ? { notas: a.notas } : {}), ...firma };
+      if (Object.keys(a.mult).length) datos[`casos/${a.id}/mult`] = { ...a.mult, ...(a.notas ? { notas: a.notas } : {}), ...firma };
+      if (a.fecha) datos[`casos/${a.id}/programa/fecha`] = a.fecha;
+      if (a.equipo) datos[`casos/${a.id}/programa/equipo`] = a.equipo;
       if (a.codigoNuevo) datos[`casos/${a.id}/codigo`] = a.codigoNuevo;
     });
     update(ref(db, 'campanas/' + p.clave), datos);

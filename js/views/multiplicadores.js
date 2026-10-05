@@ -6,7 +6,7 @@ import {
 } from '../domain/multiplicadores.js';
 import { MESES, nombreCampana } from '../domain/trabajo.js';
 import { state } from '../state.js';
-import { escapeHtml } from '../utils.js';
+import { escapeHtml, fmtDate } from '../utils.js';
 
 const esc = s => escapeHtml(s ?? '');
 const CLASE_GRUPO = { listos: 'tag-verde', por_resolver: 'tag-amarillo', no_se_miden: 'tag-gris' };
@@ -97,6 +97,11 @@ export function renderImportMultModal() {
     p.asignaciones.forEach(a => { const e = a.mult.estado || 'Sin estado'; porEstado[e] = (porEstado[e] || 0) + 1; });
     html += `<div class="panel" style="margin-top:10px"><div class="panel-titulo">${MESES[(g.mes || 1) - 1]} ${g.anio} · ${esc(g.area)} <span class="chip-dato"><b>${p.asignaciones.length}</b> casos</span></div>`;
     html += `<div class="chips-linea">${Object.entries(porEstado).sort((a, b) => b[1] - a[1]).map(([e, n]) => `<span class="chip-dato"><b>${n}</b> ${esc(e)}</span>`).join('')}</div>`;
+    if (p.dias.length) {
+      html += '<div class="filas">' + p.dias.map(d => `<div class="panel-fila"><span>Fecha ${d.n}</span><b>${fmtDate(d.instalacion)}${d.retiro ? ' al ' + fmtDate(d.retiro) : ''} · ${d.casos} ${d.casos === 1 ? 'caso' : 'casos'}</b></div>`).join('') + '</div>';
+      const conEquipo = p.asignaciones.filter(a => a.equipo).length;
+      html += `<div class="page-sub" style="margin:6px 0">${conEquipo} casos con equipo asignado</div>`;
+    }
     const reemplaza = p.asignaciones.filter(a => a.reemplaza);
     if (reemplaza.length) html += `<div class="aviso aviso-amarillo avisos-lista"><i class="ic ic-alerta"></i><div>Ya tenían multiplicador y se reemplaza con el del archivo: ${reemplaza.map(a => esc(a.codigo)).join(', ')}</div></div>`;
     const corregidos = p.asignaciones.filter(a => a.codigoNuevo);

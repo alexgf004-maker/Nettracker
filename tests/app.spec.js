@@ -1006,7 +1006,7 @@ test.describe('Precampaña', () => {
     expect(filas[1].slice(0, 12)).toEqual(['Realizado', 'CR1O2026201', 111, '', 'Estrella', '3', 13200, 240, '13200/240', 55, 80, '400/5']);
   });
 
-  test('multiplicadores: importar un Excel ya hecho con vista previa', async ({ page }) => {
+  test('multiplicadores: importar un Excel ya hecho con sus fechas y equipos, con vista previa', async ({ page }) => {
     const datos = conCampana();
     datos.campanas['2026-10_CPT-MT'].casos.CR1O2026202.mult = { estado: 'Revisar', notas: 'llamar antes' };
     app = await abrirApp(page, { excel: true, datos });
@@ -1018,9 +1018,9 @@ test.describe('Precampaña', () => {
     const archivo = excelLibro('Listado_octubre__2026.xlsx', {
       Listado: [['NC', 'CÓDIGO SIGET', 'NOMBRE'], [111, 'CR1O2026201', 'USUARIO 111']],
       Multiplicadores: [enc,
-        ['Realizado', 'CR1O2026201', 111, 'AL091-23000', 'Delta', 1, 13860, 240, '13860/240', 57.75, 160, '800/5', 'Sí', '', '', '', '', '', '', '', '', 0, 0, 0, 'U'],
-        ['Validado con usuario', 'CR1O2026202', 222, 'AL013', 'Monofásico', 'Tapón', 7620, 240, '7620/240', 31.75, 1, '1/1', 'No', '', '', '', '', '', '', '', '', 0, 0, 0, 'R'],
-        ['Validado con usuario', 'DA1O2026013O00', 222, 'AL013', 'Delta', 'Tapón', 23900, 240, '23900/240', 99.58, 120, '600/5', 'Sí'],
+        ['Realizado', 'CR1O2026201', 111, 'AL091-23000', 'Delta', 1, 13860, 240, '13860/240', 57.75, 160, '800/5', 'Sí', '2026-10-01', '2026-10-09', '1350S2402', '', '', '', '', '', 0, 0, 0, 'U'],
+        ['Validado con usuario', 'CR1O2026202', 222, 'AL013', 'Monofásico', 'Tapón', 7620, 240, '7620/240', 31.75, 1, '1/1', 'No', 46300, '', '1351S2402', '', '', '', '', '', 0, 0, 0, 'R'],
+        ['Validado con usuario', 'DA1O2026013O00', 222, 'AL013', 'Delta', 'Tapón', 23900, 240, '23900/240', 99.58, 120, '600/5', 'Sí', '2026-10-01', '', 0],
         ['Acceso denegado', 'CR1O2026299', 999, '', '', '', '', '', '/', '#DIV/0!', '', '0/5'],
         ['', 'DF1O2026023O00', 333, '', '', '', '', '', '/', '#DIV/0!', '', '0/5'],
       ],
@@ -1031,6 +1031,9 @@ test.describe('Precampaña', () => {
     await expect(modal).toContainText('Ya tenían multiplicador y se reemplaza con el del archivo: CR1O2026202');
     await expect(modal).toContainText('DA1O2026011O00 → DA1O2026013O00');
     await expect(modal).toContainText('1 filas no coinciden con ningún caso importado: CR1O2026299');
+    await expect(modal).toContainText('Fecha 101/10/2026 al 09/10/2026 · 2 casos');
+    await expect(modal).toContainText('Fecha 205/10/2026 · 1 caso');
+    await expect(modal).toContainText('2 casos con equipo asignado');
     await page.getByRole('button', { name: 'Guardar multiplicadores' }).click();
     const [op, ruta, escrito] = (await app.escrituras()).at(-1);
     expect([op, ruta]).toEqual(['update', 'campanas/2026-10_CPT-MT']);
@@ -1039,6 +1042,12 @@ test.describe('Precampaña', () => {
     expect(escrito['casos/CR1O2026202/mult']).toMatchObject({ estado: 'Validado con usuario', tap: 'Tapón', notas: 'llamar antes' });
     expect(escrito['casos/DA1O2026011O00/mult']).toMatchObject({ configuracion: 'Delta', xMedidor: 120 });
     expect(escrito['casos/DA1O2026011O00/codigo']).toBe('DA1O2026013O00');
+    // Fechas: cada día de instalación es una Fecha, con el retiro y el equipo del archivo
+    expect(escrito).toMatchObject({ 'fechas/1/instalacion': '2026-10-01', 'fechas/1/retiro': '2026-10-09', 'fechas/2/instalacion': '2026-10-05',
+      'casos/CR1O2026201/programa/fecha': '1', 'casos/CR1O2026201/programa/equipo': '1350S2402', 'casos/CR1O2026202/programa/fecha': '2',
+      'casos/CR1O2026202/programa/equipo': '1351S2402', 'casos/DA1O2026011O00/programa/fecha': '1' });
+    expect(escrito['fechas/2/retiro']).toBeUndefined();
+    expect(escrito['casos/DA1O2026011O00/programa/equipo']).toBeUndefined();
     await expect(page.locator('.toast')).toContainText('Multiplicadores importados · 3 casos');
   });
 
