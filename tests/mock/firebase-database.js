@@ -6,7 +6,15 @@ const parts = p => p.split('/').filter(Boolean);
 const getAt = p => parts(p).reduce((o, k) => (o == null ? undefined : o[k]), T);
 const setAt = (p, v) => { const ks = parts(p); let o = T; ks.slice(0, -1).forEach(k => { if (o[k] == null || typeof o[k] !== 'object') o[k] = {}; o = o[k]; }); if (v === null || v === undefined) delete o[ks.at(-1)]; else o[ks.at(-1)] = JSON.parse(JSON.stringify(v)); };
 const snap = (key, v) => ({ key, val: () => (v === undefined ? null : JSON.parse(JSON.stringify(v))), exists: () => v !== undefined && v !== null,
-  forEach: cb => { if (v && typeof v === 'object') Object.keys(v).forEach(k => cb(snap(k, v[k]))); } });
+  // Firebase cancela el recorrido cuando el callback devuelve un valor verdadero.
+  forEach: cb => {
+    if (v && typeof v === 'object') {
+      for (const k of Object.keys(v).sort()) {
+        if (cb(snap(k, v[k]))) return true;
+      }
+    }
+    return false;
+  } });
 const fire = () => setTimeout(() => listeners.forEach(l => l.cb(snap(parts(l.path).at(-1), getAt(l.path)))), 0);
 export function getDatabase() { return {}; }
 export function ref(db, path) { return { path: path || '' }; }

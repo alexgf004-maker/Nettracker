@@ -19,6 +19,15 @@ npm test
 
 GitHub también las corre solo en cada pull request y en cada push a `main` (pestaña **Actions**). Si alguna falla, el PR se marca en rojo.
 
+Para comprobar la importación y sincronización sin navegador:
+```
+npm run test:sync
+npm run test:import
+npm run test:pre-campaign
+```
+
+`test:sync` ejecuta los módulos reales con una base en memoria: importa 54 casos de 72 filas, comprueba los 54 expedientes en la pantalla de campaña y verifica repetición sin duplicados y recarga. El mock respeta la cancelación de `DataSnapshot.forEach` para detectar lecturas que se detengan en el primer registro. Estas pruebas también se ejecutan en GitHub antes de las pruebas de navegador.
+
 ## Archivos
 
 | Archivo | Qué es |

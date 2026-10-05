@@ -182,6 +182,46 @@ test('abre la precampaña mensual y guarda la recepción estimada del contratist
   expect(app.errores).toEqual([]);
 });
 
+test('muestra los 54 casos importados y los conserva al volver a abrir', async ({ page }) => {
+  await page.addInitScript(() => {
+    const row = (code, contract) => [code, contract, 'Cliente sintético', 'Dirección sintética'];
+    const rows = Array.from({ length: 48 }, (_, index) => row(`CR1O2026${201 + index}`, `NC-MT-${index + 1}`));
+    for (const type of ['DA', 'DF']) {
+      for (let index = 0; index < 12; index++) {
+        rows.push(row(`${type}1O2026${String(index + 1).padStart(2, '0')}1O00`,
+          index < 3 ? `NC-MT-${index + 1}` : `NC-BT-${index + 1}`));
+      }
+    }
+    window.XLSX = {
+      read: () => ({ SheetNames: ['DetaSorteoCPT'], Sheets: { DetaSorteoCPT: {} } }),
+      utils: { sheet_to_json: () => [['Número SIGET', 'Id del Usuario', 'Nombre del Usuario', 'Dirección'], ...rows] },
+    };
+  });
+  const app = await abrirApp(page, { datos: {
+    campaigns: { MT_2026_10: { year: 2026, month: 10, ownerArea: 'CPT MT', stage: 'pre_campaign' } },
+  } });
+  await app.ejecutar(() => openCampaign('MT_2026_10'));
+  await page.getByRole('button', { name: /Importar listado Excel/ }).click();
+  await page.locator('input[type=file][multiple]').setInputFiles({ name: 'Sintetico.xlsx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from('fixture') });
+  await page.getByRole('button', { name: 'Importar 54 casos' }).click();
+  await expect(page.locator('#app')).toContainText('Casos vinculados (54)');
+  await expect(page.locator('#app [onclick^="openCase("]')).toHaveCount(54);
+  await expect(page.locator('#app')).toContainText('#CR1O2026248');
+  const persisted = await app.ejecutar(() => window.__DB__);
+  expect(Object.keys(persisted.cases)).toHaveLength(54);
+  expect(Object.keys(persisted.servicePoints)).toHaveLength(48);
+  const reopenedPage = await page.context().newPage();
+  const reopened = await abrirApp(reopenedPage, { datos: persisted });
+  await expect(reopenedPage.locator('#app')).toContainText('Octubre 2026');
+  await reopened.ejecutar(() => openCampaign('MT_2026_10'));
+  await expect(reopenedPage.locator('#app')).toContainText('Casos vinculados (54)');
+  await expect(reopenedPage.locator('#app [onclick^="openCase("]')).toHaveCount(54);
+  expect(reopened.errores).toEqual([]);
+  await reopenedPage.close();
+  expect(app.errores).toEqual([]);
+});
+
 test('elimina una campaña vacía y protege las campañas con casos', async ({ page }) => {
   const app = await abrirApp(page);
   await cerrarAlerta(page);
