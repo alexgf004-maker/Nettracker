@@ -29,6 +29,8 @@ export const state = {
   tab: 'dashboard',
   showMas: false, // hoja "Más" del menú en celular
   areaFiltro: 'mia', // mia | todas (Inicio y pestañas de Trabajo)
+  seguimientoDesde: null, // config/seguimientoDesde: el Inicio ignora lo vencido o retirado antes
+  editandoDesde: false,
   campanas: {}, // campanas/{clave} en Firebase: { entrega: { fecha, por } }
   campanaClave: null, // campaña abierta en la pestaña Campañas
   // Precampaña
@@ -38,6 +40,11 @@ export const state = {
   casosBusqueda: '',
   casoEdit: null, // { clave, id }
   casoForm: {},
+  configCartas: null, // config/cartas: firmante, contacto, contratista y logo
+  showConfigCartas: false,
+  configCartasForm: {},
+  docsModal: null, // { clave, tipo: 'cartas' | 'hojas' }
+  docsForm: { fecha: '', periodo: '', excluidos: {} },
   volverA: null, // { tab, campanaClave } para regresar desde el detalle de una instalación
   globalSearch: '',
   showGlobalSearch: false,

@@ -32,8 +32,10 @@ export function renderDashboard() {
 }
 
 function renderPendientes(hoy, area) {
-  const lista = calcularPendientes({ registros: state.records, campanasGuardadas: state.campanas || {}, hoy, area });
+  const desde = state.seguimientoDesde;
+  const lista = calcularPendientes({ registros: state.records, campanasGuardadas: state.campanas || {}, hoy, area, desde });
   let html = `<div class="panel"><div class="panel-titulo"><i class="ic ic-campana"></i> Pendientes${lista.length ? ` <span class="contador">${lista.length}</span>` : ''}</div>`;
+  html += renderDesde(hoy, desde);
   if (!lista.length) {
     return html + '<div class="todo-al-dia"><i class="ic ic-check"></i> Todo al día. No hay nada vencido ni por vencer en los próximos 3 días.</div></div>';
   }
@@ -52,6 +54,18 @@ function renderPendientes(hoy, area) {
     html += '</div>';
   });
   return html + '</div>';
+}
+
+// Desde qué fecha se cuentan los pendientes (lo anterior no se arrastra)
+function renderDesde(hoy, desde) {
+  if (state.editandoDesde) {
+    return `<div class="desde"><label>Contar pendientes desde <input type="date" id="desde-fecha" value="${desde || hoy}"></label>
+      <button class="btn-accion" onclick="guardarSeguimientoDesde(document.getElementById('desde-fecha').value)">Guardar</button>
+      ${desde ? '<button class="btn-link" onclick="guardarSeguimientoDesde(null)">Contar todo</button>' : ''}
+      <button class="btn-link" onclick="toggleEditarDesde()">Cancelar</button></div>`;
+  }
+  if (desde) return `<div class="desde">Cuenta desde el ${fmtDate(desde)}; lo anterior no aparece. <button class="btn-link" onclick="toggleEditarDesde()">Cambiar</button></div>`;
+  return `<div class="desde">¿Aparecen mediciones viejas? <button class="btn-link" onclick="guardarSeguimientoDesde('${hoy}')">Contar solo desde hoy</button> <button class="btn-link" onclick="toggleEditarDesde()">Elegir fecha</button></div>`;
 }
 
 function accionPendiente(p) {
