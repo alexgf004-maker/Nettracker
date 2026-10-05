@@ -842,6 +842,31 @@ test.describe('Precampaña', () => {
     await expect(page.locator('.tabla-casos tr', { hasText: 'CR1O2026201' })).toContainText('13.70010, -89.21000');
   });
 
+  test('el control de puntos se busca por código: si el ente cambió el NC, completa y avisa', async ({ page }) => {
+    const datos = conCampana();
+    datos.campanas['2026-10_CPT-MT'].casos.CR1O2026220 = caso('CR1O2026220', '500447201');
+    app = await abrirApp(page, { excel: true, datos });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('casos'); });
+    const control = excel('Puntos_Control_TOTAL.xlsx', [
+      ['CONF', 'Punto de Control', 'NC', 'Tipo de punto de control', 'Nivel de Tensión', 'Fecha de Colocación', 'Fecha de Retiro', 'Tipo de Instalacion', 'Tipo de Medicion', 'comprobacion bdth', 'TARIFA', 'URBANIDAD', 'CENTROMTBT', 'POTENCIA INSTALADA', 'AL', 'NOMBRE', 'DIRECCION', 'ENERGIA', 'TENSION', 'MEDIDOR', 'FASES'],
+      [903857600, 'CR1O2026220', 903857600, 'B', 'MT', '', '', 'MONOFÁSICO', 'MEDICIONES', '', 212, 'R', 'CT3708', 50, 'AL181', 'ISRAEL CALDERON', 'CASERIO BARRIO NUEVO', 137, 13200, 1311583, 'C'],
+    ], 'LISTADO');
+    await page.locator('label', { hasText: 'Completar con control de puntos' }).locator('input').setInputFiles(control);
+    await expect.poll(async () => (await app.escrituras()).length).toBe(1);
+    const escrito = (await app.escrituras())[0][2];
+    expect(escrito).toMatchObject({ 'casos/CR1O2026220/ct': 'CT3708', 'casos/CR1O2026220/alimentador': 'AL181-13200', 'casos/CR1O2026220/ncControl': '903857600' });
+    expect(escrito['casos/CR1O2026220/nc']).toBeUndefined(); // el NC del ente no se cambia
+    await expect(page.locator('.toast')).toContainText('1 con otro NC en el control de puntos');
+    await expect(page.locator('.tabla-casos tr', { hasText: 'CR1O2026220' })).toContainText('Control: 903857600');
+
+    // Sin coordenadas para el NC del ente, se usan las del NC del control de puntos
+    const coordenadas = excel('coor.xlsx', [['IDCLIENTE', 'COORDX', 'COORDY'], [903857600, 13.974043, -89.340876]]);
+    await page.locator('label', { hasText: 'o desde un archivo' }).locator('input').setInputFiles(coordenadas);
+    await expect.poll(async () => (await app.escrituras()).length).toBe(2);
+    expect((await app.escrituras())[1][2]).toMatchObject({ 'casos/CR1O2026220/lat': 13.974043, 'casos/CR1O2026220/lng': -89.340876 });
+  });
+
   test('corregir el tipo de sistema de un DA cambia su código y queda marcado como manual', async ({ page }) => {
     app = await abrirApp(page, { datos: conCampana() });
     await cerrarAlerta(page);

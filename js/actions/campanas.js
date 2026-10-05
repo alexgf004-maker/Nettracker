@@ -105,48 +105,60 @@ export async function guardarImportListados() {
 
 // ── COMPLETAR DATOS ──
 
-// Escribe en los casos los datos encontrados, sin pisar lo que se corrigió a mano
-function completarCasos(clave, porNC, mensaje) {
+// Escribe en los casos los datos encontrados, sin pisar lo que se corrigió a mano.
+// buscar(caso) devuelve los datos de ese caso o nada.
+function completarCasos(clave, buscar, mensaje) {
   const casos = casosGuardados(clave);
-  const datos = {}; let completados = 0;
+  const datos = {}; let completados = 0; let sinDatos = 0; let otroNC = 0;
   for (const [id, caso] of Object.entries(casos)) {
-    const encontrados = porNC[caso.nc];
-    if (!encontrados) continue;
+    const encontrados = buscar(caso);
+    if (!encontrados) { sinDatos++; continue; }
     let cambio = false;
     for (const [campo, valor] of Object.entries(encontrados)) {
+      if (campo === 'nc') continue;
       if (caso.manual?.[campo] || valor === undefined || valor === '' || caso[campo] === valor) continue;
       datos[`casos/${id}/${campo}`] = valor; cambio = true;
     }
+    // Mismo código con otro NC: se guarda aparte para avisar, el NC del ente no se cambia
+    if (encontrados.nc && encontrados.nc !== caso.nc) {
+      otroNC++;
+      if (caso.ncControl !== encontrados.nc) { datos[`casos/${id}/ncControl`] = encontrados.nc; cambio = true; }
+    }
     if (cambio) completados++;
   }
-  const sinDatos = Object.values(casos).filter(c => !porNC[c.nc]).length;
-  if (!completados) { showToast(sinDatos ? `No se encontró información nueva (${sinDatos} casos no están en el archivo)` : 'Los casos ya tenían esa información'); return Promise.resolve(); }
-  return update(ref(db, 'campanas/' + clave), datos).then(() => showToast(mensaje(completados) + (sinDatos ? ` · ${sinDatos} no están en el archivo` : '')));
+  const extra = (sinDatos ? ` · ${sinDatos} no están en el archivo` : '') + (otroNC ? ` · ${otroNC} con otro NC en el control de puntos` : '');
+  if (!completados) { showToast((sinDatos ? 'No se encontró información nueva' : 'Los casos ya tenían esa información') + extra); return Promise.resolve(); }
+  return update(ref(db, 'campanas/' + clave), datos).then(() => showToast(mensaje(completados) + extra));
 }
 
-// Control de puntos: CT/DS, medidor, alimentador, urbanidad, dirección y tipo de instalación
+// Control de puntos: CT/DS, medidor, alimentador, urbanidad, dirección y tipo de instalación.
+// Se busca primero por código del caso y, si no está, por NC.
 export function completarConControl(clave, archivo) {
   const hoja = archivo.hojas.LISTADO || primeraHoja(archivo);
-  const { datos, error } = leerControlPuntos(hoja);
+  const { datos, porCodigo, error } = leerControlPuntos(hoja);
   if (error) return showToast(error);
-  completarCasos(clave, datos, n => `${n} casos completados con el control de puntos`);
+  completarCasos(clave, c => porCodigo[c.codigo] || porCodigo[c.codigoEnte] || datos[c.nc], n => `${n} casos completados con el control de puntos`);
 }
+
+// NC con los que se buscan coordenadas: el del ente y, si no hay, el del control de puntos
+const ncCoordenadas = c => [c.nc, c.ncControl].filter(Boolean);
+const coordenadaDe = (coords, c) => ncCoordenadas(c).map(nc => coords[nc]).find(Boolean);
 
 // Base de coordenadas: solo se toman los NC de la campaña
 export function completarCoordenadas(clave, archivo) {
-  const ncs = Object.values(casosGuardados(clave)).map(c => c.nc);
+  const ncs = Object.values(casosGuardados(clave)).flatMap(ncCoordenadas);
   let resultado = null;
   for (const n of archivo.orden) { const r = leerCoordenadas(archivo.hojas[n], ncs); if (!r.error) { resultado = r; break; } }
   if (!resultado) return showToast('No se encontraron columnas de NC, latitud y longitud');
-  completarCasos(clave, resultado.coords, n => `${n} casos con coordenadas`);
+  completarCasos(clave, c => coordenadaDe(resultado.coords, c), n => `${n} casos con coordenadas`);
 }
 
 // Desde la base en Firebase, sin subir archivos
 export async function completarCoordenadasBase(clave) {
   const casos = Object.values(casosGuardados(clave));
-  const coords = await buscarCoordenadas(casos.map(c => c.nc));
+  const coords = await buscarCoordenadas(casos.flatMap(ncCoordenadas));
   if (!Object.keys(coords).length) return showToast('No se encontraron coordenadas en la base. Revisa que esté cargada en Firebase (nodo coordenadas)');
-  completarCasos(clave, coords, n => `${n} casos con coordenadas`);
+  completarCasos(clave, c => coordenadaDe(coords, c), n => `${n} casos con coordenadas`);
 }
 
 export async function subirArchivoCampana(clave, tipo, files) {

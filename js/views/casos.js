@@ -41,7 +41,7 @@ export function renderCasosCampana(c) {
     const cambiado = x.codigo && x.codigoEnte && x.codigo !== x.codigoEnte;
     html += `<tr onclick="abrirCaso('${c.clave}', '${x.id}')">
       <td class="mono"><b>${esc(x.codigo || x.codigoEnte)}</b>${cambiado ? `<small>Ente: ${esc(x.codigoEnte)}</small>` : ''}${x.crRelacionado ? `<small>Usuario de ${esc(x.crRelacionado)}</small>` : ''}</td>
-      <td class="mono">${esc(x.nc)}</td><td>${esc(x.nombre)}</td><td class="col-dir">${esc(x.direccion || x.direccionEnte)}</td>
+      <td class="mono">${esc(x.nc)}${x.ncControl ? `<small class="txt-ambar" title="El control de puntos trae este código con otro NC">Control: ${esc(x.ncControl)}</small>` : ''}</td><td>${esc(x.nombre)}</td><td class="col-dir">${esc(x.direccion || x.direccionEnte)}</td>
       <td>${celda(x.ct)}</td><td>${celda(x.medidor)}</td><td>${celda(x.alimentador)}</td><td>${celda(x.urbanidad)}</td><td>${coords(x)}</td>
     </tr>`;
   });
@@ -92,7 +92,7 @@ export function renderCasoModal() {
   const campo = (k, label, extra = '') => `<div class="field"><label>${label}</label><input id="caso-${k}" value="${esc(f[k])}" oninput="setCasoField('${k}', this.value)" ${extra}></div>`;
   const sistema = sistemaDeCodigo(f.codigo);
   let html = '<div class="modal-overlay"><div class="modal hoja">';
-  html += `<div class="modal-head"><div><div class="modal-titulo mono">${esc(f.codigo)}</div><div class="page-sub">NC ${esc(caso.nc)}${caso.crRelacionado ? ' · usuario de ' + esc(caso.crRelacionado) : ''}${caso.codigoEnte && caso.codigoEnte !== f.codigo ? ' · el ente lo envió como ' + esc(caso.codigoEnte) : ''}</div></div><button class="modal-cerrar" onclick="cerrarCaso()" title="Cerrar">✕</button></div>`;
+  html += `<div class="modal-head"><div><div class="modal-titulo mono">${esc(f.codigo)}</div><div class="page-sub">NC ${esc(caso.nc)}${caso.ncControl ? ' · en el control de puntos: ' + esc(caso.ncControl) : ''}${caso.crRelacionado ? ' · usuario de ' + esc(caso.crRelacionado) : ''}${caso.codigoEnte && caso.codigoEnte !== f.codigo ? ' · el ente lo envió como ' + esc(caso.codigoEnte) : ''}</div></div><button class="modal-cerrar" onclick="cerrarCaso()" title="Cerrar">✕</button></div>`;
   if (sistema) {
     html += `<div class="field"><label>Tipo de sistema verificado en campo</label><div class="segmento segmento-ancho">${Object.entries(SISTEMAS).map(([k, label]) => `<button class="${Number(k) === sistema ? 'active' : ''}" onclick="setCasoSistema(${k})">${label}</button>`).join('')}</div></div>`;
   }
