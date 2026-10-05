@@ -178,10 +178,11 @@ No hay registros aparte: todo se deduce de las instalaciones según el código d
 - El área de una instalación de Campos y Servicios es su `areaBeneficiaria`.
 - Etapa de cada instalación: programada → en campo → descarga pendiente → retirada.
 
-## Diseño de las pantallas de campaña (mismo lenguaje visual que Daily-log)
+## Diseño de las pantallas de campaña (identidad propia: grafito + turquesa)
 
 Componentes en `css/styles.css` (sección "REDISEÑO DE CAMPAÑAS"); usarlos en pantallas nuevas en vez de inventar estilos:
-- `.hero`: encabezado degradado azul marino → azul con `.hero-eyebrow`, `.hero-titulo`, `.hero-sub`, `.hero-chip` (rojo/ambar/verde según plazo), `.hero-kpis` (números; `.alerta` en rojo con latido) y `.hero-btn`. `.hero-rojo` para Seguimiento FT.
+- Identidad: grafito (`--grafito`) con acento turquesa (`--turq`), onda de medición de fondo en los encabezados, mosaicos blancos con borde superior de color y fechas en tarjeta blanca con cabecera grafito. La organización se inspiró en Daily-log, pero el aspecto debe verse distinto a la planilla. Los FT siempre en rojo.
+- `.hero`: encabezado grafito con `.hero-eyebrow`, `.hero-titulo`, `.hero-sub`, `.hero-chip` (rojo/ambar/verde según plazo), `.hero-kpis` (números; `.alerta` en rojo con latido) y `.hero-btn`. `.hero-rojo` para Seguimiento FT.
 - `.pasos-tabs` / `.paso-tab`: pestañas de la campaña como pasos del proceso, cada una con su estado (`listo` en verde, `alerta` en rojo con `.badge-ft`). El avance se calcula en `avanceCampana(c)` (views/trabajo.js).
 - `.bloque` + `.bloque-titulo` (título en mayúsculas con barra azul), `.tiles` / `.tile` (mosaicos de color que filtran la lista: t-verde, t-rojo, t-ambar, t-azul, t-gris, t-morado), `.meta` (barra de avance hacia una meta, p. ej. 38 CR), `.barra-acciones` con botones `.b-p` (principal), `.b-g` (secundario) y `.b-l` (enlace), `.ayuda` (explicación plegable), `.pildora` (filtros), `.tg` (etiqueta de estado con borde).
 - `.tabla-r` dentro de `.tabla-caja`: tabla en PC que en celular (≤760 px) se vuelve una tarjeta por fila; cada celda lleva `data-l` con su nombre, `.cod` ocupa todo el ancho y `.vacio-m` se oculta en celular.
