@@ -279,7 +279,9 @@ Pestaña Trabajo → Seguimiento FT (`js/domain/ft.js`, `casos/{id}/ft`). Los ca
 - Remedición: el mismo código con el número de medición siguiente (CR1… → CR2…); si existe la instalación se muestra. Solo "Sí, se normalizó" cierra el caso.
 - Pasados los 90 días queda vencido: se penalizan los 90 días y la compensación diaria sigue hasta solucionarlo.
 
-Pendiente: verificar los cálculos con un Excel de multiplicadores ya lleno, importar el histórico de multiplicadores que tiene el equipo y el mapa para el contratista.
+Mapa para el contratista: en Casos, "Mapa para My Maps" descarga un KML (`kmlMapa` en `js/domain/listados.js`) con un punto por caso con coordenadas, todos del mismo color (en la precampaña no hay fechas de instalación) y todas las columnas del listado como datos del punto. Se importa en Google My Maps (Importar → archivo KML). Avisa qué casos no tienen coordenadas.
+
+Pendiente: verificar los cálculos con un Excel de multiplicadores ya lleno e importar el histórico de multiplicadores que tiene el equipo.
 
 ## Área: Inicio (dashboard)
 `calcularPendientes()` (`js/domain/pendientes.js`) arma la lista; avisa desde 3 días antes (`DIAS_AVISO`):

@@ -910,6 +910,27 @@ test.describe('Precampaña', () => {
     expect(filas[2].slice(0, 5)).toEqual([222, 'CR1O2026202', 'USUARIO 222', 'COLONIA X, CALLE 1, 12, SANTA TECLA, LA LIBERTAD', 'CT1']);
   });
 
+  test('mapa para My Maps: un punto por caso con coordenadas y los datos del listado', async ({ page }) => {
+    const datos = conCampana();
+    Object.assign(datos.campanas['2026-10_CPT-MT'].casos.CR1O2026201, { lat: 13.67, lng: -89.28, medidor: 'M-1' });
+    Object.assign(datos.campanas['2026-10_CPT-MT'].casos.DA1O2026011O00, { lat: 13.7, lng: -89.2 });
+    app = await abrirApp(page, { datos });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('casos'); });
+    const descarga = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Mapa para My Maps' }).click();
+    const archivo = await descarga;
+    expect(archivo.suggestedFilename()).toBe('Mapa_Octubre_2026_CPT_MT.kml');
+    const kml = require('fs').readFileSync(await archivo.path(), 'utf8');
+    expect(kml.match(/<Placemark>/g)).toHaveLength(2);
+    expect(kml.match(/<styleUrl>#caso<\/styleUrl>/g)).toHaveLength(2); // todos del mismo color
+    expect(kml).toContain('<name>CR1O2026201</name>');
+    expect(kml).toContain('<coordinates>-89.28,13.67,0</coordinates>');
+    expect(kml).toContain('<Data name="MEDIDOR"><value>M-1</value></Data>');
+    expect(kml).toContain('<Data name="DIRECCIÓN"><value>COLONIA X, CALLE 1, 12, SANTA TECLA, LA LIBERTAD</value></Data>');
+    await expect(page.locator('.toast')).toContainText('Sin coordenadas: CR1O2026202');
+  });
+
   test('cartas: piden los datos del firmante la primera vez y se generan con el texto del equipo', async ({ page }) => {
     app = await abrirApp(page, { datos: conCampana() });
     await cerrarAlerta(page);

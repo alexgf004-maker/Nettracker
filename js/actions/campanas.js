@@ -4,7 +4,7 @@ import { db, get, ref, update } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { hoyLocal, MESES } from '../domain/trabajo.js';
-import { armarCampanas, coordenadaValida, filasListado, leerControlPuntos, leerCoordenadas, leerListadoEnte } from '../domain/listados.js';
+import { armarCampanas, coordenadaValida, filasListado, kmlMapa, leerControlPuntos, leerCoordenadas, leerListadoEnte } from '../domain/listados.js';
 import { render } from '../views/render.js';
 import { hojaConEstilo } from '../excel.js';
 
@@ -218,4 +218,19 @@ export function exportarListado(clave) {
   XLSX.utils.book_append_sheet(wb, ws, 'Listado');
   XLSX.writeFile(wb, `Listado_${MESES[g.mes - 1]}_${g.anio}_${g.area.replace(/\s+/g, '_')}.xlsx`);
   showToast('Listado exportado');
+}
+
+// Mapa del listado para el contratista: KML que se importa en Google My Maps
+export function exportarMapa(clave) {
+  const g = state.campanas?.[clave];
+  const casos = Object.values(g?.casos || {});
+  if (!casos.length) return;
+  const nombre = `Listado ${MESES[g.mes - 1]} ${g.anio} ${g.area}`;
+  const { kml, conPunto, sinCoordenadas } = kmlMapa(nombre, casos);
+  if (!conPunto) return showToast('Ningún caso tiene coordenadas todavía. Complétalas primero.');
+  const url = URL.createObjectURL(new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' }));
+  const a = document.createElement('a'); a.href = url; a.download = `Mapa_${MESES[g.mes - 1]}_${g.anio}_${g.area.replace(/\s+/g, '_')}.kml`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  showToast(sinCoordenadas.length ? `Mapa con ${conPunto} casos. Sin coordenadas: ${sinCoordenadas.join(', ')}` : `Mapa con ${conPunto} casos`);
 }

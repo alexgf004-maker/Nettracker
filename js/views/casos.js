@@ -32,6 +32,7 @@ export function renderCasosCampana(c) {
     <label class="b b-l" title="Desde un Excel o CSV con NC, latitud y longitud">o desde un archivo<input type="file" accept=".xlsx,.xls,.xlsm,.csv" hidden onchange="subirArchivoCampana('${c.clave}', 'coordenadas', this.files)"></label>
     <span class="sep"></span>
     <button class="b b-g" onclick="exportarListado('${c.clave}')"><i class="ic ic-descargar"></i> Exportar listado</button>
+    <button class="b b-g" onclick="exportarMapa('${c.clave}')" title="Archivo KML para importar en Google My Maps"><i class="ic ic-map-pin"></i> Mapa para My Maps</button>
   </div>`;
   html += `<details class="ayuda"><summary><i class="ic ic-ayuda"></i> ¿De dónde salen los datos?</summary><p>El control de puntos completa CT/DS, medidor, alimentador y urbanidad (se busca por código y, si no está, por NC). Las coordenadas salen de la base cargada en la app. Lo que corrijas a mano en un caso no se vuelve a cambiar.${importado ? ` Listados importados el ${fmtDate(importado.fecha)} por ${esc(importado.por)}.` : ''}</p></details>`;
   html += '</div>';
