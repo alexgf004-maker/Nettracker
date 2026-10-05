@@ -200,3 +200,24 @@ export function filasListado(casos) {
   ]));
   return filas;
 }
+
+// Mapa para el contratista (Google My Maps): KML con un punto por caso, todos del mismo color
+// (en la precampaña todavía no hay fechas de instalación). Cada punto lleva las columnas del listado,
+// que My Maps muestra como tabla. Devuelve { kml, conPunto, sinCoordenadas: [códigos] }.
+export function kmlMapa(nombre, casos) {
+  const x = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const [enc, ...filas] = filasListado(casos);
+  const iLat = enc.indexOf('LATITUD'); const iLng = enc.indexOf('LONGITUD'); const iCod = enc.indexOf('CÓDIGO SIGET');
+  const num = v => (v === '' || v === null || v === undefined || Number.isNaN(Number(v)) ? null : Number(v));
+  const conPunto = filas.filter(f => num(f[iLat]) !== null && num(f[iLng]) !== null);
+  const sinCoordenadas = filas.filter(f => !conPunto.includes(f)).map(f => f[iCod]);
+  const marca = f => `<Placemark><name>${x(f[iCod])}</name><styleUrl>#caso</styleUrl><ExtendedData>${enc.map((h, i) => `<Data name="${x(h)}"><value>${x(f[i])}</value></Data>`).join('')}</ExtendedData>`
+    + `<Point><coordinates>${num(f[iLng])},${num(f[iLat])},0</coordinates></Point></Placemark>`;
+  const kml = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${x(nombre)}</name>
+<Style id="caso"><IconStyle><color>ff90740e</color><scale>1.1</scale><Icon><href>https://maps.google.com/mapfiles/kml/paddle/blu-circle.png</href></Icon></IconStyle></Style>
+<Folder><name>${x(nombre)}</name>
+${conPunto.map(marca).join('\n')}
+</Folder></Document></kml>`;
+  return { kml, conPunto: conPunto.length, sinCoordenadas };
+}
