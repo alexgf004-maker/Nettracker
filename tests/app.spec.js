@@ -1407,3 +1407,167 @@ test.describe('Precampaña', () => {
     expect(mt['casos/CR1O2026201/lat']).toBeUndefined(); // ya las tenía (se completaron arriba con el botón)
   });
 });
+
+// ── Análisis de reclamos (macros Graficar y Armónicos) ──
+// TXT sintéticos con el mismo formato del ECAMEC: 144 registros de 10 minutos.
+const fechaTXT = i => { const d = new Date(Date.UTC(2026, 8, 1) + i * 600000); const z = n => String(n).padStart(2, '0'); return `${z(d.getUTCDate())}/${z(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ${z(d.getUTCHours())}:${z(d.getUTCMinutes())}:00`; };
+// Tensión (74 columnas): 13.2 kV, los primeros 10 registros 8 % arriba (FT); PST 2 en el primero
+function txtTension({ stotal = false } = {}) {
+  const enc = ['Fecha y Hora'];
+  for (const p of [1, 2, 3]) enc.push(`U${p}Max [V]`, `U${p} [V]`, `U${p}Min [V]`);
+  for (const p of [1, 2, 3]) enc.push(`I${p}Max [A]`, `I${p} [A]`, `I${p}Min [A]`);
+  while (enc.length < 71) enc.push(`Otra${enc.length} [x]`);
+  enc.push('PST1 [p.u]', 'PST2 [p.u]', 'PST3 [p.u]');
+  if (stotal) enc.push('');
+  const filas = [enc.join(',')];
+  for (let i = 0; i < 144; i++) {
+    const u = i < 10 ? 13200 * 1.08 : 13200;
+    const f = [fechaTXT(i)];
+    for (let p = 0; p < 3; p++) f.push(u + 50, u, u - 50);
+    for (let p = 0; p < 3; p++) f.push(80, 50, 30);
+    while (f.length < 71) f.push(0);
+    f.push(i === 0 ? 2 : 0.5, 0.5, 0.5);
+    if (stotal) f.push(400000);
+    filas.push(f.join(','));
+  }
+  return filas.join('\r\n');
+}
+// Armónicos (197 columnas): H5 de tensión al 3 %, salvo en la fase 1 los primeros 15 registros al 7 % (límite 6 %)
+function txtArmonicos() {
+  const enc = ['Fecha y Hora', 'U1 [V]', 'U2 [V]', 'U3 [V]', 'I1 [A]', 'I2 [A]', 'I3 [A]', 'I4 [A]', 'P1 [kW]', 'P2 [kW]', 'P3 [kW]', 'PTotal [kW]', 'FP1', 'FP2', 'FP3', 'EA1 [kWh]', 'EA2 [kWh]', 'EA3 [kWh]', 'EATot [kWh]'];
+  for (let n = 1; n <= 25; n++) for (let p = 1; p <= 3; p++) enc.push(`Uarm${n}-${p}`);
+  for (let n = 1; n <= 25; n++) for (let p = 1; p <= 4; p++) enc.push(`Iarm${n}-${p}`);
+  enc.push('PST1 [p.u]', 'PST2 [p.u]', 'PST3 [p.u]');
+  const filas = [enc.join(',')];
+  for (let i = 0; i < 144; i++) {
+    const f = [fechaTXT(i), 13200, 13200, 13200, 50, 50, 50, 1, 5, 5, 5, 15, 1, 1, 1, 0, 0, 0, 0];
+    for (let n = 1; n <= 25; n++) for (let p = 1; p <= 3; p++) f.push(n === 1 ? 13200 : n === 5 ? 13200 * (p === 1 && i < 15 ? 0.07 : 0.03) : 0);
+    for (let n = 1; n <= 25; n++) for (let p = 1; p <= 4; p++) f.push(n === 1 ? 50 : n === 5 ? 2.5 : 0);
+    f.push(0.5, 0.5, 0.5);
+    filas.push(f.join(','));
+  }
+  return filas.join('\r\n');
+}
+
+test.describe('Análisis de reclamos', () => {
+  test('calcula el FebNoPer y los armónicos como las macros', async ({ page }) => {
+    app = await abrirApp(page);
+    const r = await page.evaluate(async ([tt, ta, ts]) => {
+      const m = await import('/js/domain/reclamo.js');
+      const d = m.leerTension(tt);
+      const t = m.analizarTension(d, { fases: 3, nominal: 13200, tol: 0.06, kva: 100, vll: 240 });
+      const a = m.analizarArmonicos(ta, 3);
+      const h5 = a.tension.find(f => f.nombre === 'H5 - TDI');
+      return {
+        tipos: [m.tipoDeTXT(tt), m.tipoDeTXT(ta)], fases: m.fasesConTension(d.U), nominal: m.sugerirNominal(d.U), stotal: d.stotal,
+        resumen: t.resumen, pst: t.pstP95, iTrafo: t.iMaxTrafo, conS: m.leerTension(ts).stotal, carga: m.analizarTension(m.leerTension(ts), { fases: 3, nominal: 13200, tol: 0.06 }).carga,
+        n: a.n, vdat: a.tension[0].fases['1'].p95, h5: h5.fases, cumpleT: a.cumpleTension, cumpleI: a.cumpleCorriente, lim: [h5.limTxt, a.tension[1].limTxt],
+        guardado: m.resumenGuardado(t, a),
+      };
+    }, [txtTension(), txtArmonicos(), txtTension({ stotal: true })]);
+    expect(r.tipos).toEqual(['tension', 'armonicos']);
+    expect(r.fases).toBe(3);
+    expect(r.nominal).toBe(13200);
+    expect(r.stotal).toBeNull(); // sin STOTAL no hay cargabilidad (la macro tomaba PST3)
+    expect(r.conS).toEqual({ origen: 'columna 75', encabezado: '' });
+    expect(r.carga.max).toBe(400); // STOTAL en VA → kVA
+    expect(r.resumen).toMatchObject({ total: 144, invalidos: 0, validos: 144, ft: 10, estado: 'FUERA DE TOLERANCIA' });
+    expect(r.resumen.febNoPer).toBeCloseTo(10 / 144, 6);
+    expect(r.iTrafo).toBeCloseTo(100 * 1000 / (Math.sqrt(3) * 240), 6); // trifásico: kVA × 1000 / (√3 × V L-L)
+    expect(r.pst['1']).toBeCloseTo(0.5, 6);
+    expect(r.n).toBe(144);
+    expect(r.h5['1']).toMatchObject({ exc: 15, cumple: false });
+    expect(r.h5['1'].pct).toBeCloseTo(1500 / 144, 6);
+    expect(r.h5['2']).toMatchObject({ exc: 0, cumple: true });
+    expect(r.cumpleT).toEqual({ 1: false, 2: true, 3: true });
+    expect(r.cumpleI).toEqual({ 1: true, 2: true, 3: true });
+    expect(r.lim).toEqual(['6.0%', '2.0%']);
+    expect(r.guardado).toEqual({ tension: { febNoPer: 10 / 144, estado: 'FUERA DE TOLERANCIA' }, armonicos: { tension: 'NO CUMPLE', corriente: 'CUMPLE' } });
+  });
+
+  test('sube los dos TXT, muestra las gráficas y lo guarda en el reclamo', async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await nav(page, 'Reclamos');
+    const fila = page.locator('.fila', { hasText: 'RE-2026-0456' });
+    await fila.getByRole('button', { name: 'Analizar TXT' }).click();
+    await page.locator('.graf-modal input[type=file]').setInputFiles([
+      { name: 'RE-2026-0456.txt', mimeType: 'text/plain', buffer: Buffer.from(txtTension()) },
+      { name: 'RE-2026-04560.txt', mimeType: 'text/plain', buffer: Buffer.from(txtArmonicos()) }]);
+    const modal = page.locator('.graf-modal');
+    await expect(modal.locator('.arch-slot.lleno')).toHaveCount(2);
+    await expect(page.locator('#ar-nominal')).toHaveValue('13200');
+    await expect(modal.locator('.tile', { hasText: 'FebNoPer' })).toContainText('6.94 %');
+    for (const g of ['u', 'umax', 'umin', 'i', 'imax', 'pst']) await expect(modal.locator(`[data-graf="${g}"]`)).toHaveCount(1);
+    await expect(modal).toContainText('no trae STOTAL');
+    // Cambiar la tolerancia recalcula
+    await page.locator('#ar-red').selectOption('rural_bt');
+    await expect(modal.locator('.tile', { hasText: 'FebNoPer' })).toContainText('0.00 %');
+    await page.locator('#ar-red').selectOption('urbano_mt');
+    await modal.getByRole('button', { name: 'Armónicos', exact: true }).click();
+    await expect(modal.locator('.veredicto').first()).toContainText('Tensión: NO CUMPLE');
+    await expect(modal.locator('.veredicto').nth(1)).toContainText('Tensión: CUMPLE');
+    await expect(modal.locator('.tabla-arm td.mal')).toHaveCount(1); // H5 de la fase 1
+    await modal.getByRole('button', { name: 'Guardar en el reclamo' }).click();
+    await expect(page.locator('.toast')).toContainText('Análisis guardado');
+    const esc = await app.escrituras();
+    const archivos = esc.find(([, ruta]) => ruta === 'archivosReclamo/r9')[2];
+    expect(archivos.tension.nombre).toBe('RE-2026-0456');
+    expect(archivos.armonicos.gz.length).toBeGreaterThan(100);
+    const guardado = esc.find(([, ruta, v]) => ruta === 'analizadores/r9' && v.analisisReclamo)[2].analisisReclamo;
+    expect(guardado.params).toMatchObject({ fases: 3, nominal: '13200', red: 'urbano_mt' });
+    expect(guardado.resultado.armonicos).toEqual({ tension: 'NO CUMPLE', corriente: 'CUMPLE' });
+    await modal.locator('.modal-cerrar').click();
+    await expect(fila).toContainText('FebNoPer 6.94 %');
+    await expect(fila).toContainText('Armónicos no cumplen (tensión)');
+    // Al reabrir se cargan los TXT guardados (comprimidos) y los datos de la medición
+    await fila.getByRole('button', { name: 'Ver análisis' }).click();
+    await expect(modal.locator('.arch-slot.lleno')).toHaveCount(2);
+    await expect(modal.locator('.tile', { hasText: 'FebNoPer' })).toContainText('6.94 %');
+  });
+
+  test('descarga los Excel de tensión y armónicos con sus gráficas', async ({ page }) => {
+    const XLSX = require('xlsx-js-style');
+    app = await abrirApp(page, { excel: true });
+    await cerrarAlerta(page);
+    await page.evaluate(([tt, ta]) => {
+      abrirAnalisisReclamo('r9');
+      cargarTXTReclamo([{ nombre: 'RE-2026-0456.txt', texto: tt }, { nombre: 'RE-2026-04560.txt', texto: ta }]);
+      setParamReclamo('usuario', 'Empresa');
+    }, [txtTension(), txtArmonicos()]);
+    const bajar = async boton => { const d = page.waitForEvent('download'); await page.getByRole('button', { name: boton }).click(); return d; };
+    const dt = await bajar('Excel de tensión');
+    expect(dt.suggestedFilename()).toBe('RE-2026-0456_Graficas.xlsx');
+    const bt = require('fs').readFileSync(await dt.path());
+    const wt = XLSX.read(bt);
+    expect(wt.SheetNames).toEqual(['Tensión promedio', 'Tensión máxima', 'Tensión mínima', 'Corriente promedio', 'Corriente máxima', 'PST']);
+    const prom = XLSX.utils.sheet_to_json(wt.Sheets['Tensión promedio'], { header: 1 });
+    expect(prom[0].slice(0, 6)).toEqual(['Fecha/Hora', 'U1 [V]', 'U2 [V]', 'U3 [V]', 'SOBRE+6%', 'SUB-6%']);
+    expect(prom[1][0]).toBe('1/9/2026 00:00');
+    expect(prom[3].slice(7, 13)).toEqual([144, 0, 144, 10, 10 / 144, 'FUERA DE TOLERANCIA']);
+    // Cada hoja lleva su gráfica nativa de Excel, con las series apuntando a sus columnas
+    const zt = XLSX.CFB.read(bt, { type: 'buffer' });
+    const chart1 = Buffer.from(XLSX.CFB.find(zt, '/xl/charts/chart1.xml').content).toString();
+    expect(chart1).toContain("'Tensión promedio'!$B$2:$B$145");
+    expect(chart1).toContain('PERFIL DE TENSIÓN PROMEDIO - EMPRESA');
+    expect(XLSX.CFB.find(zt, '/xl/charts/chart6.xml')).toBeTruthy();
+    expect(Buffer.from(XLSX.CFB.find(zt, '/xl/worksheets/sheet1.xml').content).toString()).toContain('<drawing r:id="rIdDibujo1"/>');
+
+    const da = await bajar('Excel de armónicos');
+    expect(da.suggestedFilename()).toBe('RE-2026-04560_Armonicos.xlsx');
+    const ba = require('fs').readFileSync(await da.path());
+    const wa = XLSX.read(ba);
+    expect(wa.SheetNames).toEqual(['Detalle_V', 'Detalle_I', 'Resumen_Armonicos', 'Resumen_Compacto', 'Graficos']);
+    const res = XLSX.utils.sheet_to_json(wa.Sheets.Resumen_Armonicos, { header: 1 });
+    const h5 = res.find(f => f[0] === 'H5 - TDI');
+    expect(h5.slice(1, 2)).toEqual(['6.0%']);
+    expect(h5.slice(5, 8)).toEqual([15, 0, 0]);
+    expect(h5.slice(11, 14)).toEqual(['NO CUMPLE', 'CUMPLE', 'CUMPLE']);
+    expect(XLSX.utils.sheet_to_json(wa.Sheets.Detalle_V, { header: 1 })[0].slice(0, 5)).toEqual(['Fecha y Hora', 'VDAT F1 (%)', 'VDAT F2 (%)', 'VDAT F3 (%)', 'TDI H2 F1 (%)']);
+    const za = XLSX.CFB.read(ba, { type: 'buffer' });
+    const espectro = Buffer.from(XLSX.CFB.find(za, '/xl/charts/chart1.xml').content).toString();
+    expect(espectro).toContain('<c:barChart>');
+    expect(espectro).toContain("'Graficos'!$B$2:$B$25"); // límite de la Tabla 4
+    expect(XLSX.CFB.find(za, '/xl/charts/chart4.xml')).toBeTruthy();
+  });
+});

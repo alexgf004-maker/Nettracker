@@ -52,6 +52,7 @@ export const state = {
   importProgramacion: null, // vista previa del Excel de programación de instalaciones
   importMult: null, // vista previa del Excel de multiplicadores ya hecho
   graficas: null, // { clave, id, datos } gráficas de voltaje y corriente abiertas
+  analisisReclamo: null, // { id, params, tension, armonicos } análisis de un reclamo (macros Graficar y Armónicos)
   casoForm: {},
   configCartas: null, // config/cartas: firmante, contacto, contratista y logo
   showConfigCartas: false,

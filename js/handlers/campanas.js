@@ -11,6 +11,9 @@ import { abrirMultiplicador, cerrarImportMultiplicadores, cerrarMultiplicador, e
 import { asignarEquipo, asignarFecha, cerrarProgramacion, enviarFechaADespachos, exportarFecha, guardarProgramacion, importarProgramacion, procesarProgramacion, setDatoFecha } from '../actions/fechas.js';
 import { abrirResultado, analizarArchivos, analizarTXT, cerrarAnalisis, cerrarGraficas, cerrarResultado, exportarAnalisis, exportarCuadroResumen, exportarSeries, guardarAnalisis, guardarResultado, recalcularTXT, verGraficas } from '../actions/resultados.js';
 import { moverCursorGrafica, salirCursorGrafica } from '../views/graficas.js';
+import { abrirAnalisisReclamo, cargarTXTReclamo, cerrarAnalisisReclamo, guardarAnalisisReclamo, setParamReclamo, setVistaReclamo, subirTXTReclamo } from '../actions/analisis-reclamo.js';
+import { exportarArmonicosReclamo, exportarTensionReclamo } from '../actions/excel-reclamo.js';
+import { cursorReclamo, salirCursorReclamo } from '../views/analisis-reclamo.js';
 import { abrirFT, agregarNotaFT, cerrarFT, marcarAvisoFT, quitarAvisoFT, setCompensacionFT, setRemedicionFT, setRutaFT } from '../actions/ft.js';
 import { codigoConSistema } from '../domain/listados.js';
 import { state } from '../state.js';
@@ -61,3 +64,6 @@ window.setFTNota = v => { state.ftNota = v; };
 
 // Gráficas de voltaje y corriente
 Object.assign(window, { verGraficas, cerrarGraficas, exportarSeries, moverCursorGrafica, salirCursorGrafica });
+
+// Análisis de reclamos (macros Graficar y Armónicos)
+Object.assign(window, { abrirAnalisisReclamo, cerrarAnalisisReclamo, subirTXTReclamo, cargarTXTReclamo, setParamReclamo, setVistaReclamo, guardarAnalisisReclamo, exportarTensionReclamo, exportarArmonicosReclamo, cursorReclamo, salirCursorReclamo });
