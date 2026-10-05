@@ -4,6 +4,9 @@
 //   retiro (normalmente al 8.º día, a veces más) → análisis de los TXT → informe (8 días desde el retiro).
 // - El expediente se crea a mano ("Nuevo reclamo"); las instalaciones RE sueltas no se vuelven expedientes.
 // - Un reclamo puede medirse hasta 6 veces: el mismo código con el número de medición siguiente (RE1… → RE2…).
+// - En cada medición puede haber varios puntos a la vez (medidor, trafo, tablero…). El principal lleva el código RE
+//   y es el que manda (FT y plazo del informe); los demás llevan un nombre libre y se vinculan a mano
+//   (campo reclamo: { id, n, punto } en la instalación). Cada punto tiene su análisis; el informe es uno solo.
 // - FT (FebNoPer > 5 % en tensión): mismo tratamiento que un caso regulatorio FT (aviso, 90 días, remedición).
 // - Armónicos o flicker fuera de límite: solo se avisa; le compete al usuario corregirlo.
 import { instalacionDeCaso } from './resultados.js';
@@ -78,8 +81,15 @@ export function medicionesExpediente(exp, registros, hoy) {
   for (let n = 1; n <= MAX_MEDICIONES; n++) {
     const codigo = codigoMedicion(p.resto, n);
     const inst = instalacionDeCaso({ codigo }, registros);
-    if (!inst && n !== p.n) continue;
     const res = inst?.analisisReclamo?.resultado || null;
+    // Puntos adicionales de esta medición (medidor, trafo, tablero…): instalaciones vinculadas al expediente
+    const puntos = registros.filter(r => exp.id && r.reclamo?.id === exp.id && Number(r.reclamo.n) === n && normalizarCodigo(r.caso) !== codigo)
+      .sort((a, b) => (a.fechaInstalacion || '').localeCompare(b.fechaInstalacion || ''))
+      .map(r => {
+        const rp = r.analisisReclamo?.resultado || null;
+        return { inst: r, nombre: r.reclamo.punto || r.caso, etapa: etapaInstalacion(r, hoy), resultado: rp, avisos: avisosUsuario(rp) };
+      });
+    if (!inst && !puntos.length && n !== p.n) continue;
     lista.push({
       n, codigo, inst,
       etapa: inst ? etapaInstalacion(inst, hoy) : 'sin_instalar',
@@ -88,7 +98,8 @@ export function medicionesExpediente(exp, registros, hoy) {
       informe: inst?.informeEntregado || null,
       resultado: res,
       ft: res?.tension?.estado === 'FUERA DE TOLERANCIA',
-      avisos: avisosUsuario(res),
+      avisos: [...new Set([...avisosUsuario(res), ...puntos.flatMap(x => x.avisos.map(a => `${a} (${x.nombre})`))])],
+      puntos,
     });
   }
   return lista;
@@ -154,7 +165,7 @@ export function ftExpediente(exp, mediciones, hoy) {
 export function listaExpedientes(reclamos, registros, hoy) {
   return Object.entries(reclamos || {})
     .filter(([, e]) => e?.codigo)
-    .map(([id, e]) => ({ id, ...e, resumen: resumenExpediente(e, registros, hoy) }))
+    .map(([id, e]) => ({ id, ...e, resumen: resumenExpediente({ id, ...e }, registros, hoy) }))
     .sort((a, b) => (b.recibido || '').localeCompare(a.recibido || '') || b.codigo.localeCompare(a.codigo));
 }
 

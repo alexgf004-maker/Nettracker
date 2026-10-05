@@ -62,7 +62,7 @@ export async function subirTXTReclamo(files) {
 export function cargarTXTReclamo(archivos) {
   const a = state.analisisReclamo; if (!a) return;
   const r = state.records.find(x => x.id === a.id) || {};
-  const codigo = normalizarCodigo(r.caso);
+  const codigo = r.reclamo?.id ? '' : normalizarCodigo(r.caso); // los puntos adicionales llevan un nombre libre
   const avisos = [];
   for (const f of archivos) {
     const tipo = tipoDeTXT(f.texto);

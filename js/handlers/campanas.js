@@ -14,6 +14,7 @@ import { moverCursorGrafica, salirCursorGrafica } from '../views/graficas.js';
 import { abrirAnalisisReclamo, cargarTXTReclamo, cerrarAnalisisReclamo, guardarAnalisisReclamo, setParamReclamo, setVistaReclamo, subirTXTReclamo } from '../actions/analisis-reclamo.js';
 import { exportarArmonicosReclamo, exportarTensionReclamo } from '../actions/excel-reclamo.js';
 import { cursorReclamo, salirCursorReclamo } from '../views/analisis-reclamo.js';
+import { abrirPuntoReclamo, cerrarPuntoReclamo, desvincularPuntoReclamo, registrarPuntoReclamo, setNombrePunto, vincularPuntoReclamo } from '../actions/expedientes.js';
 import { abrirExpediente, abrirNuevoReclamo, cerrarExpediente, cerrarNuevoReclamo, completarCoordenadasReclamo, eliminarExpediente, guardarDatoExpediente, guardarNuevoReclamo, leerCorreoNuevoReclamo, registrarInstalacionReclamo, setCampoNuevoReclamo, setExpedienteVista } from '../actions/expedientes.js';
 import { abrirFT, agregarNotaFT, cerrarFT, marcarAvisoFT, quitarAvisoFT, setCompensacionFT, setRemedicionFT, setRutaFT } from '../actions/ft.js';
 import { codigoConSistema } from '../domain/listados.js';
@@ -71,3 +72,4 @@ Object.assign(window, { abrirAnalisisReclamo, cerrarAnalisisReclamo, subirTXTRec
 
 // Expedientes de reclamo
 Object.assign(window, { abrirNuevoReclamo, cerrarNuevoReclamo, leerCorreoNuevoReclamo, setCampoNuevoReclamo, guardarNuevoReclamo, abrirExpediente, cerrarExpediente, setExpedienteVista, guardarDatoExpediente, completarCoordenadasReclamo, registrarInstalacionReclamo, eliminarExpediente });
+Object.assign(window, { abrirPuntoReclamo, cerrarPuntoReclamo, setNombrePunto, registrarPuntoReclamo, vincularPuntoReclamo, desvincularPuntoReclamo });

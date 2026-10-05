@@ -78,12 +78,14 @@ export async function completarCoordenadasReclamo(id, { silencioso = false } = {
   showToast('Coordenadas del usuario completadas');
 }
 
-// Lleva al formulario de nueva instalación con el código de la medición, la dirección y el retiro al 8.º día
-export function registrarInstalacionReclamo(id, codigo) {
+// Lleva al formulario de nueva instalación con el código de la medición, la dirección y el retiro al 8.º día.
+// punto: { n, nombre } para un punto adicional (medidor, trafo, tablero…): lleva el nombre como caso y queda vinculado.
+export function registrarInstalacionReclamo(id, codigo, punto = null) {
   const e = state.reclamos?.[id]; if (!e) return;
   const hoy = hoyLocal();
   state.form = {
     ...emptyForm(), caso: codigo, lugar: [e.nombre, e.direccion].filter(Boolean).join(' · '),
+    ...(punto ? { reclamo: { id, n: punto.n, punto: punto.nombre } } : {}),
     lat: e.lat ?? null, lng: e.lng ?? null, fechaInstalacion: hoy, fechaRetiro: sumarDias(hoy, DIAS_RETIRO_RECLAMO), areaInstalacion: e.area || userArea(),
   };
   state.volverA = { tab: 'reclamos', expedienteId: id };
@@ -97,4 +99,35 @@ export function eliminarExpediente(id) {
   if (!confirm(`¿Eliminar el expediente de ${e.codigo}? Las instalaciones y sus análisis no se borran.`)) return;
   remove(ref(db, 'reclamos/' + id)).then(() => showToast('Expediente eliminado'));
   state.expedienteId = null; render();
+}
+
+// ── Puntos adicionales de una medición ──
+
+export function abrirPuntoReclamo(id, n) { state.puntoReclamo = { id, n, nombre: '' }; render(); }
+export function cerrarPuntoReclamo() { state.puntoReclamo = null; render(); }
+export function setNombrePunto(v) { if (state.puntoReclamo) state.puntoReclamo.nombre = v; }
+
+const nombrePunto = () => {
+  const nombre = String(state.puntoReclamo?.nombre || '').trim();
+  if (!nombre) showToast('Escribe el nombre del punto (medidor, trafo, tablero principal…)');
+  return nombre;
+};
+
+// Instalación nueva para el punto: el nombre va como caso (así lo anotan en campo)
+export function registrarPuntoReclamo() {
+  const p = state.puntoReclamo; const nombre = nombrePunto(); if (!p || !nombre) return;
+  state.puntoReclamo = null;
+  registrarInstalacionReclamo(p.id, nombre.replace(/\s+/g, '').toLowerCase(), { n: p.n, nombre });
+}
+
+// Instalación que ya existe (registrada con un nombre libre): se vincula al expediente
+export function vincularPuntoReclamo(instId) {
+  const p = state.puntoReclamo; const nombre = nombrePunto(); if (!p || !nombre) return;
+  update(ref(db, 'analizadores/' + instId), { reclamo: { id: p.id, n: p.n, punto: nombre } }).then(() => showToast('Punto vinculado al reclamo'));
+  state.puntoReclamo = null; render();
+}
+
+export function desvincularPuntoReclamo(instId) {
+  if (!confirm('¿Quitar este punto del reclamo? La instalación y su análisis no se borran.')) return;
+  update(ref(db, 'analizadores/' + instId), { reclamo: null }).then(() => showToast('Punto quitado del reclamo'));
 }

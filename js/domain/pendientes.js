@@ -1,7 +1,7 @@
 // Pendientes del Inicio: se calculan a partir de los datos, no se anotan a mano.
 // Función pura: recibe los datos y la fecha de hoy y devuelve la lista ordenada.
 import {
-  agruparCampanas, areaDeInstalacion, nombreCampana, tipoDeTrabajo, urgencia,
+  agruparCampanas, areaDeInstalacion, nombreCampana, tipoDeRegistro, urgencia,
 } from './trabajo.js';
 import { listaExpedientes, todosFT } from './expedientes.js';
 
@@ -25,7 +25,7 @@ export function calcularPendientes({ registros, campanasGuardadas = {}, reclamos
 
   for (const r of registros) {
     if (!delArea(r)) continue;
-    const tipo = tipoDeTrabajo(r.caso);
+    const tipo = tipoDeRegistro(r);
     const ref = { id: r.id, caso: r.caso, serie: r.serie, lugar: r.lugar, tipo };
 
     // Retiro programado

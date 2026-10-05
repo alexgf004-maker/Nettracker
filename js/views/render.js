@@ -18,7 +18,7 @@ import { renderAnalisisReclamo } from './analisis-reclamo.js';
 import { renderAnalisisModal, renderResultadoModal } from './resultados.js';
 import { renderFT, renderFTModal } from './ft.js';
 import { renderCampanas, renderRequerimientos } from './trabajo.js';
-import { renderNuevoReclamo, renderReclamos } from './expedientes.js';
+import { renderNuevoReclamo, renderPuntoReclamo, renderReclamos } from './expedientes.js';
 import { renderValidaciones } from './validaciones.js';
 
 export const TAB_VIEWS = {
@@ -78,6 +78,7 @@ export function render() {
   if (state.ftEdit) html += renderFTModal();
   if (state.showConfigCartas) html += renderConfigCartas();
   if (state.nuevoReclamo) html += renderNuevoReclamo();
+  if (state.puntoReclamo) html += renderPuntoReclamo();
   if (state.analisisReclamo) html += renderAnalisisReclamo();
   if (state.graficas) html += renderGraficasModal(); // encima de los demás (se abre desde Resultados o Seguimiento FT)
 
