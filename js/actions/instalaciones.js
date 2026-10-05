@@ -16,7 +16,7 @@ export function getGPS() {
     state.form.lng = pos.coords.longitude.toFixed(6);
     if (!state.form.lugar) state.form.lugar = `${(+state.form.lat).toFixed(4)}, ${(+state.form.lng).toFixed(4)}`;
     render();
-    showToast('Ubicación capturada');
+    showToast('📍 Ubicación capturada');
   }, () => { showToast('No se pudo obtener ubicación GPS'); render(); }, { enableHighAccuracy: true, timeout: 12000 });
 }
 
@@ -29,13 +29,13 @@ export async function handleSave() {
   // Validación de duplicados
   if (!state.editId) {
     const activa = state.records.find(r => r.equipoId === state.form.equipoId && !r.retirado);
-    if (activa) return showToast('Este equipo ya tiene instalación activa en #' + (activa.caso||'?'));
+    if (activa) return showToast('⚠️ Este equipo ya tiene instalación activa en #' + (activa.caso||'?'));
   }
   // #13 Duplicate series check
   const eq = state.equipos.find(e => e.id === state.form.equipoId);
   if (eq) {
     const yaActivo = state.records.find(r => r.serie === eq.serie && !r.retirado && r.id !== state.editId);
-    if (yaActivo) return showToast('La serie ' + eq.serie + ' ya está instalada en caso #' + (yaActivo.caso||'?'));
+    if (yaActivo) return showToast('⚠️ La serie ' + eq.serie + ' ya está instalada en caso #' + (yaActivo.caso||'?'));
   }
   const usuario = state.sesionUsuario?.nombre || 'Desconocido';
   const energiaInst = state.form.energiaTipoInst === 'una'
@@ -54,14 +54,14 @@ export async function handleSave() {
     const saved = await saveInstallationWithTrace({ payload, installationId: editingId, previous });
     state.editId = null; state.view = 'lista'; state.form = emptyForm();
     render();
-    showToast(editingId ? 'Actualizado' : 'Instalación registrada y vinculada al caso');
+    showToast(editingId ? '✅ Actualizado' : '✅ Instalación registrada y vinculada al caso');
     if (!editingId) {
       setTimeout(() => {
         if (confirm('¿Quieres agregar el recordatorio de retiro a Google Calendar?')) addToGoogleCalendar(saved.payload);
       }, 500);
     }
   } catch (error) {
-    showToast('No se pudo guardar: ' + error.message);
+    showToast('❌ No se pudo guardar: ' + error.message);
   }
 }
 
@@ -84,7 +84,7 @@ export function toggleSinProblema() {
 }
 
 export async function handleRetiro() {
-  if (state.retiroForm.descargaConfirmada === null) return showToast('Indica si ya descargaste la medición');
+  if (state.retiroForm.descargaConfirmada === null) return showToast('⚠️ Indica si ya descargaste la medición');
   if (state.retiroForm.sinProblema === null && state.retiroForm.fallas.length === 0) return showToast('Indica si hubo algún problema');
   const energiaRet = state.retiroForm.energiaTipo === 'una'
     ? { tipo: 'una', una: state.retiroForm.energiaUna }
@@ -133,9 +133,9 @@ export async function handleRetiro() {
   });
   try {
     await writeTraceUpdate({ writes, event });
-    showToast('Equipo marcado como retirado');
+    showToast('✅ Equipo marcado como retirado');
   } catch (error) {
-    showToast('No se pudo registrar el retiro: ' + error.message);
+    showToast('❌ No se pudo registrar el retiro: ' + error.message);
   }
 }
 
@@ -179,15 +179,15 @@ export async function handleDescarga() {
   });
   try {
     await writeTraceUpdate({ writes, event });
-    showToast(nueva.medicionOk ? 'Descarga registrada correctamente' : 'Descarga registrada · Fallo anotado');
+    showToast(nueva.medicionOk ? '💾 Descarga registrada correctamente' : '💾 Descarga registrada · Fallo anotado');
   } catch (error) {
-    showToast('No se pudo registrar la descarga: ' + error.message);
+    showToast('❌ No se pudo registrar la descarga: ' + error.message);
   }
 }
 
 // ── DELETE DEPLOY ──
 export async function handleDelInstall(id) {
-  if (!isAdmin()) return showToast('Solo el administrador puede eliminar registros');
+  if (!isAdmin()) return showToast('⚠️ Solo el administrador puede eliminar registros');
   if (!confirm('¿Eliminar este instalación?')) return;
   const rec = state.records.find(r => r.id === id);
   if (!rec) return;

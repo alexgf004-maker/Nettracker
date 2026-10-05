@@ -23,7 +23,7 @@ export function procesarExcel(file) {
         if (cell2 && cell2.v && cell2.v.toString().toLowerCase().includes('equipo')) { headerRow = r; break; }
       }
       const rows = XLSX.utils.sheet_to_json(ws, { raw: false, range: headerRow });
-      if (rows.length === 0) return showToast('El archivo está vacío');
+      if (rows.length === 0) return showToast('⚠️ El archivo está vacío');
 
       state.cargaData = rows.map(row => {
         // Flexible column finder - handles accents, case, spaces
@@ -78,7 +78,7 @@ export function procesarExcel(file) {
       state.cargaView = 'preview';
       render();
     } catch(err) {
-      showToast('Error al leer el archivo: ' + err.message);
+      showToast('❌ Error al leer el archivo: ' + err.message);
     }
   };
   reader.readAsArrayBuffer(file);
@@ -153,14 +153,14 @@ export async function confirmarCargaMasiva() {
       importados.push(r);
       count++;
     } catch (error) {
-      showToast('No se pudo importar el caso ' + r.caso + ': ' + error.message);
+      showToast('❌ No se pudo importar el caso ' + r.caso + ': ' + error.message);
     }
     procesados++;
     if (progressBar) progressBar.style.width = Math.round(procesados/total*100)+'%';
     if (progressTxt) progressTxt.textContent = procesados + ' / ' + total;
   }
 
-  if (importados.length === 0) return showToast('No se pudo importar ninguna instalación');
+  if (importados.length === 0) return showToast('❌ No se pudo importar ninguna instalación');
 
   // Save to historial
   const registroCarga = {
@@ -171,7 +171,7 @@ export async function confirmarCargaMasiva() {
     realizadoPor: state.sesionUsuario?.nombre || 'Desconocido',
     equipos: importados.map(r => ({ s: r.serie, v: r.vineta||'', c: r.caso, l: r.lugar, fi: r.fechaInst, fr: r.fechaRetiro, n: r.notas||'', iu: r.idUsuario||'', d: r.direccion||'', ac: r.accesorios||'', m: r.multiplicador||'', co: r.corrientes||'', cx: r.conexion||'' }))
   };
-  showToast('' + count + ' instalaciones registradas');
+  showToast('✅ ' + count + ' instalaciones registradas');
   const memoHtml = buildMemoCargaMasiva(importados);
   push(historialCargasRef, {
     fecha: today(),

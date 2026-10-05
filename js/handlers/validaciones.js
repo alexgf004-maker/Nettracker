@@ -36,7 +36,7 @@ window.procesarExcelVal = input => {
         resultado: null,
       }));
       render();
-    } catch(err) { showToast('Error al leer el archivo: ' + err.message); }
+    } catch(err) { showToast('❌ Error al leer el archivo: ' + err.message); }
   };
   reader.readAsArrayBuffer(file);
 };
@@ -51,7 +51,7 @@ window.confirmarNuevaValidacion = () => {
     creadoPor: state.sesionUsuario?.nombre || 'Desconocido',
   }).then(() => {
     state.showValImport = false; state.valImportData = [];
-    showToast('Campaña creada con ' + state.valImportData.length + ' usuarios');
+    showToast('✅ Campaña creada con ' + state.valImportData.length + ' usuarios');
   });
 };
 
@@ -163,7 +163,7 @@ window.guardarValidacion = () => {
     formData: { ...state.valForm, resultado: state.valForm.resultado },
   };
   update(ref(db, 'validaciones/' + state.valCampanaId), { usuarios }).then(() => {
-    showToast('Validación guardada');
+    showToast('✅ Validación guardada');
     state.valView = 'detalle'; state.valForm = {}; render();
   });
 };
@@ -198,7 +198,7 @@ window.exportarValidaciones = el => {
   const ws = XLSX.utils.json_to_sheet(rows);
   XLSX.utils.book_append_sheet(wb, ws, 'Validaciones');
   XLSX.writeFile(wb, 'validaciones_' + camp.nombre.replace(/\s+/g,'_') + '_' + today() + '.xlsx');
-  showToast('Excel exportado');
+  showToast('📊 Excel exportado');
 };
 
 window.autoFillTapsTri = () => {

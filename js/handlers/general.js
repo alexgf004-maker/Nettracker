@@ -60,7 +60,7 @@ window.newInstallFromDash = () => {
 window.toggleMantenimiento = () => {
   const nuevo = !state.modoMantenimiento;
   set(mantenimientoRef, nuevo).then(() => {
-    showToast(nuevo ? 'Modo mantenimiento activado' : 'Mantenimiento desactivado');
+    showToast(nuevo ? '🔧 Modo mantenimiento activado' : '✅ Mantenimiento desactivado');
   });
 };
 
@@ -104,7 +104,7 @@ window.generarReporteMensual = () => {
   const wb=XLSX.utils.book_new();const aS=(n,d)=>{const ws=XLSX.utils.aoa_to_sheet(d);ws['!cols']=Array(10).fill({wch:20});XLSX.utils.book_append_sheet(wb,ws,n);};
   aS('Resumen',RES);aS('Instalaciones',iR);aS('Retiros',rtR);aS('Descargas',dR);aS('Despachos',dpR);aS('Validaciones',vR);
   XLSX.writeFile(wb,'Reporte_'+MN[mes-1]+'_'+anio+(area!=='TODOS'?'_'+area.replace(/ /g,'_'):'')+'.xlsx');
-  state.showReporteModal=false;showToast('Reporte generado');render();
+  state.showReporteModal=false;showToast('📊 Reporte generado');render();
 };
 
 window.goBack = () => { state.view = 'lista'; state.editId = null; state.editEqId = null; state.editCaseId = null; state.caseEntryMode = null; state.selectedCaseId = null; state.selectedCampaignId = null; state.form = emptyForm(); state.equipoForm = emptyEF(); state.showSelector = false; render(); };
