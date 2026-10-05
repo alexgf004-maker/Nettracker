@@ -39,7 +39,7 @@ export const state = {
   casosFiltro: 'todos', // todos | CR | DA | DF | faltantes
   casosBusqueda: '',
   casoEdit: null, // { clave, id }
-  campanaVista: 'precampana', // precampana | casos | multiplicadores | mediciones
+  campanaVista: 'precampana', // precampana | casos | multiplicadores | fechas | mediciones
   multFiltro: 'todos', // todos | listos | por_resolver | no_se_miden
   multEdit: null, // { clave, id }
   multForm: {},

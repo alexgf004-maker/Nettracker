@@ -8,6 +8,7 @@ import {
 import { state } from '../state.js';
 import { escapeHtml, fmtDate } from '../utils.js';
 import { renderCasosCampana, renderPrecampana } from './casos.js';
+import { renderFechas } from './fechas.js';
 import { renderMultiplicadores } from './multiplicadores.js';
 
 const esc = s => escapeHtml(s ?? '');
@@ -113,7 +114,7 @@ function renderCampanaDetalle(c, hoy) {
   }
   html += '</div>';
   // Secciones de la campaña
-  const secciones = [['precampana', 'Precampaña'], ['casos', 'Casos'], ['multiplicadores', 'Multiplicadores'], ['mediciones', 'Mediciones']]
+  const secciones = [['precampana', 'Precampaña'], ['casos', 'Casos'], ['multiplicadores', 'Multiplicadores'], ['fechas', 'Fechas'], ['mediciones', 'Mediciones']]
     .filter(([k]) => c.casos.length || k === 'mediciones');
   const vista = secciones.some(([k]) => k === state.campanaVista) ? state.campanaVista : secciones[0][0];
   if (secciones.length > 1) {
@@ -122,6 +123,7 @@ function renderCampanaDetalle(c, hoy) {
   if (vista === 'precampana') html += renderPrecampana(c);
   if (vista === 'casos') html += renderCasosCampana(c);
   if (vista === 'multiplicadores') html += renderMultiplicadores(c);
+  if (vista === 'fechas') html += renderFechas(c);
   if (vista === 'mediciones') {
     if (!c.registros.length) return html + vacio('instalaciones', 'Todavía no hay instalaciones registradas con códigos de esta campaña.') + '</div>';
     html += barraEtapas(c.resumen);

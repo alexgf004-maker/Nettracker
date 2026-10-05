@@ -60,18 +60,7 @@ export function procesarExcel(file) {
         const corrientes = findCol(['Corrientes','CORRIENTES','Corriente']).toString().trim();
         const conexion = findCol(['Conexion','Conexión','CONEXION','Tipo conexion','Tipo conexión']).toString().trim();
 
-        // Validate
-        const eq = state.equipos.find(e => e.serie === serie);
-        let status = 'ok';
-        let problema = '';
-        if (!serie) { status = 'error'; problema = 'Sin número de serie'; }
-        else if (!eq) { status = 'error'; problema = 'Equipo no existe en inventario'; }
-        else if ((eq.condicion||'bueno') === 'fuera') { status = 'error'; problema = 'Fuera de servicio'; }
-        else if (eqEnCampo(eq)) { status = 'error'; problema = 'Ya está instalado — instalación activa detectada'; }
-        else if (!caso) { status = 'error'; problema = 'Sin número SIGET (obligatorio)'; }
-        else if (!fechaRetiro) { status = 'error'; problema = 'Sin fecha de retiro (obligatoria)'; }
-
-        return { serie, caso, lugar, fechaInst, fechaRetiro, notas, lat, lng, status, problema, equipoId: eq?.id, modelo: eq?.modelo||'', vineta: eq?.vineta||'', idUsuario, direccion, accesorios, multiplicador, corrientes, conexion };
+        return validarFilaCarga({ serie, caso, lugar, fechaInst, fechaRetiro, notas, lat, lng, idUsuario, direccion, accesorios, multiplicador, corrientes, conexion });
       });
 
       state.cargaView = 'preview';
@@ -81,6 +70,21 @@ export function procesarExcel(file) {
     }
   };
   reader.readAsArrayBuffer(file);
+}
+
+// Revisa una fila del despacho (venga del Excel o de las Fechas de una campaña) y le agrega el equipo
+export function validarFilaCarga(fila) {
+  const { serie, caso, fechaRetiro } = fila;
+  const eq = state.equipos.find(e => e.serie === serie);
+  let status = 'ok';
+  let problema = '';
+  if (!serie) { status = 'error'; problema = 'Sin número de serie'; }
+  else if (!eq) { status = 'error'; problema = 'Equipo no existe en inventario'; }
+  else if ((eq.condicion||'bueno') === 'fuera') { status = 'error'; problema = 'Fuera de servicio'; }
+  else if (eqEnCampo(eq)) { status = 'error'; problema = 'Ya está instalado — instalación activa detectada'; }
+  else if (!caso) { status = 'error'; problema = 'Sin número SIGET (obligatorio)'; }
+  else if (!fechaRetiro) { status = 'error'; problema = 'Sin fecha de retiro (obligatoria)'; }
+  return { ...fila, status, problema, equipoId: eq?.id, modelo: eq?.modelo||'', vineta: eq?.vineta||'' };
 }
 
 export function confirmarCargaMasiva() {
