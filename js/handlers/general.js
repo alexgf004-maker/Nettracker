@@ -107,7 +107,7 @@ window.goBack = () => {
 
 window.switchTab = t => {
   state.tab = t; state.view = 'lista'; state.editId = null; state.editEqId = null;
-  state.showMas = false; state.campanaClave = null; state.volverA = null;
+  state.showMas = false; state.campanaClave = null; state.volverA = null; state.casosFiltro = 'todos'; state.casosBusqueda = '';
   if (t === 'instalaciones') state.filterStatus = 'TODOS';
   if (t === 'validaciones') { state.valView = 'lista'; state.valCampanaId = null; state.valUsuarioIdx = null; }
   state.showGlobalSearch = false; state.globalSearch = '';
@@ -122,6 +122,6 @@ window.entrarComo = entrarComo;
 // ── MENÚ Y TRABAJO ──
 window.toggleMas = () => { state.showMas = !state.showMas; render(); };
 window.setAreaFiltro = f => { state.areaFiltro = f; render(); };
-window.abrirCampanaTrabajo = clave => { state.tab = 'campanas'; state.view = 'lista'; state.campanaClave = clave; state.showMas = false; render(); };
+window.abrirCampanaTrabajo = clave => { state.casosFiltro = 'todos'; state.casosBusqueda = ''; state.tab = 'campanas'; state.view = 'lista'; state.campanaClave = clave; state.showMas = false; render(); };
 Object.assign(window, { marcarCampanaEntregada, desmarcarCampanaEntregada, marcarInformeEntregado, desmarcarInformeEntregado, setEntregaLimite, marcarRequerimientoEntregado, desmarcarRequerimientoEntregado });
 window.cerrarSesion = cerrarSesion;

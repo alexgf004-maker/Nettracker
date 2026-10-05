@@ -31,6 +31,13 @@ export const state = {
   areaFiltro: 'mia', // mia | todas (Inicio y pestañas de Trabajo)
   campanas: {}, // campanas/{clave} en Firebase: { entrega: { fecha, por } }
   campanaClave: null, // campaña abierta en la pestaña Campañas
+  // Precampaña
+  showImportListados: false,
+  importListados: null, // { archivos, campanas, avisos } antes de guardar
+  casosFiltro: 'todos', // todos | CR | DA | DF | faltantes
+  casosBusqueda: '',
+  casoEdit: null, // { clave, id }
+  casoForm: {},
   volverA: null, // { tab, campanaClave } para regresar desde el detalle de una instalación
   globalSearch: '',
   showGlobalSearch: false,

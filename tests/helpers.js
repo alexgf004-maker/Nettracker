@@ -12,9 +12,10 @@ const HOY = new Date('2026-09-23T12:00:00');
  * - Firebase se reemplaza por tests/mock/firebase-*.js con los datos de tests/fixture.js
  * - Las librerías externas (Excel, PDF, mapas, fuentes) se bloquean
  * - usuario: nombre para entrar con sesión ya iniciada, o null para ver el login
+ * - excel: true para usar la librería de Excel real (por defecto se bloquea)
  * Devuelve { errores, escrituras() } para verificar al final.
  */
-async function abrirApp(page, { usuario = 'David García', datos = fixture } = {}) {
+async function abrirApp(page, { usuario = 'David García', datos = fixture, excel = false } = {}) {
   const errores = [];
   page.on('pageerror', e => errores.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errores.push('console: ' + m.text()); });
@@ -34,6 +35,10 @@ async function abrirApp(page, { usuario = 'David García', datos = fixture } = {
   await page.route(/leaflet.*\.js$/, route => route.fulfill({ contentType: 'text/javascript',
     body: 'window.L = new Proxy(function () {}, { get: (t, k) => (k === "then" ? undefined : window.L), apply: () => window.L });' }));
   await page.route(/cdnjs\.cloudflare\.com|fonts\.(googleapis|gstatic)\.com|unpkg\.com\/.*\.css|tile\.openstreetmap/, route => route.fulfill({ body: '' }));
+  // excel: true carga la librería de Excel real (SheetJS desde node_modules) para leer y generar archivos
+  // (va después del bloqueo general porque Playwright aplica primero la última ruta registrada)
+  if (excel) await page.route(/cdnjs\.cloudflare\.com\/.*xlsx.*\.js$/, route =>
+    route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(require.resolve('xlsx/dist/xlsx.full.min.js')) }));
   await page.clock.setFixedTime(HOY);
 
   await page.goto('/');

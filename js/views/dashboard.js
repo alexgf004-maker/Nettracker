@@ -63,7 +63,7 @@ function accionPendiente(p) {
 
 function renderResumenTrabajo(hoy, area) {
   const delArea = r => !area || areaDeInstalacion(r) === area;
-  const campanas = agruparCampanas(state.records, hoy).filter(c => !area || c.area === area);
+  const campanas = agruparCampanas(state.records, hoy, state.campanas).filter(c => !area || c.area === area);
   const campAbiertas = campanas.filter(c => !state.campanas?.[c.clave]?.entrega);
   const reclamos = registrosDeTipo(state.records, 'reclamo').filter(delArea);
   const reqs = registrosDeTipo(state.records, 'requerimiento').filter(delArea);

@@ -33,15 +33,18 @@ js/
   domain/                Reglas del trabajo, funciones puras (sin Firebase ni estado)
     trabajo.js           Tipo de caso (campaña/reclamo/requerimiento), periodo, plazos, urgencia
     pendientes.js        Lista de pendientes del Inicio (vencido / hoy / próximos días / por hacer)
+    listados.js          Lectura de listados del ente, control de puntos y base de coordenadas; códigos DA/DF
   actions/               Lógica de negocio (guardar, retirar, préstamos, carga Excel, login)
     auth.js · instalaciones.js · inventario.js · carga.js · revision.js · danio.js
     trabajo.js           Marcar entregas: campaña, informe de reclamo, requerimiento
+    campanas.js          Precampaña: importar listados, completar datos, editar casos, exportar listado
   pdf/memos.js           Plantillas HTML de memorándums (movimiento, lote, carga masiva)
   views/                 Funciones que devuelven HTML (string) según el estado
     render.js            render(): arma header + modales + pestaña activa + nav
     layout.js            Header y menú (SECCIONES: Inicio · Trabajo · Recursos · Herramientas)
     login.js             Pantalla de perfiles y de mantenimiento
     trabajo.js           Pestañas Campañas, Reclamos, Requerimientos y Seguimiento FT
+    casos.js             Tabla de casos de una campaña, ventana de importación y edición de un caso
     modals.js            Todos los modales
     dashboard.js · instalaciones.js · inventario.js · validaciones.js · mapa.js · carga.js
   handlers/              Funciones `window.*` que llaman los onclick/onchange del HTML
@@ -82,7 +85,7 @@ projectId: "pqfind"
 | `historialAccesoriosRef` | `historialAccesorios` | Historial de despachos de accesorios |
 | `validacionesRef` | `validaciones` | Validaciones de tap guardadas |
 | `mantenimientoRef` | `config/mantenimiento` | Flag de modo mantenimiento (bool) |
-| `campanasRef` | `campanas/{AAAA-MM_AREA}` | `{ entrega: { fecha, por } }` cuando la campaña se cargó en el sistema CPT DELSUR |
+| `campanasRef` | `campanas/{AAAA-MM_AREA}` | `{ anio, mes, area, importado, casos, entrega }`: casos importados de los listados del ente y la marca de entrega en el sistema CPT DELSUR |
 
 Campos de seguimiento dentro de `analizadores/{id}`: `informeEntregado: { fecha, por }` (reclamos), `entregaLimite: 'AAAA-MM-DD'` y `entregaRealizada: { fecha, por }` (requerimientos).
 
@@ -163,6 +166,20 @@ No hay registros aparte: todo se deduce de las instalaciones según el código d
 - **Requerimiento**: cualquier otro código.
 - El área de una instalación de Campos y Servicios es su `areaBeneficiaria`.
 - Etapa de cada instalación: programada → en campo → descarga pendiente → retirada.
+
+## Precampaña (etapa 2, primera parte)
+En **Campañas → Importar listados del ente** se suben los cuatro Excel del ente (MT, BT, DA y FK). Los datos empiezan debajo de "Número SIGET"; la dirección viene en tres columnas (colonia, calle, número).
+- Los CR toman el área de su listado (MT → CPT MT, BT → CPT BT).
+- Cada DA y DF es un usuario que ya está entre los CR: se liga por NC (`crRelacionado`) y toma su área. Si el NC no aparece en ningún CR, se avisa y no se importa.
+- Cada caso se guarda en `campanas/{clave}/casos/{código del ente}` con `codigoEnte`, `codigo`, `tipo`, `nc`, `nombre`, `direccionEnte`, `municipio` y `depto`. Volver a importar actualiza los datos del ente sin tocar lo completado ni el código corregido.
+
+En el detalle de la campaña:
+- **Completar con control de puntos** (hoja LISTADO): por NC toma CT/DS (CENTROMTBT), medidor, alimentador (AL + "-" + TENSION, p. ej. AL091-23000), urbanidad, dirección y tipo de instalación. Las coordenadas de ese archivo no sirven y no se usan. Solo cuentan las filas con código de caso; las tablas pegadas al final se ignoran.
+- **Completar coordenadas**: de la base de usuarios (columnas NC, latitud y longitud) se toman solo los NC de la campaña; se descartan las coordenadas fuera de El Salvador.
+- **Editar un caso**: lo que se cambia a mano queda en `manual/{campo}` y ya no lo pisan los archivos. En DA/DF se corrige el tipo de sistema verificado en campo (dígito después del correlativo: 1 monofásico, 2 bifásico, 3 trifásico), lo que cambia el código; el ente no lo deja fijo.
+- **Exportar listado**: Excel con las columnas del equipo (NC, CÓDIGO SIGET, NOMBRE, DIRECCIÓN, CORTE, MEDIDOR, LATITUD, LONGITUD, UBICACIÓN, ALIMENTADOR, URBANIDAD).
+
+Pendiente para las siguientes partes de la etapa 2: multiplicadores con sus estados y Fechas 1, 2 y 3.
 
 ## Área: Inicio (dashboard)
 `calcularPendientes()` (`js/domain/pendientes.js`) arma la lista; avisa desde 3 días antes (`DIAS_AVISO`):
