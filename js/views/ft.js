@@ -1,5 +1,6 @@
 // Pestaña Seguimiento FT: casos fuera de tolerancia de todas las campañas, con su plazo de 90 días
-import { casosFT, DIAS_SOLUCION_FT, RUTAS_FT } from '../domain/ft.js';
+import { DIAS_SOLUCION_FT, RUTAS_FT } from '../domain/ft.js';
+import { todosFT } from '../domain/expedientes.js';
 import { hoyLocal, nombreCampana } from '../domain/trabajo.js';
 import { state } from '../state.js';
 import { escapeHtml, fmtDate } from '../utils.js';
@@ -11,7 +12,7 @@ const esc = s => escapeHtml(s ?? '');
 
 export function renderFT() {
   const hoy = hoyLocal();
-  const lista = casosFT(state.campanas, state.records, hoy).filter(x => !areaVista() || x.area === areaVista());
+  const lista = todosFT(state.campanas, state.reclamos, state.records, hoy).filter(x => !areaVista() || x.area === areaVista());
   const abiertos = lista.filter(x => !x.cerrado);
   const cerrados = lista.filter(x => x.cerrado);
   const sinAviso = abiertos.filter(x => !x.ft.aviso).length;
@@ -27,14 +28,14 @@ export function renderFT() {
     </div>
     <div class="hero-acciones page-hero-acciones">${areaHero(state.areaFiltro !== 'todas', userArea())}</div></div>`;
   if (!lista.length) {
-    return html + `<div class="empty"><i class="empty-icon ic ic-ft"></i><div class="empty-text">No hay casos fuera de tolerancia. Aparecen aquí cuando un resultado queda fuera de tolerancia en la pestaña Resultados de la campaña.</div></div></div>`;
+    return html + `<div class="empty"><i class="empty-icon ic ic-ft"></i><div class="empty-text">No hay casos fuera de tolerancia. Aparecen aquí cuando un resultado de campaña o el análisis de un reclamo queda fuera de tolerancia.</div></div></div>`;
   }
   const tarjeta = x => {
     const pct = x.dias === null ? 0 : Math.min(100, Math.round(x.dias * 100 / DIAS_SOLUCION_FT));
     const feb = x.caso.resultado?.febNoPer;
     return `<div class="card ft-card ${x.cerrado ? 'cerrado' : ''}" onclick="abrirFT('${x.clave}', '${x.id}')"><div class="ft-item" style="border:none">
       <div class="ft-pct">${feb === undefined || feb === '' ? '—' : esc(feb) + '%'}<small>FebNoPer</small></div>
-      <div class="ft-info"><div class="card-top" style="margin:0"><div><b>${esc(x.codigo)}</b><div class="n">${esc(x.caso.nombre)} · ${nombreCampana(x)} · ${esc(x.area)}</div></div>
+      <div class="ft-info"><div class="card-top" style="margin:0"><div><b>${esc(x.codigo)}</b><div class="n">${esc(x.caso.nombre)} · ${x.tipo === 'reclamo' ? 'Reclamo' : nombreCampana(x)} · ${esc(x.area)}</div></div>
           ${x.cerrado ? '<span class="tg verde"><i class="ic ic-check"></i> Cerrado</span>' : x.limite ? tagPlazo(x.limite, hoy) : '<span class="falta">Sin fecha de instalación</span>'}</div>
         ${x.dias !== null && !x.cerrado ? `<div class="ft-dias"><i class="${x.vencido || pct >= 80 ? 'mal' : ''}" style="width:${pct}%"></i></div>
           <div class="barra-leyenda" style="margin:4px 0 0"><span>Día ${x.dias} de ${DIAS_SOLUCION_FT}</span><span>Instalación ${fmtDate(x.inicio)} · plazo ${fmtDate(x.limite)}</span></div>` : ''}
@@ -53,12 +54,13 @@ export function renderFT() {
 
 export function renderFTModal() {
   const { clave, id } = state.ftEdit;
-  const x = casosFT({ [clave]: state.campanas?.[clave] }, state.records, hoyLocal()).find(f => f.id === id);
+  const x = todosFT(clave === 'reclamo' ? {} : { [clave]: state.campanas?.[clave] }, clave === 'reclamo' ? state.reclamos : {}, state.records, hoyLocal()).find(f => f.id === id);
   if (!x) return '';
   const ft = x.ft; const rem = ft.remedicion || {};
   let html = '<div class="modal-overlay"><div class="modal hoja">';
   html += `<div class="modal-head"><div><div class="modal-titulo mono">${esc(x.codigo)}</div><div class="page-sub">${esc(x.caso.nombre)} · FebNoPer ${esc(x.caso.resultado?.febNoPer ?? '—')} %</div></div><button class="modal-cerrar" onclick="cerrarFT()" title="Cerrar">✕</button></div>`;
-  if (x.caso.resultado?.graficas) html += `<button class="btn btn-secondary" onclick="verGraficas('${clave}', '${id}')"><i class="ic ic-grafica"></i> Ver gráficas de voltaje y corriente</button>`;
+  if (x.tipo === 'reclamo' && x.instId) html += `<button class="btn btn-secondary" onclick="cerrarFT(); abrirAnalisisReclamo('${x.instId}')"><i class="ic ic-grafica"></i> Ver análisis de la medición</button>`;
+  else if (x.caso.resultado?.graficas) html += `<button class="btn btn-secondary" onclick="verGraficas('${clave}', '${id}')"><i class="ic ic-grafica"></i> Ver gráficas de voltaje y corriente</button>`;
   html += `<div class="panel-fila"><span>Instalación de la medición inicial</span><b>${fmtDate(x.inicio)}</b></div>`;
   html += `<div class="panel-fila"><span>Plazo de ${DIAS_SOLUCION_FT} días</span><b>${fmtDate(x.limite)}${x.dias !== null ? ` · día ${x.dias}` : ''}</b></div>`;
 

@@ -1,9 +1,9 @@
 // Pendientes del Inicio: se calculan a partir de los datos, no se anotan a mano.
 // Función pura: recibe los datos y la fecha de hoy y devuelve la lista ordenada.
 import {
-  agruparCampanas, areaDeInstalacion, fechaInformeReclamo, nombreCampana, tipoDeTrabajo, urgencia,
+  agruparCampanas, areaDeInstalacion, nombreCampana, tipoDeTrabajo, urgencia,
 } from './trabajo.js';
-import { casosFT } from './ft.js';
+import { listaExpedientes, todosFT } from './expedientes.js';
 
 // Orden de las urgencias en pantalla
 export const GRUPOS = [
@@ -14,10 +14,11 @@ export const GRUPOS = [
 ];
 
 // registros: instalaciones (analizadores); campanasGuardadas: { [clave|area]: { entrega } }
+// reclamos: expedientes de reclamo (reclamos/{id}); solo ellos generan pendientes de reclamo
 // area: 'CPT MT' | 'CPT BT' | null (todas)
 // desde: 'AAAA-MM-DD' o null. Lo que venció o se retiró antes de esa fecha no se cuenta
 // (sirve para no arrastrar mediciones viejas registradas antes de usar el seguimiento).
-export function calcularPendientes({ registros, campanasGuardadas = {}, hoy, area = null, desde = null }) {
+export function calcularPendientes({ registros, campanasGuardadas = {}, reclamos = {}, hoy, area = null, desde = null }) {
   const lista = [];
   const delArea = r => !area || areaDeInstalacion(r) === area;
   const cuenta = fecha => !desde || (fecha && fecha >= desde);
@@ -36,12 +37,6 @@ export function calcularPendientes({ registros, campanasGuardadas = {}, hoy, are
     if (r.retirado && r.descargaPendiente && cuenta(r.fechaRetiroReal)) {
       lista.push({ ...ref, clase: 'descarga', urgencia: 'sin_fecha', fecha: r.fechaRetiroReal || null, titulo: `Descargar medición de ${r.serie || 'equipo'}`, detalle: detalleCaso(r) });
     }
-    // Informe de reclamo: 8 días calendario desde el retiro
-    if (tipo === 'reclamo' && r.retirado && !r.informeEntregado && cuenta(r.fechaRetiroReal)) {
-      const limite = fechaInformeReclamo(r.fechaRetiroReal);
-      const u = urgencia(limite, hoy);
-      lista.push({ ...ref, clase: 'informe', urgencia: u === 'ok' ? 'sin_fecha' : u, fecha: limite, titulo: `Entregar informe del reclamo ${r.caso || ''}`.trim(), detalle: r.lugar || '' });
-    }
     // Requerimiento con fecha de entrega
     if (tipo === 'requerimiento' && r.entregaLimite && !r.entregaRealizada && cuenta(r.entregaLimite)) {
       const u = urgencia(r.entregaLimite, hoy);
@@ -57,10 +52,25 @@ export function calcularPendientes({ registros, campanasGuardadas = {}, hoy, are
     if (u !== 'ok') lista.push({ clase: 'campana', clave: c.clave, tipo: 'campana', urgencia: u, fecha: c.fechaEntrega, titulo: `Cargar la campaña ${nombreCampana(c)} en el sistema CPT DELSUR`, detalle: `${c.area} · ${c.casos.length || c.resumen.total} ${(c.casos.length || c.resumen.total) === 1 ? 'caso' : 'casos'}` });
   }
 
-  // Casos fuera de tolerancia: avisar a DELSUR de inmediato y no pasar los 90 días
-  for (const x of casosFT(campanasGuardadas, registros, hoy)) {
+  // Expedientes de reclamo: instalar la medición y entregar el informe 8 días después del retiro
+  for (const e of listaExpedientes(reclamos, registros, hoy)) {
+    if (area && e.area !== area) continue;
+    const ref = { clase: 'reclamo', tipo: 'reclamo', id: e.id, caso: e.codigo };
+    const actual = e.resumen.actual;
+    if (actual?.etapa === 'sin_instalar' && e.resumen.estado !== 'cerrado') {
+      lista.push({ ...ref, urgencia: 'sin_fecha', fecha: e.recibido || null, titulo: `Ubicar e instalar el reclamo ${actual.codigo}`, detalle: e.nombre || '' });
+    }
+    for (const m of e.resumen.informePendiente) {
+      if (!cuenta(m.inst.fechaRetiroReal)) continue;
+      const u = urgencia(m.informeLimite, hoy);
+      lista.push({ ...ref, clase: 'informe', urgencia: u === 'ok' ? 'sin_fecha' : u, fecha: m.informeLimite, titulo: `Entregar informe del reclamo ${m.codigo}`, detalle: e.nombre || '' });
+    }
+  }
+
+  // Casos fuera de tolerancia (campañas y reclamos): avisar a DELSUR de inmediato y no pasar los 90 días
+  for (const x of todosFT(campanasGuardadas, reclamos, registros, hoy)) {
     if (x.cerrado || (area && x.area !== area)) continue;
-    const ref = { clase: 'ft', tipo: 'campana', clave: x.clave, id: x.id, caso: x.codigo };
+    const ref = { clase: 'ft', tipo: x.tipo, clave: x.clave, id: x.id, caso: x.codigo };
     if (!x.ft.aviso) lista.push({ ...ref, urgencia: 'hoy', fecha: hoy, titulo: `Avisar a DELSUR del caso FT ${x.codigo}`, detalle: x.caso.nombre || '' });
     if (x.limite && cuenta(x.limite)) {
       const u = urgencia(x.limite, hoy);

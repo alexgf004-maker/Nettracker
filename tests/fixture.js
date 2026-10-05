@@ -11,7 +11,7 @@ module.exports = {
     r7: { serie: 'SN-200', modelo: 'PQ-1', caso: 'CR192026101', lugar: 'Nejapa', fechaInstalacion: '2026-09-05', fechaRetiro: '2026-10-08', areaInstalacion: 'CPT MT', fechaRegistro: '2026-09-05T10:00' },
     r8: { serie: 'SN-201', modelo: 'PQ-1', caso: 'DA182026201', lugar: 'Quezaltepeque', fechaInstalacion: '2026-08-01', fechaRetiro: '2026-08-30', areaInstalacion: 'CPT MT', fechaRegistro: '2026-08-01T10:00',
       retirado: true, fechaRetiroReal: '2026-08-30', descargaPendiente: true },
-    r9: { serie: 'SN-202', modelo: 'PQ-2', caso: 'RE-2026-0456', lugar: 'Antiguo Cuscatlán', fechaInstalacion: '2026-09-01', fechaRetiro: '2026-09-15', areaInstalacion: 'CPT MT', fechaRegistro: '2026-09-01T09:00',
+    r9: { serie: 'SN-202', modelo: 'PQ-2', caso: 'RE192026456', lugar: 'Antiguo Cuscatlán', fechaInstalacion: '2026-09-01', fechaRetiro: '2026-09-15', areaInstalacion: 'CPT MT', fechaRegistro: '2026-09-01T09:00',
       retirado: true, fechaRetiroReal: '2026-09-16' },
   },
   equipos: {
@@ -38,6 +38,10 @@ module.exports = {
   },
   historialAccesorios: {
     ha1: { fecha: '2026-09-18', hora: '08:00', de: 'CPT MT', para: 'Campos y Servicios', items: [{ nombre: 'Candados', cantidad: 3, detalle: '' }] },
+  },
+  // Expediente de reclamo (datos inventados) para la instalación r9
+  reclamos: {
+    'RE-92026456': { codigo: 'RE192026456', wo: 'WO-100200', ct: 'CT10001', motivo: 'Se requiere el estudio de voltaje', nc: '900100', nombre: 'USUARIO DE PRUEBA', direccion: 'CALLE PRUEBA 1, SANTA TECLA', corte: 'DS100001', medidor: 'MED-1', area: 'CPT MT', recibido: '2026-08-30' },
   },
   config: { mantenimiento: false },
 };

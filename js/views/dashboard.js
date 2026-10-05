@@ -2,14 +2,14 @@
 import { isAdmin, userArea } from '../config.js';
 import { GRUPOS, calcularPendientes } from '../domain/pendientes.js';
 import { agruparCampanas, areaDeInstalacion, diasEntre, hoyLocal, registrosDeTipo } from '../domain/trabajo.js';
-import { casosFT } from '../domain/ft.js';
+import { listaExpedientes, todosFT } from '../domain/expedientes.js';
 import { state } from '../state.js';
 import { calcSt, escapeHtml, eqEnCampo, eqSt, fmtDate } from '../utils.js';
 import { areaVista, textoPlazo } from './trabajo.js';
 import { areaHero, heroSeccion } from './componentes.js';
 
 const esc = s => escapeHtml(s ?? '');
-const ICONO_PENDIENTE = { ft: 'ft', retiro: 'ruta', descarga: 'descargar', informe: 'reclamos', requerimiento: 'requerimientos', campana: 'campanas' };
+const ICONO_PENDIENTE = { ft: 'ft', retiro: 'ruta', descarga: 'descargar', informe: 'reclamos', reclamo: 'reclamos', requerimiento: 'requerimientos', campana: 'campanas' };
 const CLASE_GRUPO = { vencido: 'rojo', hoy: 'rojo', proximo: 'amarillo', sin_fecha: 'gris' };
 
 export function renderDashboard() {
@@ -17,7 +17,7 @@ export function renderDashboard() {
   const area = areaVista();
   const nombre = state.sesionUsuario?.nombre?.split(' ')[0] || '';
   const fechaLarga = new Date().toLocaleDateString('es-SV', { weekday: 'long', day: 'numeric', month: 'long' }).replace(/^./, c => c.toUpperCase());
-  const pend = calcularPendientes({ registros: state.records, campanasGuardadas: state.campanas || {}, hoy, area, desde: state.seguimientoDesde });
+  const pend = calcularPendientes({ registros: state.records, campanasGuardadas: state.campanas || {}, reclamos: state.reclamos || {}, hoy, area, desde: state.seguimientoDesde });
   const cuenta = u => pend.filter(p => p.urgencia === u).length;
   const resumen = [[cuenta('vencido'), 'vencido', 'vencidos'], [cuenta('hoy'), 'para hoy', 'para hoy'], [cuenta('proximo'), 'próximo', 'próximos']]
     .filter(([n]) => n).map(([n, uno, varios]) => `${n} ${n === 1 ? uno : varios}`).join(' · ');
@@ -27,7 +27,7 @@ export function renderDashboard() {
   const enCampo = state.records.filter(r => delArea(r) && !r.retirado && (r.fechaInstalacion || '') <= hoy).length;
   const retirosSemana = state.records.filter(r => delArea(r) && !r.retirado && r.fechaRetiro && r.fechaRetiro >= hoy && diasEntre(hoy, r.fechaRetiro) <= 7).length;
   const campAbiertas = agruparCampanas(state.records, hoy, state.campanas).filter(c => (!area || c.area === area) && !state.campanas?.[c.clave]?.entrega).length;
-  const ftAbiertos = casosFT(state.campanas, state.records, hoy).filter(x => !x.cerrado && (!area || x.area === area)).length;
+  const ftAbiertos = todosFT(state.campanas, state.reclamos, state.records, hoy).filter(x => !x.cerrado && (!area || x.area === area)).length;
 
   let html = '<div class="content inicio">';
   html += heroSeccion({
@@ -96,7 +96,7 @@ function renderDesde(hoy, desde) {
 function accionPendiente(p) {
   if (p.clase === 'campana') return `abrirCampanaTrabajo('${p.clave}')`;
   if (p.clase === 'ft') return `switchTab('ft'); abrirFT('${p.clave}', '${p.id}')`;
-  if (p.clase === 'informe') return "switchTab('reclamos')";
+  if (p.clase === 'informe' || p.clase === 'reclamo') return `switchTab('reclamos'); abrirExpediente('${p.id}')`;
   if (p.clase === 'requerimiento') return "switchTab('requerimientos')";
   return `goToInstall('${p.id}')`;
 }
@@ -106,14 +106,15 @@ function renderResumenTrabajo(hoy, area, ftAbiertos) {
   const delArea = r => !area || areaDeInstalacion(r) === area;
   const campanas = agruparCampanas(state.records, hoy, state.campanas).filter(c => !area || c.area === area);
   const campAbiertas = campanas.filter(c => !state.campanas?.[c.clave]?.entrega);
-  const reclamos = registrosDeTipo(state.records, 'reclamo').filter(delArea);
+  const reclamos = listaExpedientes(state.reclamos, state.records, hoy).filter(e => !area || e.area === area);
+  const recAbiertos = reclamos.filter(e => e.resumen.estado !== 'cerrado');
   const reqs = registrosDeTipo(state.records, 'requerimiento').filter(delArea);
   const fila = (tab, icono, titulo, num, sub, alerta = false) => `<button class="ini-fila ${alerta ? 'alerta' : ''}" onclick="switchTab('${tab}')">
       <span class="ini-fila-ic"><i class="ic ic-${icono}"></i></span><span class="ini-fila-tx"><b>${titulo}</b><small>${sub}</small></span><span class="ini-fila-n">${num}</span><i class="ic ic-chevron-right ini-fila-go"></i></button>`;
   let html = '<div class="bloque"><div class="bloque-head"><div class="bloque-titulo">Trabajo</div></div><div class="ini-filas">';
   html += fila('campanas', 'campanas', 'Campañas', campAbiertas.length, campAbiertas.length === 1 ? 'sin entregar' : 'sin entregar');
-  html += fila('reclamos', 'reclamos', 'Reclamos', reclamos.filter(r => !r.informeEntregado).length,
-    `${reclamos.filter(r => !r.retirado).length} en campo · ${reclamos.filter(r => r.retirado && !r.informeEntregado).length} con informe pendiente`);
+  html += fila('reclamos', 'reclamos', 'Reclamos', recAbiertos.length,
+    `${recAbiertos.filter(e => e.resumen.actual?.etapa === 'en_campo').length} en campo · ${reclamos.filter(e => e.resumen.informePendiente.length).length} con informe pendiente`);
   html += fila('requerimientos', 'requerimientos', 'Requerimientos', reqs.filter(r => !r.entregaRealizada).length, 'por entregar');
   html += fila('ft', 'ft', 'Seguimiento FT', ftAbiertos, ftAbiertos ? 'abiertos: se penalizan' : 'sin casos abiertos', ftAbiertos > 0);
   return html + '</div></div>';

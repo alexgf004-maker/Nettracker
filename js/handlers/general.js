@@ -32,7 +32,7 @@ window.setGlobalSearch = v => {
 window.goToInstall = el => {
   const id = typeof el === 'string' ? el : el.dataset.id;
   // Desde Inicio o Trabajo, "volver" regresa a donde estaba
-  state.volverA = state.tab !== 'instalaciones' ? { tab: state.tab, campanaClave: state.campanaClave } : null;
+  state.volverA = state.tab !== 'instalaciones' ? { tab: state.tab, campanaClave: state.campanaClave, expedienteId: state.expedienteId } : null;
   state.showGlobalSearch = false; state.tab = 'instalaciones'; state.view = 'detalle'; state.editId = id;
   const r = state.records.find(x => x.id === id);
   if (r) state.instTab = (r.areaInstalacion||'CPT MT')==='CPT BT'?'cpt_bt':(r.areaInstalacion==='Campos y Servicios'?'campos':'cpt_mt');
@@ -103,12 +103,13 @@ window.generarReporteMensual = () => {
 
 window.goBack = () => {
   if (state.view === 'lista' && state.campanaClave) { state.campanaClave = null; render(); return; }
-  if (state.view === 'detalle' && state.volverA) { Object.assign(state, state.volverA, { view: 'lista', editId: null, volverA: null }); render(); return; }
+  if (state.view === 'lista' && state.tab === 'reclamos' && state.expedienteId) { state.expedienteId = null; render(); return; }
+  if ((state.view === 'detalle' || state.view === 'form') && state.volverA) { Object.assign(state, state.volverA, { view: 'lista', editId: null, volverA: null }); render(); return; }
   state.view = 'lista'; state.editId = null; state.editEqId = null; state.form = emptyForm(); state.equipoForm = emptyEF(); state.showSelector = false; render(); };
 
 window.switchTab = t => {
   state.tab = t; state.view = 'lista'; state.editId = null; state.editEqId = null;
-  state.showMas = false; state.campanaClave = null; state.volverA = null; state.casosFiltro = 'todos'; state.casosBusqueda = '';
+  state.showMas = false; state.campanaClave = null; state.expedienteId = null; state.volverA = null; state.casosFiltro = 'todos'; state.casosBusqueda = '';
   if (t === 'instalaciones') state.filterStatus = 'TODOS';
   if (t === 'validaciones') { state.valView = 'lista'; state.valCampanaId = null; state.valUsuarioIdx = null; }
   state.showGlobalSearch = false; state.globalSearch = '';

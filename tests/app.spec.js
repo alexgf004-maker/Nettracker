@@ -42,7 +42,7 @@ test.describe('Navegación', () => {
     app = await abrirApp(page);
     await cerrarAlerta(page);
     await expect(app$(page)).toContainText('Pendientes');
-    for (const [pestana, texto] of [['Campañas', 'Agosto 2026'], ['Reclamos', 'RE-2026-0456'], ['Requerimientos', 'C-001'], ['Seguimiento FT', 'No hay casos fuera de tolerancia']]) {
+    for (const [pestana, texto] of [['Campañas', 'Agosto 2026'], ['Reclamos', 'USUARIO DE PRUEBA'], ['Requerimientos', 'C-001'], ['Seguimiento FT', 'No hay casos fuera de tolerancia']]) {
       await nav(page, pestana);
       await expect(app$(page)).toContainText(texto);
     }
@@ -75,7 +75,7 @@ test.describe('Inicio', () => {
     await cerrarAlerta(page);
     const grupo = titulo => page.locator('.grupo', { has: page.locator('.grupo-titulo', { hasText: titulo }) });
     await expect(grupo('Vencido')).toContainText('Cargar la campaña Agosto 2026 en el sistema CPT DELSUR');
-    await expect(grupo('Próximos días')).toContainText('Entregar informe del reclamo RE-2026-0456');
+    await expect(grupo('Próximos días')).toContainText('Entregar informe del reclamo RE192026456');
     await expect(grupo('Próximos días')).toContainText('Retirar SN-101');
     await expect(grupo('Por hacer')).toContainText('Descargar medición de SN-201');
     // SN-102 es de CPT BT: solo aparece al ver todas las áreas
@@ -150,11 +150,12 @@ test.describe('Trabajo', () => {
 
   test('reclamos: informe a 8 días del retiro y marcarlo entregado', async ({ page }) => {
     await nav(page, 'Reclamos');
-    await expect(app$(page)).toContainText('Informe para el 24/09/2026');
+    await page.locator('.exp-card', { hasText: 'RE192026456' }).click();
+    await expect(page.locator('.exp-medicion')).toContainText('Límite (8 días del retiro)');
+    await expect(page.locator('.exp-medicion')).toContainText('24/09/2026');
     await page.getByRole('button', { name: 'Informe entregado' }).click();
     expect(await app.escrituras()).toContainEqual(['update', 'analizadores/r9', { informeEntregado: { fecha: '2026-09-23', por: 'David García' } }]);
-    await expect(app$(page)).toContainText('Informe entregado (1)');
-    await page.getByRole('button', { name: 'Deshacer' }).click();
+    await page.getByRole('button', { name: 'Quitar marca de informe' }).click();
     expect((await app.escrituras()).at(-1)).toEqual(['update', 'analizadores/r9', { informeEntregado: null }]);
   });
 
@@ -1503,18 +1504,18 @@ test.describe('Análisis de reclamos', () => {
     expect(r.cumpleT).toEqual({ 1: false, 2: true, 3: true });
     expect(r.cumpleI).toEqual({ 1: true, 2: true, 3: true });
     expect(r.lim).toEqual(['6.0%', '2.0%']);
-    expect(r.guardado).toEqual({ tension: { febNoPer: 10 / 144, estado: 'FUERA DE TOLERANCIA' }, armonicos: { tension: 'NO CUMPLE', corriente: 'CUMPLE' } });
+    expect(r.guardado).toEqual({ tension: { febNoPer: 10 / 144, estado: 'FUERA DE TOLERANCIA' }, flicker: 'CUMPLE', armonicos: { tension: 'NO CUMPLE', corriente: 'CUMPLE' } });
   });
 
   test('sube los dos TXT, muestra las gráficas y lo guarda en el reclamo', async ({ page }) => {
     app = await abrirApp(page);
     await cerrarAlerta(page);
     await nav(page, 'Reclamos');
-    const fila = page.locator('.fila', { hasText: 'RE-2026-0456' });
-    await fila.getByRole('button', { name: 'Analizar TXT' }).click();
+    await page.locator('.exp-card', { hasText: 'RE192026456' }).click();
+    await page.locator('.exp-medicion').getByRole('button', { name: 'Analizar TXT' }).click();
     await page.locator('.graf-modal input[type=file]').setInputFiles([
-      { name: 'RE-2026-0456.txt', mimeType: 'text/plain', buffer: Buffer.from(txtTension()) },
-      { name: 'RE-2026-04560.txt', mimeType: 'text/plain', buffer: Buffer.from(txtArmonicos()) }]);
+      { name: 'RE192026456.txt', mimeType: 'text/plain', buffer: Buffer.from(txtTension()) },
+      { name: 'RE1920264560.txt', mimeType: 'text/plain', buffer: Buffer.from(txtArmonicos()) }]);
     const modal = page.locator('.graf-modal');
     await expect(modal.locator('.arch-slot.lleno')).toHaveCount(2);
     await expect(page.locator('#ar-nominal')).toHaveValue('13200');
@@ -1533,16 +1534,26 @@ test.describe('Análisis de reclamos', () => {
     await expect(page.locator('.toast')).toContainText('Análisis guardado');
     const esc = await app.escrituras();
     const archivos = esc.find(([, ruta]) => ruta === 'archivosReclamo/r9')[2];
-    expect(archivos.tension.nombre).toBe('RE-2026-0456');
+    expect(archivos.tension.nombre).toBe('RE192026456');
     expect(archivos.armonicos.gz.length).toBeGreaterThan(100);
     const guardado = esc.find(([, ruta, v]) => ruta === 'analizadores/r9' && v.analisisReclamo)[2].analisisReclamo;
     expect(guardado.params).toMatchObject({ fases: 3, nominal: '13200', red: 'urbano_mt' });
     expect(guardado.resultado.armonicos).toEqual({ tension: 'NO CUMPLE', corriente: 'CUMPLE' });
     await modal.locator('.modal-cerrar').click();
-    await expect(fila).toContainText('FebNoPer 6.94 %');
-    await expect(fila).toContainText('Armónicos no cumplen (tensión)');
+    // El expediente muestra el resultado; con FebNoPer > 5 % pasa a fuera de tolerancia
+    const med = page.locator('.exp-medicion');
+    await expect(med).toContainText('FebNoPer 6.94 % · fuera de tolerancia');
+    await expect(med).toContainText('Armónicos: tensión no cumple · corriente cumple');
+    await expect(page.locator('.hero')).toContainText('Fuera de tolerancia');
+    await page.getByRole('tab', { name: /Seguimiento/ }).click();
+    await expect(app$(page)).toContainText('Armónicos de tensión fuera de límite. Le compete al usuario');
+    await expect(page.locator('.ft-item')).toContainText('Falta avisar a DELSUR');
+    await nav(page, 'Seguimiento FT');
+    await expect(page.locator('.ft-card')).toContainText('USUARIO DE PRUEBA · Reclamo');
     // Al reabrir se cargan los TXT guardados (comprimidos) y los datos de la medición
-    await fila.getByRole('button', { name: 'Ver análisis' }).click();
+    await nav(page, 'Reclamos');
+    await page.locator('.exp-card', { hasText: 'RE192026456' }).click();
+    await page.locator('.exp-medicion').getByRole('button', { name: 'Ver análisis' }).click();
     await expect(modal.locator('.arch-slot.lleno')).toHaveCount(2);
     await expect(modal.locator('.tile', { hasText: 'FebNoPer' })).toContainText('6.94 %');
   });
@@ -1553,12 +1564,12 @@ test.describe('Análisis de reclamos', () => {
     await cerrarAlerta(page);
     await page.evaluate(([tt, ta]) => {
       abrirAnalisisReclamo('r9');
-      cargarTXTReclamo([{ nombre: 'RE-2026-0456.txt', texto: tt }, { nombre: 'RE-2026-04560.txt', texto: ta }]);
+      cargarTXTReclamo([{ nombre: 'RE192026456.txt', texto: tt }, { nombre: 'RE1920264560.txt', texto: ta }]);
       setParamReclamo('usuario', 'Empresa');
     }, [txtTension(), txtArmonicos()]);
     const bajar = async boton => { const d = page.waitForEvent('download'); await page.getByRole('button', { name: boton }).click(); return d; };
     const dt = await bajar('Excel de tensión');
-    expect(dt.suggestedFilename()).toBe('RE-2026-0456_Graficas.xlsx');
+    expect(dt.suggestedFilename()).toBe('RE192026456_Graficas.xlsx');
     const bt = require('fs').readFileSync(await dt.path());
     const wt = XLSX.read(bt);
     expect(wt.SheetNames).toEqual(['Tensión promedio', 'Tensión máxima', 'Tensión mínima', 'Corriente promedio', 'Corriente máxima', 'PST']);
@@ -1575,7 +1586,7 @@ test.describe('Análisis de reclamos', () => {
     expect(Buffer.from(XLSX.CFB.find(zt, '/xl/worksheets/sheet1.xml').content).toString()).toContain('<drawing r:id="rIdDibujo1"/>');
 
     const da = await bajar('Excel de armónicos');
-    expect(da.suggestedFilename()).toBe('RE-2026-04560_Armonicos.xlsx');
+    expect(da.suggestedFilename()).toBe('RE1920264560_Armonicos.xlsx');
     const ba = require('fs').readFileSync(await da.path());
     const wa = XLSX.read(ba);
     expect(wa.SheetNames).toEqual(['Detalle_V', 'Detalle_I', 'Resumen_Armonicos', 'Resumen_Compacto', 'Graficos']);
@@ -1590,5 +1601,76 @@ test.describe('Análisis de reclamos', () => {
     expect(espectro).toContain('<c:barChart>');
     expect(espectro).toContain("'Graficos'!$B$2:$B$25"); // límite de la Tabla 4
     expect(XLSX.CFB.find(za, '/xl/charts/chart4.xml')).toBeTruthy();
+  });
+});
+
+// ── Expedientes de reclamo ──
+test.describe('Expedientes de reclamo', () => {
+  // Correo como queda al copiarlo de Outlook (datos inventados)
+  const CORREO = [
+    'RE182026999 _ RV: WO-123456 , CT20001 , Se requiere el estudio de voltaje , COLONIA PRUEBA, MUNICIPIO PRUEBA LA LIBERTAD',
+    'Buenas tardes David.',
+    'Favor su apoyo con la atención de este requerimiento.',
+    'RE182026999',
+    'Identificación del Punto de medición',
+    'ID Usuario:\t900999',
+    'Nombre del Usuario:\tUSUARIO INVENTADO',
+    'Dirección:',
+    'CALLE INVENTADA 5, SAN SALVADOR',
+    'Centro MT/BT ó Corte:\tDS999999',
+    'Medidor\t999999-XT',
+  ].join('\n');
+
+  test('lee el asunto y la tabla del correo de DELSUR', async ({ page }) => {
+    app = await abrirApp(page);
+    const r = await page.evaluate(async c => (await import('/js/domain/expedientes.js')).leerCorreoReclamo(c), CORREO);
+    expect(r).toEqual({ codigo: 'RE182026999', wo: 'WO-123456', ct: 'CT20001', motivo: 'Se requiere el estudio de voltaje', zona: 'COLONIA PRUEBA, MUNICIPIO PRUEBA LA LIBERTAD', nc: '900999', nombre: 'USUARIO INVENTADO', direccion: 'CALLE INVENTADA 5, SAN SALVADOR', corte: 'DS999999', medidor: '999999-XT' });
+  });
+
+  test('nuevo reclamo desde el correo: crea el expediente y lleva a registrar la instalación', async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await nav(page, 'Reclamos');
+    // Las instalaciones RE sueltas no son expedientes: solo aparece el que se creó a mano
+    await expect(page.locator('.exp-card')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Nuevo reclamo' }).click();
+    await page.locator('#nr-correo').fill(CORREO);
+    await page.locator('#nr-correo').blur();
+    await expect(page.locator('#nr-nombre')).toHaveValue('USUARIO INVENTADO');
+    await expect(page.locator('#nr-wo')).toHaveValue('WO-123456');
+    await page.getByRole('button', { name: 'Crear expediente' }).click();
+    const creado = (await app.escrituras()).find(([op, ruta]) => op === 'set' && ruta === 'reclamos/RE-82026999');
+    expect(creado[2]).toMatchObject({ codigo: 'RE182026999', nc: '900999', medidor: '999999-XT', area: 'CPT MT', recibido: '2026-09-23', creado: { fecha: '2026-09-23', por: 'David García' } });
+    await expect(page.locator('.hero')).toContainText('RE182026999');
+    await expect(page.locator('#exp-direccion')).toHaveValue('CALLE INVENTADA 5, SAN SALVADOR');
+    // Pendiente en el Inicio hasta instalar
+    await nav(page, 'Inicio');
+    await expect(app$(page)).toContainText('Ubicar e instalar el reclamo RE182026999');
+    // Registrar la instalación: formulario con el código y el retiro al 8.º día
+    await page.locator('.pendiente', { hasText: 'RE182026999' }).click();
+    await page.getByRole('tab', { name: /Mediciones/ }).click();
+    await page.getByRole('button', { name: 'Registrar instalación' }).click();
+    await expect(page.locator('input[oninput*="\'caso\'"]')).toHaveValue('RE182026999');
+    await expect(page.locator('input[oninput*="\'fechaRetiro\'"]')).toHaveValue('2026-10-01');
+    await expect(page.locator('input[oninput*="\'lugar\'"]:visible')).toHaveValue('USUARIO INVENTADO · CALLE INVENTADA 5, SAN SALVADOR');
+  });
+
+  test('las remediciones (RE2…) se ligan al mismo expediente y el FT se sigue como en campañas', async ({ page }) => {
+    const datos = JSON.parse(JSON.stringify(fixture));
+    datos.analizadores.r9.analisisReclamo = { resultado: { tension: { febNoPer: 0.12, estado: 'FUERA DE TOLERANCIA' }, flicker: 'NO CUMPLE' } };
+    datos.analizadores.rem = { serie: 'SN-300', caso: 'RE292026456', lugar: 'x', fechaInstalacion: '2026-09-20', fechaRetiro: '2026-09-28', areaInstalacion: 'CPT MT' };
+    app = await abrirApp(page, { datos });
+    await cerrarAlerta(page);
+    await nav(page, 'Reclamos');
+    await page.locator('.exp-card', { hasText: 'USUARIO DE PRUEBA' }).click();
+    await page.getByRole('tab', { name: /Mediciones/ }).click();
+    await expect(page.locator('.exp-medicion')).toHaveCount(2);
+    await expect(page.locator('.exp-medicion').nth(1)).toContainText('Remedición 1 · RE292026456');
+    await expect(page.locator('.exp-medicion').first()).toContainText('Flicker no cumple');
+    await page.getByRole('tab', { name: /Seguimiento/ }).click();
+    await expect(page.locator('.ft-item')).toContainText('Remedición RE292026456 en campo');
+    await page.locator('.ft-item').getByRole('button', { name: 'Seguimiento' }).click();
+    await page.getByRole('button', { name: 'Marcar aviso enviado por correo' }).click();
+    expect((await app.escrituras()).at(-1)).toEqual(['set', 'reclamos/RE-92026456/ft/aviso', { fecha: '2026-09-23', por: 'David García' }]);
   });
 });

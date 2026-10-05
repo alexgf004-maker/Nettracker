@@ -2,7 +2,7 @@
 // Todo se arma a partir de las instalaciones según el código del caso.
 import { userArea } from '../config.js';
 import {
-  agruparCampanas, areaDeInstalacion, diasEntre, ETAPAS, etapaInstalacion, fechaInformeReclamo, hoyLocal,
+  agruparCampanas, areaDeInstalacion, diasEntre, ETAPAS, etapaInstalacion, hoyLocal,
   registrosDeTipo, subtipoCampana, urgencia,
 } from '../domain/trabajo.js';
 import { state } from '../state.js';
@@ -191,47 +191,7 @@ function renderCampanaDetalle(c, hoy) {
   return html + '</div>';
 }
 
-// ── RECLAMOS ──
-
-export function renderReclamos() {
-  const hoy = hoyLocal();
-  const reclamos = registrosDeTipo(state.records, 'reclamo').filter(delArea);
-  let html = '<div class="content">';
-
-  const informe = reclamos.filter(r => r.retirado && !r.informeEntregado)
-    .sort((a, b) => (fechaInformeReclamo(a.fechaRetiroReal) || '').localeCompare(fechaInformeReclamo(b.fechaRetiroReal) || ''));
-  const enCampo = reclamos.filter(r => !r.retirado);
-  const entregados = reclamos.filter(r => r.retirado && r.informeEntregado);
-  const vencidosInf = informe.filter(r => { const l = fechaInformeReclamo(r.fechaRetiroReal); return l && urgencia(l, hoy) === 'vencido'; }).length;
-  html += heroSeccion({
-    eyebrow: 'Trabajo', titulo: 'Reclamos', sub: 'Casos RE. El informe se entrega 8 días calendario después del retiro.', derecha: areaHero(state.areaFiltro !== 'todas', userArea()),
-    kpis: [{ v: informe.length, l: 'Informe pendiente', alerta: vencidosInf > 0 }, { v: enCampo.length, l: 'En campo' }, { v: entregados.length, l: 'Informe entregado' }],
-  });
-  if (!reclamos.length) return html + vacio('reclamos', 'No hay instalaciones con códigos de reclamo (RE).') + '</div>';
-
-  html += seccion('Informe pendiente', informe.length, informe.map(r => {
-    const limite = fechaInformeReclamo(r.fechaRetiroReal);
-    return filaConAccion(r, hoy, (limite ? `Informe para el ${fmtDate(limite)} ${tagPlazo(limite, hoy)}` : 'Sin fecha de retiro registrada') + tagsAnalisis(r),
-      btnAnalisis(r) + `<button class="btn-accion" onclick="marcarInformeEntregado('${r.id}')"><i class="ic ic-check"></i> Informe entregado</button>`);
-  }));
-  html += seccion('En campo', enCampo.length, enCampo.map(r => filaConAccion(r, hoy, r.fechaRetiro ? `Retiro programado ${fmtDate(r.fechaRetiro)}` : '', '')));
-  html += seccion('Informe entregado', entregados.length, entregados.map(r => filaConAccion(r, hoy, `Entregado ${firmado(r.informeEntregado)}` + tagsAnalisis(r),
-    btnAnalisis(r) + `<button class="btn-link" onclick="desmarcarInformeEntregado('${r.id}')">Deshacer</button>`)));
-  return html + '</div>';
-}
-
-// Análisis del reclamo (gráficas y armónicos de los TXT): botón y resultado guardado
-const btnAnalisis = r => `<button class="btn-accion btn-sec" onclick="abrirAnalisisReclamo('${r.id}')"><i class="ic ic-grafica"></i> ${r.analisisReclamo ? 'Ver análisis' : 'Analizar TXT'}</button>`;
-function tagsAnalisis(r) {
-  const x = r.analisisReclamo?.resultado; if (!x) return '';
-  const tags = [];
-  if (x.tension) tags.push(`<span class="tag ${x.tension.estado === 'DENTRO DE TOLERANCIA' ? 'tag-verde' : 'tag-rojo'}">FebNoPer ${(x.tension.febNoPer * 100).toFixed(2)} %</span>`);
-  if (x.armonicos) {
-    const ok = x.armonicos.tension === 'CUMPLE' && x.armonicos.corriente === 'CUMPLE';
-    tags.push(`<span class="tag ${ok ? 'tag-verde' : 'tag-rojo'}">Armónicos ${ok ? 'cumplen' : `no cumplen (${[x.armonicos.tension !== 'CUMPLE' ? 'tensión' : '', x.armonicos.corriente !== 'CUMPLE' ? 'corriente' : ''].filter(Boolean).join(' y ')})`}</span>`);
-  }
-  return ` <span class="tags-analisis">${tags.join('')}</span>`;
-}
+// ── RECLAMOS ── (expedientes: ver views/expedientes.js)
 
 function seccion(titulo, n, filas) {
   if (!n) return '';

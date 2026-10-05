@@ -259,10 +259,19 @@ En el detalle de la campaña:
 - Se abren desde el ícono de la fila en Resultados, el bloque rojo de FT, el editor del resultado y el detalle en Seguimiento FT.
 - Ojo: el TXT real de ECAMEC (p. ej. CR122026234) trae los 74 encabezados repetidos dos veces (148 columnas); la macro y la app lo marcan "por revisar" por número de columnas.
 
+## Expedientes de reclamo
+
+- Un reclamo es un expediente (`reclamos/{RE-<resto del código>}`) que se crea **a mano** con "Nuevo reclamo" (confirmado: las instalaciones RE sueltas no se vuelven expedientes ni generan pendientes). Se pega el asunto y la tabla del correo de DELSUR y `leerCorreoReclamo` (`js/domain/expedientes.js`) llena código, WO, CT, motivo, zona, ID de usuario (NC), nombre, dirección, centro MT/BT o corte y medidor.
+- Proceso: recibido → ubicado (coordenadas por NC desde la base o a mano) → instalado → retirado (normalmente al 8.º día; "Registrar instalación" abre el formulario con el código, la dirección y el retiro a 8 días) → analizado → informe entregado (8 días calendario desde el retiro).
+- Mediciones: hasta 6, el mismo código con el número de medición siguiente (RE1… → RE2…). Cada una se liga sola con su instalación por código; el informe entregado se guarda en la instalación (`informeEntregado`).
+- FT: si el análisis da FebNoPer > 5 % (tensión) el expediente pasa a FT con el mismo tratamiento de un caso regulatorio: aviso a DELSUR, 90 días desde la instalación de esa medición, ruta, bitácora y remedición (`reclamos/{id}/ft`, mismas acciones de Seguimiento FT con clave `reclamo`). Aparece en Seguimiento FT y en el Inicio junto a los de campaña (`todosFT`).
+- Armónicos o flicker (P95 del PST > 1) fuera de límite: solo aviso en el expediente; le compete al usuario (confirmado).
+- Pendientes del Inicio: "Ubicar e instalar el reclamo" mientras no hay instalación, "Entregar informe del reclamo" por medición retirada y los de FT.
+
 ## Análisis de reclamos (macros Graficar y Armónicos)
 
 - En reclamo se mide con doble intervalo y el equipo genera dos TXT de 10 minutos del mismo periodo: el de **tensión** (74 columnas, con máximos y mínimos; STOTAL en la columna 75 cuando viene) y el de **armónicos** (197 columnas: `Uarm{n}-{fase}`, `Iarm{n}-{fase}`, PST). La app reconoce cuál es cuál por los encabezados.
-- Reclamos → "Analizar TXT" en cada reclamo retirado. Datos que pide (como la macro): usuario o empresa, tipo de instalación (1, 2 o 3 fases; se sugiere por las fases con tensión), tensión nominal (se sugiere la más cercana de la lista de la macro), urbanidad y red (Urbano/MT ±6 %, Rural/MT ±7 %, Urbano/BT ±7 %, Rural/BT ±8 %), kVA y V L-L del trafo.
+- Expediente → Mediciones → "Analizar TXT" en cada medición retirada. Datos que pide (como la macro): usuario o empresa, tipo de instalación (1, 2 o 3 fases; se sugiere por las fases con tensión), tensión nominal (se sugiere la más cercana de la lista de la macro), urbanidad y red (Urbano/MT ±6 %, Rural/MT ±7 %, Urbano/BT ±7 %, Rural/BT ±8 %), kVA y V L-L del trafo.
 - `js/domain/reclamo.js` (funciones puras):
   - Tensión (GraficarTension3): resumen sobre la tensión promedio igual que la macro (inválido si una fase < 70 % del nominal, FT si alguna fase sale de la banda, FebNoPer = FT ÷ válidos, estado FUERA/DENTRO DE TOLERANCIA o "ERROR - NIVEL DE TENSIÓN INCORRECTO"); Máx/Prom/Mín por fase de cada perfil; PST con límite 1 y percentil 95 (PERCENTILE de Excel, inclusivo); corriente máxima del trafo = kVA × 1000 ÷ (√3 × V L-L) en trifásico y kVA × 1000 ÷ V L-L en mono y bifásico (la macro no dividía entre √3; corregido a pedido del equipo); cargabilidad = STOTAL ÷ 1000 contra la capacidad y el 85 %.
   - STOTAL se busca por nombre y si no en la columna 75 (confirmado). La macro tomaba la última columna, que en un TXT sin STOTAL es PST3; la app avisa que no hay cargabilidad.
