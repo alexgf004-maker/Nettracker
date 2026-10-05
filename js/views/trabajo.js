@@ -7,10 +7,13 @@ import {
 } from '../domain/trabajo.js';
 import { state } from '../state.js';
 import { escapeHtml, fmtDate } from '../utils.js';
-import { renderCasosCampana, renderPrecampana } from './casos.js';
+import { avancePrecampana, renderCasosCampana, renderPrecampana } from './casos.js';
+import { contarTipos, faltantes } from '../domain/listados.js';
+import { grupoDeEstado, resumenMultiplicadores } from '../domain/multiplicadores.js';
+import { resumenResultados } from '../domain/resultados.js';
 import { renderFechas } from './fechas.js';
 import { renderMultiplicadores } from './multiplicadores.js';
-import { renderResultados } from './resultados.js';
+import { filasResultados, renderResultados } from './resultados.js';
 
 const esc = s => escapeHtml(s ?? '');
 
@@ -60,6 +63,31 @@ function filaInstalacion(r, hoy, extra = '') {
 
 // ── CAMPAÑAS ──
 
+// Avance de una campaña por paso del proceso (lo usan la lista y el encabezado del detalle)
+export function avanceCampana(c) {
+  const g = state.campanas?.[c.clave] || {};
+  const casos = c.casos;
+  const pre = avancePrecampana(c);
+  const mult = resumenMultiplicadores(casos);
+  const listos = casos.filter(x => grupoDeEstado(x.mult?.estado) === 'listos');
+  const conFecha = casos.filter(x => x.programa?.fecha).length;
+  const fechas = new Set(casos.map(x => x.programa?.fecha).filter(Boolean)).size;
+  const filas = casos.length ? filasResultados(c) : [];
+  const res = resumenResultados(filas);
+  const ft = filas.filter(f => f.resultado.medicion === 'valida' && f.resultado.tolerancia === 'fuera');
+  const ftSinAviso = ft.filter(f => !f.caso.ft?.aviso).length;
+  const pasos = [
+    ['precampana', 'Precampaña', pre.hechos === pre.total],
+    ['multiplicadores', 'Multiplicadores', casos.length > 0 && mult.porGrupo.por_resolver === 0],
+    ['fechas', 'Fechas', listos.length > 0 && listos.every(x => x.programa?.fecha)],
+    ['resultados', 'Resultados', res.valida > 0 && res.pendiente === 0 && res.revisar === 0],
+    ['entrega', 'Entrega', !!g.entrega],
+  ];
+  return { pre, mult, listos: listos.length, conFecha, fechas, res, ft, ftSinAviso, pasos, entrega: g.entrega };
+}
+
+const CLASE_CHIP_PLAZO = { vencido: 'rojo', hoy: 'rojo', proximo: 'ambar', ok: '' };
+
 export function renderCampanas() {
   const hoy = hoyLocal();
   const campanas = agruparCampanas(state.records, hoy, state.campanas).filter(c => !areaVista() || c.area === areaVista());
@@ -67,22 +95,37 @@ export function renderCampanas() {
   if (sel) return renderCampanaDetalle(sel, hoy);
 
   let html = '<div class="content">';
-  html += `<div class="page-head"><div><h1 class="page-title">Campañas</h1><div class="page-sub">Casos CR, DA y DF agrupados por mes. La entrega vence el día 10 del mes siguiente.</div></div>
-    <div class="page-acciones">${filtroArea()}<button class="btn-accion" onclick="abrirImportListados()"><i class="ic ic-subir"></i> Importar listados del ente</button></div></div>`;
+  html += `<div class="hero"><div class="hero-top"><div><div class="hero-eyebrow">Trabajo</div><h1 class="hero-titulo">Campañas</h1>
+    <div class="hero-sub">Casos CR, DA y DF por mes. La entrega en el sistema CPT DELSUR vence el día 10 del mes siguiente.</div></div></div>
+    <div class="hero-acciones page-hero-acciones"><button class="hero-btn blanco" onclick="abrirImportListados()"><i class="ic ic-subir"></i> Importar listados del ente</button>${filtroAreaHero()}</div></div>`;
   if (!campanas.length) return html + vacio('campanas', 'Todavía no hay campañas. Importa los listados que manda el ente para empezar la precampaña.') + '</div>';
   html += '<div class="list">';
   campanas.forEach(c => {
-    const entrega = state.campanas?.[c.clave]?.entrega;
+    const a = avanceCampana(c);
     const r = c.resumen;
-    html += `<div class="card" onclick="abrirCampanaTrabajo('${c.clave}')"><div class="card-inner">
-      <div class="card-top"><div><div class="card-titulo">${c.nombre}</div><div class="card-sub">${c.area}</div></div>
-        ${entrega ? '<span class="tag tag-verde"><i class="ic ic-check"></i> Entregada</span>' : tagPlazo(c.fechaEntrega, hoy)}</div>
-      <div class="chips-linea">${['CR', 'DA', 'DF'].filter(s => c.subtipos[s]).map(s => `<span class="chip-dato"><b>${c.subtipos[s]}</b> ${s}</span>`).join('')}<span class="chip-dato"><b>${r.total}</b> ${r.total === 1 ? 'medición' : 'mediciones'}</span></div>
-      ${r.total ? barraEtapas(r) : `<div class="barra-leyenda"><span><i class="punto punto-gris"></i>Precampaña · ${c.casos.length} casos importados</span></div>`}
-      <div class="card-footer"><span class="card-date">Entrega ${fmtDate(c.fechaEntrega)}</span><span class="card-date">${entrega ? 'Entregada ' + firmado(entrega) : ''}</span></div>
-    </div></div>`;
+    const actual = a.pasos.findIndex(([, , ok]) => !ok);
+    const total = c.casos.length || r.total;
+    html += `<div class="camp-card" onclick="abrirCampanaTrabajo('${c.clave}')">
+      <div class="camp-card-top ${a.entrega ? 'entregada' : ''}"><div><div class="hero-eyebrow">${esc(c.area)}</div><div class="hero-titulo" style="font-size:19px">${c.nombre}</div></div>
+        ${a.entrega ? '<span class="hero-chip"><i class="ic ic-check"></i> Entregada</span>' : `<span class="hero-chip ${CLASE_CHIP_PLAZO[urgencia(c.fechaEntrega, hoy)]}">${textoPlazo(c.fechaEntrega, hoy)}</span>`}</div>
+      <div class="camp-card-cuerpo">
+        ${c.casos.length ? `<div class="camp-pasos">${a.pasos.map(([, , ok], i) => `<i class="${ok ? 'ok' : i === actual ? 'en' : ''}" title="${a.pasos[i][1]}"></i>`).join('')}</div>
+        <div class="camp-pasos-l"><span>${actual < 0 ? 'Todo listo' : 'Paso actual: ' + a.pasos[actual][1]}</span><span>Entrega ${fmtDate(c.fechaEntrega)}</span></div>` : `<div class="camp-pasos-l" style="margin-top:4px"><span>${r.total} ${r.total === 1 ? 'medición registrada' : 'mediciones registradas'}</span><span>Entrega ${fmtDate(c.fechaEntrega)}</span></div>`}
+        <div class="camp-datos">
+          <div class="camp-dato"><b>${total}</b> <span>${total === 1 ? 'caso' : 'casos'}</span></div>
+          <div class="camp-dato"><b>${a.listos}</b> <span>listos</span></div>
+          <div class="camp-dato"><b>${a.res.valida}</b> <span>válidas</span></div>
+          <div class="camp-dato ${a.ft.length ? 'rojo' : ''}"><b>${a.ft.length}</b> <span>FT</span></div>
+        </div>
+      </div></div>`;
   });
   return html + '</div></div>';
+}
+
+// Selector de área sobre fondo oscuro
+function filtroAreaHero() {
+  const mia = state.areaFiltro !== 'todas';
+  return `<button class="hero-btn" onclick="setAreaFiltro('${mia ? 'todas' : 'mia'}')"><i class="ic ic-capas"></i> ${mia ? `Solo ${userArea()}` : 'Todas las áreas'}</button>`;
 }
 
 function barraEtapas(r) {
@@ -95,42 +138,66 @@ function barraEtapas(r) {
 }
 
 function renderCampanaDetalle(c, hoy) {
-  const entrega = state.campanas?.[c.clave]?.entrega;
+  const a = avanceCampana(c);
+  const entrega = a.entrega;
   const pendientesDescarga = c.resumen.descarga_pendiente;
   const enCampo = c.resumen.en_campo + c.resumen.programada;
+  const n = contarTipos(c.casos);
   let html = '<div class="content">';
-  const partes = [c.area, c.casos.length ? `${c.casos.length} casos` : '', `${c.resumen.total} ${c.resumen.total === 1 ? 'medición' : 'mediciones'}`].filter(Boolean);
-  html += `<div class="page-head"><div><h1 class="page-title">${c.nombre}</h1><div class="page-sub">${partes.join(' · ')}</div></div></div>`;
-  html += '<div class="panel">';
-  html += `<div class="panel-fila"><span>Entrega en el sistema CPT DELSUR</span><b>${fmtDate(c.fechaEntrega)}</b></div>`;
-  if (entrega) {
-    html += `<div class="aviso aviso-verde"><i class="ic ic-check"></i> Entregada el ${firmado(entrega)}</div>`;
-    html += `<button class="btn btn-secondary" onclick="desmarcarCampanaEntregada('${c.clave}')">Quitar marca de entregada</button>`;
-  } else {
-    html += `<div class="panel-fila"><span>Plazo</span>${tagPlazo(c.fechaEntrega, hoy)}</div>`;
-    if (enCampo || pendientesDescarga) {
-      html += `<div class="aviso aviso-amarillo"><i class="ic ic-alerta"></i> ${[enCampo ? enCampo + ' en campo o programadas' : '', pendientesDescarga ? pendientesDescarga + ' con descarga pendiente' : ''].filter(Boolean).join(' y ')}</div>`;
-    }
-    html += `<button class="btn btn-primary" onclick="marcarCampanaEntregada('${c.clave}')"><i class="ic ic-check"></i> Marcar como cargada en CPT DELSUR</button>`;
+
+  // Encabezado: campaña, plazo de entrega y lo más importante en números
+  const plazo = entrega
+    ? `<span class="hero-chip verde"><i class="ic ic-check"></i> Entregada el ${firmado(entrega)}</span>`
+    : `<span class="hero-chip ${CLASE_CHIP_PLAZO[urgencia(c.fechaEntrega, hoy)]}"><i class="ic ic-calendario"></i> Entrega ${fmtDate(c.fechaEntrega)} · ${textoPlazo(c.fechaEntrega, hoy)}</span>`;
+  const enCurso = [enCampo ? `${enCampo} en campo o programadas` : '', pendientesDescarga ? `${pendientesDescarga} con descarga pendiente` : ''].filter(Boolean).join(' · ');
+  const tipos = ['CR', 'DA', 'DF'].filter(t => n[t]).map(t => `${n[t]} ${t}`).join(' · ');
+  html += `<div class="hero"><div class="hero-top"><div><div class="hero-eyebrow">Campaña ${esc(c.area)}</div><h1 class="hero-titulo">${c.nombre}</h1>
+      <div class="hero-sub">${[tipos, enCurso].filter(Boolean).join(' · ') || `${c.resumen.total} ${c.resumen.total === 1 ? 'medición' : 'mediciones'}`}</div></div>
+      <div class="hero-acciones">${plazo}</div></div>`;
+  if (c.casos.length) {
+    html += `<div class="hero-kpis">
+      <button class="hero-kpi" onclick="setCampanaVista('casos')"><b>${c.casos.length}</b><span>Casos</span></button>
+      <button class="hero-kpi" onclick="setCampanaVista('multiplicadores')"><b>${a.listos}</b><span>Listos para medir</span></button>
+      <button class="hero-kpi" onclick="setCampanaVista('resultados')"><b>${a.res.valida}</b><span>Mediciones válidas</span></button>
+      <button class="hero-kpi ${a.ft.length ? 'alerta' : ''}" onclick="verFTCampana()"><b>${a.ft.length}</b><span>${a.ft.length ? (a.ftSinAviso ? `FT · ${a.ftSinAviso} sin avisar` : 'Fuera de tolerancia') : 'Fuera de tolerancia'}</span></button>
+    </div>`;
   }
+  html += `<div class="hero-acciones" style="margin-top:12px">${entrega
+    ? `<button class="hero-btn" onclick="desmarcarCampanaEntregada('${c.clave}')">Quitar marca de entregada</button>`
+    : `<button class="hero-btn blanco" onclick="marcarCampanaEntregada('${c.clave}')"><i class="ic ic-check"></i> Marcar como cargada en CPT DELSUR</button>`}</div>`;
   html += '</div>';
-  // Secciones de la campaña
-  const secciones = [['precampana', 'Precampaña'], ['casos', 'Casos'], ['multiplicadores', 'Multiplicadores'], ['fechas', 'Fechas'], ['resultados', 'Resultados'], ['mediciones', 'Mediciones']]
-    .filter(([k]) => c.casos.length || k === 'mediciones');
+
+  // Pestañas como pasos del proceso, cada una con su estado
+  const pasoOk = Object.fromEntries(a.pasos.map(([k, , ok]) => [k, ok]));
+  const faltan = c.casos.filter(x => faltantes(x).length).length;
+  const secciones = [
+    ['precampana', 'Precampaña', 'pasos', `${a.pre.hechos} de ${a.pre.total} pasos`],
+    ['casos', 'Casos', 'usuarios', faltan ? `${faltan} con datos faltantes` : `${c.casos.length} casos completos`],
+    ['multiplicadores', 'Multiplicadores', 'sliders', `${a.listos} listos · ${a.mult.porGrupo.por_resolver} por resolver`],
+    ['fechas', 'Fechas', 'calendario-dias', a.fechas ? `${a.fechas} ${a.fechas === 1 ? 'fecha' : 'fechas'} · ${a.conFecha} casos` : 'Sin programar'],
+    ['resultados', 'Resultados', 'grafica', `${a.res.valida} válidas · ${a.res.pendiente} pendientes`],
+    ['mediciones', 'Mediciones', 'instalaciones', `${c.registros.length} en la app`],
+  ].filter(([k]) => c.casos.length || k === 'mediciones');
   const vista = secciones.some(([k]) => k === state.campanaVista) ? state.campanaVista : secciones[0][0];
   if (secciones.length > 1) {
-    html += `<div class="pestanas">${secciones.map(([k, label]) => `<button class="${vista === k ? 'active' : ''}" onclick="setCampanaVista('${k}')">${label}${k === 'mediciones' ? ` (${c.registros.length})` : ''}</button>`).join('')}</div>`;
+    html += '<div class="pasos-tabs" role="tablist">' + secciones.map(([k, label, icono, estado]) => {
+      const alerta = k === 'resultados' && a.ft.length;
+      const listo = !alerta && (k === 'casos' ? !faltan : pasoOk[k]);
+      return `<button role="tab" class="paso-tab ${vista === k ? 'active' : ''} ${listo ? 'listo' : ''} ${alerta ? 'alerta' : ''}" onclick="setCampanaVista('${k}')">
+        <span class="paso-tab-ic"><i class="ic ic-${listo ? 'check' : icono}"></i></span><span class="paso-tab-tx"><b>${label}</b><small>${estado}</small></span>
+        ${alerta ? `<span class="badge-ft">${a.ft.length} FT</span>` : ''}</button>`;
+    }).join('') + '</div>';
   }
   if (vista === 'precampana') html += renderPrecampana(c);
   if (vista === 'casos') html += renderCasosCampana(c);
   if (vista === 'multiplicadores') html += renderMultiplicadores(c);
   if (vista === 'fechas') html += renderFechas(c);
-  if (vista === 'resultados') html += renderResultados(c);
+  if (vista === 'resultados') html += renderResultados(c, a);
   if (vista === 'mediciones') {
     if (!c.registros.length) return html + vacio('instalaciones', 'Todavía no hay instalaciones registradas con códigos de esta campaña.') + '</div>';
-    html += barraEtapas(c.resumen);
+    html += `<div class="bloque"><div class="bloque-head"><div class="bloque-titulo">Mediciones en la app <span class="cuenta">${c.registros.length}</span></div></div>${barraEtapas(c.resumen)}</div>`;
     html += '<div class="filas">';
-    [...c.registros].sort((a, b) => (a.caso || '').localeCompare(b.caso || ''))
+    [...c.registros].sort((x, y) => (x.caso || '').localeCompare(y.caso || ''))
       .forEach(r => { html += filaInstalacion(r, hoy, `<span class="tag tag-gris">${subtipoCampana(r.caso)}</span>`); });
     html += '</div>';
   }

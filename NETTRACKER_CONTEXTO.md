@@ -178,6 +178,17 @@ No hay registros aparte: todo se deduce de las instalaciones según el código d
 - El área de una instalación de Campos y Servicios es su `areaBeneficiaria`.
 - Etapa de cada instalación: programada → en campo → descarga pendiente → retirada.
 
+## Diseño de las pantallas de campaña (mismo lenguaje visual que Daily-log)
+
+Componentes en `css/styles.css` (sección "REDISEÑO DE CAMPAÑAS"); usarlos en pantallas nuevas en vez de inventar estilos:
+- `.hero`: encabezado degradado azul marino → azul con `.hero-eyebrow`, `.hero-titulo`, `.hero-sub`, `.hero-chip` (rojo/ambar/verde según plazo), `.hero-kpis` (números; `.alerta` en rojo con latido) y `.hero-btn`. `.hero-rojo` para Seguimiento FT.
+- `.pasos-tabs` / `.paso-tab`: pestañas de la campaña como pasos del proceso, cada una con su estado (`listo` en verde, `alerta` en rojo con `.badge-ft`). El avance se calcula en `avanceCampana(c)` (views/trabajo.js).
+- `.bloque` + `.bloque-titulo` (título en mayúsculas con barra azul), `.tiles` / `.tile` (mosaicos de color que filtran la lista: t-verde, t-rojo, t-ambar, t-azul, t-gris, t-morado), `.meta` (barra de avance hacia una meta, p. ej. 38 CR), `.barra-acciones` con botones `.b-p` (principal), `.b-g` (secundario) y `.b-l` (enlace), `.ayuda` (explicación plegable), `.pildora` (filtros), `.tg` (etiqueta de estado con borde).
+- `.tabla-r` dentro de `.tabla-caja`: tabla en PC que en celular (≤760 px) se vuelve una tarjeta por fila; cada celda lleva `data-l` con su nombre, `.cod` ocupa todo el ancho y `.vacio-m` se oculta en celular.
+- Resultados: los FT van primero en `.ft-bloque` (FebNoPer, aviso a DELSUR, día del plazo de 90) y sus filas llevan `.fila-ft`. El filtro de resultados es `state.resultadosFiltro`; `verFTCampana()` abre Resultados filtrado en FT.
+- Fechas como `.boleto`. Precampaña como línea de tiempo `.tl`.
+- El modo oscuro de la app no se aplica hoy (las variables de `[data-theme="dark"]` quedan antes de `:root` y pierden); está pendiente.
+
 ## Precampaña (etapa 2, primera parte)
 En **Campañas → Importar listados del ente** se suben los cuatro Excel del ente (MT, BT, DA y FK). Los datos empiezan debajo de "Número SIGET"; la dirección viene en tres columnas (colonia, calle, número).
 - Los CR toman el área de su listado (MT → CPT MT, BT → CPT BT).

@@ -3,6 +3,7 @@ import { ordenarCasos } from '../domain/listados.js';
 import { CR_OBLIGATORIOS_MT } from '../domain/multiplicadores.js';
 import { instalacionDeCaso, MEDICION, resultadoCaso, resumenResultados, situacionCaso, TOLERANCIA } from '../domain/resultados.js';
 import { hoyLocal } from '../domain/trabajo.js';
+import { casosFT, DIAS_SOLUCION_FT } from '../domain/ft.js';
 import { state } from '../state.js';
 import { hayTXTEnMemoria } from '../actions/resultados.js';
 import { UMBRAL_FT } from '../domain/analisis.js';
@@ -19,38 +20,96 @@ export function filasResultados(c) {
   });
 }
 
+const tagMedicion = r => ({
+  valida: '<span class="tg verde"><i class="ic ic-check"></i> Válida</span>',
+  fallida: '<span class="tg rojo"><i class="ic ic-x"></i> Fallida</span>',
+  revisar: '<span class="tg ambar"><i class="ic ic-alerta"></i> Por revisar</span>',
+  no_medida: '<span class="tg gris">No medida</span>',
+}[r.medicion] || '');
+
+const esFT = r => r.medicion === 'valida' && r.tolerancia === 'fuera';
+const FILTRO_RES = {
+  todos: () => true,
+  valida: f => f.resultado.medicion === 'valida',
+  ft: f => esFT(f.resultado),
+  fallida: f => f.resultado.medicion === 'fallida',
+  revisar: f => f.resultado.medicion === 'revisar',
+  pendiente: f => !f.resultado.medicion && f.situacion.clave !== 'sin_medir',
+};
+
+// Bloque rojo con los casos fuera de tolerancia: se penalizan, hay que avisar y remedir en 90 días
+function bloqueFT(c, hoy) {
+  const lista = casosFT({ [c.clave]: state.campanas?.[c.clave] }, state.records, hoy);
+  if (!lista.length) return '';
+  const sinAviso = lista.filter(x => !x.ft.aviso && !x.cerrado).length;
+  let html = '<div class="ft-bloque">';
+  html += `<div class="ft-head"><div class="ft-head-ic"><i class="ic ic-sirena"></i></div><div class="ft-head-tx">
+    <div class="ft-head-t">${lista.length} ${lista.length === 1 ? 'caso fuera de tolerancia' : 'casos fuera de tolerancia'}</div>
+    <div class="ft-head-s">Se penalizan. Avisa a DELSUR de inmediato y normaliza con una remedición antes de ${DIAS_SOLUCION_FT} días desde la instalación.</div></div>
+    ${sinAviso ? `<span class="hero-chip rojo" style="background:#fff;color:#b91c1c;border-color:#fff">${sinAviso} sin avisar</span>` : ''}</div>`;
+  lista.forEach(x => {
+    const pct = x.dias === null ? 0 : Math.min(100, Math.round(x.dias * 100 / DIAS_SOLUCION_FT));
+    const feb = x.caso.resultado?.febNoPer;
+    html += `<div class="ft-item" onclick="abrirFT('${c.clave}', '${x.id}')">
+      <div class="ft-pct">${feb === undefined || feb === '' ? '—' : esc(feb) + '%'}<small>FebNoPer</small></div>
+      <div class="ft-info"><b>${esc(x.codigo)}</b><div class="n">${esc(x.caso.nombre)}</div>
+        <div class="tags">${x.cerrado ? '<span class="tg verde"><i class="ic ic-check"></i> Normalizado</span>' : x.ft.aviso ? `<span class="tg verde"><i class="ic ic-correo"></i> Avisado ${fmtDate(x.ft.aviso.fecha)}</span>` : '<span class="tg rojo"><i class="ic ic-correo"></i> Falta avisar a DELSUR</span>'}
+          ${x.limite ? `<span class="tg ${x.vencido ? 'rojo' : 'gris'}"><i class="ic ic-reloj"></i> ${x.vencido ? 'Plazo vencido' : `Día ${x.dias} de ${DIAS_SOLUCION_FT} · hasta ${fmtDate(x.limite)}`}</span>` : '<span class="tg gris">Sin instalación registrada</span>'}
+          ${x.ft.ruta ? `<span class="tg azul">${esc(x.ft.ruta)}</span>` : ''}</div>
+        ${x.limite && !x.cerrado ? `<div class="ft-dias"><i class="${x.vencido || pct >= 80 ? 'mal' : ''}" style="width:${pct}%"></i></div>` : ''}</div>
+      <i class="ic ic-chevron-right" style="color:var(--text3)"></i></div>`;
+  });
+  html += '<div class="ft-pie"><button class="b b-g" onclick="switchTab(\'ft\')"><i class="ic ic-ft"></i> Ir a Seguimiento FT</button></div>';
+  return html + '</div>';
+}
+
 export function renderResultados(c) {
+  const hoy = hoyLocal();
   const filas = filasResultados(c);
   const n = resumenResultados(filas);
-  const dato = (num, label, clase = '') => `<div class="resumen-estado ${clase}"><b>${num}</b><span>${label}</span></div>`;
-  let html = '<div class="panel">';
-  html += `<div class="resumen-mult resumen-5">${dato(n.valida, 'Válidas')}${dato(n.fallida, 'Fallidas')}${dato(n.ft, 'Fuera de tolerancia')}${dato(n.revisar, 'Por revisar')}${dato(n.pendiente, 'Sin resultado')}</div>`;
+  const filtro = FILTRO_RES[state.resultadosFiltro] ? state.resultadosFiltro : 'todos';
+  const visibles = filas.filter(FILTRO_RES[filtro]);
+  let html = bloqueFT(c, hoy);
+
+  html += '<div class="bloque">';
+  html += '<div class="bloque-head"><div class="bloque-titulo">Resultados de la campaña</div></div>';
+  const tile = (k, v, l, clase, icono = '') => `<button class="tile ${clase} ${filtro === k ? 'sel' : ''} ${v ? '' : 'vacio'}" onclick="setResultadosFiltro('${filtro === k ? 'todos' : k}')">${icono ? `<i class="ic ic-${icono}"></i>` : ''}<span class="v">${v}</span><span class="l">${l}</span></button>`;
+  html += '<div class="tiles resumen-estado-lista">'
+    + tile('valida', n.valida, 'Válidas', 't-verde', 'check')
+    + tile('ft', n.ft, 'Fuera de tolerancia', n.ft ? 't-rojo pulso' : 't-gris', 'sirena')
+    + tile('fallida', n.fallida, 'Fallidas', 't-morado', 'x')
+    + tile('revisar', n.revisar, 'Por revisar', 't-ambar', 'alerta')
+    + tile('pendiente', n.pendiente, 'Sin resultado', 't-azul', 'reloj') + '</div>';
   if (c.area === 'CPT MT') {
     const ok = n.crValidas >= CR_OBLIGATORIOS_MT;
-    html += `<div class="aviso ${ok ? 'aviso-verde' : 'aviso-amarillo'}"><i class="ic ${ok ? 'ic-check' : 'ic-alerta'}"></i> ${n.crValidas} de ${CR_OBLIGATORIOS_MT} CR obligatorios con medición válida</div>`;
+    html += `<div class="meta ${ok ? 'ok' : ''}"><div class="meta-tx">CR obligatorios con medición válida<small>${n.daValidas} DA y ${n.dfValidas} DF válidas${n.sinMedir ? ` · ${n.sinMedir} no se medirán` : ''}</small></div>
+      <div class="meta-barra"><i style="width:${Math.min(100, Math.round(n.crValidas * 100 / CR_OBLIGATORIOS_MT))}%"></i></div><div class="meta-num">${n.crValidas}<small> / ${CR_OBLIGATORIOS_MT}</small></div></div>`;
   }
-  html += `<div class="chips-linea"><span class="chip-dato"><b>${n.crValidas}</b> CR válidas</span><span class="chip-dato"><b>${n.daValidas}</b> DA válidas</span><span class="chip-dato"><b>${n.dfValidas}</b> DF válidas</span>${n.sinMedir ? `<span class="chip-dato"><b>${n.sinMedir}</b> no medidas</span>` : ''}</div>`;
-  html += `<div class="page-sub">Sube los TXT de ECAMEC (el nombre del archivo es el código del caso): se validan y se calcula el FebNoPer como en la macro. Más de ${UMBRAL_FT * 100} % es fuera de tolerancia. Las advertencias quedan "por revisar": corrige el dato del caso y recalcula. También se puede anotar el resultado a mano.</div>`;
-  html += `<div class="acciones-casos">
-    <label class="btn-accion"><i class="ic ic-subir"></i> Analizar TXT<input type="file" accept=".txt" multiple hidden onchange="analizarTXT('${c.clave}', this.files)"></label>
-    ${hayTXTEnMemoria(c.clave) ? `<button class="btn-accion" onclick="recalcularTXT('${c.clave}')"><i class="ic ic-repetir"></i> Recalcular con los datos actuales</button>` : ''}
-    <button class="btn-accion" onclick="exportarCuadroResumen('${c.clave}')"><i class="ic ic-excel"></i> Exportar cuadro resumen</button>
-    <button class="btn-accion" onclick="exportarAnalisis('${c.clave}')"><i class="ic ic-grafica"></i> Exportar análisis (Resumen de la macro)</button>
+  html += `<div class="barra-acciones">
+    <label class="b b-p"><i class="ic ic-subir"></i> Analizar TXT<input type="file" accept=".txt" multiple hidden onchange="analizarTXT('${c.clave}', this.files)"></label>
+    ${hayTXTEnMemoria(c.clave) ? `<button class="b b-g" onclick="recalcularTXT('${c.clave}')"><i class="ic ic-repetir"></i> Recalcular con los datos actuales</button>` : ''}
+    <span class="sep"></span>
+    <button class="b b-g" onclick="exportarCuadroResumen('${c.clave}')"><i class="ic ic-excel"></i> Exportar cuadro resumen</button>
+    <button class="b b-g" onclick="exportarAnalisis('${c.clave}')"><i class="ic ic-grafica"></i> Exportar análisis (Resumen de la macro)</button>
   </div>`;
+  html += `<details class="ayuda"><summary><i class="ic ic-ayuda"></i> ¿Cómo se calculan?</summary><p>Sube los TXT de ECAMEC (el nombre del archivo es el código del caso): se validan y se calcula el FebNoPer como en la macro. Más de ${UMBRAL_FT * 100} % es fuera de tolerancia. Las advertencias quedan "por revisar": corrige el dato del caso (suele ser el nivel de tensión) y recalcula. También se puede anotar el resultado a mano tocando el caso.</p></details>`;
   html += '</div>';
 
-  html += '<div class="tabla-wrap"><table class="tabla-casos"><thead><tr><th>Código</th><th>Situación</th><th>Instalación</th><th>Medición</th><th>Tolerancia</th><th>FebNoPer</th></tr></thead><tbody>';
-  filas.forEach(({ caso, inst, situacion, resultado: r }) => {
-    html += `<tr onclick="abrirResultado('${c.clave}', '${caso.id}')">
-      <td class="mono"><b>${esc(caso.codigo || caso.codigoEnte)}</b><small>${esc(caso.nombre)}</small></td>
-      <td><span class="tag ${CLASE_SITUACION[situacion.clave]}">${esc(situacion.texto)}</span></td>
-      <td>${inst ? `${fmtDate(inst.fechaInstalacion)}<small>${esc(inst.serie)}${inst.fechaRetiroReal ? ' · retiro ' + fmtDate(inst.fechaRetiroReal) : ''}</small>` : '—'}</td>
-      <td>${r.medicion ? `<span class="tag ${r.medicion === 'valida' ? 'tag-verde' : r.medicion === 'fallida' ? 'tag-rojo' : r.medicion === 'revisar' ? 'tag-amarillo' : 'tag-gris'}">${MEDICION[r.medicion]}</span>${r.desdeDescarga ? '<small>según la descarga</small>' : ''}${r.analisis ? `<small>${esc(r.analisis.detalle)}</small>` : ''}` : situacion.clave === 'sin_medir' ? '<span class="tag tag-gris">No medida</span>' : '<span class="falta">Pendiente</span>'}</td>
-      <td>${r.tolerancia ? `<span class="tag ${r.tolerancia === 'fuera' ? 'tag-rojo' : 'tag-verde'}">${r.tolerancia === 'fuera' ? 'FT' : 'Dentro'}</span>` : '—'}</td>
-      <td class="mono">${r.febNoPer === '' ? '—' : esc(r.febNoPer) + ' %'}</td>
+  if (filtro !== 'todos') html += `<div class="filtros"><span class="pildora active">${{ valida: 'Válidas', ft: 'Fuera de tolerancia', fallida: 'Fallidas', revisar: 'Por revisar', pendiente: 'Sin resultado' }[filtro]} <b>${visibles.length}</b></span><button class="b b-l" onclick="setResultadosFiltro('todos')">Ver todos</button></div>`;
+
+  html += '<div class="tabla-caja"><div class="tabla-scroll"><table class="tabla-r tabla-casos"><thead><tr><th>Código</th><th>Situación</th><th>Instalación</th><th>Resultado</th><th>FebNoPer</th></tr></thead><tbody>';
+  visibles.forEach(({ caso, inst, situacion, resultado: r }) => {
+    const ft = esFT(r);
+    html += `<tr class="${ft ? 'fila-ft' : ''}" onclick="abrirResultado('${c.clave}', '${caso.id}')">
+      <td class="cod"><b>${esc(caso.codigo || caso.codigoEnte)}</b><small>${esc(caso.nombre)}</small></td>
+      <td data-l="Situación"><span class="tag ${CLASE_SITUACION[situacion.clave]}">${esc(situacion.texto)}</span></td>
+      <td data-l="Instalación" class="${inst ? '' : 'vacio-m'}">${inst ? `${fmtDate(inst.fechaInstalacion)}<small>${esc(inst.serie)}${inst.fechaRetiroReal ? ' · retiro ' + fmtDate(inst.fechaRetiroReal) : ''}</small>` : '—'}</td>
+      <td data-l="Resultado">${r.medicion ? `${ft ? '<span class="tg ft"><i class="ic ic-sirena"></i> Fuera de tolerancia</span>' : tagMedicion(r)}${r.tolerancia === 'dentro' ? ' <span class="tg verde">Dentro</span>' : ''}${r.desdeDescarga ? '<small>según la descarga</small>' : ''}${r.analisis ? `<small>${esc(r.analisis.detalle)}</small>` : ''}${r.nota ? `<small>${esc(r.nota)}</small>` : ''}` : situacion.clave === 'sin_medir' ? '<span class="tg gris">No medida</span>' : '<span class="falta">Pendiente</span>'}</td>
+      <td data-l="FebNoPer" class="num">${r.febNoPer === '' ? '—' : `<span class="${ft ? 'ft-valor' : ''}">${esc(r.febNoPer)} %</span>`}</td>
     </tr>`;
   });
-  return html + '</tbody></table></div>';
+  if (!visibles.length) html += '<tr><td colspan="5" class="vacia">No hay casos con ese filtro</td></tr>';
+  return html + '</tbody></table></div></div>';
 }
 
 export function renderResultadoModal() {

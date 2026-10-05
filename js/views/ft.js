@@ -10,27 +10,39 @@ const esc = s => escapeHtml(s ?? '');
 export function renderFT() {
   const hoy = hoyLocal();
   const lista = casosFT(state.campanas, state.records, hoy).filter(x => !areaVista() || x.area === areaVista());
-  let html = '<div class="content">';
-  html += `<div class="page-head"><div><h1 class="page-title">Seguimiento FT</h1><div class="page-sub">Casos fuera de tolerancia. Hay ${DIAS_SOLUCION_FT} días calendario desde la instalación de la medición inicial; solo la remedición normalizada cierra el caso.</div></div>${filtroArea()}</div>`;
-  if (!lista.length) {
-    return html + `<div class="empty"><i class="empty-icon ic ic-ft"></i><div class="empty-text">No hay casos fuera de tolerancia. Aparecen aquí al marcar un resultado como "Fuera (FT)" en la pestaña Resultados de la campaña.</div></div></div>`;
-  }
   const abiertos = lista.filter(x => !x.cerrado);
   const cerrados = lista.filter(x => x.cerrado);
+  const sinAviso = abiertos.filter(x => !x.ft.aviso).length;
+  const vencidos = abiertos.filter(x => x.vencido).length;
+  let html = '<div class="content">';
+  html += `<div class="hero ${abiertos.length ? 'hero-rojo' : ''}"><div class="hero-top"><div><div class="hero-eyebrow">Trabajo</div><h1 class="hero-titulo">Seguimiento FT</h1>
+    <div class="hero-sub">Casos fuera de tolerancia: se penalizan. Hay ${DIAS_SOLUCION_FT} días calendario desde la instalación de la medición inicial y solo la remedición normalizada cierra el caso.</div></div></div>
+    <div class="hero-kpis">
+      <div class="hero-kpi"><b>${abiertos.length}</b><span>Abiertos</span></div>
+      <div class="hero-kpi ${sinAviso ? 'alerta' : ''}"><b>${sinAviso}</b><span>Sin avisar a DELSUR</span></div>
+      <div class="hero-kpi ${vencidos ? 'alerta' : ''}"><b>${vencidos}</b><span>Plazo vencido</span></div>
+      <div class="hero-kpi"><b>${cerrados.length}</b><span>Cerrados</span></div>
+    </div>
+    <div class="hero-acciones page-hero-acciones">${filtroArea()}</div></div>`;
+  if (!lista.length) {
+    return html + `<div class="empty"><i class="empty-icon ic ic-ft"></i><div class="empty-text">No hay casos fuera de tolerancia. Aparecen aquí cuando un resultado queda fuera de tolerancia en la pestaña Resultados de la campaña.</div></div></div>`;
+  }
   const tarjeta = x => {
     const pct = x.dias === null ? 0 : Math.min(100, Math.round(x.dias * 100 / DIAS_SOLUCION_FT));
-    return `<div class="card" onclick="abrirFT('${x.clave}', '${x.id}')"><div class="card-inner">
-      <div class="card-top"><div><div class="card-titulo mono">${esc(x.codigo)}</div><div class="card-sub">${esc(x.caso.nombre)} · ${nombreCampana(x)} · ${esc(x.area)}</div></div>
-        ${x.cerrado ? '<span class="tag tag-verde"><i class="ic ic-check"></i> Cerrado</span>' : x.limite ? tagPlazo(x.limite, hoy) : '<span class="falta">Sin fecha de instalación</span>'}</div>
-      ${x.dias !== null ? `<div class="barra"><span class="${x.vencido ? 'barra-rojo' : pct >= 80 ? 'barra-amarillo' : 'barra-azul'}" style="flex:${pct}"></span><span style="flex:${100 - pct}"></span></div>
-        <div class="barra-leyenda"><span>Día ${x.dias} de ${DIAS_SOLUCION_FT}</span><span>Instalación ${fmtDate(x.inicio)} · plazo ${fmtDate(x.limite)}</span></div>` : ''}
-      <div class="chips-linea">
-        ${x.ft.aviso ? `<span class="tag tag-verde">Aviso enviado ${fmtDate(x.ft.aviso.fecha)}</span>` : '<span class="tag tag-rojo">Falta avisar a DELSUR</span>'}
-        ${x.ft.ruta ? `<span class="chip-dato">${esc(x.ft.ruta)}</span>` : ''}
-        ${x.remedicionInstalada ? `<span class="chip-dato">Remedición ${esc(x.remedicionInstalada.codigo)} ${x.remedicionInstalada.retirado ? 'retirada' : 'en campo'}</span>` : ''}
-        ${x.vencido ? '<span class="tag tag-rojo">Más de 90 días: se penalizan los 90 días y la compensación sigue</span>' : ''}
-      </div>
-    </div></div>`;
+    const feb = x.caso.resultado?.febNoPer;
+    return `<div class="card ft-card ${x.cerrado ? 'cerrado' : ''}" onclick="abrirFT('${x.clave}', '${x.id}')"><div class="ft-item" style="border:none">
+      <div class="ft-pct">${feb === undefined || feb === '' ? '—' : esc(feb) + '%'}<small>FebNoPer</small></div>
+      <div class="ft-info"><div class="card-top" style="margin:0"><div><b>${esc(x.codigo)}</b><div class="n">${esc(x.caso.nombre)} · ${nombreCampana(x)} · ${esc(x.area)}</div></div>
+          ${x.cerrado ? '<span class="tg verde"><i class="ic ic-check"></i> Cerrado</span>' : x.limite ? tagPlazo(x.limite, hoy) : '<span class="falta">Sin fecha de instalación</span>'}</div>
+        ${x.dias !== null && !x.cerrado ? `<div class="ft-dias"><i class="${x.vencido || pct >= 80 ? 'mal' : ''}" style="width:${pct}%"></i></div>
+          <div class="barra-leyenda" style="margin:4px 0 0"><span>Día ${x.dias} de ${DIAS_SOLUCION_FT}</span><span>Instalación ${fmtDate(x.inicio)} · plazo ${fmtDate(x.limite)}</span></div>` : ''}
+        <div class="tags">
+          ${x.ft.aviso ? `<span class="tg verde"><i class="ic ic-correo"></i> Aviso enviado ${fmtDate(x.ft.aviso.fecha)}</span>` : '<span class="tg rojo"><i class="ic ic-correo"></i> Falta avisar a DELSUR</span>'}
+          ${x.ft.ruta ? `<span class="tg azul">${esc(x.ft.ruta)}</span>` : ''}
+          ${x.remedicionInstalada ? `<span class="tg gris">Remedición ${esc(x.remedicionInstalada.codigo)} ${x.remedicionInstalada.retirado ? 'retirada' : 'en campo'}</span>` : ''}
+          ${x.vencido ? '<span class="tg rojo">Más de 90 días: se penalizan los 90 días y la compensación sigue</span>' : ''}
+        </div></div>
+      <i class="ic ic-chevron-right" style="color:var(--text3)"></i></div></div>`;
   };
   if (abiertos.length) html += `<div class="section-title">Abiertos (${abiertos.length})</div><div class="list">${abiertos.map(tarjeta).join('')}</div>`;
   if (cerrados.length) html += `<div class="section-title" style="margin-top:16px">Cerrados (${cerrados.length})</div><div class="list">${cerrados.map(tarjeta).join('')}</div>`;
