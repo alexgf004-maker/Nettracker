@@ -206,6 +206,7 @@ En el detalle de la campaña:
 - Cada caso se asigna a una fecha (`casos/{id}/programa = { fecha, equipo }`) y a un equipo del inventario que no esté instalado, fuera de servicio ni en mantenimiento.
 - Cada fecha tiene instalación, retiro y accesorios (`campanas/{clave}/fechas/{n}`); por defecto los accesorios son "3 pinzas de corriente, 4 caimanes, 4 alimentadores de voltaje tipo banana".
 - Avisa si faltan fechas, equipos o multiplicadores, si un equipo se repite y cuántos casos listos para medir no tienen fecha.
+- **Importar programación**: el Excel "Usuarios seleccionados" (hoja DATA GENERAL) trae la fecha de instalación de cada caso. Cada día distinto de una campaña queda como una Fecha en orden (MT suele tener 3; BT puede tener más). Los casos se buscan por código y, si no, por NC y tipo (en DA/DF el archivo trae el tipo de sistema corregido y se actualiza el código, salvo que se haya corregido a mano). Avisa si un código viene con otro NC, qué casos no vienen y qué filas no coinciden. La fecha de retiro no viene en el archivo.
 - **Exportar Excel**: mismas columnas que las hojas Fecha1/2/3 (encabezado en la fila 3): Número SIGET, Equipo, Nombre del Usuario, Id del Usuario, Dirección, Multiplicador (ECAMEC), Corrientes (TI), Conexion (configuración), fechas, coordenadas y accesorios.
 - **Enviar a Despachos**: abre la vista previa de la carga masiva con esas filas y las mismas validaciones que el Excel (`validarFilaCarga` en `actions/carga.js`); al confirmar se crean las instalaciones y el memo como siempre.
 

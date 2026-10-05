@@ -3,7 +3,8 @@ import { db, ref, update } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { validarFilaCarga } from './carga.js';
-import { casosDeFecha, filaFecha, filasFecha } from '../domain/fechas.js';
+import { leerArchivo } from './campanas.js';
+import { casosDeFecha, leerProgramacion, planificarFechas, filaFecha, filasFecha } from '../domain/fechas.js';
 import { ordenarCasos } from '../domain/listados.js';
 import { MESES } from '../domain/trabajo.js';
 import { render } from '../views/render.js';
@@ -47,5 +48,44 @@ export function enviarFechaADespachos(clave, n) {
   state.cargaView = 'preview';
   state.cargaSubView = 'subir';
   state.tab = 'carga'; state.view = 'lista'; state.campanaClave = null;
+  render();
+}
+
+// ── IMPORTAR PROGRAMACIÓN (Excel con la fecha de instalación de cada caso) ──
+
+export async function importarProgramacion(files) {
+  if (!files?.length) return;
+  try {
+    procesarProgramacion(await leerArchivo(files[0]));
+  } catch (err) {
+    showToast('No se pudo leer el archivo: ' + err.message);
+  }
+}
+
+// archivo: { nombre, hojas, orden } (separado para poder probarlo sin archivo)
+export function procesarProgramacion(archivo) {
+  let leido = null;
+  for (const n of archivo.orden) { const r = leerProgramacion(archivo.hojas[n]); if (!r.error) { leido = r; break; } }
+  if (!leido) return showToast('No se encontraron las columnas "Número SIGET" y "Fecha instalación"');
+  state.importProgramacion = { nombre: archivo.nombre, ...planificarFechas(leido.filas, state.campanas) };
+  render();
+}
+export function cerrarProgramacion() { state.importProgramacion = null; render(); }
+
+export function guardarProgramacion() {
+  const imp = state.importProgramacion;
+  if (!imp?.planes.length) return;
+  imp.planes.forEach(p => {
+    const datos = {};
+    p.dias.forEach((d, i) => { datos[`fechas/${i + 1}/instalacion`] = d; });
+    p.asignaciones.forEach(a => {
+      if (a.fecha) datos[`casos/${a.id}/programa/fecha`] = a.fecha;
+      if (a.codigoNuevo) datos[`casos/${a.id}/codigo`] = a.codigoNuevo;
+    });
+    update(ref(db, 'campanas/' + p.clave), datos);
+  });
+  const total = imp.planes.reduce((n, p) => n + p.asignaciones.length, 0);
+  showToast(`Programación guardada · ${total} casos`);
+  state.importProgramacion = null;
   render();
 }

@@ -1021,4 +1021,33 @@ test.describe('Precampaña', () => {
     const push = (await app.escrituras()).find(([op, ruta]) => op === 'push' && ruta === 'analizadores');
     expect(push[2]).toMatchObject({ caso: 'CR1O2026201', serie: 'SN-105', fechaInstalacion: '2026-10-05', fechaRetiro: '2026-10-13', areaInstalacion: 'Campos y Servicios', areaBeneficiaria: 'CPT MT', lat: '13.7' });
   });
+
+  test('importar la programación: cada día de instalación queda como una Fecha', async ({ page }) => {
+    const datos = conCampana();
+    datos.campanas['2026-10_CPT-MT'].casos.DA1O2026011O00.manual = undefined;
+    app = await abrirApp(page, { excel: true, datos });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('fechas'); });
+    const programacion = excel('10-Usuarios_seleccionados-octubre-2026.xlsx', [
+      ['Número SIGET', 'Id del Usuario', 'Nombre del Usuario   4', 'DIRECCIÓN', 'Municipio  7', 'Fecha instalación', 'Transformador', 'Alimentador   16', 'TIPO  B/R', 'TIPO 2  BT/MT', 'EMPRESA'],
+      ['CR1O2026202', 222, 'USUARIO 222', 'X', 'Y', new Date(Date.UTC(2026, 9, 2)), 'CT1', 'AL014', 'B', 'MT', 'C&S'],
+      ['DA1O2026013O00', 222, 'USUARIO 222', 'X', 'Y', new Date(Date.UTC(2026, 9, 2)), 'CT1', 'AL014', 'B', 'MT', 'C&S'],
+      ['CR1O2026201', 999, 'OTRO DUEÑO', 'X', 'Y', new Date(Date.UTC(2026, 9, 1)), 'CT1', 'AL014', 'B', 'MT', 'C&S'],
+      ['CR1O2026999', 555, 'NO EXISTE', 'X', 'Y', new Date(Date.UTC(2026, 9, 1)), 'CT1', 'AL014', 'B', 'MT', 'C&S'],
+    ], 'DATA GENERAL');
+    await page.locator('label', { hasText: 'Importar programación' }).locator('input').setInputFiles(programacion);
+    const modal = page.locator('.modal');
+    await expect(modal).toContainText('Fecha 1');
+    await expect(modal).toContainText('01/10/2026 · 1 casos');
+    await expect(modal).toContainText('02/10/2026 · 2 casos');
+    await expect(modal).toContainText('DA1O2026011O00 → DA1O2026013O00');
+    await expect(modal).toContainText('CR1O2026201 (999)');
+    await expect(modal).toContainText('1 filas no coinciden con ningún caso importado: CR1O2026999');
+    await page.getByRole('button', { name: 'Guardar programación' }).click();
+    expect((await app.escrituras()).at(-1)).toEqual(['update', 'campanas/2026-10_CPT-MT', {
+      'fechas/1/instalacion': '2026-10-01', 'fechas/2/instalacion': '2026-10-02',
+      'casos/CR1O2026201/programa/fecha': '1', 'casos/CR1O2026202/programa/fecha': '2',
+      'casos/DA1O2026011O00/programa/fecha': '2', 'casos/DA1O2026011O00/codigo': 'DA1O2026013O00',
+    }]);
+  });
 });
