@@ -128,9 +128,9 @@ test.describe('Trabajo', () => {
 
   test('campañas agrupadas por mes; marcar la entrega quita el aviso', async ({ page }) => {
     await nav(page, 'Campañas');
-    await expect(page.locator('.card', { hasText: 'Septiembre 2026' })).toContainText('faltan 17 días');
-    await expect(page.locator('.card', { hasText: 'Agosto 2026' })).toContainText('venció hace 13 días');
-    await page.locator('.card', { hasText: 'Agosto 2026' }).click();
+    await expect(page.locator('.camp-card', { hasText: 'Septiembre 2026' })).toContainText('faltan 17 días');
+    await expect(page.locator('.camp-card', { hasText: 'Agosto 2026' })).toContainText('venció hace 13 días');
+    await page.locator('.camp-card', { hasText: 'Agosto 2026' }).click();
     await expect(app$(page)).toContainText('DA182026201');
     await expect(app$(page)).toContainText('1 con descarga pendiente');
     await page.getByRole('button', { name: 'Marcar como cargada en CPT DELSUR' }).click();
@@ -802,7 +802,7 @@ test.describe('Precampaña', () => {
     expect(mt.importado).toMatchObject({ fecha: '2026-09-23', por: 'David García' });
     const bt = escrituras.find(([, ruta]) => ruta === 'campanas/2026-10_CPT-BT')[2];
     expect(bt['casos/DA1O2026041O00/crRelacionado']).toBe('CR1O2026001');
-    await expect(page.locator('.card', { hasText: 'Octubre 2026' })).toContainText('Precampaña · 5 casos importados');
+    await expect(page.locator('.camp-card', { hasText: 'Octubre 2026' })).toContainText('Paso actual: Precampaña');
   });
 
   test('volver a importar no cambia el código corregido', async ({ page }) => {
@@ -824,7 +824,7 @@ test.describe('Precampaña', () => {
     await cerrarAlerta(page);
     await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('casos'); });
     await expect(page.locator('.tabla-casos')).toContainText('CR1O2026201');
-    await expect(page.locator('.tag', { hasText: 'con datos faltantes' })).toHaveText('3 con datos faltantes');
+    await expect(page.locator('.tg', { hasText: 'con datos faltantes' })).toHaveText('3 con datos faltantes');
 
     const control = excel('Puntos_Control_TOTAL.xlsx', [
       ['CONF', 'Punto de Control', 'NC', 'Tipo de punto de control', 'Nivel de Tensión', 'Fecha de Colocación', 'Fecha de Retiro', 'Tipo de Instalacion', 'Tipo de Medicion', 'comprobacion bdth', 'TARIFA', 'URBANIDAD', 'CENTROMTBT', 'POTENCIA INSTALADA', 'AL', 'NOMBRE', 'DIRECCION', 'ENERGIA', 'TENSION', 'MEDIDOR', 'FASES', 'PERIODO', 'X', 'PERIODO', 'NC'],
@@ -915,7 +915,7 @@ test.describe('Precampaña', () => {
     await cerrarAlerta(page);
     const docs = await capturarDocsPrecampana(page);
     await app.ejecutar(() => abrirCampanaTrabajo('2026-10_CPT-MT'));
-    await expect(page.locator('.panel', { hasText: 'pasos' })).toContainText('0 de 8 pasos');
+    await expect(page.locator('.bloque', { hasText: 'Pasos de la precampaña' })).toContainText('0 de 8');
     await page.getByRole('button', { name: 'Generar cartas' }).click();
     await expect(page.locator('.modal-titulo')).toHaveText('Datos de las cartas');
     await page.locator('#cfg-firmante').fill('Persona Firmante');
@@ -954,7 +954,7 @@ test.describe('Precampaña', () => {
 
     await page.locator('.paso', { hasText: 'Firma de las cartas' }).getByRole('button', { name: 'Marcar' }).click();
     expect((await app.escrituras()).at(-1)).toEqual(['set', 'campanas/2026-10_CPT-MT/precampana/firma', { fecha: '2026-09-23', por: 'David García' }]);
-    await expect(page.locator('.panel', { hasText: 'pasos' })).toContainText('2 de 8 pasos');
+    await expect(page.locator('.bloque', { hasText: 'Pasos de la precampaña' })).toContainText('2 de 8');
     await page.locator('.paso', { hasText: 'Firma de las cartas' }).getByRole('button', { name: 'Deshacer' }).click();
     expect((await app.escrituras()).at(-1)).toEqual(['remove', 'campanas/2026-10_CPT-MT/precampana/firma']);
   });
@@ -980,7 +980,7 @@ test.describe('Precampaña', () => {
     await page.getByRole('button', { name: 'Guardar', exact: true }).click();
     expect((await app.escrituras()).at(-1)).toEqual(['set', 'campanas/2026-10_CPT-MT/casos/CR1O2026201/mult',
       { estado: 'Realizado', configuracion: 'Estrella', tap: '3', tensionTap: 13200, tensionBT: 240, xMedidor: 80, vab: 241, editadoPor: 'David García', fecha: '2026-09-23' }]);
-    await expect(page.locator('.resumen-estado', { hasText: 'Listos para medir' })).toContainText('1');
+    await expect(page.locator('.tile', { hasText: 'Listos para medir' })).toContainText('1');
     await expect(page.locator('.aviso')).toContainText('1 de 38 CR obligatorios');
 
     // Medición primaria: TI = (X/120)·5/5
@@ -1072,7 +1072,7 @@ test.describe('Precampaña', () => {
     app = await abrirApp(page, { excel: true, datos });
     await cerrarAlerta(page);
     await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('fechas'); });
-    await expect(page.locator('.aviso-azul')).toContainText('1 caso listo para medir no tiene fecha asignada');
+    await expect(page.locator('.meta')).toContainText('1 caso listo para medir no tiene fecha');
     await page.getByLabel('Fecha de CR1O2026201').selectOption('1');
     expect((await app.escrituras()).at(-1)).toEqual(['update', 'campanas/2026-10_CPT-MT/casos/CR1O2026201/programa', { fecha: '1' }]);
     await page.getByLabel('Equipo de CR1O2026201').selectOption('SN-105');
@@ -1083,7 +1083,7 @@ test.describe('Precampaña', () => {
     await tarjeta.locator('input[type=date]').nth(0).fill('2026-10-05');
     await tarjeta.locator('input[type=date]').nth(1).fill('2026-10-13');
     await expect.poll(async () => (await app.escrituras()).at(-1)).toEqual(['update', 'campanas/2026-10_CPT-MT/fechas/1', { retiro: '2026-10-13' }]);
-    await expect(tarjeta.locator('.aviso')).toHaveCount(0);
+    await expect(tarjeta.locator('.boleto-avisos')).toHaveCount(0);
 
     const descarga = page.waitForEvent('download');
     await tarjeta.getByRole('button', { name: 'Exportar Excel' }).click();
@@ -1144,7 +1144,7 @@ test.describe('Precampaña', () => {
     await expect(fila('CR1O2026201')).toContainText('según la descarga');
     await expect(fila('CR1O2026202')).toContainText('Sin instalar');
     await expect(fila('DA1O2026011O00')).toContainText('Acceso denegado');
-    await expect(page.locator('.aviso')).toContainText('1 de 38 CR obligatorios con medición válida');
+    await expect(page.locator('.meta', { hasText: 'CR obligatorios con medición válida' })).toContainText('1 / 38');
 
     await fila('CR1O2026202').click();
     await page.locator('.modal').getByRole('button', { name: 'Válida' }).click();
@@ -1152,8 +1152,11 @@ test.describe('Precampaña', () => {
     await page.locator('#res-febNoPer').fill('7,5');
     await page.getByRole('button', { name: 'Guardar', exact: true }).click();
     expect((await app.escrituras()).at(-1)).toEqual(['set', 'campanas/2026-10_CPT-MT/casos/CR1O2026202/resultado', { medicion: 'valida', tolerancia: 'fuera', febNoPer: 7.5, por: 'David García', fecha: '2026-09-23' }]);
-    await expect(fila('CR1O2026202')).toContainText('FT');
-    await expect(page.locator('.resumen-estado', { hasText: 'Fuera de tolerancia' })).toContainText('1');
+    await expect(fila('CR1O2026202')).toContainText('Fuera de tolerancia');
+    await expect(fila('CR1O2026202')).toHaveClass(/fila-ft/); // resalta en rojo
+    await expect(page.locator('.ft-bloque')).toContainText('1 caso fuera de tolerancia');
+    await expect(page.locator('.ft-bloque')).toContainText('Falta avisar a DELSUR');
+    await expect(page.locator('.tile', { hasText: 'Fuera de tolerancia' })).toContainText('1');
 
     const descarga = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Exportar cuadro resumen' }).click();

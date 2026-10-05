@@ -41,6 +41,7 @@ export const state = {
   casoEdit: null, // { clave, id }
   campanaVista: 'precampana', // precampana | casos | multiplicadores | fechas | resultados | mediciones
   multFiltro: 'todos', // todos | listos | por_resolver | no_se_miden
+  resultadosFiltro: 'todos', // todos | valida | ft | fallida | revisar | pendiente
   multEdit: null, // { clave, id }
   multForm: {},
   ftEdit: null, // { clave, id }

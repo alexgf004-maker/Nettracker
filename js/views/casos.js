@@ -21,32 +21,36 @@ export function renderCasosCampana(c) {
   const n = contarTipos(c.casos);
   const importado = state.campanas?.[c.clave]?.importado;
 
-  let html = '<div class="panel">';
-  html += `<div class="chips-linea" style="margin-top:0">${['CR', 'DA', 'DF'].filter(t => n[t]).map(t => `<span class="chip-dato"><b>${n[t]}</b> ${t}</span>`).join('')}
-    ${conFaltantes.length ? `<span class="tag tag-amarillo"><i class="ic ic-alerta"></i> ${conFaltantes.length} con datos faltantes</span>` : '<span class="tag tag-verde"><i class="ic ic-check"></i> Datos completos</span>'}</div>`;
-  if (importado) html += `<div class="page-sub">Importado el ${fmtDate(importado.fecha)} por ${esc(importado.por)}</div>`;
-  html += `<div class="acciones-casos">
-    <label class="btn-accion"><i class="ic ic-excel"></i> Completar con control de puntos<input type="file" accept=".xlsx,.xls,.csv" hidden onchange="subirArchivoCampana('${c.clave}', 'control', this.files)"></label>
-    <button class="btn-accion" onclick="completarCoordenadasBase('${c.clave}')"><i class="ic ic-map-pin"></i> Completar coordenadas</button>
-    <label class="btn-link" title="Desde un Excel o CSV con NC, latitud y longitud">o desde un archivo<input type="file" accept=".xlsx,.xls,.xlsm,.csv" hidden onchange="subirArchivoCampana('${c.clave}', 'coordenadas', this.files)"></label>
-    <button class="btn-accion" onclick="exportarListado('${c.clave}')"><i class="ic ic-descargar"></i> Exportar listado</button>
+  let html = '<div class="bloque">';
+  html += `<div class="bloque-head"><div class="bloque-titulo">Datos de los casos</div>${conFaltantes.length ? `<span class="tg ambar"><i class="ic ic-alerta"></i> ${conFaltantes.length} con datos faltantes</span>` : '<span class="tg verde"><i class="ic ic-check"></i> Datos completos</span>'}</div>`;
+  const tile = (k, v, l, clase) => `<button class="tile ${clase} ${filtro === k ? 'sel' : ''} ${v ? '' : 'vacio'}" onclick="setCasosFiltro('${filtro === k ? 'todos' : k}')"><span class="v">${v}</span><span class="l">${l}</span></button>`;
+  html += '<div class="tiles">' + ['CR', 'DA', 'DF'].filter(t => n[t]).map(t => tile(t, n[t], { CR: 'Regulación (CR)', DA: 'Armónicos (DA)', DF: 'Flicker (DF)' }[t], 't-azul')).join('')
+    + tile('faltantes', conFaltantes.length, 'Con datos faltantes', conFaltantes.length ? 't-ambar' : 't-verde') + '</div>';
+  html += `<div class="barra-acciones">
+    <label class="b b-p"><i class="ic ic-excel"></i> Completar con control de puntos<input type="file" accept=".xlsx,.xls,.csv" hidden onchange="subirArchivoCampana('${c.clave}', 'control', this.files)"></label>
+    <button class="b b-g" onclick="completarCoordenadasBase('${c.clave}')"><i class="ic ic-map-pin"></i> Completar coordenadas</button>
+    <label class="b b-l" title="Desde un Excel o CSV con NC, latitud y longitud">o desde un archivo<input type="file" accept=".xlsx,.xls,.xlsm,.csv" hidden onchange="subirArchivoCampana('${c.clave}', 'coordenadas', this.files)"></label>
+    <span class="sep"></span>
+    <button class="b b-g" onclick="exportarListado('${c.clave}')"><i class="ic ic-descargar"></i> Exportar listado</button>
   </div>`;
+  html += `<details class="ayuda"><summary><i class="ic ic-ayuda"></i> ¿De dónde salen los datos?</summary><p>El control de puntos completa CT/DS, medidor, alimentador y urbanidad (se busca por código y, si no está, por NC). Las coordenadas salen de la base cargada en la app. Lo que corrijas a mano en un caso no se vuelve a cambiar.${importado ? ` Listados importados el ${fmtDate(importado.fecha)} por ${esc(importado.por)}.` : ''}</p></details>`;
   html += '</div>';
 
-  html += '<div class="casos-filtros"><div class="segmento">' + FILTROS.map(([k, label]) => `<button class="${filtro === k ? 'active' : ''}" onclick="setCasosFiltro('${k}')">${label}${k === 'faltantes' ? ` (${conFaltantes.length})` : ''}</button>`).join('') + '</div>';
-  html += `<input class="search-input casos-buscar" placeholder="Buscar código, NC o nombre" value="${esc(state.casosBusqueda || '')}" oninput="setCasosBusqueda(this.value)" ${state.casosBusqueda ? 'data-active="true"' : ''}></div>`;
+  html += `<div class="filtros">${FILTROS.map(([k, label]) => `<button class="pildora ${filtro === k ? 'active' : ''}" onclick="setCasosFiltro('${k}')">${label}${k === 'faltantes' ? ` <b>${conFaltantes.length}</b>` : ''}</button>`).join('')}
+    <input class="search-input buscar casos-buscar" placeholder="Buscar código, NC o nombre" value="${esc(state.casosBusqueda || '')}" oninput="setCasosBusqueda(this.value)" ${state.casosBusqueda ? 'data-active="true"' : ''}></div>`;
 
-  html += '<div class="tabla-wrap"><table class="tabla-casos"><thead><tr><th>Código</th><th>NC</th><th>Nombre</th><th>Dirección</th><th>CT/DS</th><th>Medidor</th><th>Alimentador</th><th>Urb.</th><th>Coordenadas</th></tr></thead><tbody>';
+  html += '<div class="tabla-caja"><div class="tabla-scroll"><table class="tabla-r tabla-casos"><thead><tr><th>Código</th><th>NC</th><th>Dirección</th><th>CT/DS</th><th>Medidor</th><th>Alimentador</th><th>Urb.</th><th>Coordenadas</th></tr></thead><tbody>';
   visibles.forEach(x => {
     const cambiado = x.codigo && x.codigoEnte && x.codigo !== x.codigoEnte;
     html += `<tr onclick="abrirCaso('${c.clave}', '${x.id}')">
-      <td class="mono"><b>${esc(x.codigo || x.codigoEnte)}</b>${cambiado ? `<small>Ente: ${esc(x.codigoEnte)}</small>` : ''}${x.crRelacionado ? `<small>Usuario de ${esc(x.crRelacionado)}</small>` : ''}</td>
-      <td class="mono">${esc(x.nc)}${x.ncControl ? `<small class="txt-ambar" title="El control de puntos trae este código con otro NC">Control: ${esc(x.ncControl)}</small>` : ''}</td><td>${esc(x.nombre)}</td><td class="col-dir">${esc(x.direccion || x.direccionEnte)}</td>
-      <td>${celda(x.ct)}</td><td>${celda(x.medidor)}</td><td>${celda(x.alimentador)}</td><td>${celda(x.urbanidad)}</td><td>${coords(x)}</td>
+      <td class="cod"><b>${esc(x.codigo || x.codigoEnte)}</b><small>${esc(x.nombre)}</small>${cambiado ? `<small>Ente: ${esc(x.codigoEnte)}</small>` : ''}${x.crRelacionado ? `<small>Usuario de ${esc(x.crRelacionado)}</small>` : ''}</td>
+      <td class="num" data-l="NC">${esc(x.nc)}${x.ncControl ? `<small class="txt-ambar" title="El control de puntos trae este código con otro NC">Control: ${esc(x.ncControl)}</small>` : ''}</td>
+      <td class="col-dir ancho" data-l="Dirección">${esc(x.direccion || x.direccionEnte)}</td>
+      <td data-l="CT/DS">${celda(x.ct)}</td><td data-l="Medidor">${celda(x.medidor)}</td><td data-l="Alimentador">${celda(x.alimentador)}</td><td data-l="Urbanidad">${celda(x.urbanidad)}</td><td data-l="Coordenadas">${coords(x)}</td>
     </tr>`;
   });
-  if (!visibles.length) html += '<tr><td colspan="9" class="tabla-vacia">No hay casos con ese filtro</td></tr>';
-  return html + '</tbody></table></div>';
+  if (!visibles.length) html += '<tr><td colspan="8" class="vacia tabla-vacia">No hay casos con ese filtro</td></tr>';
+  return html + '</tbody></table></div></div>';
 }
 
 // ── IMPORTAR LISTADOS ──
@@ -121,32 +125,42 @@ export const PASOS_PRECAMPANA = [
   ['evidencias', 'Hojas llenas y fotos recibidas del contratista', 'manual'],
 ];
 
-export function renderPrecampana(c) {
+// Cuántos pasos de la precampaña están listos
+export function avancePrecampana(c) {
   const g = state.campanas?.[c.clave] || {};
   const p = g.precampana || {};
   const conFaltantes = c.casos.filter(x => faltantes(x).length).length;
-  const estado = {
+  const auto = {
     listados: g.importado ? `${fmtDate(g.importado.fecha)} · ${esc(g.importado.por)}` : null,
     datos: c.casos.length && !conFaltantes ? 'Todos los casos tienen sus datos' : null,
   };
-  const hechos = PASOS_PRECAMPANA.filter(([k]) => estado[k] || p[k]).length;
-  let html = '<div class="panel">';
-  html += `<div class="panel-titulo"><i class="ic ic-clipboard"></i> ${hechos} de ${PASOS_PRECAMPANA.length} pasos<span class="progreso"><span style="width:${Math.round(hechos * 100 / PASOS_PRECAMPANA.length)}%"></span></span></div>`;
-  html += '<div class="pasos">';
-  PASOS_PRECAMPANA.forEach(([k, label, tipo]) => {
+  const hechos = PASOS_PRECAMPANA.filter(([k]) => auto[k] || p[k]).length;
+  return { hechos, total: PASOS_PRECAMPANA.length, auto, marcados: p, conFaltantes };
+}
+
+export function renderPrecampana(c) {
+  const { hechos, total, auto, marcados: p, conFaltantes } = avancePrecampana(c);
+  const actual = PASOS_PRECAMPANA.findIndex(([k]) => !(auto[k] || p[k]));
+  let html = '<div class="bloque">';
+  html += `<div class="bloque-head"><div class="bloque-titulo">Pasos de la precampaña <span class="cuenta">${hechos} de ${total}</span></div>
+    <button class="b b-l" onclick="abrirConfigCartas()"><i class="ic ic-ajustes"></i> Datos de las cartas</button></div>`;
+  html += `<div class="meta ${hechos === total ? 'ok' : ''}"><div class="meta-tx">${hechos === total ? 'Precampaña completa' : `Sigue: ${PASOS_PRECAMPANA[actual][1]}`}</div><div class="meta-barra"><i style="width:${Math.round(hechos * 100 / total)}%"></i></div><div class="meta-num">${Math.round(hechos * 100 / total)}<small> %</small></div></div>`;
+  html += '<div class="tl pasos">';
+  PASOS_PRECAMPANA.forEach(([k, label, tipo], i) => {
     const hecho = p[k] || null;
-    const listo = estado[k] || hecho;
-    let detalle = estado[k] || (hecho ? `${fmtDate(hecho.fecha)} · ${esc(hecho.por)}${hecho.total ? ` · ${hecho.total} casos` : ''}` : '');
-    if (k === 'datos' && !listo) detalle = `${conFaltantes} ${conFaltantes === 1 ? 'caso' : 'casos'} con datos faltantes`;
+    const listo = auto[k] || hecho;
+    let detalle = auto[k] || (hecho ? `${fmtDate(hecho.fecha)} · ${esc(hecho.por)}${hecho.total ? ` · ${hecho.total} casos` : ''}` : '');
+    let claseDetalle = '';
+    if (k === 'datos' && !listo) { detalle = `${conFaltantes} ${conFaltantes === 1 ? 'caso' : 'casos'} con datos faltantes`; claseDetalle = 'falta-tx'; }
     let accion = '';
-    if (tipo === 'manual') accion = hecho ? `<button class="btn-link" onclick="desmarcarPaso('${c.clave}', '${k}')">Deshacer</button>` : `<button class="btn-accion" onclick="marcarPaso('${c.clave}', '${k}')"><i class="ic ic-check"></i> Marcar</button>`;
-    if (k === 'cartas') accion = `<button class="btn-accion" onclick="abrirDocumentos('${c.clave}', 'cartas')"><i class="ic ic-correo"></i> ${hecho ? 'Generar de nuevo' : 'Generar cartas'}</button>`;
-    if (k === 'hojas') accion = `<button class="btn-accion" onclick="abrirDocumentos('${c.clave}', 'hojas')"><i class="ic ic-archivo"></i> ${hecho ? 'Generar de nuevo' : 'Generar hojas'}</button>`;
-    html += `<div class="paso ${listo ? 'paso-listo' : ''}"><i class="ic ${listo ? 'ic-cuadro-check' : 'ic-cuadro'}"></i>
-      <div class="paso-texto"><div>${label}</div>${detalle ? `<small>${detalle}</small>` : ''}</div>${accion}</div>`;
+    if (k === 'datos' && !listo) accion = '<button class="b b-g" onclick="setCampanaVista(\'casos\')"><i class="ic ic-usuarios"></i> Ver casos</button>';
+    if (tipo === 'manual') accion = hecho ? `<button class="b b-l" onclick="desmarcarPaso('${c.clave}', '${k}')">Deshacer</button>` : `<button class="b ${i === actual ? 'b-p' : 'b-g'}" onclick="marcarPaso('${c.clave}', '${k}')"><i class="ic ic-check"></i> Marcar</button>`;
+    if (k === 'cartas') accion = `<button class="b ${hecho || i !== actual ? 'b-g' : 'b-p'}" onclick="abrirDocumentos('${c.clave}', 'cartas')"><i class="ic ic-correo"></i> ${hecho ? 'Generar de nuevo' : 'Generar cartas'}</button>`;
+    if (k === 'hojas') accion = `<button class="b ${hecho || i !== actual ? 'b-g' : 'b-p'}" onclick="abrirDocumentos('${c.clave}', 'hojas')"><i class="ic ic-archivo"></i> ${hecho ? 'Generar de nuevo' : 'Generar hojas'}</button>`;
+    html += `<div class="tl-paso paso ${listo ? 'listo paso-listo' : ''} ${i === actual ? 'actual' : ''}"><div class="tl-num">${listo ? '<i class="ic ic-check"></i>' : i + 1}</div>
+      <div class="tl-cuerpo"><div class="tl-tx paso-texto"><b>${label}</b>${detalle ? `<small class="${claseDetalle}">${detalle}</small>` : ''}</div>${accion}</div></div>`;
   });
   html += '</div>';
-  html += `<button class="btn-link" style="margin-top:8px" onclick="abrirConfigCartas()">Datos de las cartas (firmante, contacto, contratista y logo)</button>`;
   return html + '</div>';
 }
 

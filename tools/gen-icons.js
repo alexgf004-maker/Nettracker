@@ -16,6 +16,8 @@ const MAP = {
   capas: 'layers', excel: 'file-spreadsheet', guardar: 'save', luna: 'moon', sol: 'sun', llave: 'wrench',
   satelite: 'satellite', imprimir: 'printer', ojo: 'eye', info: 'info', bateria: 'battery-warning', escudo: 'shield-check',
   ruta: 'route', medidor: 'gauge',
+  usuarios: 'users', pasos: 'list-checks', sliders: 'sliders-horizontal', 'calendario-dias': 'calendar-days', sirena: 'siren',
+  ayuda: 'circle-help', 'chevron-down': 'chevron-down', bandera: 'flag', 'reloj-alerta': 'clock-alert',
 };
 let css = '/* Íconos Lucide (https://lucide.dev, licencia ISC) usados como máscara: toman el color del texto.\n   Uso: <i class="ic ic-home"></i> o, dentro de textos, <i class=ic-home></i> (sin comillas). Generado por un script; para agregar uno, agrega su SVG aquí. */\n';
 css += '.ic, [class^=\"ic-\"], [class*=\" ic-\"] { display: inline-block; width: 1.15em; height: 1.15em; vertical-align: -0.2em; flex-shrink: 0; background-color: currentColor; -webkit-mask: var(--ic) center / contain no-repeat; mask: var(--ic) center / contain no-repeat; }\n';

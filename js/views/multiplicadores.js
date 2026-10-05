@@ -9,8 +9,9 @@ import { state } from '../state.js';
 import { escapeHtml, fmtDate } from '../utils.js';
 
 const esc = s => escapeHtml(s ?? '');
-const CLASE_GRUPO = { listos: 'tag-verde', por_resolver: 'tag-amarillo', no_se_miden: 'tag-gris' };
-const tagEstado = e => (e ? `<span class="tag ${CLASE_GRUPO[grupoDeEstado(e)]}">${esc(e)}</span>` : '<span class="falta">Sin estado</span>');
+
+const TG_GRUPO = { listos: 'verde', por_resolver: 'ambar', no_se_miden: 'gris' };
+const tgEstado = e => (e ? `<span class="tg ${TG_GRUPO[grupoDeEstado(e)]}">${esc(e)}</span>` : '<span class="falta">Sin estado</span>');
 
 export function renderMultiplicadores(c) {
   const casos = ordenarCasos(c.casos);
@@ -18,32 +19,41 @@ export function renderMultiplicadores(c) {
   const filtro = state.multFiltro || 'todos';
   const visibles = casos.filter(x => filtro === 'todos' || grupoDeEstado(x.mult?.estado) === filtro);
 
-  let html = '<div class="panel">';
-  html += '<div class="resumen-mult">';
-  GRUPOS_ESTADO.forEach(([k, label]) => {
-    html += `<button class="resumen-estado ${filtro === k ? 'active' : ''}" onclick="setMultFiltro('${filtro === k ? 'todos' : k}')"><b>${r.porGrupo[k]}</b><span>${label}</span></button>`;
-  });
-  html += '</div>';
+  let html = '<div class="bloque">';
+  html += '<div class="bloque-head"><div class="bloque-titulo">Multiplicadores</div></div>';
+  const CLASE = { listos: 't-verde', por_resolver: 't-ambar', no_se_miden: 't-gris' };
+  const ICONO = { listos: 'check', por_resolver: 'alerta', no_se_miden: 'x' };
+  html += '<div class="tiles resumen-mult">' + GRUPOS_ESTADO.map(([k, label]) => `<button class="tile ${CLASE[k]} ${filtro === k ? 'sel' : ''} ${r.porGrupo[k] ? '' : 'vacio'}" onclick="setMultFiltro('${filtro === k ? 'todos' : k}')"><i class="ic ic-${ICONO[k]}"></i><span class="v">${r.porGrupo[k]}</span><span class="l">${label}</span></button>`).join('') + '</div>';
   if (c.area === 'CPT MT') {
     const ok = r.crListos >= CR_OBLIGATORIOS_MT;
-    html += `<div class="aviso ${ok ? 'aviso-verde' : 'aviso-amarillo'}"><i class="ic ${ok ? 'ic-check' : 'ic-alerta'}"></i> ${r.crListos} de ${CR_OBLIGATORIOS_MT} CR obligatorios listos para medir</div>`;
+    html += `<div class="meta aviso ${ok ? 'ok' : ''}"><div class="meta-tx">${r.crListos} de ${CR_OBLIGATORIOS_MT} CR obligatorios listos para medir<small>${Object.entries(r.porEstado).sort((a, b) => b[1] - a[1]).map(([e, n]) => `${n} ${esc(e || 'sin estado')}`).join(' · ')}</small></div>
+      <div class="meta-barra"><i style="width:${Math.min(100, Math.round(r.crListos * 100 / CR_OBLIGATORIOS_MT))}%"></i></div><div class="meta-num">${r.crListos}<small> / ${CR_OBLIGATORIOS_MT}</small></div></div>`;
+  } else {
+    html += `<div class="chips-linea">${Object.entries(r.porEstado).sort((a, b) => b[1] - a[1]).map(([e, n]) => `<span class="chip-dato"><b>${n}</b> ${esc(e || 'Sin estado')}</span>`).join('')}</div>`;
   }
-  html += `<div class="chips-linea">${Object.entries(r.porEstado).sort((a, b) => b[1] - a[1]).map(([e, n]) => `<span class="chip-dato"><b>${n}</b> ${esc(e || 'Sin estado')}</span>`).join('')}</div>`;
-  html += `<div class="acciones-casos"><button class="btn-accion" onclick="exportarMultiplicadores('${c.clave}')"><i class="ic ic-descargar"></i> Exportar multiplicadores</button>
-    <label class="btn-accion"><i class="ic ic-subir"></i> Importar desde Excel<input type="file" accept=".xlsx,.xlsm,.xls" hidden onchange="importarMultiplicadores(this.files)"></label>
-    ${filtro !== 'todos' ? '<button class="btn-link" onclick="setMultFiltro(\'todos\')">Ver todos</button>' : ''}</div>`;
+  html += `<div class="barra-acciones">
+    <button class="b b-p" onclick="exportarMultiplicadores('${c.clave}')"><i class="ic ic-descargar"></i> Exportar multiplicadores</button>
+    <label class="b b-g"><i class="ic ic-subir"></i> Importar desde Excel<input type="file" accept=".xlsx,.xlsm,.xls" hidden onchange="importarMultiplicadores(this.files)"></label>
+  </div>`;
+  html += '<details class="ayuda"><summary><i class="ic ic-ayuda"></i> ¿Cómo se calculan?</summary><p>Toca un caso para anotar lo que se vio en campo: configuración, posición del TAP, tensión según la placa del transformador, tensión de baja y X del medidor. El multiplicador ECAMEC, el DRANETZ y el TI se calculan con las mismas fórmulas del Excel. Si el usuario ya se midió antes, se puede usar su histórico. "Importar desde Excel" carga una hoja de multiplicadores ya hecha, con sus fechas y equipos.</p></details>';
   html += '</div>';
 
-  html += '<div class="tabla-wrap"><table class="tabla-casos"><thead><tr><th>Estado</th><th>Código</th><th>Alimentador</th><th>Configuración</th><th>TAP</th><th>Multiplicador ECAMEC</th><th>DRANETZ</th><th>X medidor</th><th>TI</th><th>Testblock</th></tr></thead><tbody>';
+  if (filtro !== 'todos') html += `<div class="filtros"><span class="pildora active">${GRUPOS_ESTADO.find(([k]) => k === filtro)[1]} <b>${visibles.length}</b></span><button class="b b-l" onclick="setMultFiltro('todos')">Ver todos</button></div>`;
+
+  html += '<div class="tabla-caja"><div class="tabla-scroll"><table class="tabla-r tabla-casos"><thead><tr><th>Código</th><th>Estado</th><th>Configuración</th><th>Multiplicador</th><th>X medidor · TI</th><th>Testblock</th></tr></thead><tbody>';
   visibles.forEach(x => {
     const m = x.mult || {}; const k = calcularMultiplicador(m);
+    const tieneDatos = m.configuracion || k.ecamec;
     html += `<tr onclick="abrirMultiplicador('${c.clave}', '${x.id}')">
-      <td>${tagEstado(m.estado)}</td><td class="mono"><b>${esc(x.codigo || x.codigoEnte)}</b><small>${esc(x.nombre)}</small></td><td>${esc(x.alimentador)}</td>
-      <td>${esc(m.configuracion)}</td><td>${esc(m.tap)}</td><td class="mono">${esc(k.ecamec)}</td><td class="mono">${redondear(k.dranetz)}</td>
-      <td class="mono">${esc(m.xMedidor)}</td><td class="mono">${esc(k.ti)}</td><td>${esc(m.testblock)}</td></tr>`;
+      <td class="cod"><b>${esc(x.codigo || x.codigoEnte)}</b><small>${esc(x.nombre)}</small>${x.alimentador ? `<small>${esc(x.alimentador)}</small>` : ''}</td>
+      <td data-l="Estado">${tgEstado(m.estado)}</td>
+      <td data-l="Configuración" class="${tieneDatos ? '' : 'vacio-m'}">${esc(m.configuracion) || '—'}${m.tap ? `<small>TAP ${esc(m.tap)}</small>` : ''}</td>
+      <td data-l="Multiplicador" class="num ${tieneDatos ? '' : 'vacio-m'}">${esc(k.ecamec) || '—'}${k.dranetz !== null ? `<small>DRANETZ ${redondear(k.dranetz)}</small>` : ''}</td>
+      <td data-l="X medidor · TI" class="num ${tieneDatos ? '' : 'vacio-m'}">${esc(m.xMedidor) || '—'}${k.ti ? `<small>TI ${esc(k.ti)}</small>` : ''}</td>
+      <td data-l="Testblock" class="${m.testblock ? '' : 'vacio-m'}">${esc(m.testblock) || '—'}</td></tr>`;
   });
-  if (!visibles.length) html += '<tr><td colspan="10" class="tabla-vacia">No hay casos con ese filtro</td></tr>';
-  return html + '</tbody></table></div>';
+  if (!visibles.length) html += '<tr><td colspan="6" class="vacia tabla-vacia">No hay casos con ese filtro</td></tr>';
+  return html + '</tbody></table></div></div>';
 }
 
 // Resultado calculado (se actualiza sin redibujar mientras se escribe)

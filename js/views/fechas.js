@@ -8,7 +8,7 @@ import { state } from '../state.js';
 import { eqEnCampo, escapeHtml } from '../utils.js';
 
 const esc = s => escapeHtml(s ?? '');
-const CLASE_GRUPO = { listos: 'tag-verde', por_resolver: 'tag-amarillo', no_se_miden: 'tag-gris' };
+const TG_GRUPO = { listos: 'verde', por_resolver: 'ambar', no_se_miden: 'gris' };
 
 // Equipos que se pueden asignar: no instalados ni fuera de servicio o en mantenimiento
 const equiposDisponibles = () => state.equipos
@@ -20,46 +20,53 @@ export function renderFechas(c) {
   const casos = ordenarCasos(c.casos);
   const disponibles = equiposDisponibles();
   const FECHAS = fechasDe(g);
-  let html = `<div class="panel fila-importar"><div><b>Programación de instalaciones</b><div class="page-sub">Sube el Excel de usuarios seleccionados con la fecha de instalación de cada caso: cada día queda como una Fecha.</div></div>
-    <label class="btn-accion"><i class="ic ic-subir"></i> Importar programación<input type="file" accept=".xlsx,.xls" hidden onchange="importarProgramacion(this.files)"></label></div>`;
-  html += '<div class="fechas-grid">';
+  const sinFecha = casos.filter(x => !x.programa?.fecha && grupoDeEstado(x.mult?.estado) === 'listos').length;
+  let html = '<div class="bloque">';
+  html += `<div class="bloque-head"><div class="bloque-titulo">Programación de instalaciones</div>
+    <label class="b b-p"><i class="ic ic-subir"></i> Importar programación<input type="file" accept=".xlsx,.xls" hidden onchange="importarProgramacion(this.files)"></label></div>`;
+  html += sinFecha
+    ? `<div class="meta"><div class="meta-tx">${sinFecha} ${sinFecha === 1 ? 'caso listo para medir no tiene' : 'casos listos para medir no tienen'} fecha<small>Asígnalos en la tabla de abajo o importa la programación</small></div></div>`
+    : '<div class="meta ok"><div class="meta-tx">Todos los casos listos para medir tienen fecha</div></div>';
+  html += '<details class="ayuda"><summary><i class="ic ic-ayuda"></i> ¿Cómo funciona?</summary><p>Sube el Excel de usuarios seleccionados con la fecha de instalación de cada caso: cada día queda como una Fecha. En cada Fecha pon el retiro y los accesorios, exporta el Excel para Despachos o envíala directo a la carga masiva.</p></details>';
+  html += '</div>';
+
+  html += '<div class="boletos fechas-grid">';
   FECHAS.forEach(n => {
     const f = g.fechas?.[n] || {};
     const delGrupo = casosDeFecha(casos, n);
     const avisos = delGrupo.length ? revisarFecha(delGrupo, f) : [];
-    html += `<div class="panel fecha-card">
-      <div class="panel-titulo">Fecha ${n} <span class="chip-dato"><b>${delGrupo.length}</b> ${delGrupo.length === 1 ? 'caso' : 'casos'}</span></div>
-      <div class="row">
-        <div class="field"><label>Instalación</label><input type="date" value="${esc(f.instalacion)}" onchange="setDatoFecha('${c.clave}', '${n}', 'instalacion', this.value)"></div>
-        <div class="field"><label>Retiro</label><input type="date" value="${esc(f.retiro)}" onchange="setDatoFecha('${c.clave}', '${n}', 'retiro', this.value)"></div>
+    html += `<div class="boleto fecha-card ${delGrupo.length ? '' : 'vacio'}">
+      <div class="boleto-top"><div><div class="boleto-k">Fecha ${n}</div><div class="boleto-t">${f.instalacion ? fmtDate(f.instalacion) : 'Sin fecha'}${f.retiro ? ' al ' + fmtDate(f.retiro) : ''}</div></div>
+        <div class="boleto-n"><b>${delGrupo.length}</b> <span>${delGrupo.length === 1 ? 'caso' : 'casos'}</span></div></div>
+      <div class="boleto-corte"></div>
+      <div class="boleto-campos">
+        <div><label>Instalación</label><input type="date" value="${esc(f.instalacion)}" onchange="setDatoFecha('${c.clave}', '${n}', 'instalacion', this.value)"></div>
+        <div><label>Retiro</label><input type="date" value="${esc(f.retiro)}" onchange="setDatoFecha('${c.clave}', '${n}', 'retiro', this.value)"></div>
+        <div class="ancho"><label>Accesorios</label><input value="${esc(f.accesorios || ACCESORIOS_DEFECTO)}" onchange="setDatoFecha('${c.clave}', '${n}', 'accesorios', this.value)"></div>
       </div>
-      <div class="field"><label>Accesorios</label><input value="${esc(f.accesorios || ACCESORIOS_DEFECTO)}" onchange="setDatoFecha('${c.clave}', '${n}', 'accesorios', this.value)"></div>
-      ${avisos.length ? `<div class="aviso aviso-amarillo avisos-lista"><i class="ic ic-alerta"></i><div>${avisos.map(esc).join('<br>')}</div></div>` : ''}
-      <div class="acciones-casos">
-        <button class="btn-accion" ${delGrupo.length ? '' : 'disabled'} onclick="exportarFecha('${c.clave}', '${n}')"><i class="ic ic-excel"></i> Exportar Excel</button>
-        <button class="btn-accion" ${delGrupo.length ? '' : 'disabled'} onclick="enviarFechaADespachos('${c.clave}', '${n}')"><i class="ic ic-despachos"></i> Enviar a Despachos</button>
+      ${avisos.length ? `<div class="boleto-avisos">${avisos.map(esc).join('<br>')}</div>` : ''}
+      <div class="boleto-acciones">
+        <button class="hero-btn blanco" ${delGrupo.length ? '' : 'disabled'} onclick="exportarFecha('${c.clave}', '${n}')"><i class="ic ic-excel"></i> Exportar Excel</button>
+        <button class="hero-btn" ${delGrupo.length ? '' : 'disabled'} onclick="enviarFechaADespachos('${c.clave}', '${n}')"><i class="ic ic-despachos"></i> Enviar a Despachos</button>
       </div>
     </div>`;
   });
   html += '</div>';
 
-  const sinFecha = casos.filter(x => !x.programa?.fecha && grupoDeEstado(x.mult?.estado) === 'listos').length;
-  if (sinFecha) html += `<div class="aviso aviso-azul"><i class="ic ic-info"></i> ${sinFecha} ${sinFecha === 1 ? 'caso listo para medir no tiene' : 'casos listos para medir no tienen'} fecha asignada</div>`;
-
-  html += '<div class="tabla-wrap"><table class="tabla-casos tabla-fechas"><thead><tr><th>Código</th><th>Estado</th><th>Multiplicador</th><th>Fecha</th><th>Equipo</th></tr></thead><tbody>';
+  html += '<div class="tabla-caja"><div class="tabla-scroll"><table class="tabla-r tabla-casos tabla-fechas"><thead><tr><th>Código</th><th>Estado</th><th>Multiplicador</th><th>Fecha</th><th>Equipo</th></tr></thead><tbody>';
   casos.forEach(x => {
     const m = x.mult || {}; const k = calcularMultiplicador(m);
     const p = x.programa || {};
     const opcionesEq = [...new Set([...(p.equipo ? [p.equipo] : []), ...disponibles])];
     html += `<tr>
-      <td class="mono"><b>${esc(x.codigo || x.codigoEnte)}</b><small>${esc(x.nombre)}</small></td>
-      <td>${m.estado ? `<span class="tag ${CLASE_GRUPO[grupoDeEstado(m.estado)]}">${esc(m.estado)}</span>` : '<span class="falta">Sin estado</span>'}</td>
-      <td class="mono">${esc(k.ecamec) || '—'}<small>${esc(k.ti)}${m.configuracion ? ' · ' + esc(m.configuracion) : ''}</small></td>
-      <td><select aria-label="Fecha de ${esc(x.codigo)}" onchange="asignarFecha('${c.clave}', '${x.id}', this.value)"><option value="">—</option>${FECHAS.map(n => `<option value="${n}" ${String(p.fecha || '') === n ? 'selected' : ''}>Fecha ${n}</option>`).join('')}</select></td>
-      <td><select aria-label="Equipo de ${esc(x.codigo)}" onchange="asignarEquipo('${c.clave}', '${x.id}', this.value)"><option value="">—</option>${opcionesEq.map(s => `<option ${p.equipo === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></td>
+      <td class="cod"><b>${esc(x.codigo || x.codigoEnte)}</b><small>${esc(x.nombre)}</small></td>
+      <td data-l="Estado">${m.estado ? `<span class="tg ${TG_GRUPO[grupoDeEstado(m.estado)]}">${esc(m.estado)}</span>` : '<span class="falta">Sin estado</span>'}</td>
+      <td data-l="Multiplicador" class="num">${esc(k.ecamec) || '—'}<small>${esc(k.ti)}${m.configuracion ? ' · ' + esc(m.configuracion) : ''}</small></td>
+      <td data-l="Fecha"><select aria-label="Fecha de ${esc(x.codigo)}" onchange="asignarFecha('${c.clave}', '${x.id}', this.value)"><option value="">—</option>${FECHAS.map(n => `<option value="${n}" ${String(p.fecha || '') === n ? 'selected' : ''}>Fecha ${n}</option>`).join('')}</select></td>
+      <td data-l="Equipo"><select aria-label="Equipo de ${esc(x.codigo)}" onchange="asignarEquipo('${c.clave}', '${x.id}', this.value)"><option value="">—</option>${opcionesEq.map(s => `<option ${p.equipo === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></td>
     </tr>`;
   });
-  return html + '</tbody></table></div>';
+  return html + '</tbody></table></div></div>';
 }
 
 // Vista previa de la programación importada
