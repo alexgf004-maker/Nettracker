@@ -4,7 +4,7 @@ import {
   calcularMultiplicador, CONFIGURACIONES, CR_OBLIGATORIOS_MT, estadosDe, GRUPOS_ESTADO, grupoDeEstado, historicoDe, POSICIONES_TAP,
   redondear, resumenMultiplicadores, TENSIONES_BT,
 } from '../domain/multiplicadores.js';
-import { nombreCampana } from '../domain/trabajo.js';
+import { MESES, nombreCampana } from '../domain/trabajo.js';
 import { state } from '../state.js';
 import { escapeHtml } from '../utils.js';
 
@@ -30,6 +30,7 @@ export function renderMultiplicadores(c) {
   }
   html += `<div class="chips-linea">${Object.entries(r.porEstado).sort((a, b) => b[1] - a[1]).map(([e, n]) => `<span class="chip-dato"><b>${n}</b> ${esc(e || 'Sin estado')}</span>`).join('')}</div>`;
   html += `<div class="acciones-casos"><button class="btn-accion" onclick="exportarMultiplicadores('${c.clave}')"><i class="ic ic-descargar"></i> Exportar multiplicadores</button>
+    <label class="btn-accion"><i class="ic ic-subir"></i> Importar desde Excel<input type="file" accept=".xlsx,.xlsm,.xls" hidden onchange="importarMultiplicadores(this.files)"></label>
     ${filtro !== 'todos' ? '<button class="btn-link" onclick="setMultFiltro(\'todos\')">Ver todos</button>' : ''}</div>`;
   html += '</div>';
 
@@ -81,5 +82,31 @@ export function renderMultModal() {
   html += `<div class="field"><label>Notas</label><input id="mult-notas" value="${esc(f.notas)}" oninput="setMultField('notas', this.value)" placeholder="Detalle o duda del caso"></div>`;
   html += '<button class="btn btn-primary" onclick="guardarMultiplicador()">Guardar</button>';
   html += '<button class="btn btn-secondary" onclick="cerrarMultiplicador()">Cancelar</button>';
+  return html + '</div></div>';
+}
+
+// Vista previa del Excel de multiplicadores importado
+export function renderImportMultModal() {
+  const imp = state.importMult;
+  let html = '<div class="modal-overlay"><div class="modal hoja">';
+  html += `<div class="modal-head"><div><div class="modal-titulo">Importar multiplicadores</div><div class="page-sub">${esc(imp.nombre)}</div></div><button class="modal-cerrar" onclick="cerrarImportMultiplicadores()" title="Cerrar">✕</button></div>`;
+  if (!imp.planes.length) html += '<div class="aviso aviso-amarillo"><i class="ic ic-alerta"></i> Ningún caso del archivo coincide con las campañas importadas. Primero importa los listados del ente.</div>';
+  imp.planes.forEach(p => {
+    const g = state.campanas?.[p.clave] || {};
+    const porEstado = {};
+    p.asignaciones.forEach(a => { const e = a.mult.estado || 'Sin estado'; porEstado[e] = (porEstado[e] || 0) + 1; });
+    html += `<div class="panel" style="margin-top:10px"><div class="panel-titulo">${MESES[(g.mes || 1) - 1]} ${g.anio} · ${esc(g.area)} <span class="chip-dato"><b>${p.asignaciones.length}</b> casos</span></div>`;
+    html += `<div class="chips-linea">${Object.entries(porEstado).sort((a, b) => b[1] - a[1]).map(([e, n]) => `<span class="chip-dato"><b>${n}</b> ${esc(e)}</span>`).join('')}</div>`;
+    const reemplaza = p.asignaciones.filter(a => a.reemplaza);
+    if (reemplaza.length) html += `<div class="aviso aviso-amarillo avisos-lista"><i class="ic ic-alerta"></i><div>Ya tenían multiplicador y se reemplaza con el del archivo: ${reemplaza.map(a => esc(a.codigo)).join(', ')}</div></div>`;
+    const corregidos = p.asignaciones.filter(a => a.codigoNuevo);
+    if (corregidos.length) html += `<div class="aviso aviso-azul avisos-lista"><i class="ic ic-info"></i><div>Se actualiza el código (tipo de sistema verificado): ${corregidos.map(a => `${esc(a.codigo)} → ${esc(a.codigoNuevo)}`).join(', ')}</div></div>`;
+    if (p.faltan.length) html += `<div class="aviso aviso-amarillo avisos-lista"><i class="ic ic-alerta"></i><div>Sin datos en el archivo (quedan como están): ${p.faltan.map(esc).join(', ')}</div></div>`;
+    html += '</div>';
+  });
+  if (imp.estadosRaros.length) html += `<div class="aviso aviso-amarillo avisos-lista"><i class="ic ic-alerta"></i><div>Estados que la app no conoce (se guardan tal cual): ${imp.estadosRaros.map(esc).join(', ')}</div></div>`;
+  if (imp.sinCaso.length) html += `<div class="aviso aviso-amarillo avisos-lista"><i class="ic ic-alerta"></i><div>${imp.sinCaso.length} filas no coinciden con ningún caso importado: ${imp.sinCaso.slice(0, 12).map(f => esc(f.codigo)).join(', ')}${imp.sinCaso.length > 12 ? '…' : ''}</div></div>`;
+  html += `<button class="btn btn-primary" style="margin-top:12px" ${imp.planes.length ? '' : 'disabled'} onclick="guardarImportMultiplicadores()">Guardar multiplicadores</button>`;
+  html += '<button class="btn btn-secondary" onclick="cerrarImportMultiplicadores()">Cancelar</button>';
   return html + '</div></div>';
 }

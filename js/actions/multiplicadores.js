@@ -1,9 +1,10 @@
 // Multiplicadores: editar el de cada caso, usar el histórico del usuario y exportar la hoja
-import { db, ref, set } from '../firebase.js';
+import { db, ref, set, update } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { ordenarCasos } from '../domain/listados.js';
-import { filasMultiplicadores, historicoDe } from '../domain/multiplicadores.js';
+import { filasMultiplicadores, historicoDe, leerMultiplicadoresExcel, planificarMultiplicadores } from '../domain/multiplicadores.js';
+import { leerArchivo } from './campanas.js';
 import { hoyLocal, MESES } from '../domain/trabajo.js';
 import { render } from '../views/render.js';
 
@@ -60,4 +61,44 @@ export function exportarMultiplicadores(clave) {
   XLSX.utils.book_append_sheet(wb, ws, 'Multiplicadores');
   XLSX.writeFile(wb, `Multiplicadores_${MESES[g.mes - 1]}_${g.anio}_${g.area.replace(/\s+/g, '_')}.xlsx`);
   showToast('Multiplicadores exportados');
+}
+
+// ── IMPORTAR UN EXCEL DE MULTIPLICADORES YA HECHO ──
+
+export async function importarMultiplicadores(files) {
+  if (!files?.length) return;
+  try {
+    procesarMultiplicadores(await leerArchivo(files[0]));
+  } catch (err) {
+    showToast('No se pudo leer el archivo: ' + err.message);
+  }
+}
+
+// archivo: { nombre, hojas, orden }. Busca la hoja "Multiplicadores" (o la primera que tenga sus columnas).
+export function procesarMultiplicadores(archivo) {
+  const orden = [...archivo.orden].sort((a, b) => (/multiplicador/i.test(b) ? 1 : 0) - (/multiplicador/i.test(a) ? 1 : 0));
+  let leido = null;
+  for (const n of orden) { const r = leerMultiplicadoresExcel(archivo.hojas[n]); if (!r.error) { leido = r; break; } }
+  if (!leido) return showToast('No se encontró la hoja de multiplicadores (columnas "ESTADO" y "Código SIGET")');
+  state.importMult = { nombre: archivo.nombre, estadosRaros: leido.estadosRaros, ...planificarMultiplicadores(leido.filas, state.campanas) };
+  render();
+}
+export function cerrarImportMultiplicadores() { state.importMult = null; render(); }
+
+export function guardarImportMultiplicadores() {
+  const imp = state.importMult;
+  if (!imp?.planes.length) return;
+  const firma = { editadoPor: state.sesionUsuario?.nombre || '', fecha: hoyLocal(), origen: 'excel' };
+  imp.planes.forEach(p => {
+    const datos = {};
+    p.asignaciones.forEach(a => {
+      datos[`casos/${a.id}/mult`] = { ...a.mult, ...(a.notas ? { notas: a.notas } : {}), ...firma };
+      if (a.codigoNuevo) datos[`casos/${a.id}/codigo`] = a.codigoNuevo;
+    });
+    update(ref(db, 'campanas/' + p.clave), datos);
+  });
+  const total = imp.planes.reduce((n, p) => n + p.asignaciones.length, 0);
+  showToast(`Multiplicadores importados · ${total} casos`);
+  state.importMult = null;
+  render();
 }

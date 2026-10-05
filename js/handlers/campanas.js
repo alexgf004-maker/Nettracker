@@ -7,7 +7,7 @@ import {
   abrirConfigCartas, abrirDocumentos, cargarLogo, cerrarConfigCartas, cerrarDocumentos, desmarcarPaso, excluirTodos, generarDocumentos,
   guardarConfigCartas, marcarPaso, toggleExcluirCaso,
 } from '../actions/documentos.js';
-import { abrirMultiplicador, cerrarMultiplicador, exportarMultiplicadores, guardarMultiplicador, usarHistorico } from '../actions/multiplicadores.js';
+import { abrirMultiplicador, cerrarImportMultiplicadores, cerrarMultiplicador, exportarMultiplicadores, guardarImportMultiplicadores, guardarMultiplicador, importarMultiplicadores, procesarMultiplicadores, usarHistorico } from '../actions/multiplicadores.js';
 import { asignarEquipo, asignarFecha, cerrarProgramacion, enviarFechaADespachos, exportarFecha, guardarProgramacion, importarProgramacion, procesarProgramacion, setDatoFecha } from '../actions/fechas.js';
 import { abrirResultado, analizarArchivos, analizarTXT, cerrarAnalisis, cerrarResultado, exportarAnalisis, exportarCuadroResumen, guardarAnalisis, guardarResultado, recalcularTXT } from '../actions/resultados.js';
 import { abrirFT, agregarNotaFT, cerrarFT, marcarAvisoFT, quitarAvisoFT, setCompensacionFT, setRemedicionFT, setRutaFT } from '../actions/ft.js';
@@ -33,7 +33,7 @@ window.setCasoField = (k, v) => { state.casoForm[k] = v; };
 window.setCasoSistema = s => { state.casoForm.codigo = codigoConSistema(state.casoForm.codigo, s); render(); };
 
 // Multiplicadores
-Object.assign(window, { abrirMultiplicador, cerrarMultiplicador, guardarMultiplicador, usarHistorico, exportarMultiplicadores });
+Object.assign(window, { abrirMultiplicador, cerrarMultiplicador, guardarMultiplicador, usarHistorico, exportarMultiplicadores, importarMultiplicadores, procesarMultiplicadores, guardarImportMultiplicadores, cerrarImportMultiplicadores });
 window.setCampanaVista = v => { state.campanaVista = v; render(); };
 window.setMultFiltro = f => { state.multFiltro = f; render(); };
 window.setMultSelect = (k, v) => { state.multForm[k] = v; render(); };

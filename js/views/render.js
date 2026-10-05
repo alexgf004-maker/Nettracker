@@ -12,7 +12,7 @@ import { renderMapa } from './mapa.js';
 import { renderAlertaRetiros, renderCondicionModal, renderDescargaModal, renderGlobalSearch, renderImportModal, renderMantModal, renderPrestamoModal, renderDanioModal, renderRetiroModal, renderRevisionModal, renderSelectorModal } from './modals.js';
 import { renderCasoModal, renderConfigCartas, renderDocsModal, renderImportListados } from './casos.js';
 import { renderProgramacionModal } from './fechas.js';
-import { renderMultModal } from './multiplicadores.js';
+import { renderImportMultModal, renderMultModal } from './multiplicadores.js';
 import { renderAnalisisModal, renderResultadoModal } from './resultados.js';
 import { renderFT, renderFTModal } from './ft.js';
 import { renderCampanas, renderReclamos, renderRequerimientos } from './trabajo.js';
@@ -69,6 +69,7 @@ export function render() {
   if (state.docsModal) html += renderDocsModal();
   if (state.multEdit) html += renderMultModal();
   if (state.importProgramacion) html += renderProgramacionModal();
+  if (state.importMult) html += renderImportMultModal();
   if (state.resultadoEdit) html += renderResultadoModal();
   if (state.analisisTXT) html += renderAnalisisModal();
   if (state.ftEdit) html += renderFTModal();

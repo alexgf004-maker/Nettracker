@@ -742,6 +742,12 @@ test.describe('Precampaña', () => {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filas), hoja);
     return { name: nombre, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) };
   };
+  // Excel con varias hojas: { nombreHoja: filas }
+  const excelLibro = (nombre, hojas) => {
+    const wb = XLSX.utils.book_new();
+    Object.entries(hojas).forEach(([hoja, filas]) => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filas), hoja));
+    return { name: nombre, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) };
+  };
   // Mismo formato que los listados del ente: título, periodo y datos debajo de "Número SIGET"
   const listadoEnte = (nombre, titulo, casos) => {
     const filas = Array.from({ length: 10 }, () => []);
@@ -998,6 +1004,42 @@ test.describe('Precampaña', () => {
     const filas = XLSX.utils.sheet_to_json(wb.Sheets.Multiplicadores, { header: 1 });
     expect(filas[0].slice(0, 13)).toEqual(['ESTADO', 'Código SIGET', 'NC', 'Alimentador', 'Configuración', 'Posición de TAP', 'Nivel de tensión según TAP (KV)', 'Nivel de Baja Tensión (V)', 'Multiplicador ECAMEC', 'Multiplicador DRANETZ', 'X medidor', 'TI', 'Testblock']);
     expect(filas[1].slice(0, 12)).toEqual(['Realizado', 'CR1O2026201', 111, '', 'Estrella', '3', 13200, 240, '13200/240', 55, 80, '400/5']);
+  });
+
+  test('multiplicadores: importar un Excel ya hecho con vista previa', async ({ page }) => {
+    const datos = conCampana();
+    datos.campanas['2026-10_CPT-MT'].casos.CR1O2026202.mult = { estado: 'Revisar', notas: 'llamar antes' };
+    app = await abrirApp(page, { excel: true, datos });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('multiplicadores'); });
+    const enc = ['ESTADO', 'Código SIGET', 'NC', 'Alimentador', 'Configuración ', 'Posición de TAP', 'Nivel de tensión según TAP (KV)', 'Nivel de Baja Tensión (V)',
+      'Multiplicador ECAMEC', 'Multiplicador DRANETZ', 'X medidor', 'TI', 'Testblock', 'Fecha de instalación', 'Fecha de retiro', 'EQUIPO', 'ELEMENTOS', '', '', '', 'Vac',
+      'Proyección primario ab', 'Proyección primario bc', 'Proyección primario ac', 'Urbanidad'];
+    const archivo = excelLibro('Listado_octubre__2026.xlsx', {
+      Listado: [['NC', 'CÓDIGO SIGET', 'NOMBRE'], [111, 'CR1O2026201', 'USUARIO 111']],
+      Multiplicadores: [enc,
+        ['Realizado', 'CR1O2026201', 111, 'AL091-23000', 'Delta', 1, 13860, 240, '13860/240', 57.75, 160, '800/5', 'Sí', '', '', '', '', '', '', '', '', 0, 0, 0, 'U'],
+        ['Validado con usuario', 'CR1O2026202', 222, 'AL013', 'Monofásico', 'Tapón', 7620, 240, '7620/240', 31.75, 1, '1/1', 'No', '', '', '', '', '', '', '', '', 0, 0, 0, 'R'],
+        ['Validado con usuario', 'DA1O2026013O00', 222, 'AL013', 'Delta', 'Tapón', 23900, 240, '23900/240', 99.58, 120, '600/5', 'Sí'],
+        ['Acceso denegado', 'CR1O2026299', 999, '', '', '', '', '', '/', '#DIV/0!', '', '0/5'],
+        ['', 'DF1O2026023O00', 333, '', '', '', '', '', '/', '#DIV/0!', '', '0/5'],
+      ],
+    });
+    await page.locator('label', { hasText: 'Importar desde Excel' }).locator('input').setInputFiles(archivo);
+    const modal = page.locator('.modal');
+    await expect(modal).toContainText('3 casos');
+    await expect(modal).toContainText('Ya tenían multiplicador y se reemplaza con el del archivo: CR1O2026202');
+    await expect(modal).toContainText('DA1O2026011O00 → DA1O2026013O00');
+    await expect(modal).toContainText('1 filas no coinciden con ningún caso importado: CR1O2026299');
+    await page.getByRole('button', { name: 'Guardar multiplicadores' }).click();
+    const [op, ruta, escrito] = (await app.escrituras()).at(-1);
+    expect([op, ruta]).toEqual(['update', 'campanas/2026-10_CPT-MT']);
+    expect(escrito['casos/CR1O2026201/mult']).toMatchObject({ estado: 'Realizado', configuracion: 'Delta', tap: '1', tensionTap: 13860, tensionBT: 240, xMedidor: 160, testblock: 'Sí', origen: 'excel' });
+    expect(escrito['casos/CR1O2026201/mult'].vab).toBeUndefined();
+    expect(escrito['casos/CR1O2026202/mult']).toMatchObject({ estado: 'Validado con usuario', tap: 'Tapón', notas: 'llamar antes' });
+    expect(escrito['casos/DA1O2026011O00/mult']).toMatchObject({ configuracion: 'Delta', xMedidor: 120 });
+    expect(escrito['casos/DA1O2026011O00/codigo']).toBe('DA1O2026013O00');
+    await expect(page.locator('.toast')).toContainText('Multiplicadores importados · 3 casos');
   });
 
   test('multiplicadores: usar el histórico del mismo usuario de una campaña anterior', async ({ page }) => {

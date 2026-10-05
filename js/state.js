@@ -49,6 +49,7 @@ export const state = {
   resultadoEdit: null, // { clave, id }
   resultadoForm: {},
   importProgramacion: null, // vista previa del Excel de programación de instalaciones
+  importMult: null, // vista previa del Excel de multiplicadores ya hecho
   casoForm: {},
   configCartas: null, // config/cartas: firmante, contacto, contratista y logo
   showConfigCartas: false,

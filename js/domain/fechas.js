@@ -2,7 +2,7 @@
 // El Excel de cada fecha tiene las columnas que lee Despachos (carga masiva). Funciones puras.
 import { normalizar, normalizarNC } from './listados.js';
 import { calcularMultiplicador } from './multiplicadores.js';
-import { claveCampana, periodoCampana, subtipoCampana } from './trabajo.js';
+import { buscarCasoImportado } from './trabajo.js';
 
 export const FECHAS = ['1', '2', '3'];
 // Grupos de una campaña: al menos 3; BT puede tener más (un grupo por día de instalación)
@@ -80,21 +80,7 @@ export function planificarFechas(programacion, campanas) {
   const porCampana = {};
   const sinCampana = [];
   for (const p of programacion) {
-    const periodo = periodoCampana(p.codigo);
-    const tipo = subtipoCampana(p.codigo);
-    const candidatas = Object.entries(campanas || {}).filter(([clave]) => periodo && clave.startsWith(claveCampana(periodo) + '_'));
-    // Primero por código exacto (el NC puede cambiar si cambió el contrato); si no, por NC y tipo
-    // (en DA/DF el código puede traer corregido el tipo de sistema)
-    let encontrado = null;
-    for (const porCodigo of [true, false]) {
-      for (const [clave, g] of candidatas) {
-        const hit = Object.entries(g.casos || {}).find(([, c]) => (porCodigo
-          ? c.codigo === p.codigo || c.codigoEnte === p.codigo
-          : c.nc === p.nc && (c.tipo || subtipoCampana(c.codigo)) === tipo));
-        if (hit) { encontrado = { clave, id: hit[0], caso: hit[1] }; break; }
-      }
-      if (encontrado) break;
-    }
+    const encontrado = buscarCasoImportado(p, campanas);
     if (!encontrado) { sinCampana.push(p); continue; }
     (porCampana[encontrado.clave] ??= []).push({ ...p, id: encontrado.id, caso: encontrado.caso });
   }
