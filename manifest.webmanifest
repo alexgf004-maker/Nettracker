@@ -3,7 +3,7 @@
   "short_name": "CPT INNOVA",
   "display": "standalone",
   "background_color": "#f0f4f8",
-  "theme_color": "#0057b8",
+  "theme_color": "#0f172a",
   "start_url": "./",
   "scope": "./",
   "icons": [
