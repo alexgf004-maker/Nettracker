@@ -55,6 +55,7 @@ export const state = {
   reclamos: {}, // reclamos/{id}: expedientes de reclamo creados a mano
   expedienteId: null, // expediente abierto en la pestaña Reclamos
   expedienteVista: 'mediciones', // datos | mediciones | seguimiento
+  puntoReclamo: null, // { id, n, nombre } agregar un punto de medición al reclamo
   nuevoReclamo: null, // { texto, datos } formulario de Nuevo reclamo
   analisisReclamo: null, // { id, params, tension, armonicos } análisis de un reclamo (macros Graficar y Armónicos)
   casoForm: {},

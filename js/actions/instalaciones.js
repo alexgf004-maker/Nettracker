@@ -51,6 +51,8 @@ export function handleSave() {
   } else {
     const savedPayload = {...payload};
     state.view = 'lista'; state.form = emptyForm();
+    // Registrada desde un expediente de reclamo: se vuelve al expediente
+    if (state.volverA?.expedienteId) { Object.assign(state, state.volverA, { volverA: null, expedienteVista: 'mediciones' }); render(); }
     push(installsRef, savedPayload).then(newRef => {
       showToast('Instalación registrado');
       setTimeout(() => {

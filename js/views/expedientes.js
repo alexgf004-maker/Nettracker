@@ -3,7 +3,7 @@
 import { userArea } from '../config.js';
 import { CAMPOS_RECLAMO, ETAPAS_MEDICION, listaExpedientes, PASOS_RECLAMO } from '../domain/expedientes.js';
 import { DIAS_SOLUCION_FT } from '../domain/ft.js';
-import { hoyLocal, urgencia } from '../domain/trabajo.js';
+import { hoyLocal, tipoDeTrabajo, urgencia } from '../domain/trabajo.js';
 import { state } from '../state.js';
 import { escapeHtml, fmtDate } from '../utils.js';
 import { areaHero, heroSeccion } from './componentes.js';
@@ -112,11 +112,11 @@ function vistaMediciones(e, hoy) {
     html += `<div class="bloque exp-medicion"><div class="bloque-head"><div class="bloque-titulo">${m.n === 1 ? 'Medición inicial' : `Remedición ${m.n - 1}`} · <span class="mono">${esc(m.codigo)}</span></div>
       <span class="tg ${CLASE_ETAPA[m.etapa]}">${ETAPAS_MEDICION[m.etapa]}</span></div>`;
     if (!i) {
-      html += `<div class="page-sub" style="margin-bottom:10px">Todavía no hay una instalación con el código ${esc(m.codigo)}. Al registrarla con ese código se liga sola a este expediente.</div>
-        <button class="b b-p" onclick="registrarInstalacionReclamo('${e.id}', '${m.codigo}')"><i class="ic ic-plus"></i> Registrar instalación</button></div>`;
+      html += `<div class="page-sub" style="margin-bottom:10px">Todavía no hay una instalación con el código ${esc(m.codigo)} (punto principal). Al registrarla con ese código se liga sola a este expediente.</div>
+        <button class="b b-p" onclick="registrarInstalacionReclamo('${e.id}', '${m.codigo}')"><i class="ic ic-plus"></i> Registrar instalación</button>${bloquePuntos(e, m)}</div>`;
       return;
     }
-    html += `<div class="exp-fechas">
+    html += `<div class="exp-punto-t">Punto principal · ${esc(i.serie || '')}</div><div class="exp-fechas">
       <div><small>Instalación</small><b>${fmtDate(i.fechaInstalacion)}</b><span>${esc(i.serie || '')}</span></div>
       <div><small>Retiro</small><b>${i.retirado ? fmtDate(i.fechaRetiroReal) : fmtDate(i.fechaRetiro || m.retiroSugerido)}</b><span>${i.retirado ? 'Retirado' : `Programado · 8.º día ${fmtDate(m.retiroSugerido)}`}</span></div>
       <div><small>Informe</small><b>${m.informe ? fmtDate(m.informe.fecha) : m.informeLimite ? fmtDate(m.informeLimite) : '—'}</b><span>${m.informe ? 'Entregado' + (m.informe.por ? ' · ' + esc(m.informe.por) : '') : m.informeLimite ? 'Límite (8 días del retiro)' : 'Después del retiro'}</span></div>
@@ -132,12 +132,53 @@ function vistaMediciones(e, hoy) {
     if (i.retirado) html += `<button class="b ${res ? 'b-g' : 'b-p'}" onclick="abrirAnalisisReclamo('${i.id}')"><i class="ic ic-grafica"></i> ${res ? 'Ver análisis' : 'Analizar TXT'}</button>`;
     if (i.retirado && !m.informe) html += `<button class="b b-p" onclick="marcarInformeEntregado('${i.id}')"><i class="ic ic-check"></i> Informe entregado</button> ${m.informeLimite ? tagPlazo(m.informeLimite, hoy) : ''}`;
     if (m.informe) html += `<button class="b b-l" onclick="desmarcarInformeEntregado('${i.id}')">Quitar marca de informe</button>`;
-    html += `<span class="sep"></span><button class="b b-l" onclick="goToInstall('${i.id}')">Ver instalación</button></div></div>`;
+    html += `<span class="sep"></span><button class="b b-l" onclick="goToInstall('${i.id}')">Ver instalación</button></div>${bloquePuntos(e, m)}</div>`;
   });
   const ultima = r.mediciones[r.mediciones.length - 1];
   const siguiente = ultima && ultima.n < 6 && ultima.inst?.retirado ? `RE${ultima.n + 1}${ultima.codigo.slice(3)}` : null;
   if (siguiente) html += `<div class="barra-acciones"><button class="b b-g" onclick="registrarInstalacionReclamo('${e.id}', '${siguiente}')"><i class="ic ic-plus"></i> Registrar remedición ${esc(siguiente)}</button></div>`;
   return html;
+}
+
+// Puntos adicionales de la medición (medidor, trafo, tablero…): cada uno con su análisis
+const tagsResultado = res => {
+  if (!res) return '';
+  let t = '';
+  if (res.tension) t += `<span class="tg gris">FebNoPer ${pct(res.tension.febNoPer)}</span>`;
+  if (res.flicker) t += `<span class="tg ${res.flicker === 'CUMPLE' ? 'verde' : 'ambar'}">Flicker ${res.flicker === 'CUMPLE' ? 'cumple' : 'no cumple'}</span>`;
+  if (res.armonicos) t += `<span class="tg ${res.armonicos.tension === 'CUMPLE' && res.armonicos.corriente === 'CUMPLE' ? 'verde' : 'ambar'}">Armónicos ${res.armonicos.tension === 'CUMPLE' && res.armonicos.corriente === 'CUMPLE' ? 'cumplen' : 'no cumplen'}</span>`;
+  return t;
+};
+function bloquePuntos(e, m) {
+  let html = `<div class="exp-puntos"><div class="exp-punto-t">Otros puntos de esta medición${m.puntos.length ? ` (${m.puntos.length})` : ''}</div>`;
+  m.puntos.forEach(p => {
+    const i = p.inst;
+    html += `<div class="exp-punto"><div class="exp-punto-main"><b>${esc(p.nombre)}</b><span>${esc(i.serie || '')} · ${fmtDate(i.fechaInstalacion)} → ${i.retirado ? fmtDate(i.fechaRetiroReal) : fmtDate(i.fechaRetiro)}</span>
+      <div class="tags"><span class="tg ${CLASE_ETAPA[p.etapa]}">${ETAPAS_MEDICION[p.etapa]}</span>${tagsResultado(p.resultado)}</div></div>
+      <div class="exp-punto-acc">${i.retirado ? `<button class="b ${p.resultado ? 'b-g' : 'b-p'}" onclick="abrirAnalisisReclamo('${i.id}')"><i class="ic ic-grafica"></i> ${p.resultado ? 'Ver análisis' : 'Analizar TXT'}</button>` : ''}
+        <button class="b b-l" onclick="goToInstall('${i.id}')">Ver</button><button class="b b-l" onclick="desvincularPuntoReclamo('${i.id}')">Quitar</button></div></div>`;
+  });
+  return html + `<button class="b b-g" onclick="abrirPuntoReclamo('${e.id}', ${m.n})"><i class="ic ic-plus"></i> Agregar punto (medidor, trafo, tablero…)</button></div>`;
+}
+
+// Agregar un punto: registrar una instalación nueva o vincular una que ya existe
+export function renderPuntoReclamo() {
+  const p = state.puntoReclamo;
+  const e = state.reclamos?.[p.id] || {};
+  const desde = e.recibido || '';
+  const candidatas = state.records
+    .filter(r => !r.reclamo?.id && !['campana', 'reclamo'].includes(tipoDeTrabajo(r.caso)) && (!r.retirado || (r.fechaInstalacion || '') >= desde))
+    .sort((a, b) => (b.fechaInstalacion || '').localeCompare(a.fechaInstalacion || '')).slice(0, 20);
+  let html = '<div class="modal-overlay"><div class="modal hoja">';
+  html += `<div class="modal-head"><div><div class="modal-titulo">Agregar punto de medición</div><div class="page-sub">${esc(e.codigo)} · medición ${p.n}</div></div><button class="modal-cerrar" onclick="cerrarPuntoReclamo()" title="Cerrar">✕</button></div>`;
+  html += `<div class="field"><label>Nombre del punto</label><input id="punto-nombre" list="punto-nombres" value="${esc(p.nombre)}" oninput="setNombrePunto(this.value)" placeholder="Medidor, trafo, tablero principal…">
+    <datalist id="punto-nombres">${['Medidor', 'Trafo', 'Tablero principal', 'Tablero secundario'].map(x => `<option value="${x}">`).join('')}</datalist></div>`;
+  html += `<button class="btn btn-primary" onclick="registrarPuntoReclamo()"><i class="ic ic-plus"></i> Registrar instalación nueva</button>`;
+  html += '<div class="section-title" style="margin-top:14px">O vincular una instalación que ya está registrada</div>';
+  html += candidatas.length ? '<div class="filas">' + candidatas.map(r => `<div class="fila"><div class="fila-main"><div class="fila-titulo">${esc(r.caso)}</div><div class="fila-sub">${esc(r.serie || '')} · ${fmtDate(r.fechaInstalacion)} · ${esc(r.lugar || '')}</div></div>
+      <button class="btn-accion" onclick="vincularPuntoReclamo('${r.id}')">Vincular</button></div>`).join('') + '</div>'
+    : '<div class="page-sub">No hay instalaciones sin código desde que se recibió el reclamo.</div>';
+  return html + '</div></div>';
 }
 
 function vistaSeguimiento(e, hoy) {

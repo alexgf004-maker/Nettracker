@@ -168,8 +168,11 @@ function contarSubtipos(registros) {
   return c;
 }
 
+// Tipo de una instalación: las vinculadas a un expediente de reclamo son del reclamo aunque no lleven el código
+export const tipoDeRegistro = r => (r.reclamo?.id ? 'reclamo' : tipoDeTrabajo(r.caso));
+
 export function registrosDeTipo(registros, tipo) {
-  return registros.filter(r => tipoDeTrabajo(r.caso) === tipo);
+  return registros.filter(r => tipoDeRegistro(r) === tipo);
 }
 
 // Caso de una campaña guardada que corresponde a una fila de un Excel del equipo ({ codigo, nc }).

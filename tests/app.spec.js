@@ -1673,4 +1673,38 @@ test.describe('Expedientes de reclamo', () => {
     await page.getByRole('button', { name: 'Marcar aviso enviado por correo' }).click();
     expect((await app.escrituras()).at(-1)).toEqual(['set', 'reclamos/RE-92026456/ft/aviso', { fecha: '2026-09-23', por: 'David García' }]);
   });
+
+  test('varios puntos en la misma medición: el principal lleva el código y los demás se vinculan', async ({ page }) => {
+    const datos = JSON.parse(JSON.stringify(fixture));
+    datos.analizadores.tab = { serie: 'SN-400', caso: 'tableroprincipal', lugar: 'x', fechaInstalacion: '2026-09-01', fechaRetiro: '2026-09-09', retirado: true, fechaRetiroReal: '2026-09-16', areaInstalacion: 'CPT MT',
+      analisisReclamo: { resultado: { flicker: 'NO CUMPLE' } } };
+    app = await abrirApp(page, { datos });
+    await cerrarAlerta(page);
+    // Sin vincular, la instalación sin código sale en Requerimientos
+    await nav(page, 'Requerimientos');
+    await expect(app$(page)).toContainText('tableroprincipal');
+    await nav(page, 'Reclamos');
+    await page.locator('.exp-card', { hasText: 'USUARIO DE PRUEBA' }).click();
+    await page.getByRole('button', { name: /Agregar punto/ }).click();
+    await page.locator('#punto-nombre').fill('Tablero principal');
+    await page.locator('.modal .fila', { hasText: 'tableroprincipal' }).getByRole('button', { name: 'Vincular' }).click();
+    expect((await app.escrituras()).at(-1)).toEqual(['update', 'analizadores/tab', { reclamo: { id: 'RE-92026456', n: 1, punto: 'Tablero principal' } }]);
+    const punto = page.locator('.exp-punto', { hasText: 'Tablero principal' });
+    await expect(punto).toContainText('Flicker no cumple');
+    await expect(punto.getByRole('button', { name: 'Ver análisis' })).toBeVisible();
+    // El aviso al usuario incluye el punto; el FT solo lo decide el principal (no hay FT)
+    await page.getByRole('tab', { name: /Seguimiento/ }).click();
+    await expect(app$(page)).toContainText('Flicker (Tablero principal)');
+    await expect(page.locator('.ft-item')).toHaveCount(0);
+    // Ya no es un requerimiento
+    await nav(page, 'Requerimientos');
+    await expect(app$(page)).not.toContainText('tableroprincipal');
+    // Registrar un punto nuevo: formulario con el nombre como caso y vuelta al expediente al guardar
+    await nav(page, 'Reclamos');
+    await page.locator('.exp-card', { hasText: 'USUARIO DE PRUEBA' }).click();
+    await page.getByRole('button', { name: /Agregar punto/ }).click();
+    await page.locator('#punto-nombre').fill('Trafo');
+    await page.getByRole('button', { name: 'Registrar instalación nueva' }).click();
+    await expect(page.locator('input[oninput*="\'caso\'"]')).toHaveValue('trafo');
+  });
 });
