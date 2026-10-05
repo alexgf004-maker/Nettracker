@@ -1,6 +1,6 @@
 // Handlers de la precampaña (importar listados, completar datos, editar casos)
 import {
-  abrirCaso, abrirImportListados, cerrarCaso, cerrarImportListados, exportarListado, guardarCaso, guardarImportListados,
+  abrirCaso, abrirImportListados, cerrarCaso, completarCoordenadasBase, cerrarImportListados, exportarListado, guardarCaso, guardarImportListados,
   leerListadosEnte, procesarListados, subirArchivoCampana,
 } from '../actions/campanas.js';
 import {
@@ -18,7 +18,7 @@ import { render } from '../views/render.js';
 
 Object.assign(window, {
   abrirImportListados, cerrarImportListados, leerListadosEnte, procesarListados, guardarImportListados,
-  subirArchivoCampana, exportarListado, abrirCaso, cerrarCaso, guardarCaso,
+  subirArchivoCampana, completarCoordenadasBase, exportarListado, abrirCaso, cerrarCaso, guardarCaso,
   abrirDocumentos, cerrarDocumentos, generarDocumentos, toggleExcluirCaso, excluirTodos, marcarPaso, desmarcarPaso,
   abrirConfigCartas, cerrarConfigCartas, guardarConfigCartas, cargarLogo,
 });

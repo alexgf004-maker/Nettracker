@@ -1,10 +1,10 @@
 // Precampaña: importar los listados del ente, completar con el control de puntos y las coordenadas,
 // corregir casos y exportar el listado. Los casos viven en campanas/{clave}/casos/{código del ente}.
-import { db, ref, update } from '../firebase.js';
+import { db, get, ref, update } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { hoyLocal, MESES } from '../domain/trabajo.js';
-import { armarCampanas, filasListado, leerControlPuntos, leerCoordenadas, leerListadoEnte } from '../domain/listados.js';
+import { armarCampanas, coordenadaValida, filasListado, leerControlPuntos, leerCoordenadas, leerListadoEnte } from '../domain/listados.js';
 import { render } from '../views/render.js';
 
 // Lee un Excel (o CSV) y devuelve { nombre, hojas: { nombreHoja: filas } }
@@ -58,10 +58,27 @@ export async function leerListadosEnte(files) {
   }
 }
 
+// Coordenadas de la base guardada en Firebase (coordenadas/{NC} = [lat, lng]), solo de los NC pedidos
+export async function buscarCoordenadas(ncs) {
+  const unicos = [...new Set(ncs.filter(Boolean))];
+  const pares = await Promise.all(unicos.map(nc => get(ref(db, 'coordenadas/' + nc)).then(s => [nc, s.exists() ? s.val() : null]).catch(() => [nc, null])));
+  const coords = {};
+  for (const [nc, v] of pares) {
+    const lat = Number(v?.[0] ?? v?.lat); const lng = Number(v?.[1] ?? v?.lng);
+    if (coordenadaValida(lat, lng)) coords[nc] = { lat, lng };
+  }
+  return coords;
+}
+
 // Guarda las campañas. Si ya existían, actualiza los datos del ente sin tocar lo que ya se completó o corrigió.
-export function guardarImportListados() {
+// Las coordenadas se toman de la base en Firebase (si está cargada) para los casos que no las tengan.
+export async function guardarImportListados() {
   const imp = state.importListados;
   if (!imp?.campanas.length) return;
+  state.showImportListados = false;
+  state.importListados = null;
+  render();
+  const coords = await buscarCoordenadas(imp.campanas.flatMap(c => Object.values(c.casos).map(x => x.nc)));
   const escrituras = imp.campanas.map(c => {
     const previos = casosGuardados(c.clave);
     const datos = { anio: c.anio, mes: c.mes, area: c.area, importado: { ...firma(), archivos: imp.archivos.filter(a => !a.error).map(a => a.nombre) } };
@@ -73,16 +90,17 @@ export function guardarImportListados() {
       });
       if (caso.crRelacionado) datos[base + 'crRelacionado'] = caso.crRelacionado;
       if (!previos[id]) datos[base + 'codigo'] = caso.codigo; // el código puede corregirse después (tipo de sistema)
+      const p = previos[id] || {};
+      if (coords[caso.nc] && (p.lat === undefined || p.lat === null || p.lat === '') && !p.manual?.lat) {
+        datos[base + 'lat'] = coords[caso.nc].lat; datos[base + 'lng'] = coords[caso.nc].lng;
+      }
     }
     return update(ref(db, 'campanas/' + c.clave), datos);
   });
-  Promise.all(escrituras).then(() => {
-    const total = imp.campanas.reduce((n, c) => n + Object.keys(c.casos).length, 0);
-    showToast(`${imp.campanas.length} ${imp.campanas.length === 1 ? 'campaña importada' : 'campañas importadas'} · ${total} casos`);
-  });
-  state.showImportListados = false;
-  state.importListados = null;
-  render();
+  await Promise.all(escrituras);
+  const total = imp.campanas.reduce((n, c) => n + Object.keys(c.casos).length, 0);
+  const conCoords = imp.campanas.reduce((n, c) => n + Object.values(c.casos).filter(x => coords[x.nc]).length, 0);
+  showToast(`${imp.campanas.length} ${imp.campanas.length === 1 ? 'campaña importada' : 'campañas importadas'} · ${total} casos${conCoords ? ` · ${conCoords} con coordenadas` : ''}`);
 }
 
 // ── COMPLETAR DATOS ──
@@ -121,6 +139,14 @@ export function completarCoordenadas(clave, archivo) {
   for (const n of archivo.orden) { const r = leerCoordenadas(archivo.hojas[n], ncs); if (!r.error) { resultado = r; break; } }
   if (!resultado) return showToast('No se encontraron columnas de NC, latitud y longitud');
   completarCasos(clave, resultado.coords, n => `${n} casos con coordenadas`);
+}
+
+// Desde la base en Firebase, sin subir archivos
+export async function completarCoordenadasBase(clave) {
+  const casos = Object.values(casosGuardados(clave));
+  const coords = await buscarCoordenadas(casos.map(c => c.nc));
+  if (!Object.keys(coords).length) return showToast('No se encontraron coordenadas en la base. Revisa que esté cargada en Firebase (nodo coordenadas)');
+  completarCasos(clave, coords, n => `${n} casos con coordenadas`);
 }
 
 export async function subirArchivoCampana(clave, tipo, files) {

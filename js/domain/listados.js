@@ -130,9 +130,9 @@ export function leerControlPuntos(filas) {
 
 // ── BASE DE COORDENADAS ──
 
-const NOMBRES_NC = ['NC', 'IDUSUARIO', 'ID USUARIO', 'ID DEL USUARIO', 'NUMERO DE CONTRATO', 'CONTRATO'];
-const NOMBRES_LAT = ['LATITUD', 'LATITUDE', 'LAT', 'Y'];
-const NOMBRES_LNG = ['LONGITUD', 'LONGITUDE', 'LON', 'LNG', 'LONG', 'X'];
+const NOMBRES_NC = ['NC', 'IDCLIENTE', 'ID CLIENTE', 'IDUSUARIO', 'ID USUARIO', 'ID DEL USUARIO', 'NUMERO DE CONTRATO', 'CONTRATO'];
+const NOMBRES_LAT = ['LATITUD', 'LATITUDE', 'LAT', 'COORDX', 'COORD X', 'COORDENADA X', 'Y'];
+const NOMBRES_LNG = ['LONGITUD', 'LONGITUDE', 'LON', 'LNG', 'LONG', 'COORDY', 'COORD Y', 'COORDENADA Y', 'X'];
 // Rango aproximado de El Salvador (descarta coordenadas en otro sistema, como las del control de puntos)
 export const coordenadaValida = (lat, lng) => lat >= 13 && lat <= 14.6 && lng >= -90.2 && lng <= -87.6;
 
@@ -151,7 +151,9 @@ export function leerCoordenadas(filas, ncBuscados) {
     const f = filas[i]; if (!f) continue;
     const nc = normalizarNC(f[col.nc]);
     if (!buscados.has(nc)) continue;
-    const lat = parseFloat(f[col.lat]); const lng = parseFloat(f[col.lng]);
+    let lat = parseFloat(f[col.lat]); let lng = parseFloat(f[col.lng]);
+    // Hay bases donde "X" es la latitud y "Y" la longitud: se acomodan por el rango de El Salvador
+    if (!coordenadaValida(lat, lng) && coordenadaValida(lng, lat)) [lat, lng] = [lng, lat];
     if (coordenadaValida(lat, lng)) coords[nc] = { lat, lng }; else descartadas++;
   }
   return { coords, descartadas };
