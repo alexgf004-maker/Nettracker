@@ -13,16 +13,16 @@ export function handleSaveEq() {
   // Check for duplicate serie
   const serieTrim = state.equipoForm.serie.trim().toUpperCase();
   const duplicate = state.equipos.find(e => e.serie.trim().toUpperCase() === serieTrim && e.id !== state.editEqId);
-  if (duplicate) return showToast('⚠️ Ya existe un equipo con ese número de serie');
+  if (duplicate) return showToast('Ya existe un equipo con ese número de serie');
   const usuario = state.sesionUsuario?.nombre || 'Desconocido';
   const data = { ...state.equipoForm, serie: serieTrim, fechaRegistro: today(), creadoPor: usuario };
   if (state.editEqId) {
     const id = state.editEqId;
     state.editEqId = null; state.equipoForm = emptyEF(); state.view = 'lista';
-    update(ref(db, `equipos/${id}`), { ...data, editadoPor: usuario, fechaEdicion: today() }).then(() => showToast('✅ Equipo actualizado'));
+    update(ref(db, `equipos/${id}`), { ...data, editadoPor: usuario, fechaEdicion: today() }).then(() => showToast('Equipo actualizado'));
   } else {
     state.equipoForm = emptyEF(); state.view = 'lista';
-    push(equiposRef, data).then(() => showToast('✅ Equipo agregado'));
+    push(equiposRef, data).then(() => showToast('Equipo agregado'));
   }
 }
 
@@ -57,7 +57,7 @@ export function confirmMovimiento() {
   const movs = eq.movimientos || [];
   const last = movs[movs.length - 1];
   if (last && last.tipo === state.prestamoForm.tipo && last.de === state.prestamoForm.de && last.a === state.prestamoForm.a && last.fecha === today()) {
-    return showToast('⚠️ Ya se registró este movimiento hoy');
+    return showToast('Ya se registró este movimiento hoy');
   }
   const esPrestamo = state.prestamoForm.tipo === 'prestamo';
   const sedeDest = sedeDestinoMovimiento(state.prestamoForm);
@@ -68,7 +68,7 @@ export function confirmMovimiento() {
     : { prestado: false, prestadoFecha: null, sede: sedeDest, movimientos };
   state.showPrestamoModal = false; state.prestamoId = null;
   update(ref(db, `equipos/${eq.id}`), updateData).then(() =>
-    showToast(esPrestamo ? '🔄 Préstamo registrado' : '✅ Devolución registrada')
+    showToast(esPrestamo ? 'Préstamo registrado' : 'Devolución registrada')
   );
 }
 
@@ -88,7 +88,7 @@ export function confirmCondicion() {
   const historialCondicion = [...(eq.historialCondicion || []), cambio];
   const id = state.condicionEqId;
   state.showCondicionModal = false; state.condicionEqId = null;
-  update(ref(db, `equipos/${id}`), { condicion: state.condicionForm.condicion, historialCondicion }).then(() => showToast('✅ Condición actualizada'));
+  update(ref(db, `equipos/${id}`), { condicion: state.condicionForm.condicion, historialCondicion }).then(() => showToast('Condición actualizada'));
 }
 
 export function procesarExcelInventario(file) {
@@ -98,7 +98,7 @@ export function procesarExcelInventario(file) {
       const wb = XLSX.read(e.target.result, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { raw: true });
-      if (rows.length === 0) return showToast('⚠️ El archivo está vacío');
+      if (rows.length === 0) return showToast('El archivo está vacío');
 
       state.importData = rows.map(row => {
         const findCol = keys => {
@@ -128,7 +128,7 @@ export function procesarExcelInventario(file) {
       state.showImportModal = true;
       render();
     } catch(err) {
-      showToast('❌ Error: ' + err.message);
+      showToast('Error: ' + err.message);
     }
   };
   reader.readAsArrayBuffer(file);
@@ -140,13 +140,13 @@ export function confirmarImportInventario() {
   nuevos.forEach(r => {
     push(equiposRef, { serie: r.serie, modelo: r.modelo, vineta: r.vineta, condicion: r.condicion, sede: r.sede, notas: r.notas, fechaRegistro: today() });
   });
-  showToast('✅ ' + nuevos.length + ' equipos importados');
+  showToast('' + nuevos.length + ' equipos importados');
   state.showImportModal = false; state.importData = [];
   render();
 }
 
 export function eliminarMovimientoFn(eqId, movIdx) {
-  if (!isAdmin()) return showToast('⚠️ Solo el administrador puede eliminar movimientos');
+  if (!isAdmin()) return showToast('Solo el administrador puede eliminar movimientos');
   const eq = state.equipos.find(x => x.id === eqId);
   if (!eq || !eq.movimientos) return;
   if (!confirm('¿Eliminar este movimiento del historial?')) return;
@@ -161,12 +161,12 @@ export function eliminarMovimientoFn(eqId, movIdx) {
     // Deshacer el préstamo: vuelve a donde estaba (lo despachado a Campos y Servicios sale de la Cucumacayán)
     updates.sede = deleted.de === 'CPT BT' || deleted.a === 'Campos y Servicios' ? 'Subestación Cucumacayán' : 'Plantel Central';
   }
-  update(ref(db, 'equipos/' + eqId), updates).then(() => showToast('🗑 Movimiento eliminado'));
+  update(ref(db, 'equipos/' + eqId), updates).then(() => showToast('Movimiento eliminado'));
 }
 
 export function handleDelEq(id) {
-  if (!isAdmin()) return showToast('⚠️ Solo el administrador puede eliminar equipos');
-  if (state.records.find(r => r.equipoId === id && !r.retirado)) return showToast('⚠️ Equipo instalado actualmente');
+  if (!isAdmin()) return showToast('Solo el administrador puede eliminar equipos');
+  if (state.records.find(r => r.equipoId === id && !r.retirado)) return showToast('Equipo instalado actualmente');
   if (!confirm('¿Eliminar del inventario?')) return;
   state.view = 'lista';
   remove(ref(db, `equipos/${id}`)).then(() => showToast('Eliminado'));

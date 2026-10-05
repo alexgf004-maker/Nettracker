@@ -1,29 +1,23 @@
-// Login por PIN y sesión
+// Perfil activo (sin PIN)
 import { USUARIOS } from '../config.js';
 import { state } from '../state.js';
 import { render } from '../views/render.js';
 
-export function doLogin() {
-  if (!state.loginForm.nombre) { state.loginForm.error = 'Selecciona un usuario'; render(); return; }
-  if (!state.loginForm.pin) { state.loginForm.error = 'Ingresa tu PIN'; render(); return; }
-  const user = USUARIOS.find(u => u.nombre === state.loginForm.nombre);
-  if (!user || user.pin !== state.loginForm.pin) {
-    state.loginForm.error = 'PIN incorrecto';
-    state.loginForm.pin = '';
-    render();
-    return;
-  }
+// Entrar con un perfil (no hay PIN: la app es interna y solo distingue quién trabaja)
+export function entrarComo(nombre) {
+  const user = USUARIOS.find(u => u.nombre === nombre);
+  if (!user) return;
   state.sesionUsuario = { nombre: user.nombre };
-  state.loginForm = { nombre: '', pin: '', error: '' };
   state.instTab = user.area === 'CPT BT' ? 'cpt_bt' : 'cpt_mt';
+  state.alertaDismissed = false;
   try { localStorage.setItem('cpt_session', JSON.stringify(state.sesionUsuario)); } catch(e) {}
   render();
 }
 
+// Volver a la pantalla de perfiles
 export function cerrarSesion() {
-  if (!confirm('¿Cerrar sesión de ' + state.sesionUsuario.nombre + '?')) return;
   state.sesionUsuario = null;
-  state.loginForm = { nombre: '', pin: '', error: '' };
+  state.tab = 'dashboard'; state.view = 'lista'; state.showMas = false; state.campanaClave = null;
   try { localStorage.removeItem('cpt_session'); } catch(e) {}
   render();
 }

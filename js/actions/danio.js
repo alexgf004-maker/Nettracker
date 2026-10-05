@@ -78,7 +78,7 @@ function guardarEdicionDanio(r) {
       }],
     });
   }
-  showToast('✏️ Memo actualizado');
+  showToast('Memo actualizado');
 }
 
 export function confirmDanio() {
@@ -126,9 +126,9 @@ export function confirmDanio() {
       }];
     }
     update(ref(db, 'equipos/' + eq.id), eqUpdates)
-      .then(() => showToast('📝 Memo generado · Equipo ' + (cond ? cond.label : memo.condicion)));
+      .then(() => showToast('Memo generado · Equipo ' + (cond ? cond.label : memo.condicion)));
   } else {
-    showToast('📝 Memo generado');
+    showToast('Memo generado');
   }
 }
 

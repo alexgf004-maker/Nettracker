@@ -41,7 +41,7 @@ export function renderInstalaciones() {
       return true;
     });
     // Sub-tabs
-    const subTabs = [{key:'cpt_mt',label:'⚡ CPT MT'},{key:'cpt_bt',label:'⚡ CPT BT'},{key:'campos',label:'🏗 Campos y Serv.'}];
+    const subTabs = [{key:'cpt_mt',label:'<i class=ic-instalaciones></i> CPT MT'},{key:'cpt_bt',label:'<i class=ic-instalaciones></i> CPT BT'},{key:'campos',label:'<i class=ic-casco></i> Campos y Serv.'}];
     html += '<div style="display:flex;background:var(--white);border-bottom:1px solid var(--border);padding:0 16px">';
     subTabs.forEach(t => {
       const active = state.instTab === t.key;
@@ -66,7 +66,7 @@ export function renderInstalaciones() {
             </div>`).join('')}
         </div>
         <div style="background:linear-gradient(135deg,var(--primary-dark),var(--primary));border-radius:14px;padding:14px 16px;margin-bottom:12px;color:#fff">
-          <div style="font-size:11px;color:rgba(255,255,255,.7);margin-bottom:6px;font-weight:600">📅 ${new Date().toLocaleDateString("es-SV",{weekday:"long",day:"numeric",month:"long"}).replace(/^./,c=>c.toUpperCase())}</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.7);margin-bottom:6px;font-weight:600"><i class=ic-calendario></i> ${new Date().toLocaleDateString("es-SV",{weekday:"long",day:"numeric",month:"long"}).replace(/^./,c=>c.toUpperCase())}</div>
           ${(()=>{
           const ua = userArea();
           const miArea = state.records.filter(r => (r.areaInstalacion||'CPT MT') === ua);
@@ -78,14 +78,14 @@ export function renderInstalaciones() {
             +(nHoy>0?'<div><div style="font-size:22px;font-weight:800;color:#ffd700">'+nHoy+'</div><div style="font-size:10px;color:rgba(255,255,255,.7)">Vencen hoy</div></div>':'')
             +(nSemana>0?'<div><div style="font-size:22px;font-weight:800;color:#7dd3fc">'+nSemana+'</div><div style="font-size:10px;color:rgba(255,255,255,.7)">Esta semana</div></div>':'')
             +'</div>'
-            +(nHoy>0?'<div style="margin-top:8px;font-size:11px;color:#ffd700;font-weight:600">⚠️ Hay retiros de '+ua+' programados para hoy</div>':'');
+            +(nHoy>0?'<div style="margin-top:8px;font-size:11px;color:#ffd700;font-weight:600"><i class=ic-alerta></i> Hay retiros de '+ua+' programados para hoy</div>':'');
         })()}
         </div>
-        <div class="search-wrap"><span class="search-icon">🔍</span>
+        <div class="search-wrap"><span class="search-icon"><i class=ic-buscar></i></span>
           <input class="search-input" placeholder="Buscar serie, caso, lugar..." value="${state.search}" oninput="setSearch(this.value)" ${state.search?'data-active="true"':''}>
         </div>`;
     if (filtered.length === 0) {
-      html += `<div class="empty"><div class="empty-icon">📡</div>
+      html += `<div class="empty"><div class="empty-icon"><i class=ic-antena></i></div>
           <div class="empty-text">${state.records.length === 0 ? 'Sin instalaciones registrados' : 'Sin resultados'}</div>
           ${state.records.length === 0 ? `<button class="btn btn-primary" style="max-width:240px;margin:0 auto" onclick="newInstall()">+ Registrar instalación</button>` : ''}
         </div>`;
@@ -101,12 +101,12 @@ export function renderInstalaciones() {
         const stripe = stCard==='ACTIVO'?'':stCard==='PROXIMO'?' yellow':stCard==='PROGRAMADO'?' purple':' gray';
         html += `<div onclick="openDetail('${r.id}')" style="background:var(--white);border:1px solid var(--border);border-left:3px solid ${stCard==='ACTIVO'?'var(--green)':stCard==='PROXIMO'?'var(--yellow)':stCard==='PROGRAMADO'?'#7c3aed':'var(--border2)'};border-radius:12px;padding:10px 14px;cursor:pointer;box-shadow:var(--shadow);margin-bottom:8px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
-              <div style="display:flex;align-items:center;gap:6px"><div style="font-family:var(--mono);font-size:14px;font-weight:800;color:var(--text)">${r.serie||'—'}</div>${(()=>{const eq=state.equipos.find(e=>e.id===r.equipoId);return eq&&eq.vineta?'<span style="font-size:10px;color:var(--text3);font-family:var(--mono);background:var(--border2);padding:2px 6px;border-radius:4px">🏷'+eq.vineta+'</span>':''})()}</div>
+              <div style="display:flex;align-items:center;gap:6px"><div style="font-family:var(--mono);font-size:14px;font-weight:800;color:var(--text)">${r.serie||'—'}</div>${(()=>{const eq=state.equipos.find(e=>e.id===r.equipoId);return eq&&eq.vineta?'<span style="font-size:10px;color:var(--text3);font-family:var(--mono);background:var(--border2);padding:2px 6px;border-radius:4px"><i class=ic-etiqueta></i>'+eq.vineta+'</span>':''})()}</div>
               ${badgeSt(stCard)}
             </div>
             <div style="font-size:11px;color:var(--text3);margin-bottom:4px">#${r.caso}${r.modelo?' · '+r.modelo:''}</div>
             <div style="display:flex;justify-content:space-between;align-items:center">
-              <div style="font-size:12px;color:var(--text2)">📍 ${r.lugar||'Sin ubicación'}</div>
+              <div style="font-size:12px;color:var(--text2)"><i class=ic-map-pin></i> ${r.lugar||'Sin ubicación'}</div>
               <span style="font-size:10px;color:var(--text3)">${r.areaInstalacion||'CPT MT'}</span>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px;padding-top:5px;border-top:1px solid var(--border2)">
@@ -132,7 +132,7 @@ export function renderInstalaciones() {
             ${selEq ? `<div class="equipo-preview">
               <div><div style="font-weight:700;font-family:var(--mono)">${selEq.serie}</div><div style="font-size:12px;color:var(--text3)">${selEq.modelo}</div></div>
               <button class="change-btn" onclick="openSelector()">Cambiar</button>
-            </div>` : `<button class="btn btn-secondary" style="border-color:#c7d5fd;color:var(--blue);background:var(--blue-light)" onclick="openSelector()">📦 Elegir del inventario</button>`}
+            </div>` : `<button class="btn btn-secondary" style="border-color:#c7d5fd;color:var(--blue);background:var(--blue-light)" onclick="openSelector()"><i class=ic-equipos></i> Elegir del inventario</button>`}
           </div>
         </div>
         <div class="form-section">
@@ -144,13 +144,13 @@ export function renderInstalaciones() {
         <div class="form-section">
           <div class="form-section-title">Ubicación</div>
           <div class="loc-toggle">
-            <button class="loc-tab ${state.locMode==='gps'?'active':''}" onclick="setLocMode('gps')">📍 GPS</button>
-            <button class="loc-tab ${state.locMode==='manual'?'active':''}" onclick="setLocMode('manual')">✏️ Manual</button>
+            <button class="loc-tab ${state.locMode==='gps'?'active':''}" onclick="setLocMode('gps')"><i class=ic-map-pin></i> GPS</button>
+            <button class="loc-tab ${state.locMode==='manual'?'active':''}" onclick="setLocMode('manual')"><i class=ic-editar></i> Manual</button>
           </div>
           ${state.locMode === 'gps' ? `
             <div class="field">
-              <button class="gps-btn" id="gps-btn" onclick="triggerGPS()">📍 Capturar ubicación GPS</button>
-              ${state.form.lat ? `<div class="gps-tag">🛰 ${state.form.lat}, ${state.form.lng}</div>` : ''}
+              <button class="gps-btn" id="gps-btn" onclick="triggerGPS()"><i class=ic-map-pin></i> Capturar ubicación GPS</button>
+              ${state.form.lat ? `<div class="gps-tag"><i class=ic-satelite></i> ${state.form.lat}, ${state.form.lng}</div>` : ''}
             </div>
             <div class="field"><label>Descripción del lugar</label>
               <input placeholder="Ej: Quezaltepeque / Edificio Central" value="${state.form.lugar}" oninput="setField('lugar',this.value)">
@@ -227,13 +227,13 @@ export function renderInstalaciones() {
             <div><div class="detail-serie">${r.serie||'—'}</div><div class="detail-modelo">${r.modelo||''}</div></div>
             ${badgeSt(st)}
           </div>
-          ${dias === 0 && !r.retirado ? `<div class="alert-banner alert-yellow" style="margin-top:12px">🔔 Este analizador debe retirarse HOY</div>` : ''}
-          ${dias !== null && dias < 0 ? `<div class="alert-banner alert-red" style="margin-top:12px">⚠️ Vencido: debió retirarse hace ${Math.abs(dias)} día${Math.abs(dias)>1?'s':''}</div>` : ''}
+          ${dias === 0 && !r.retirado ? `<div class="alert-banner alert-yellow" style="margin-top:12px"><i class=ic-campana></i> Este analizador debe retirarse HOY</div>` : ''}
+          ${dias !== null && dias < 0 ? `<div class="alert-banner alert-red" style="margin-top:12px"><i class=ic-alerta></i> Vencido: debió retirarse hace ${Math.abs(dias)} día${Math.abs(dias)>1?'s':''}</div>` : ''}
         </div>
         <div class="detail-grid">
           <div class="detail-row"><div class="detail-label">Caso / Campaña</div><div class="detail-value">#${r.caso}</div></div>
           <div class="detail-row"><div class="detail-label">Área</div><div class="detail-value">${r.areaInstalacion||'CPT MT'}</div></div>
-          ${r.sede ? `<div class="detail-row"><div class="detail-label">Sede salida</div><div class="detail-value">🏭 ${r.sede}</div></div>` : ''}
+          ${r.sede ? `<div class="detail-row"><div class="detail-label">Sede salida</div><div class="detail-value"><i class=ic-fabrica></i> ${r.sede}</div></div>` : ''}
           <div class="detail-row"><div class="detail-label">Lugar</div><div class="detail-value">${r.lugar||'—'}</div></div>
           ${r.lat ? `<div class="detail-row"><div class="detail-label">GPS</div><div class="detail-value">${r.lat}, ${r.lng}</div></div>` : ''}
           <div class="detail-row"><div class="detail-label">Instalaciones</div><div class="detail-value">${fmtDate(r.fechaInstalacion)}</div></div>
@@ -252,7 +252,7 @@ export function renderInstalaciones() {
               <div class="historial-card">
                 <div class="historial-row">
                   <div>
-                    <div class="historial-lugar">💾 ${d.tecnico}</div>
+                    <div class="historial-lugar"><i class=ic-descargar></i> ${d.tecnico}</div>
                     <div class="historial-caso">${d.notas||'Sin observaciones'}</div>
                     ${d.registradoPor && d.registradoPor !== d.tecnico ? `<div style="font-size:10px;color:var(--text3);margin-top:2px">Registrado por: ${d.registradoPor}</div>` : ''}
                   </div>
@@ -262,19 +262,19 @@ export function renderInstalaciones() {
           </div>` : ''}
         ${r.lat || !r.retirado ? `
           <div style="display:flex;gap:8px;margin-bottom:10px">
-            ${r.lat ? `<a href="https://maps.google.com/?q=${r.lat},${r.lng}" target="_blank" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;background:var(--primary-light);border:1px solid var(--primary);border-radius:10px;text-decoration:none;font-size:12px;font-weight:700;color:var(--primary)">🗺 Google Maps</a>` : ''}
-            ${!r.retirado ? `<button onclick="addToCalendar('${r.id}')" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;background:#e8f0fb;border:1px solid #c7d5fd;border-radius:10px;font-family:var(--font);font-size:12px;font-weight:700;color:#1a73e8;cursor:pointer">📅 Calendar</button>` : ''}
+            ${r.lat ? `<a href="https://maps.google.com/?q=${r.lat},${r.lng}" target="_blank" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;background:var(--primary-light);border:1px solid var(--primary);border-radius:10px;text-decoration:none;font-size:12px;font-weight:700;color:var(--primary)"><i class=ic-mapa></i> Google Maps</a>` : ''}
+            ${!r.retirado ? `<button onclick="addToCalendar('${r.id}')" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;background:#e8f0fb;border:1px solid #c7d5fd;border-radius:10px;font-family:var(--font);font-size:12px;font-weight:700;color:#1a73e8;cursor:pointer"><i class=ic-calendario></i> Calendar</button>` : ''}
           </div>` : ''}
         ${!r.retirado ? `
           <div style="display:flex;gap:8px;margin-bottom:10px">
-            ${isAdmin() ? `<button onclick="editInstall('${r.id}')" style="flex:1;padding:11px;background:var(--white);border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:13px;font-weight:700;color:var(--text2);cursor:pointer">✏️ Editar</button>` : ''}
-            <button onclick="openDescargaModal('${r.id}')" style="flex:1;padding:11px;background:var(--accent-light);border:1.5px solid var(--accent);border-radius:10px;font-family:var(--font);font-size:13px;font-weight:700;color:var(--primary);cursor:pointer">💾 Descarga</button>
+            ${isAdmin() ? `<button onclick="editInstall('${r.id}')" style="flex:1;padding:11px;background:var(--white);border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:13px;font-weight:700;color:var(--text2);cursor:pointer"><i class=ic-editar></i> Editar</button>` : ''}
+            <button onclick="openDescargaModal('${r.id}')" style="flex:1;padding:11px;background:var(--accent-light);border:1.5px solid var(--accent);border-radius:10px;font-family:var(--font);font-size:13px;font-weight:700;color:var(--primary);cursor:pointer"><i class=ic-descargar></i> Descarga</button>
           </div>
           <button class="btn btn-danger" onclick="openRetiroModal('${r.id}')">Marcar como retirado</button>
         ` : ''}
         ${r.areaInstalacion === 'Campos y Servicios' && r.equipoId ? (r.memoDanio
-          ? `<div style="display:flex;gap:8px"><button class="btn" style="flex:2;background:#fef2f2;color:#dc2626;border:1px solid #dc2626" onclick="memoDanio('${r.id}')">📄 Ver memo de equipo dañado</button><button class="btn" style="flex:1;background:var(--white);color:#dc2626;border:1px solid #dc2626" onclick="editarDanio('${r.id}')">✏️ Editar</button></div>`
-          : `<button class="btn" style="background:#fef2f2;color:#dc2626;border:1px solid #dc2626" onclick="openDanioModal('${r.id}')">📝 Memo de equipo dañado</button>`) : ''}
+          ? `<div style="display:flex;gap:8px"><button class="btn" style="flex:2;background:#fef2f2;color:#dc2626;border:1px solid #dc2626" onclick="memoDanio('${r.id}')"><i class=ic-archivo></i> Ver memo de equipo dañado</button><button class="btn" style="flex:1;background:var(--white);color:#dc2626;border:1px solid #dc2626" onclick="editarDanio('${r.id}')"><i class=ic-editar></i> Editar</button></div>`
+          : `<button class="btn" style="background:#fef2f2;color:#dc2626;border:1px solid #dc2626" onclick="openDanioModal('${r.id}')"><i class=ic-archivo-editar></i> Memo de equipo dañado</button>`) : ''}
         ${isAdmin() ? `<div style="text-align:center;margin-top:4px">
           <button onclick="delInstall('${r.id}')" style="background:none;border:none;font-family:var(--font);font-size:12px;color:var(--text3);cursor:pointer;padding:6px 12px;text-decoration:underline">Eliminar registro</button>
         </div>` : ''}

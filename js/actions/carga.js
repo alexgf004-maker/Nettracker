@@ -22,7 +22,7 @@ export function procesarExcel(file) {
         if (cell2 && cell2.v && cell2.v.toString().toLowerCase().includes('equipo')) { headerRow = r; break; }
       }
       const rows = XLSX.utils.sheet_to_json(ws, { raw: false, range: headerRow });
-      if (rows.length === 0) return showToast('⚠️ El archivo está vacío');
+      if (rows.length === 0) return showToast('El archivo está vacío');
 
       state.cargaData = rows.map(row => {
         // Flexible column finder - handles accents, case, spaces
@@ -67,7 +67,7 @@ export function procesarExcel(file) {
         if (!serie) { status = 'error'; problema = 'Sin número de serie'; }
         else if (!eq) { status = 'error'; problema = 'Equipo no existe en inventario'; }
         else if ((eq.condicion||'bueno') === 'fuera') { status = 'error'; problema = 'Fuera de servicio'; }
-        else if (eqEnCampo(eq)) { status = 'error'; problema = '⚠️ Ya está instalado — instalación activa detectada'; }
+        else if (eqEnCampo(eq)) { status = 'error'; problema = 'Ya está instalado — instalación activa detectada'; }
         else if (!caso) { status = 'error'; problema = 'Sin número SIGET (obligatorio)'; }
         else if (!fechaRetiro) { status = 'error'; problema = 'Sin fecha de retiro (obligatoria)'; }
 
@@ -77,7 +77,7 @@ export function procesarExcel(file) {
       state.cargaView = 'preview';
       render();
     } catch(err) {
-      showToast('❌ Error al leer el archivo: ' + err.message);
+      showToast('Error al leer el archivo: ' + err.message);
     }
   };
   reader.readAsArrayBuffer(file);
@@ -145,7 +145,7 @@ export function confirmarCargaMasiva() {
     realizadoPor: state.sesionUsuario?.nombre || 'Desconocido',
     equipos: validos.map(r => ({ s: r.serie, v: r.vineta||'', c: r.caso, l: r.lugar, fi: r.fechaInst, fr: r.fechaRetiro, n: r.notas||'', iu: r.idUsuario||'', d: r.direccion||'', ac: r.accesorios||'', m: r.multiplicador||'', co: r.corrientes||'', cx: r.conexion||'' }))
   };
-  showToast('✅ ' + count + ' instalaciones registradas');
+  showToast('' + count + ' instalaciones registradas');
   const memoHtml = buildMemoCargaMasiva(validos);
   push(historialCargasRef, {
     fecha: today(),

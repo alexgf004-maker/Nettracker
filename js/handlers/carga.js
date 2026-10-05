@@ -25,7 +25,7 @@ window.reimprimirMemoAcc = el => {
 window.eliminarMemoAcc = el => {
   const id = typeof el === 'string' ? el : el.dataset.id;
   if (!confirm('¿Eliminar este memo del historial?')) return;
-  remove(ref(db, 'historialAccesorios/' + id)).then(() => showToast('🗑 Memo eliminado'));
+  remove(ref(db, 'historialAccesorios/' + id)).then(() => showToast('Memo eliminado'));
 };
 
 window.handleFileUpload = e => { const f = e.target.files[0]; if (f) procesarExcel(f); };
@@ -236,7 +236,7 @@ window.retiroMasivo = id => {
       if (eq) update(ref(db, 'equipos/' + r.equipoId), { sede: SEDE_CUCUMACAYAN }); // Campos y Servicios los regresa a la Cucumacayán
     }
   });
-  showToast('✅ ' + instDespacho.length + ' equipos marcados como retirados · Descarga pendiente');
+  showToast('' + instDespacho.length + ' equipos marcados como retirados · Descarga pendiente');
 };
 
 window.regenerarMemo = id => {

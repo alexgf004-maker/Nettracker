@@ -7,6 +7,12 @@ module.exports = {
     r5: { serie: 'SN-104', modelo: 'PQ-1', caso: 'C-005', lugar: 'Ilopango', lat: 13.69, lng: -89.1, fechaInstalacion: '2026-10-01', fechaRetiro: '2026-10-20', areaInstalacion: 'Campos y Servicios', areaBeneficiaria: 'CPT BT', equipoId: 'e5', creadoPor: 'Francisco Chulo', fechaRegistro: '2026-09-20', despachoId: 'hc1' },
     r6: { serie: 'SN-106', modelo: 'PQ-1', caso: 'C-006', lugar: 'Zaragoza', fechaInstalacion: '2026-08-10', fechaRetiro: '2026-09-10', areaInstalacion: 'Campos y Servicios', areaBeneficiaria: 'CPT MT', equipoId: 'e7', creadoPor: 'David García', fechaRegistro: '2026-08-10T10:00',
       retirado: true, fechaRetiroReal: '2026-09-12', sinProblema: false, fallas: ['No enciende / Sin señales de vida'], descripcionFalla: 'Carcasa quebrada', retiradoPor: 'Bryan Francia' },
+    // Trabajo por tipo de caso (sin equipo asignado para no alterar el inventario)
+    r7: { serie: 'SN-200', modelo: 'PQ-1', caso: 'CR192026101', lugar: 'Nejapa', fechaInstalacion: '2026-09-05', fechaRetiro: '2026-10-08', areaInstalacion: 'CPT MT', fechaRegistro: '2026-09-05T10:00' },
+    r8: { serie: 'SN-201', modelo: 'PQ-1', caso: 'DA182026201', lugar: 'Quezaltepeque', fechaInstalacion: '2026-08-01', fechaRetiro: '2026-08-30', areaInstalacion: 'CPT MT', fechaRegistro: '2026-08-01T10:00',
+      retirado: true, fechaRetiroReal: '2026-08-30', descargaPendiente: true },
+    r9: { serie: 'SN-202', modelo: 'PQ-2', caso: 'RE-2026-0456', lugar: 'Antiguo Cuscatlán', fechaInstalacion: '2026-09-01', fechaRetiro: '2026-09-15', areaInstalacion: 'CPT MT', fechaRegistro: '2026-09-01T09:00',
+      retirado: true, fechaRetiroReal: '2026-09-16' },
   },
   equipos: {
     e1: { serie: 'SN-100', modelo: 'PQ-1', sede: 'Plantel Central', condicion: 'bueno', vineta: 'V1', fechaRegistro: '2026-01-01', creadoPor: 'David García',

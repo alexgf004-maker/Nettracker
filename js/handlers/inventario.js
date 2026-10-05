@@ -163,7 +163,7 @@ ${movimientos.length > 0 ? `
   <thead><tr><th>Tipo</th><th>De</th><th>A</th><th>Fecha</th><th>Notas</th></tr></thead>
   <tbody>${movimientos.map(m => `
     <tr>
-      <td><span style="font-weight:700;color:${m.tipo==='prestamo'?'#0057b8':'#059669'}">${m.tipo==='prestamo'?'🔄 Préstamo':'✅ Devolución'}</span></td>
+      <td><span style="font-weight:700;color:${m.tipo==='prestamo'?'#0057b8':'#059669'}">${m.tipo==='prestamo'?'Préstamo':'Devolución'}</span></td>
       <td>${m.de||'—'}</td>
       <td>${m.a||'—'}</td>
       <td style="white-space:nowrap">${fmtDate(m.fecha)}</td>
@@ -177,7 +177,7 @@ ${mantHistorial.length > 0 ? `
 <table>
   <thead><tr><th>Descripción</th><th>Acción</th><th>Resultado</th><th>F. Inicio</th><th>F. Resolución</th></tr></thead>
   <tbody>${mantHistorial.map(m => {
-    const resLabel = m.resultado==='resuelto'?'✅ Resuelto':m.resultado==='sin_solucion'?'❌ Sin solución':'⏳ Pendiente';
+    const resLabel = m.resultado==='resuelto'?'Resuelto':m.resultado==='sin_solucion'?'Sin solución':'Pendiente';
     return `<tr>
       <td>${m.descripcion||'—'}</td>
       <td>${m.accion||'—'}</td>
@@ -223,7 +223,7 @@ window.saveEquipo = handleSaveEq;
 window.openEqDetalle = id => { state.editEqId = id; state.view = 'equipo_detalle'; state.eqDetalleTab = 'general'; render(); };
 
 window.editEquipo = id => {
-  if (!isAdmin()) return showToast('⚠️ Solo el administrador puede editar equipos');
+  if (!isAdmin()) return showToast('Solo el administrador puede editar equipos');
   const eq = state.equipos.find(x => x.id === id); if (!eq) return;
   state.equipoForm = { serie: eq.serie, modelo: eq.modelo||'', notas: eq.notas||'', sede: eq.sede||'Plantel Central', condicion: eq.condicion||'bueno', vineta: eq.vineta||'' };
   state.editEqId = id; state.view = 'equipo_form'; render();
@@ -251,11 +251,11 @@ window.guardarMant = () => {
   const updates = { historialMantenimiento };
   if (state.mantForm.resultado === 'resuelto') updates.condicion = 'bueno';
   state.showMantModal = false; state.mantEqId = null;
-  update(ref(db, 'equipos/' + eq.id), updates).then(() => showToast('🔧 Ficha guardada' + (state.mantForm.resultado === 'resuelto' ? ' · Equipo marcado como Bueno' : '')));
+  update(ref(db, 'equipos/' + eq.id), updates).then(() => showToast('Ficha guardada' + (state.mantForm.resultado === 'resuelto' ? ' · Equipo marcado como Bueno' : '')));
 };
 
 window.eliminarCondicion = (eqId, idx) => {
-  if (!isAdmin()) return showToast('⚠️ Solo el administrador puede eliminar esto');
+  if (!isAdmin()) return showToast('Solo el administrador puede eliminar esto');
   const eq = state.equipos.find(x => x.id === eqId);
   if (!eq || !eq.historialCondicion) return;
   if (!confirm('¿Eliminar este registro de condición?')) return;
@@ -263,7 +263,7 @@ window.eliminarCondicion = (eqId, idx) => {
   // Restore condicion to last remaining entry or 'bueno'
   const lastCond = hist.length > 0 ? hist[hist.length-1].condicionNueva : 'bueno';
   update(ref(db, 'equipos/' + eqId), { historialCondicion: hist, condicion: lastCond })
-    .then(() => showToast('🗑 Registro eliminado'));
+    .then(() => showToast('Registro eliminado'));
 };
 
 window.registrarDevolucion = handleDevolucion;
