@@ -320,7 +320,7 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
 .tag-verde { background: var(--green-light); color: var(--green); }
 .tag-azul { background: var(--primary-light); color: var(--primary); }
 .tag-gris { background: var(--border2); color: var(--text2); }
-.txt-verde { color: var(--green); } .txt-azul { color: var(--primary); } .txt-morado { color: #7c3aed; } .txt-rojo { color: var(--red); }
+.txt-verde { color: var(--green); } .txt-azul { color: var(--primary); } .txt-morado { color: #7c3aed; } .txt-rojo { color: var(--red); } .txt-ambar { color: var(--yellow); }
 .mono { font-family: var(--mono); }
 .card-titulo { font-size: 16px; font-weight: 800; color: var(--text); }
 .chips-linea { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }

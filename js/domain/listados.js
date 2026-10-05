@@ -110,7 +110,7 @@ export function leerControlPuntos(filas) {
     tension: enc.indexOf('TENSION'), medidor: enc.indexOf('MEDIDOR'), direccion: enc.indexOf('DIRECCION'), nombre: enc.indexOf('NOMBRE'),
     tipoInstalacion: enc.indexOf('TIPO DE INSTALACION'), nivel: enc.indexOf('NIVEL DE TENSION'),
   };
-  const datos = {};
+  const datos = {}; const porCodigo = {};
   for (const f of filas.slice(h + 1)) {
     const nc = normalizarNC(f?.[col.nc]);
     if (!/^\d+$/.test(nc)) continue;
@@ -123,9 +123,12 @@ export function leerControlPuntos(filas) {
       tipoInstalacion: valido(f[col.tipoInstalacion]), nivel: valido(f[col.nivel]),
     };
     Object.keys(d).forEach(k => { if (!d[k]) delete d[k]; });
-    if (Object.keys(d).length) datos[nc] = { ...d, ...datos[nc] }; // si el NC se repite (CR y DA), gana la primera fila
+    if (!Object.keys(d).length) continue;
+    datos[nc] = { ...d, ...datos[nc] }; // si el NC se repite (CR y DA), gana la primera fila
+    if (col.codigo >= 0) porCodigo[normalizar(f[col.codigo])] = { ...d, nc };
   }
-  return { datos };
+  // porCodigo: el ente a veces cambia el usuario de un punto; el código manda y el NC del archivo se informa
+  return { datos, porCodigo };
 }
 
 // ── BASE DE COORDENADAS ──
