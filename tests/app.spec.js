@@ -42,7 +42,7 @@ test.describe('Navegación', () => {
     app = await abrirApp(page);
     await cerrarAlerta(page);
     await expect(app$(page)).toContainText('Pendientes');
-    for (const [pestana, texto] of [['Campañas', 'Agosto 2026'], ['Reclamos', 'RE-2026-0456'], ['Requerimientos', 'C-001'], ['Seguimiento FT', 'próxima etapa']]) {
+    for (const [pestana, texto] of [['Campañas', 'Agosto 2026'], ['Reclamos', 'RE-2026-0456'], ['Requerimientos', 'C-001'], ['Seguimiento FT', 'No hay casos fuera de tolerancia']]) {
       await nav(page, pestana);
       await expect(app$(page)).toContainText(texto);
     }
@@ -1049,5 +1049,84 @@ test.describe('Precampaña', () => {
       'casos/CR1O2026201/programa/fecha': '1', 'casos/CR1O2026202/programa/fecha': '2',
       'casos/DA1O2026011O00/programa/fecha': '2', 'casos/DA1O2026011O00/codigo': 'DA1O2026013O00',
     }]);
+  });
+
+  test('resultados: situación de cada caso, anotar el resultado y exportar el cuadro resumen', async ({ page }) => {
+    const datos = conCampana();
+    datos.analizadores = { ...datos.analizadores, r20: { serie: 'SN-300', caso: 'CR1O2026201', lugar: 'X', fechaInstalacion: '2026-09-10', fechaRetiro: '2026-09-18', areaInstalacion: 'Campos y Servicios', areaBeneficiaria: 'CPT MT', retirado: true, fechaRetiroReal: '2026-09-18', descargaPendiente: false, descargas: [{ fecha: '2026-09-19', medicionOk: true }], fechaRegistro: '2026-09-10' } };
+    datos.campanas['2026-10_CPT-MT'].casos.DA1O2026011O00.mult = { estado: 'Acceso denegado' };
+    app = await abrirApp(page, { excel: true, datos });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('resultados'); });
+    const fila = codigo => page.locator('.tabla-casos tr', { hasText: codigo });
+    await expect(fila('CR1O2026201')).toContainText('Descargado');
+    await expect(fila('CR1O2026201')).toContainText('Válida');
+    await expect(fila('CR1O2026201')).toContainText('según la descarga');
+    await expect(fila('CR1O2026202')).toContainText('Sin instalar');
+    await expect(fila('DA1O2026011O00')).toContainText('Acceso denegado');
+    await expect(page.locator('.aviso')).toContainText('1 de 38 CR obligatorios con medición válida');
+
+    await fila('CR1O2026202').click();
+    await page.locator('.modal').getByRole('button', { name: 'Válida' }).click();
+    await page.locator('.modal').getByRole('button', { name: 'Fuera (FT)' }).click();
+    await page.locator('#res-febNoPer').fill('7,5');
+    await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+    expect((await app.escrituras()).at(-1)).toEqual(['set', 'campanas/2026-10_CPT-MT/casos/CR1O2026202/resultado', { medicion: 'valida', tolerancia: 'fuera', febNoPer: 7.5, por: 'David García', fecha: '2026-09-23' }]);
+    await expect(fila('CR1O2026202')).toContainText('FT');
+    await expect(page.locator('.resumen-estado', { hasText: 'Fuera de tolerancia' })).toContainText('1');
+
+    const descarga = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Exportar cuadro resumen' }).click();
+    const filas = XLSX.utils.sheet_to_json(XLSX.readFile(await (await descarga).path()).Sheets['Cuadro resumen'], { header: 1, defval: '' });
+    expect(filas[0]).toEqual(['Código SIGET', 'NC', 'Nombre', 'Situación', 'Medición', 'Tolerancia', 'FebNoPer (%)', 'Observaciones']);
+    expect(filas.slice(1).map(f => [f[0], f[3], f[4], f[5], f[6]])).toEqual([
+      ['CR1O2026201', 'Descargado', 'Válida', '', ''],
+      ['CR1O2026202', 'Sin instalar', 'Válida', 'Fuera de tolerancia (FT)', 7.5],
+      ['DA1O2026011O00', 'Acceso denegado', 'No medida', '', ''],
+    ]);
+  });
+
+  test('seguimiento FT: plazo de 90 días desde la instalación, aviso, bitácora y cierre con remedición', async ({ page }) => {
+    const datos = conCampana();
+    datos.analizadores = { ...datos.analizadores,
+      r20: { serie: 'SN-300', caso: 'CR1O2026201', lugar: 'X', fechaInstalacion: '2026-07-01', fechaRetiro: '2026-07-09', areaInstalacion: 'Campos y Servicios', areaBeneficiaria: 'CPT MT', retirado: true, fechaRetiroReal: '2026-07-09', fechaRegistro: '2026-07-01' },
+      r21: { serie: 'SN-301', caso: 'CR2O2026201', lugar: 'X', fechaInstalacion: '2026-09-20', fechaRetiro: '2026-09-28', areaInstalacion: 'CPT MT', fechaRegistro: '2026-09-20' } };
+    datos.campanas['2026-10_CPT-MT'].casos.CR1O2026201.resultado = { medicion: 'valida', tolerancia: 'fuera', febNoPer: 7.5 };
+    app = await abrirApp(page, { datos });
+    await cerrarAlerta(page);
+    // En Inicio: avisar ya y el plazo (01/07 + 90 = 29/09, faltan 6 días: aún no avisa el plazo)
+    await expect(page.locator('.pendiente', { hasText: 'Avisar a DELSUR del caso FT CR1O2026201' })).toBeVisible();
+    await page.locator('.pendiente', { hasText: 'Avisar a DELSUR' }).click();
+    const modal = page.locator('.modal');
+    await expect(modal).toContainText('29/09/2026 · día 84');
+    await expect(modal).toContainText('Instalación encontrada: CR2O2026201');
+    await modal.getByRole('button', { name: 'Marcar aviso enviado por correo' }).click();
+    expect((await app.escrituras()).at(-1)).toEqual(['set', 'campanas/2026-10_CPT-MT/casos/CR1O2026201/ft/aviso', { fecha: '2026-09-23', por: 'David García' }]);
+    await modal.locator('select').selectOption('Transferencia de alimentador');
+    expect((await app.escrituras()).at(-1)).toEqual(['update', 'campanas/2026-10_CPT-MT/casos/CR1O2026201/ft', { ruta: 'Transferencia de alimentador' }]);
+    await page.locator('#ft-nota').fill('Se transfirió al AL092');
+    await modal.getByRole('button', { name: 'Agregar' }).click();
+    expect((await app.escrituras()).at(-1)[2].notas).toEqual([{ fecha: '2026-09-23', por: 'David García', texto: 'Se transfirió al AL092' }]);
+    await expect(modal).toContainText('Se transfirió al AL092');
+    // "No" no cierra; "Sí" cierra
+    await modal.getByRole('button', { name: 'No', exact: true }).click();
+    await expect(modal).not.toContainText('Caso cerrado');
+    await modal.getByRole('button', { name: 'Sí, se normalizó' }).click();
+    expect((await app.escrituras()).at(-1)).toEqual(['update', 'campanas/2026-10_CPT-MT/casos/CR1O2026201/ft/remedicion', { normalizado: true, registradoPor: 'David García' }]);
+    await expect(modal).toContainText('Caso cerrado por remedición normalizada');
+    await app.ejecutar(() => cerrarFT());
+    await expect(page.locator('.section-title', { hasText: 'Cerrados (1)' })).toBeVisible();
+  });
+
+  test('seguimiento FT: pasados los 90 días queda vencido', async ({ page }) => {
+    const datos = conCampana();
+    datos.analizadores = { ...datos.analizadores, r20: { serie: 'SN-300', caso: 'CR1O2026201', fechaInstalacion: '2026-06-01', fechaRetiro: '2026-06-09', areaInstalacion: 'CPT MT', retirado: true, fechaRetiroReal: '2026-06-09', fechaRegistro: '2026-06-01' } };
+    datos.campanas['2026-10_CPT-MT'].casos.CR1O2026201.resultado = { medicion: 'valida', tolerancia: 'fuera' };
+    datos.campanas['2026-10_CPT-MT'].casos.CR1O2026201.ft = { aviso: { fecha: '2026-06-20', por: 'David García' } };
+    app = await abrirApp(page, { datos });
+    await cerrarAlerta(page);
+    await expect(page.locator('.grupo', { has: page.locator('.grupo-titulo', { hasText: 'Vencido' }) })).toContainText('Plazo de 90 días del caso FT CR1O2026201');
+    await nav(page, 'Seguimiento FT');
+    await expect(page.locator('.card', { hasText: 'CR1O2026201' })).toContainText('Más de 90 días: se penalizan los 90 días y la compensación sigue');
   });
 });

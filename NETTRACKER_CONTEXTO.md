@@ -210,6 +210,21 @@ En el detalle de la campaña:
 - **Exportar Excel**: mismas columnas que las hojas Fecha1/2/3 (encabezado en la fila 3): Número SIGET, Equipo, Nombre del Usuario, Id del Usuario, Dirección, Multiplicador (ECAMEC), Corrientes (TI), Conexion (configuración), fechas, coordenadas y accesorios.
 - **Enviar a Despachos**: abre la vista previa de la carga masiva con esas filas y las mismas validaciones que el Excel (`validarFilaCarga` en `actions/carga.js`); al confirmar se crean las instalaciones y el memo como siempre.
 
+**Resultados** (pestaña de la campaña, base del cuadro resumen; `casos/{id}/resultado`):
+- Cada caso se liga a su instalación por código y muestra su situación: sin instalar / programado en Fecha n, en campo, retirado con descarga pendiente, descargado, o no medido (Cliente de baja, Conexión no posible, Acceso denegado).
+- El resultado (válida, fallida o no medida; dentro o fuera de tolerancia; FebNoPer) se anota a mano hasta integrar la macro. Si no hay resultado anotado, se toma lo marcado al descargar ("la medición salió bien").
+- Resumen de válidas, fallidas, FT y sin resultado; en CPT MT, CR válidas contra 38.
+- Exportar cuadro resumen con todos los casos del mes (también los no medidos). Formato provisional hasta tener uno ya entregado.
+
+## Seguimiento FT
+Pestaña Trabajo → Seguimiento FT (`js/domain/ft.js`, `casos/{id}/ft`). Los casos FT salen de Resultados (válida + fuera de tolerancia):
+- Plazo: 90 días calendario desde la instalación de la medición inicial (no desde el retiro ni la descarga).
+- Paso 1: aviso a DELSUR por correo, lo antes posible (aparece en Inicio como pendiente de hoy hasta marcarlo).
+- Ruta: Estudio y propuesta de obras, Transferencia de alimentador o CPT DELSUR y Planificación. Bitácora libre para los pasos (mediciones aledañas, memo, presupuesto…).
+- Compensación diaria informada: solo se anota; el cálculo de montos está pendiente de definir.
+- Remedición: el mismo código con el número de medición siguiente (CR1… → CR2…); si existe la instalación se muestra. Solo "Sí, se normalizó" cierra el caso.
+- Pasados los 90 días queda vencido: se penalizan los 90 días y la compensación diaria sigue hasta solucionarlo.
+
 Pendiente: verificar los cálculos con un Excel de multiplicadores ya lleno, importar el histórico de multiplicadores que tiene el equipo y el mapa para el contratista.
 
 ## Área: Inicio (dashboard)

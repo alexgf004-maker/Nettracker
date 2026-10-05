@@ -10,6 +10,7 @@ import { escapeHtml, fmtDate } from '../utils.js';
 import { renderCasosCampana, renderPrecampana } from './casos.js';
 import { renderFechas } from './fechas.js';
 import { renderMultiplicadores } from './multiplicadores.js';
+import { renderResultados } from './resultados.js';
 
 const esc = s => escapeHtml(s ?? '');
 
@@ -114,7 +115,7 @@ function renderCampanaDetalle(c, hoy) {
   }
   html += '</div>';
   // Secciones de la campaña
-  const secciones = [['precampana', 'Precampaña'], ['casos', 'Casos'], ['multiplicadores', 'Multiplicadores'], ['fechas', 'Fechas'], ['mediciones', 'Mediciones']]
+  const secciones = [['precampana', 'Precampaña'], ['casos', 'Casos'], ['multiplicadores', 'Multiplicadores'], ['fechas', 'Fechas'], ['resultados', 'Resultados'], ['mediciones', 'Mediciones']]
     .filter(([k]) => c.casos.length || k === 'mediciones');
   const vista = secciones.some(([k]) => k === state.campanaVista) ? state.campanaVista : secciones[0][0];
   if (secciones.length > 1) {
@@ -124,6 +125,7 @@ function renderCampanaDetalle(c, hoy) {
   if (vista === 'casos') html += renderCasosCampana(c);
   if (vista === 'multiplicadores') html += renderMultiplicadores(c);
   if (vista === 'fechas') html += renderFechas(c);
+  if (vista === 'resultados') html += renderResultados(c);
   if (vista === 'mediciones') {
     if (!c.registros.length) return html + vacio('instalaciones', 'Todavía no hay instalaciones registradas con códigos de esta campaña.') + '</div>';
     html += barraEtapas(c.resumen);
@@ -197,13 +199,4 @@ export function renderRequerimientos() {
   html += seccion('Entregados', entregados.length, entregados.map(r => filaConAccion(r, hoy, `Entregado ${firmado(r.entregaRealizada)}`,
     `<button class="btn-link" onclick="desmarcarRequerimientoEntregado('${r.id}')">Deshacer</button>`)));
   return html + '</div>';
-}
-
-// ── SEGUIMIENTO FT ──
-
-export function renderFT() {
-  return `<div class="content">
-    <div class="page-head"><div><h1 class="page-title">Seguimiento FT</h1></div></div>
-    ${vacio('ft', 'El seguimiento de casos FT se agregará en una próxima etapa, cuando definamos juntos cómo se registra cada caso.')}
-  </div>`;
 }
