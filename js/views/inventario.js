@@ -3,7 +3,6 @@ import { CONDICIONES, SEDES, isAdmin } from '../config.js';
 import { state } from '../state.js';
 import { badgeSt } from '../ui.js';
 import { calcSt, eqEnCampo, eqPrestado, eqSt, fmtDate } from '../utils.js';
-import { renderTraceTimeline } from './traceability.js';
 
 export function renderInventario() {
   let html = '';
@@ -199,7 +198,6 @@ if (state.inventarioSearch) {
     if (!eq) { state.view = 'lista'; return null; }
     const st = eqSt(eq);
     const historial = state.records.filter(r => r.equipoId === eq.id).sort((a,b) => (b.fechaRegistro||'').localeCompare(a.fechaRegistro||''));
-    const traceEvents = state.equipmentEvents.filter(event => event.equipmentId === eq.id);
     const condIcon = eq.condicion === 'fuera' ? '🔴' : eq.condicion === 'mantenimiento' ? '🔧' : eq.condicion === 'detalles' ? '🟡' : '🟢';
 
     html += `<div class="content">
@@ -299,10 +297,6 @@ if (state.inventarioSearch) {
 
     // TAB: INSTALACIONES
     if (state.eqDetalleTab === 'instalaciones') {
-      if (traceEvents.length > 0) {
-        html += '<div class="section-title">Bitácora caso–equipo (' + traceEvents.length + ')</div>';
-        html += renderTraceTimeline(traceEvents);
-      }
       // Trazabilidad de fallas
       html += `${(()=>{
         const conFallasFis = historial.filter(r => r.retirado && r.fallas && r.fallas.length > 0);
@@ -344,7 +338,7 @@ if (state.inventarioSearch) {
           html += '<div class="historial-card">';
           html += '<div class="historial-row"><div>';
           html += '<div class="historial-lugar">' + (r.lugar||'Sin lugar') + '</div>';
-          html += '<div class="historial-caso">' + (r.caseId ? '<button onclick="openCase(\'' + r.caseId + '\')" style="border:none;background:none;padding:0;color:var(--primary);font-family:var(--mono);font-size:11px;font-weight:700;cursor:pointer">#' + r.caso + ' · Ver expediente →</button>' : '#' + r.caso) + '</div>';
+          html += '<div class="historial-caso">#' + r.caso + '</div>';
           if (r.descargas && r.descargas.length > 0) html += '<div style="font-size:11px;color:var(--primary);font-weight:600;margin-top:2px">💾 '+r.descargas.length+' descarga'+(r.descargas.length>1?'s':'')+'</div>';
           html += '</div><div class="historial-fecha">' + fmtDate(r.fechaInstalacion) + '<br>→ ' + fmtDate(r.fechaRetiroReal||r.fechaRetiro) + '</div></div>';
           html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">';

@@ -1,239 +1,607 @@
-// Pruebas de humo con datos sintéticos. No contienen información operativa real.
+// Pruebas automáticas de NetTracker: recorren la app con datos de ejemplo
+// (tests/fixture.js) y una Firebase falsa en memoria. Ver tests/README.md
 const { test, expect } = require('@playwright/test');
-const { abrirApp, cerrarAlerta } = require('./helpers');
+const { abrirApp, cerrarAlerta, fixture } = require('./helpers');
 
-test('permite seleccionar un perfil y entrar', async ({ page }) => {
-  const app = await abrirApp(page, { usuario: null });
-  await page.locator('#app [onclick^="selectLoginUser"]').first().click();
-  await page.getByRole('button', { name: 'Entrar' }).click();
-  await expect(page.locator('#app')).toContainText('Mi espacio de trabajo');
-  await expect(page.locator('#app')).toContainText('Campañas en curso');
-  expect(app.errores).toEqual([]);
+const app$ = page => page.locator('#app');
+const nav = (page, texto) => page.locator('nav.bottom-nav button', { hasText: texto }).click();
+
+// Cada prueba termina verificando que no hubo errores de JavaScript
+let app;
+test.afterEach(async () => {
+  expect(app.errores, 'errores de JavaScript en la página').toEqual([]);
 });
 
-test('carga las vistas principales', async ({ page }) => {
-  const app = await abrirApp(page);
-  await cerrarAlerta(page);
+test.describe('Login', () => {
+  test('PIN incorrecto muestra error y PIN correcto entra al inicio', async ({ page }) => {
+    app = await abrirApp(page, { usuario: null });
+    await page.getByText('David García').first().click();
+    await page.locator('#pin-input').fill('0000');
+    await page.locator('#pin-input').press('Enter');
+    await expect(app$(page)).toContainText('PIN incorrecto');
 
-  for (const vista of ['Campañas', 'Reclamos', 'Equipos', 'Operación', 'Inicio']) {
-    await page.locator('nav.bottom-nav button', { hasText: vista }).click();
-    await expect(page.locator('#app .loading')).toHaveCount(0);
+    await page.locator('#pin-input').fill('2442');
+    await page.locator('#pin-input').press('Enter');
+    await expect(app$(page)).toContainText('Hola, David!');
+  });
+
+  test('cerrar sesión vuelve al login', async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await page.locator('[title="Cerrar sesión"]').click();
+    await expect(page.locator('#pin-input')).toHaveCount(0);
+    await expect(app$(page)).toContainText('Bryan Francia');
+  });
+});
+
+test.describe('Navegación', () => {
+  test('todas las pestañas cargan sin errores', async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await expect(app$(page)).toContainText(/instalaciones activas/i);
+    await nav(page, 'Instalac.');
+    await expect(app$(page)).toContainText('SN-100');
+    await nav(page, 'Inventario');
+    await expect(app$(page)).toContainText(/disponibles/i);
+    await nav(page, 'Despachos');
+    await expect(app$(page)).toContainText('Subir archivo');
+    await nav(page, 'Mapa');
+    await expect(app$(page)).toContainText(/en mapa/i);
+    await nav(page, 'Inicio');
+    await expect(app$(page)).toContainText(/acciones rápidas/i);
+  });
+
+  test('búsqueda global, calendario y modo oscuro', async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { toggleGlobalSearch(); setGlobalSearch('SN-102'); });
+    await expect(app$(page)).toContainText('SN-102');
+    await app.ejecutar(() => { toggleGlobalSearch(); toggleCal(); calNav(1); calNav(-1); });
+    await app.ejecutar(() => toggleDarkMode());
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  });
+});
+
+test.describe('Dashboard', () => {
+  test('muestra alertas y resumen según los datos', async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await expect(app$(page)).toContainText('1 retiro vencido');
+    await expect(app$(page)).toContainText(/retiros próximos \(1\)/i);
+    await expect(app$(page)).toContainText('Validaciones de TAP (1 campañas)');
+  });
+});
+
+test.describe('Instalaciones', () => {
+  test.beforeEach(async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await nav(page, 'Instalac.');
+  });
+
+  test('filtra por área y por estado', async ({ page }) => {
+    await expect(app$(page)).toContainText('SN-100');
+    await expect(app$(page)).not.toContainText('SN-102'); // es de CPT BT
+    await app.ejecutar(() => setInstTab('cpt_bt'));
+    await expect(app$(page)).toContainText('SN-102');
+    await app.ejecutar(() => { setInstTab('cpt_mt'); setFilter('PROXIMO'); });
+    await expect(app$(page)).toContainText('SN-101');
+    await expect(app$(page)).not.toContainText('SN-100');
+    await app.ejecutar(() => { setFilter('TODOS'); setInstTab('campos'); });
+    await expect(app$(page)).toContainText('SN-104');
+  });
+
+  test('detalle, editar y volver', async ({ page }) => {
+    await app.ejecutar(() => openDetail('r1'));
+    await expect(app$(page)).toContainText('#C-001');
+    await expect(app$(page)).toContainText('Col. Escalón');
+    await app.ejecutar(() => editInstall('r1'));
+    await app.ejecutar(() => goBack());
+    await expect(app$(page)).toContainText(/total/i);
+  });
+
+  test('un registro que ya no existe vuelve a la lista', async ({ page }) => {
+    await app.ejecutar(() => openDetail('no-existe'));
+    await expect(app$(page)).toContainText(/total/i);
+  });
+
+  test('registrar una instalación nueva guarda en Firebase', async ({ page }) => {
+    await page.getByText('+ Nuevo').click();
+    await expect(app$(page)).toContainText('Nuevo instalación');
+    await app.ejecutar(() => {
+      openSelector(); setSelectorSearch('105'); pickEquipo('e6');
+      setField('caso', 'C-999'); setField('lugar', 'Lugar X'); setField('fechaRetiro', '2026-10-30');
+    });
+    await app.ejecutar(() => saveInstall());
+    const push = (await app.escrituras()).find(([op, ruta]) => op === 'push' && ruta === 'analizadores');
+    expect(push, 'se guardó la instalación').toBeTruthy();
+    expect(push[2]).toMatchObject({ caso: 'C-999', serie: 'SN-105', fechaRetiro: '2026-10-30' });
+  });
+
+  test('modales de retiro y descarga', async ({ page }) => {
+    await app.ejecutar(() => { openRetiroModal('r2'); toggleFalla('LED intermitente'); });
+    await expect(app$(page)).toContainText('Registrar retiro');
+    await app.ejecutar(() => { closeRetiroModal(); openDescargaModal('r1'); });
+    await app.ejecutar(() => closeDescargaModal());
+    await expect(app$(page)).not.toContainText('Registrar retiro');
+  });
+
+  // Al retirar, la falla marcada define la nueva condición del equipo
+  for (const [falla, condicion] of [
+    ['No enciende / Sin señales de vida', 'fuera'],
+    ['Equipo calcinado / Explosión', 'fuera'],
+    ['LED intermitente', 'detalles'],
+  ]) {
+    test(`retiro con "${falla}" deja el equipo como ${condicion}`, async ({ page }) => {
+      await app.ejecutar(() => openRetiroModal('r2')); // SN-101, equipo e2 en condición "bueno"
+      await page.locator(`div[onclick="toggleFalla('${falla}')"]`).click();
+      await page.getByText('Sí, ya descargué').click();
+      await page.getByText('Confirmar retiro').click();
+      await expect.poll(async () => (await app.escrituras()).length).toBe(2);
+      const [retiro, equipo] = await app.escrituras();
+      expect(retiro.slice(0, 2)).toEqual(['update', 'analizadores/r2']);
+      expect(retiro[2].fallas).toEqual([falla]);
+      expect(equipo.slice(0, 2)).toEqual(['update', 'equipos/e2']);
+      expect(equipo[2].condicion).toBe(condicion);
+      expect(equipo[2].historialCondicion.at(-1)).toMatchObject({ condicionAnterior: 'bueno', condicionNueva: condicion });
+    });
   }
 
-  expect(app.errores).toEqual([]);
+  test('eliminar una instalación', async ({ page }) => {
+    await app.ejecutar(() => delInstall('r2'));
+    expect(await app.escrituras()).toContainEqual(['remove', 'analizadores/r2']);
+  });
 });
 
-test('abre la trazabilidad sintética de una instalación', async ({ page }) => {
-  const app = await abrirApp(page);
-  await cerrarAlerta(page);
-  await app.ejecutar(() => {
-    switchTab('instalaciones');
-    openDetail('r1');
+test.describe('Inventario', () => {
+  test.beforeEach(async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await nav(page, 'Inventario');
   });
 
-  await expect(page.locator('#app')).toContainText('#C-001');
-  await expect(page.locator('#app')).toContainText('Sitio de prueba A');
-  expect(app.errores).toEqual([]);
-});
-
-test('muestra la bandeja y el expediente de casos', async ({ page }) => {
-  const app = await abrirApp(page);
-  await cerrarAlerta(page);
-  await page.locator('nav.bottom-nav button', { hasText: 'Operación' }).click();
-  await page.getByRole('button', { name: /Otros expedientes/ }).click();
-  await expect(page.locator('#app')).toContainText('Cliente de prueba A');
-  await page.getByText('#C-001').click();
-  await expect(page.locator('#app')).toContainText('NC-TEST-001');
-  expect(app.errores).toEqual([]);
-});
-
-test('separa campañas mensuales y sus casos', async ({ page }) => {
-  const app = await abrirApp(page);
-  await cerrarAlerta(page);
-  await page.locator('nav.bottom-nav button', { hasText: 'Campañas' }).click();
-  await expect(page.locator('#app')).toContainText('Abril 2026');
-  await expect(page.locator('#app')).toContainText('Junio 2026');
-  await page.getByText('Abril 2026').click();
-  await expect(page.locator('#app')).toContainText('#CR142026201');
-  await expect(page.locator('#app')).toContainText('#DA142026011O00');
-  await expect(page.locator('#app')).not.toContainText('#CR162026201');
-  await expect(page.locator('#app')).toContainText('10/05/2026');
-  expect(app.errores).toEqual([]);
-});
-
-test('abre reclamos desde su espacio propio', async ({ page }) => {
-  const app = await abrirApp(page);
-  await cerrarAlerta(page);
-  await page.locator('nav.bottom-nav button', { hasText: 'Reclamos' }).click();
-  await expect(page.locator('#app')).toContainText('#RE172026201');
-  await page.getByText('#RE172026201').click();
-  await expect(page.locator('#app')).toContainText('Próximo paso · Reclamo');
-  await expect(page.locator('#app')).toContainText('Programar la visita');
-  expect(app.errores).toEqual([]);
-});
-
-test('mantiene instalaciones, mapa y despachos en Operación', async ({ page }) => {
-  const app = await abrirApp(page);
-  await cerrarAlerta(page);
-  await page.locator('nav.bottom-nav button', { hasText: 'Operación' }).click();
-  await page.getByRole('button', { name: /Instalaciones y retiros/ }).click();
-  await expect(page.locator('#app')).toContainText('SN-100');
-  await page.locator('nav.bottom-nav button', { hasText: 'Operación' }).click();
-  await page.getByRole('button', { name: /Despachos/ }).click();
-  await expect(page.locator('#app')).toContainText('Subir archivo');
-  expect(app.errores).toEqual([]);
-});
-
-test('valida el período al agregar un caso a una campaña', async ({ page }) => {
-  const app = await abrirApp(page);
-  await cerrarAlerta(page);
-  await app.ejecutar(() => { openCampaign('MT_2026_04'); newCase('MT_2026_04'); });
-  await app.ejecutar(() => {
-    setCaseField('code', 'CR162026202');
-    setCaseField('customerName', 'Cliente de prueba');
+  test('lista, filtros, búsqueda y vista en cuadrícula', async ({ page }) => {
+    await expect(app$(page)).toContainText('SN-105');
+    await app.ejecutar(() => setInvFiltro('prestado'));
+    await expect(app$(page)).toContainText('SN-103');
+    await expect(app$(page)).not.toContainText('SN-105');
+    await app.ejecutar(() => { setInvFiltro('TODOS'); toggleVistaInv(); toggleVistaInv(); setInvSearch('102'); });
+    await expect(app$(page)).toContainText('SN-102');
+    await expect(app$(page)).not.toContainText('SN-105');
   });
-  await page.getByRole('button', { name: 'Crear expediente' }).click();
-  await expect(page.locator('#toast')).toContainText('deben coincidir');
-  expect(await app.escrituras()).toEqual([]);
-  expect(app.errores).toEqual([]);
-});
 
-test('crea una campaña independiente con entrega el mes siguiente', async ({ page }) => {
-  const app = await abrirApp(page);
-  await cerrarAlerta(page);
-  await app.ejecutar(() => {
-    switchTab('instalaciones');
-    setInstSection('campaigns');
-    newCampaign();
-    setCampaignField('year', 2026);
-    setCampaignField('month', 8);
-  });
-  await page.getByRole('button', { name: 'Crear campaña' }).click();
-  await expect(page.locator('#app')).toContainText('Agosto 2026');
-  const writes = await app.escrituras();
-  const saved = writes.find(([operation, path, values]) => operation === 'update' && path === '' && values['campaigns/MT_2026_08']);
-  expect(saved?.[2]['campaigns/MT_2026_08']).toMatchObject({ year: 2026, month: 8, ownerArea: 'CPT MT', submissionDueAt: '2026-09-10' });
-  expect(app.errores).toEqual([]);
-});
-
-test('vincula el caso creado dentro de su campaña', async ({ page }) => {
-  const app = await abrirApp(page);
-  await cerrarAlerta(page);
-  await app.ejecutar(() => {
-    openCampaign('MT_2026_04');
-    newCase('MT_2026_04');
-    setCaseField('code', 'CR142026202');
-    setCaseField('customerName', 'Cliente de prueba');
-  });
-  await page.getByRole('button', { name: 'Crear expediente' }).click();
-  await expect(page.locator('#app')).toContainText('#CR142026202');
-  const writes = await app.escrituras();
-  const saved = writes.find(([operation, path, values]) => operation === 'update' && path === '' && values['caseCodeIndex/CR142026202']);
-  const caseId = saved?.[2]['caseCodeIndex/CR142026202'];
-  expect(saved?.[2][`cases/${caseId}`]).toMatchObject({ campaignId: 'MT_2026_04', caseType: 'CR' });
-  expect(saved?.[2][`caseIdsByCampaign/MT_2026_04/${caseId}`]).toBe(true);
-  expect(app.errores).toEqual([]);
-});
-
-test('revisa un listado antes de importar y vincula perturbaciones por contrato', async ({ page }) => {
-  await page.addInitScript(() => {
-    window.XLSX = {
-      read: () => ({ SheetNames: ['Listado'], Sheets: { Listado: {} } }),
-      utils: { sheet_to_json: () => [
-        ['NC', 'CÓDIGO SIGET', 'NOMBRE', 'DIRECCIÓN', 'CORTE', 'MEDIDOR', 'LATITUD', 'LONGITUD', 'UBICACIÓN', 'ALIMENTADOR', 'URBANIDAD'],
-        ['NC-PRUEBA-1', 'CR142026202', 'Cliente ficticio', 'Lugar ficticio', 'CT-PRUEBA', 'M-PRUEBA', 13.7, -89.2, '', 'AL013-23000', 'U'],
-        ['NC-PRUEBA-1', 'DA142026021O00', 'Cliente ficticio', 'Lugar ficticio'],
-        ['NC-AJENO', 'DF142026031O00', 'Cliente ajeno', 'Lugar ajeno'],
-      ] },
-    };
-  });
-  const app = await abrirApp(page);
-  await cerrarAlerta(page);
-  await app.ejecutar(() => openCampaign('MT_2026_04'));
-  await page.getByRole('button', { name: /Importar listado Excel/ }).click();
-  await page.locator('input[type=file][multiple]').setInputFiles({ name: 'Sintetico.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from('fixture') });
-  await expect(page.locator('#app')).toContainText('Perturbación sin CR de esta campaña');
-  await page.getByRole('button', { name: 'Importar 2 casos' }).click();
-  await expect(page.locator('#app')).toContainText('#CR142026202');
-  await expect(page.locator('#app')).toContainText('#DA142026021O00');
-  const writes = await app.escrituras();
-  const saved = writes.find(([operation, path, values]) => operation === 'update' && path === '' && values['caseCodeIndex/CR142026202']);
-  const crId = saved?.[2]['caseCodeIndex/CR142026202'];
-  const daId = saved?.[2]['caseCodeIndex/DA142026021O00'];
-  expect(saved?.[2][`cases/${crId}`].servicePointId).toBe(saved?.[2][`cases/${daId}`].servicePointId);
-  expect(saved?.[2][`servicePoints/${saved[2][`cases/${crId}`].servicePointId}`].networkVoltageLL).toBe(23000);
-  expect(saved?.[2]['caseCodeIndex/DF142026031O00']).toBeUndefined();
-  expect(app.errores).toEqual([]);
-});
-
-test('abre la precampaña mensual y guarda la recepción estimada del contratista', async ({ page }) => {
-  const app = await abrirApp(page);
-  await cerrarAlerta(page);
-  await app.ejecutar(() => openCampaign('MT_2026_04'));
-  await page.getByRole('button', { name: /Preparar precampaña/ }).click();
-  await expect(page.locator('#app')).toContainText('Puntos incompletos');
-  await expect(page.locator('#app')).toContainText('Descargar listado Excel');
-  await app.ejecutar(() => setPreCampaignField('contractorDeliveredAt', '2026-04-02'));
-  await page.getByRole('button', { name: 'Guardar seguimiento' }).click();
-  const writes = await app.escrituras();
-  expect(writes.some(([operation, path, value]) => operation === 'update' && path === '' && value['campaigns/MT_2026_04/preCampaign']?.contractorDeliveredAt === '2026-04-02')).toBe(true);
-  await page.getByRole('button', { name: /Ver mapa/i }).click();
-  await expect(page.locator('#app')).toContainText('Mapa de precampaña');
-  expect(app.errores).toEqual([]);
-});
-
-test('muestra los 54 casos importados y los conserva al volver a abrir', async ({ page }) => {
-  await page.addInitScript(() => {
-    const row = (code, contract) => [code, contract, 'Cliente sintético', 'Dirección sintética'];
-    const rows = Array.from({ length: 48 }, (_, index) => row(`CR1O2026${201 + index}`, `NC-MT-${index + 1}`));
-    for (const type of ['DA', 'DF']) {
-      for (let index = 0; index < 12; index++) {
-        rows.push(row(`${type}1O2026${String(index + 1).padStart(2, '0')}1O00`,
-          index < 3 ? `NC-MT-${index + 1}` : `NC-BT-${index + 1}`));
-      }
+  test('detalle del equipo en todas sus pestañas', async ({ page }) => {
+    for (const t of ['general', 'mantenimiento', 'instalaciones', 'movimientos']) {
+      await app.ejecutar(t => { openEqDetalle('e1'); setEqDetalleTab(t); }, t);
+      await expect(app$(page)).toContainText('SN-100');
     }
-    window.XLSX = {
-      read: () => ({ SheetNames: ['DetaSorteoCPT'], Sheets: { DetaSorteoCPT: {} } }),
-      utils: { sheet_to_json: () => [['Número SIGET', 'Id del Usuario', 'Nombre del Usuario', 'Dirección'], ...rows] },
-    };
   });
-  const app = await abrirApp(page, { datos: {
-    campaigns: { MT_2026_10: { year: 2026, month: 10, ownerArea: 'CPT MT', stage: 'pre_campaign' } },
-  } });
-  await app.ejecutar(() => openCampaign('MT_2026_10'));
-  await page.getByRole('button', { name: /Importar listado Excel/ }).click();
-  await page.locator('input[type=file][multiple]').setInputFiles({ name: 'Sintetico.xlsx',
-    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from('fixture') });
-  await page.getByRole('button', { name: 'Importar 54 casos' }).click();
-  await expect(page.locator('#app')).toContainText('Casos vinculados (54)');
-  await expect(page.locator('#app [onclick^="openCase("]')).toHaveCount(54);
-  await expect(page.locator('#app')).toContainText('#CR1O2026248');
-  const persisted = await app.ejecutar(() => window.__DB__);
-  expect(Object.keys(persisted.cases)).toHaveLength(54);
-  expect(Object.keys(persisted.servicePoints)).toHaveLength(48);
-  const reopenedPage = await page.context().newPage();
-  const reopened = await abrirApp(reopenedPage, { datos: persisted });
-  await expect(reopenedPage.locator('#app')).toContainText('Octubre 2026');
-  await reopened.ejecutar(() => openCampaign('MT_2026_10'));
-  await expect(reopenedPage.locator('#app')).toContainText('Casos vinculados (54)');
-  await expect(reopenedPage.locator('#app [onclick^="openCase("]')).toHaveCount(54);
-  expect(reopened.errores).toEqual([]);
-  await reopenedPage.close();
-  expect(app.errores).toEqual([]);
+
+  test('guardar mantenimiento, condición y préstamo', async ({ page }) => {
+    await app.ejecutar(() => { openMantModal('e1'); setMantForm('descripcion', 'falla x'); guardarMant(); });
+    await app.ejecutar(() => { openCondicionModal('e1'); setCondicionField('condicion', 'malo'); doCondicion(); });
+    await app.ejecutar(() => { registrarPrestamo('e2'); setPrestamoField('a', 'Campos y Servicios'); doMovimiento(); });
+    const rutas = (await app.escrituras()).map(([op, ruta]) => op + ' ' + ruta);
+    expect(rutas).toEqual(['update equipos/e1', 'update equipos/e1', 'update equipos/e2']);
+  });
+
+  test('crear equipo nuevo', async ({ page }) => {
+    await app.ejecutar(() => { newEquipo(); setEF('serie', 'SN-777'); setEF('modelo', 'PQ-9'); saveEquipo(); });
+    const push = (await app.escrituras()).find(([op, ruta]) => op === 'push' && ruta === 'equipos');
+    expect(push[2]).toMatchObject({ serie: 'SN-777', modelo: 'PQ-9' });
+  });
+
+  test('modo lote', async ({ page }) => {
+    await app.ejecutar(() => { activarModoLote('prestamo'); toggleLote('e6'); });
+    await expect(app$(page)).toContainText('Cancelar');
+    await app.ejecutar(() => cancelarLote());
+  });
 });
 
-test('elimina una campaña vacía y protege las campañas con casos', async ({ page }) => {
-  const app = await abrirApp(page);
+test.describe('Validaciones de TAP', () => {
+  test('campaña y formulario para cada tipo de conexión', async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { switchTab('validaciones'); abrirCampana('v1'); });
+    await expect(app$(page)).toContainText('Usuario A');
+    await expect(app$(page)).toContainText('1 / 3');
+    for (const tipo of ['monofasico', 'bifasico', 'trifasico']) {
+      await app.ejecutar(tipo => { abrirFormVal('0'); setValTipoUsuario(tipo); }, tipo);
+      await expect(app$(page)).toContainText('Validación de TAP');
+    }
+    await expect(app$(page)).toContainText('23,000 V'); // opciones trifásicas
+  });
+
+  test('monofásico ofrece 120 V', async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { switchTab('validaciones'); abrirCampana('v1'); abrirFormVal('0'); setValTipoUsuario('monofasico'); });
+    await page.locator('#vf-ref-vs').selectOption('120');
+    await page.locator('#vf-cp-vs').selectOption('120');
+    await expect(page.locator('#vf-ref-vs')).toHaveValue('120');
+  });
+
+  // Elegir "Otro" solo muestra el campo manual, sin redibujar: lo ya escrito no se borra
+  for (const [tipo, lectura] of [['monofasico', 'vf-ref-lec'], ['bifasico', 'vf-ref-lec1'], ['trifasico', 'vf-ref-lec1']]) {
+    test(`voltaje secundario "Otro" no borra lo escrito (${tipo})`, async ({ page }) => {
+      app = await abrirApp(page);
+      await cerrarAlerta(page);
+      await app.ejecutar(tipo => { switchTab('validaciones'); abrirCampana('v1'); abrirFormVal('0'); setValTipoUsuario(tipo); }, tipo);
+      await expect(page.locator('#vf-ref-vs-otro')).toBeHidden();
+      await page.locator('#' + lectura).fill('236');
+      await page.locator('#vf-ref-vs').selectOption('otro');
+      await page.locator('#vf-ref-vs-otro').fill('250');
+      await page.locator('#vf-cp-vs').selectOption('otro');
+      await expect(page.locator('#' + lectura)).toHaveValue('236');
+      await expect(page.locator('#vf-ref-vs')).toHaveValue('otro');
+      await expect(page.locator('#vf-ref-vs-otro')).toHaveValue('250');
+      await expect(page.locator('#vf-cp-vs-otro')).toBeVisible();
+      // volver a un voltaje normal oculta el campo manual
+      await page.locator('#vf-cp-vs').selectOption('240');
+      await expect(page.locator('#vf-cp-vs-otro')).toBeHidden();
+    });
+  }
+});
+
+test.describe('Despachos y mapa', () => {
+  test('sub-vistas de despachos', async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await nav(page, 'Despachos');
+    await app.ejecutar(() => setCargaSubView('historial'));
+    await expect(app$(page)).toContainText('Historial de despachos');
+    await expect(app$(page)).toContainText('20/09/2026');
+    await app.ejecutar(() => setCargaSubView('accesorios'));
+    await app.ejecutar(() => setCargaSubView('subir'));
+    await expect(app$(page)).toContainText('Subir archivo');
+  });
+
+  test('mapa con filtros por área', async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await nav(page, 'Mapa');
+    await expect(page.locator('#app iframe')).toHaveCount(1);
+    await app.ejecutar(() => setMapaFiltro('CPT BT'));
+    await app.ejecutar(() => setMapaFiltro('TODOS'));
+    await expect(app$(page)).toContainText('3');
+  });
+});
+
+test.describe('Modo mantenimiento', () => {
+  test('bloquea a los usuarios que no son admin', async ({ page }) => {
+    app = await abrirApp(page, { usuario: 'Bryan Francia', datos: { ...fixture, config: { mantenimiento: true } } });
+    await expect(app$(page)).toContainText('En mantenimiento');
+  });
+
+  test('el admin lo activa desde el dashboard', async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await app.ejecutar(() => toggleMantenimiento());
+    expect(await app.escrituras()).toContainEqual(['set', 'config/mantenimiento', true]);
+  });
+});
+
+test.describe('Envío a revisión (Cucumacayán)', () => {
+  // Guarda el HTML de cada documento que la app abre (memos) para poder revisarlo
+  async function capturarDocs(page) {
+    await page.evaluate(() => {
+      window.__docs = [];
+      const crear = URL.createObjectURL.bind(URL);
+      URL.createObjectURL = b => { b.text().then(t => window.__docs.push(t)); return crear(b); };
+    });
+    return () => page.evaluate(() => window.__docs);
+  }
+
+  test.beforeEach(async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await nav(page, 'Inventario');
+  });
+
+  test('prellena con las fallas del último retiro, genera el memo y registra la entrega', async ({ page }) => {
+    const docs = await capturarDocs(page);
+    await app.ejecutar(() => openEqDetalle('e4'));
+    await page.getByText('Enviar a revisión (Cucumacayán)').click();
+    await expect(page.locator('#rev-descripcion')).toHaveValue(/LED intermitente, No agarra WiFi\. Se apaga solo/);
+    await expect(page.locator('#rev-descripcion')).toHaveValue(/caso C-004, Apopa/);
+    await expect(page.locator('#rev-fecha')).toHaveValue('2026-07-21');
+
+    await page.locator('#rev-motivo').fill('Diagnóstico de batería');
+    await page.locator('#rev-descripcion').fill('No enciende <sin batería>');
+    await page.getByText('Enviar y generar memo').click();
+
+    // Memo
+    await expect.poll(async () => (await docs()).length).toBe(1);
+    const memo = (await docs())[0];
+    expect(memo).toContain('ENVÍO A REVISIÓN');
+    expect(memo).toContain('SN-103');
+    expect(memo).toContain('Diagnóstico de batería');
+    expect(memo).toContain('No enciende &lt;sin batería&gt;'); // el texto del usuario se escapa
+    expect(memo).toContain('21/07/2026'); // fecha del incidente
+    expect(memo).toContain('Subestación Cucumacayán');
+    expect(memo).toContain('David García');
+
+    // Trazabilidad en Firebase
+    const [op, ruta, datos] = (await app.escrituras()).at(-1);
+    expect([op, ruta]).toEqual(['update', 'equipos/e4']);
+    expect(datos).toMatchObject({ sede: 'Subestación Cucumacayán', condicion: 'mantenimiento' });
+    expect(datos.historialCondicion.at(-1)).toMatchObject({ condicionAnterior: 'malo', condicionNueva: 'mantenimiento' });
+    expect(datos.historialMantenimiento.at(-1)).toMatchObject({
+      resultado: 'pendiente', descripcion: 'No enciende <sin batería>', observaciones: 'Diagnóstico de batería',
+      envioRevision: { fechaIncidente: '2026-07-21', sedeOrigen: 'Plantel Central', entregadoPor: 'David García' },
+    });
+
+    // Ya no ofrece enviarlo otra vez, y el memo se puede reimprimir desde su ficha
+    await expect(app$(page)).not.toContainText('Enviar a revisión (Cucumacayán)');
+    await app.ejecutar(() => setEqDetalleTab('mantenimiento'));
+    await page.getByText('Memo de envío').click();
+    await expect.poll(async () => (await docs()).length).toBe(2);
+    expect((await docs())[1]).toContain('No enciende &lt;sin batería&gt;');
+  });
+
+  test('sin historial queda en blanco y exige describir la falla', async ({ page }) => {
+    await app.ejecutar(() => openEqDetalle('e6'));
+    await page.getByText('Enviar a revisión (Cucumacayán)').click();
+    await expect(page.locator('#rev-descripcion')).toHaveValue('');
+    await expect(page.locator('#rev-fecha')).toHaveValue('2026-09-23');
+    await page.getByText('Enviar y generar memo').click();
+    await expect(page.locator('#toast')).toHaveText('Describe qué le pasó al equipo');
+    expect(await app.escrituras()).toEqual([]);
+  });
+
+  test('no se ofrece para equipos instalados en campo', async ({ page }) => {
+    await app.ejecutar(() => openEqDetalle('e1'));
+    await expect(app$(page)).toContainText('SN-100');
+    await expect(app$(page)).not.toContainText('Enviar a revisión (Cucumacayán)');
+  });
+});
+
+test.describe('Campos y Servicios', () => {
+  test.beforeEach(async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+  });
+
+  test('el retiro individual regresa el equipo a la Cucumacayán', async ({ page }) => {
+    await app.ejecutar(() => { switchTab('instalaciones'); openRetiroModal('r5'); });
+    await page.locator(`div[onclick="toggleSinProblema()"]`).click();
+    await page.getByText('Sí, ya descargué').click();
+    await page.getByText('Confirmar retiro').click();
+    await expect.poll(async () => (await app.escrituras()).length).toBe(2);
+    const [, equipo] = await app.escrituras();
+    expect(equipo.slice(0, 2)).toEqual(['update', 'equipos/e5']);
+    expect(equipo[2].sede).toBe('Subestación Cucumacayán');
+  });
+
+  test('el retiro masivo de un despacho de CPT MT regresa los equipos a la Cucumacayán', async ({ page }) => {
+    await app.ejecutar(() => retiroMasivo('hc1'));
+    expect(await app.escrituras()).toContainEqual(['update', 'equipos/e5', { sede: 'Subestación Cucumacayán' }]);
+  });
+
+  test('la devolución de Campos y Servicios a CPT MT deja el equipo en la Cucumacayán', async ({ page }) => {
+    await app.ejecutar(() => { switchTab('inventario'); openEqDetalle('e5'); });
+    await page.getByText('Registrar devolución').click();
+    await expect(app$(page)).toContainText('Sede destino: Subestación Cucumacayán');
+    await app.ejecutar(() => doMovimiento());
+    const [op, ruta, datos] = (await app.escrituras()).at(-1);
+    expect([op, ruta]).toEqual(['update', 'equipos/e5']);
+    expect(datos).toMatchObject({ prestado: false, sede: 'Subestación Cucumacayán' });
+    expect(datos.movimientos.at(-1)).toMatchObject({ tipo: 'devolucion', de: 'Campos y Servicios', a: 'CPT MT' });
+  });
+
+  test('eliminar el préstamo a Campos y Servicios devuelve el equipo a la Cucumacayán', async ({ page }) => {
+    await app.ejecutar(() => eliminarMovimiento('e5', 0));
+    const [, ruta, datos] = (await app.escrituras()).at(-1);
+    expect(ruta).toBe('equipos/e5');
+    expect(datos).toMatchObject({ prestado: false, sede: 'Subestación Cucumacayán' });
+  });
+
+  test('una devolución normal a CPT MT sigue yendo a Plantel Central', async ({ page }) => {
+    await app.ejecutar(() => { switchTab('inventario'); registrarDevolucion('e4'); setPrestamoField('de', 'CPT BT'); setPrestamoField('a', 'CPT MT'); });
+    await expect(app$(page)).toContainText('Sede destino: Plantel Central');
+    await app.ejecutar(() => doMovimiento());
+    expect((await app.escrituras()).at(-1)[2].sede).toBe('Plantel Central');
+  });
+
+  test('memo de equipo dañado: prellenado, tres firmas y trazabilidad', async ({ page }) => {
+    await page.evaluate(() => {
+      window.__docs = [];
+      const crear = URL.createObjectURL.bind(URL);
+      URL.createObjectURL = b => { b.text().then(t => window.__docs.push(t)); return crear(b); };
+    });
+    const docs = () => page.evaluate(() => window.__docs);
+    await app.ejecutar(() => { switchTab('instalaciones'); setInstTab('campos'); openDetail('r6'); });
+    await page.getByText('Memo de equipo dañado').click();
+    await expect(page.locator('#danio-descripcion')).toHaveValue('No enciende / Sin señales de vida. Carcasa quebrada');
+    await expect(page.locator('#danio-fecha')).toHaveValue('2026-09-12');
+    await expect(page.locator(`div[onclick="setDanioField('condicion','fuera')"]`)).toHaveCSS('border-top-color', 'rgb(220, 38, 38)');
+    await page.locator('#danio-tecnico').fill('Juan Pérez');
+    await page.getByText('Generar memo').click();
+
+    await expect.poll(async () => (await docs()).length).toBe(1);
+    const memo = (await docs())[0];
+    for (const texto of ['EQUIPO DAÑADO EN CAMPO', 'SN-106', '#C-006', 'Zaragoza', 'Carcasa quebrada', 'Fuera de servicio', 'Juan Pérez', 'David García']) {
+      expect(memo, texto).toContain(texto);
+    }
+    // Retiro programado (10/09) y fecha del daño (retiro real, 12/09)
+    expect(memo).toMatch(/Retiro programado<\/div><div class="info-value normal">10\/09\/2026/);
+    expect(memo).toMatch(/Fecha del daño<\/div><div class="info-value normal">12\/09\/2026/);
+    expect(memo.match(/class="firma-label"/g)).toHaveLength(3);
+    expect(memo).toContain('<div class="firma-label">Subestación Cucumacayán</div>');
+    expect(memo).toContain('<div class="firma-label">Campos y Servicios</div>');
+
+    const escrituras = await app.escrituras();
+    const inst = escrituras.find(([, ruta]) => ruta === 'analizadores/r6');
+    expect(inst[2].memoDanio).toMatchObject({ caso: 'C-006', condicion: 'fuera', tecnicoCampos: 'Juan Pérez', fechaDanio: '2026-09-12' });
+    const eq = escrituras.find(([, ruta]) => ruta === 'equipos/e7');
+    expect(eq[2]).toMatchObject({ sede: 'Subestación Cucumacayán', condicion: 'fuera' });
+    expect(eq[2].historialCondicion.at(-1)).toMatchObject({ condicionAnterior: 'bueno', condicionNueva: 'fuera' });
+
+    // Queda guardado y se puede reimprimir
+    await page.getByText('Ver memo de equipo dañado').click();
+    await expect.poll(async () => (await docs()).length).toBe(2);
+    expect((await docs())[1]).toContain('Carcasa quebrada');
+  });
+
+  test('no aparece en instalaciones de CPT MT', async ({ page }) => {
+    await app.ejecutar(() => { switchTab('instalaciones'); openDetail('r1'); });
+    await expect(app$(page)).toContainText('#C-001');
+    await expect(app$(page)).not.toContainText('Memo de equipo dañado');
+  });
+});
+
+test.describe('Editar memos', () => {
+  async function capturarDocs(page) {
+    await page.evaluate(() => {
+      window.__docs = [];
+      const crear = URL.createObjectURL.bind(URL);
+      URL.createObjectURL = b => { b.text().then(t => window.__docs.push(t)); return crear(b); };
+    });
+    return () => page.evaluate(() => window.__docs);
+  }
+
+  test.beforeEach(async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+  });
+
+  test('memo de equipo dañado: se corrige y el cambio de condición llega al equipo', async ({ page }) => {
+    const docs = await capturarDocs(page);
+    await app.ejecutar(() => { switchTab('instalaciones'); setInstTab('campos'); openDetail('r6'); });
+    await page.getByText('Memo de equipo dañado').click();
+    await page.getByText('Generar memo').click();
+    await expect(page.getByText('Ver memo de equipo dañado')).toBeVisible();
+
+    await page.getByRole('button', { name: '✏️ Editar' }).click();
+    await expect(page.getByText('Editar memo de equipo dañado')).toBeVisible();
+    await expect(page.locator('#danio-descripcion')).toHaveValue('No enciende / Sin señales de vida. Carcasa quebrada');
+    await page.locator('#danio-descripcion').fill('Pantalla rota');
+    await page.locator(`div[onclick="setDanioField('condicion','detalles')"]`).click();
+    await page.getByText('Guardar cambios').click();
+
+    await expect.poll(async () => (await docs()).length).toBe(2);
+    const memo = (await docs())[1];
+    expect(memo).toContain('Pantalla rota');
+    expect(memo).toContain('Con detalles');
+    expect(memo).toContain('Última edición: 23/09/2026 por David García');
+
+    const escrituras = await app.escrituras();
+    const memos = escrituras.filter(([, ruta]) => ruta === 'analizadores/r6').map(w => w[2].memoDanio);
+    expect(memos).toHaveLength(2);
+    expect(memos[1]).toMatchObject({ descripcion: 'Pantalla rota', condicion: 'detalles', editadoPor: 'David García', caso: 'C-006' });
+    expect(memos[1].fecha).toBe(memos[0].fecha); // conserva la fecha original del memo
+    const eq = escrituras.filter(([, ruta]) => ruta === 'equipos/e7').at(-1)[2];
+    expect(eq.condicion).toBe('detalles');
+    expect(eq.historialCondicion.at(-1)).toMatchObject({ condicionAnterior: 'fuera', condicionNueva: 'detalles' });
+    expect(eq.sede).toBeUndefined(); // editar no mueve el equipo
+  });
+
+  test('memo de envío a revisión: se corrige sin cambiar sede ni condición', async ({ page }) => {
+    const docs = await capturarDocs(page);
+    await app.ejecutar(() => { switchTab('inventario'); openEqDetalle('e6'); });
+    await page.getByText('Enviar a revisión (Cucumacayán)').click();
+    await page.locator('#rev-descripcion').fill('No enciende');
+    await page.getByText('Enviar y generar memo').click();
+    await app.ejecutar(() => setEqDetalleTab('mantenimiento'));
+
+    await page.getByRole('button', { name: '✏️ Editar' }).click();
+    await expect(page.getByText('Editar envío a revisión')).toBeVisible();
+    await expect(page.locator('#rev-descripcion')).toHaveValue('No enciende');
+    await page.locator('#rev-descripcion').fill('No enciende y huele a quemado');
+    await page.locator('#rev-fecha').fill('2026-09-20');
+    await page.getByText('Guardar cambios').click();
+
+    await expect.poll(async () => (await docs()).length).toBe(2);
+    expect((await docs())[1]).toContain('No enciende y huele a quemado');
+    expect((await docs())[1]).toContain('Última edición: 23/09/2026 por David García');
+
+    const [, ruta, datos] = (await app.escrituras()).at(-1);
+    expect(ruta).toBe('equipos/e6');
+    expect(Object.keys(datos)).toEqual(['historialMantenimiento']);
+    const ficha = datos.historialMantenimiento.at(-1);
+    expect(ficha.descripcion).toBe('No enciende y huele a quemado');
+    expect(ficha.envioRevision).toMatchObject({ descripcion: 'No enciende y huele a quemado', fechaIncidente: '2026-09-20', editadoPor: 'David García', entregadoPor: 'David García' });
+  });
+});
+
+test.describe('Vista de PC', () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  test('menú lateral, listas en columnas y modales centrados', async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    // El menú queda a la izquierda, en vertical
+    const nav = await page.locator('nav.bottom-nav').boundingBox();
+    expect(nav.x).toBe(0);
+    expect(nav.height).toBeGreaterThan(nav.width);
+    // Las tarjetas del inventario se reparten en columnas
+    await page.locator('nav.bottom-nav button', { hasText: 'Inventario' }).click();
+    const [a, b] = await Promise.all(['SN-105', 'SN-106'].map(s => page.locator('.eq-lista > div', { hasText: s }).boundingBox()));
+    expect(Math.abs(a.y - b.y)).toBeLessThan(2);
+    // Los modales se muestran como ventana centrada
+    await app.ejecutar(() => { openEqDetalle('e6'); openRevisionModal('e6'); });
+    const modal = await page.locator('.modal-overlay > div').boundingBox();
+    expect(modal.width).toBeLessThanOrEqual(560);
+    expect(modal.y).toBeGreaterThan(20);
+  });
+
+  test('en celular el menú sigue abajo', async ({ page }) => {
+    await page.setViewportSize({ width: 400, height: 800 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    const nav = await page.locator('nav.bottom-nav').boundingBox();
+    expect(nav.y + nav.height).toBeCloseTo(800, 0);
+    expect(nav.width).toBe(400);
+  });
+});
+
+test('el selector de equipo se abre como ventana sobre el formulario', async ({ page }) => {
+  app = await abrirApp(page);
   await cerrarAlerta(page);
-  await app.ejecutar(() => openCampaign('MT_2026_04'));
-  await expect(page.getByRole('button', { name: 'Eliminar campaña', exact: true })).toBeDisabled();
-  await app.ejecutar(() => deleteCampaign());
-  expect(await app.escrituras()).toEqual([]);
-  await app.ejecutar(() => { newCampaign(); setCampaignField('year', 2026); setCampaignField('month', 8); });
-  await page.getByRole('button', { name: 'Crear campaña' }).click();
-  await page.getByRole('button', { name: 'Eliminar campaña', exact: true }).click();
-  await expect(page.locator('#app')).not.toContainText('Agosto 2026');
-  const writes = await app.escrituras();
-  expect(writes.some(([operation, path, values]) => operation === 'update' && path === '' && Object.hasOwn(values, 'campaigns/MT_2026_08') && values['campaigns/MT_2026_08'] === null)).toBe(true);
-  expect(app.errores).toEqual([]);
+  await app.ejecutar(() => { switchTab('instalaciones'); newInstall(); openSelector(); });
+  await expect(page.locator('.modal-overlay')).toHaveCSS('position', 'fixed');
+});
+
+test.describe('Firma de quien genera el memo', () => {
+  const conMemos = () => {
+    const d = JSON.parse(JSON.stringify(fixture));
+    d.analizadores.r6.memoDanio = { fecha: '2026-09-15', hora: '10:00', fechaDanio: '2026-09-12', descripcion: 'No enciende', condicion: 'fuera',
+      tecnicoCampos: '', generadoPor: 'David García', areaGenera: 'CPT MT', serie: 'SN-106', modelo: 'PQ-1', caso: 'C-006', lugar: 'Zaragoza', fechaRetiro: '2026-09-10' };
+    d.equipos.e6.historialMantenimiento = [{ descripcion: 'No enciende', accion: 'Enviado a revisión', resultado: 'pendiente', fechaInicio: '2026-09-15',
+      envioRevision: { fecha: '2026-09-15', hora: '10:00', fechaIncidente: '2026-09-14', motivo: 'Revisión', descripcion: 'No enciende',
+        sedeOrigen: 'Plantel Central', condicionAnterior: 'bueno', entregadoPor: 'David García', antecedentes: [] } }];
+    return d;
+  };
+  async function capturarDocs(page) {
+    await page.evaluate(() => {
+      window.__docs = [];
+      const crear = URL.createObjectURL.bind(URL);
+      URL.createObjectURL = b => { b.text().then(t => window.__docs.push(t)); return crear(b); };
+    });
+    return () => page.evaluate(() => window.__docs);
+  }
+
+  test('al editar el memo de equipo dañado firma quien lo edita', async ({ page }) => {
+    app = await abrirApp(page, { usuario: 'Bryan Francia', datos: conMemos() });
+    await cerrarAlerta(page);
+    const docs = await capturarDocs(page);
+    await app.ejecutar(() => editarDanio('r6'));
+    await page.getByText('Guardar cambios').click();
+    await expect.poll(async () => (await docs()).length).toBe(1);
+    expect((await docs())[0]).toMatch(/firma-label">CPT MT<\/div>\s*<div class="firma-name">Bryan Francia/);
+    const memo = (await app.escrituras()).find(([, ruta]) => ruta === 'analizadores/r6')[2].memoDanio;
+    expect(memo).toMatchObject({ generadoPor: 'Bryan Francia', areaGenera: 'CPT MT', creadoPor: 'David García', fecha: '2026-09-15' });
+  });
+
+  test('al editar el memo de envío a revisión firma quien lo edita', async ({ page }) => {
+    app = await abrirApp(page, { usuario: 'Francisco Chulo', datos: conMemos() });
+    await cerrarAlerta(page);
+    const docs = await capturarDocs(page);
+    await app.ejecutar(() => editarRevision('e6', 0));
+    await page.getByText('Guardar cambios').click();
+    await expect.poll(async () => (await docs()).length).toBe(1);
+    expect((await docs())[0]).toMatch(/firma-name">Francisco Chulo<\/div>\s*<div class="firma-sub">CPT BT/);
+    const envio = (await app.escrituras()).at(-1)[2].historialMantenimiento[0].envioRevision;
+    expect(envio).toMatchObject({ entregadoPor: 'Francisco Chulo', creadoPor: 'David García' });
+  });
 });

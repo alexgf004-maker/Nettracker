@@ -2,23 +2,9 @@
 import { SEDES, USUARIOS, isAdmin, userArea } from '../config.js';
 import { state } from '../state.js';
 import { badgeSt } from '../ui.js';
-import { calcSt, daysUntil, escapeHtml, fmtDate, today } from '../utils.js';
-import { normalizeCaseCode } from '../domain/cases.js';
-import { campaignLabel } from '../domain/campaigns.js';
-import { renderCaseForm, renderCaseList, renderInstallSectionSwitch } from './cases.js';
-import { renderCampaignDetail, renderCampaignForm, renderCampaignList, renderCampaignImport } from './campaigns.js';
-import { renderPreCampaign, renderPreCampaignMap } from './pre-campaign.js';
-import { renderTraceTimeline } from './traceability.js';
+import { calcSt, daysUntil, fmtDate, today } from '../utils.js';
 
 export function renderInstalaciones() {
-  if (state.view === 'lista' && state.instSection === 'campaigns') return renderCampaignList();
-  if (state.view === 'campaign_form') return renderCampaignForm();
-  if (state.view === 'campaign_detail') return renderCampaignDetail();
-  if (state.view === 'campaign_import') return renderCampaignImport();
-  if (state.view === 'campaign_preparation') return renderPreCampaign();
-  if (state.view === 'campaign_map') return renderPreCampaignMap();
-  if (state.view === 'lista' && state.instSection === 'cases') return renderCaseList();
-  if (state.view === 'case_form') return renderCaseForm();
   let html = '';
   const counts = {
     TODOS: state.records.length,
@@ -54,7 +40,6 @@ export function renderInstalaciones() {
       if (state.search) { const q = state.search.toLowerCase(); return (r.serie||'').toLowerCase().includes(q) || (r.caso||'').toLowerCase().includes(q) || (r.lugar||'').toLowerCase().includes(q); }
       return true;
     });
-    if (state.tab !== 'instalaciones') html += renderInstallSectionSwitch();
     // Sub-tabs
     const subTabs = [{key:'cpt_mt',label:'⚡ CPT MT'},{key:'cpt_bt',label:'⚡ CPT BT'},{key:'campos',label:'🏗 Campos y Serv.'}];
     html += '<div style="display:flex;background:var(--white);border-bottom:1px solid var(--border);padding:0 16px">';
@@ -246,7 +231,7 @@ export function renderInstalaciones() {
           ${dias !== null && dias < 0 ? `<div class="alert-banner alert-red" style="margin-top:12px">⚠️ Vencido: debió retirarse hace ${Math.abs(dias)} día${Math.abs(dias)>1?'s':''}</div>` : ''}
         </div>
         <div class="detail-grid">
-          <div class="detail-row"><div class="detail-label">Caso / Campaña</div><div class="detail-value">${r.caseId ? `<button onclick="openCase('${r.caseId}')" style="border:none;background:none;padding:0;color:var(--primary);font-family:var(--mono);font-size:14px;font-weight:800;cursor:pointer">#${r.caso} · Ver expediente →</button>` : `#${r.caso}`}</div></div>
+          <div class="detail-row"><div class="detail-label">Caso / Campaña</div><div class="detail-value">#${r.caso}</div></div>
           <div class="detail-row"><div class="detail-label">Área</div><div class="detail-value">${r.areaInstalacion||'CPT MT'}</div></div>
           ${r.sede ? `<div class="detail-row"><div class="detail-label">Sede salida</div><div class="detail-value">🏭 ${r.sede}</div></div>` : ''}
           <div class="detail-row"><div class="detail-label">Lugar</div><div class="detail-value">${r.lugar||'—'}</div></div>
@@ -294,56 +279,6 @@ export function renderInstalaciones() {
           <button onclick="delInstall('${r.id}')" style="background:none;border:none;font-family:var(--font);font-size:12px;color:var(--text3);cursor:pointer;padding:6px 12px;text-decoration:underline">Eliminar registro</button>
         </div>` : ''}
       </div>`;
-  }
-
-  else if (state.view === 'caso_detalle') {
-    const c = state.cases.find(x => x.id === state.selectedCaseId);
-    if (!c) { state.view = 'lista'; state.selectedCaseId = null; return null; }
-    const caseRecords = state.records
-      .filter(r => r.caseId === c.id || (!r.caseId && normalizeCaseCode(r.caso) === c.normalizedCode))
-      .sort((a, b) => (b.fechaInstalacion || '').localeCompare(a.fechaInstalacion || ''));
-    const events = state.equipmentEvents.filter(e => e.caseId === c.id);
-    const point = state.servicePoints.find(item => item.id === c.servicePointId);
-    const campaign = state.campaigns.find(item => item.id === c.campaignId);
-    const complaintNext = c.workflowType !== 'complaint' ? '' : c.complianceStatus === 'outside'
-      ? 'Dar seguimiento al caso fuera de tolerancia y programar remedición.'
-      : !caseRecords.length ? 'Programar la visita e instalar el analizador.'
-      : caseRecords.some(r => !r.retirado) ? 'Registrar el retiro y descargar la medición.'
-      : caseRecords.some(r => r.descargaPendiente) ? 'Descargar los archivos del analizador.'
-      : 'Revisar los resultados, preparar el informe y registrar la entrega.';
-    const typeLabel = c.caseType === 'CR' ? 'Regulación de tensión' : c.caseType === 'DA' ? 'Armónicos' : c.caseType === 'DF' ? 'Flicker' : c.caseType === 'RE' ? 'Reclamo' : 'Requerimiento especial';
-    const statusLabels = { scheduled: 'Programado', measuring: 'En medición', pending_download: 'Descarga pendiente', analysis: 'En análisis', pending_submission: 'Pendiente de entrega', closed: 'Cerrado' };
-    html += `<div class="content">
-      <div class="detail-hero">
-        <div style="font-size:10px;color:rgba(255,255,255,.7);font-weight:700;letter-spacing:1px;text-transform:uppercase">Expediente de caso</div>
-        <div class="detail-serie" style="margin-top:4px">#${c.code}</div>
-        <div class="detail-modelo">${typeLabel} · ${c.ownerArea || 'CPT MT'}</div>
-        <div style="display:flex;gap:14px;margin-top:14px">
-          <div><div style="font-size:18px;font-weight:800">${caseRecords.length}</div><div style="font-size:9px;color:rgba(255,255,255,.7)">MEDICIONES</div></div>
-          <div><div style="font-size:18px;font-weight:800">${new Set(caseRecords.map(r => r.equipoId).filter(Boolean)).size}</div><div style="font-size:9px;color:rgba(255,255,255,.7)">EQUIPOS</div></div>
-          <div><div style="font-size:18px;font-weight:800">${events.filter(e => e.failure).length}</div><div style="font-size:9px;color:rgba(255,255,255,.7)">INCIDENCIAS</div></div>
-        </div>
-      </div>
-      ${complaintNext ? `<div class="work-next-card"><span>Próximo paso · Reclamo</span><strong>${escapeHtml(complaintNext)}</strong></div>` : ''}
-      <div class="detail-grid">
-        <div class="detail-row"><div class="detail-label">Flujo</div><div class="detail-value">${c.workflowType === 'campaign' ? 'Campaña regulatoria' : c.workflowType === 'complaint' ? 'Reclamo de usuario' : 'Requerimiento especial'}</div></div>
-        ${campaign ? `<div class="detail-row"><div class="detail-label">Campaña</div><div class="detail-value"><button onclick="openCampaign('${escapeHtml(campaign.id)}')" style="border:none;background:none;padding:0;color:var(--primary);font-weight:700;cursor:pointer">${escapeHtml(campaignLabel(campaign))} · ${escapeHtml(campaign.ownerArea)} →</button></div></div>` : c.workflowType === 'campaign' ? '<div class="detail-row"><div class="detail-label">Campaña</div><div class="detail-value">Sin asociar · Edita el expediente</div></div>' : ''}
-        <div class="detail-row"><div class="detail-label">Estado del expediente</div><div class="detail-value">${statusLabels[c.lifecycleStatus] || c.lifecycleStatus || 'Programado'}</div></div>
-        <div class="detail-row"><div class="detail-label">Lugar inicial</div><div class="detail-value">${c.placeSnapshot || caseRecords[0]?.lugar || '—'}</div></div>
-        <div class="detail-row"><div class="detail-label">Responsable de creación</div><div class="detail-value">${c.createdBy || '—'}</div></div>
-        ${point?.customerName ? `<div class="detail-row"><div class="detail-label">Cliente / usuario</div><div class="detail-value">${escapeHtml(point.customerName)}</div></div>` : ''}
-        ${point?.contractNumber ? `<div class="detail-row"><div class="detail-label">Número de contrato</div><div class="detail-value">${escapeHtml(point.contractNumber)}</div></div>` : ''}
-        ${point?.meterNumber ? `<div class="detail-row"><div class="detail-label">Medidor</div><div class="detail-value">${escapeHtml(point.meterNumber)}</div></div>` : ''}
-        ${point?.electricalReference ? `<div class="detail-row"><div class="detail-label">CT / DS</div><div class="detail-value">${escapeHtml(point.electricalReference)}</div></div>` : ''}
-        ${point?.address ? `<div class="detail-row"><div class="detail-label">Dirección</div><div class="detail-value">${escapeHtml(point.address)}</div></div>` : ''}
-        ${point?.feeder || point?.networkVoltageLL ? `<div class="detail-row"><div class="detail-label">Red</div><div class="detail-value">${escapeHtml(point.feeder || '—')}${point.networkVoltageLL ? ' · ' + escapeHtml(point.networkVoltageLL) + ' V L-L' : ''}${point.urbanity ? ' · ' + (point.urbanity === 'R' ? 'Rural' : 'Urbano') : ''}</div></div>` : ''}
-      </div>
-      <div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn btn-secondary" style="flex:1" onclick="editCase('${c.id}')">✏️ Editar expediente</button><button class="btn btn-primary" style="flex:1" onclick="newInstallForCase('${c.id}')">⚡ Registrar medición</button></div>
-      <div class="section-title">Intentos e instalaciones (${caseRecords.length})</div>
-      ${caseRecords.length ? '<div class="list" style="margin-bottom:16px">' + caseRecords.map((r, idx) => `<div class="historial-card" onclick="openDetail('${r.id}')" style="cursor:pointer"><div class="historial-row"><div><div class="historial-lugar">${idx === caseRecords.length - 1 ? 'Medición original' : 'Intento / remedición'} · ${r.serie || 'Sin equipo'}</div><div class="historial-caso">📍 ${r.lugar || 'Sin lugar'}${r.fallas?.length ? ' · ⚠️ ' + r.fallas.join(', ') : ''}</div></div><div class="historial-fecha">${fmtDate(r.fechaInstalacion)}<br>→ ${fmtDate(r.fechaRetiroReal || r.fechaRetiro)}</div></div></div>`).join('') + '</div>' : '<div class="empty"><div class="empty-text">El caso todavía no tiene mediciones vinculadas</div></div>'}
-      <div class="section-title">Bitácora caso–equipo (${events.length})</div>
-      ${renderTraceTimeline(events, { showCase: false })}
-    </div>`;
   }
   return html;
 }
