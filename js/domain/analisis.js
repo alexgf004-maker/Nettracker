@@ -137,6 +137,7 @@ export function analizarMedicion(nombre, texto, datos = {}) {
     const tol = r.urbanidad === 'U' ? 0.06 : 0.07;
     const nominal = esPerturb || fam === 'mono' || fam === 'bi' ? nominalLN(r.nivelTension) : r.nivelTension;
     const sup = nominal * (1 + tol); const inf = nominal * (1 - tol); const minimo = nominal * LIMITE_INVALIDO;
+    r.nominal = Math.round(nominal * 10) / 10; r.tolerancia = tol; // para dibujar la banda en las gráficas
     for (const f of datosF) {
       const v = [valor(f, c1) ?? 0, valor(f, c2) ?? 0, valor(f, c3) ?? 0];
       const activas = fam === 'mono' ? v.slice(0, 1) : fam === 'bi' ? v.slice(0, 2) : fam === 'tri' ? v : [];

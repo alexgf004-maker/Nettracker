@@ -9,7 +9,8 @@ import {
 } from '../actions/documentos.js';
 import { abrirMultiplicador, cerrarImportMultiplicadores, cerrarMultiplicador, exportarMultiplicadores, guardarImportMultiplicadores, guardarMultiplicador, importarMultiplicadores, procesarMultiplicadores, usarHistorico } from '../actions/multiplicadores.js';
 import { asignarEquipo, asignarFecha, cerrarProgramacion, enviarFechaADespachos, exportarFecha, guardarProgramacion, importarProgramacion, procesarProgramacion, setDatoFecha } from '../actions/fechas.js';
-import { abrirResultado, analizarArchivos, analizarTXT, cerrarAnalisis, cerrarResultado, exportarAnalisis, exportarCuadroResumen, guardarAnalisis, guardarResultado, recalcularTXT } from '../actions/resultados.js';
+import { abrirResultado, analizarArchivos, analizarTXT, cerrarAnalisis, cerrarGraficas, cerrarResultado, exportarAnalisis, exportarCuadroResumen, exportarSeries, guardarAnalisis, guardarResultado, recalcularTXT, verGraficas } from '../actions/resultados.js';
+import { moverCursorGrafica, salirCursorGrafica } from '../views/graficas.js';
 import { abrirFT, agregarNotaFT, cerrarFT, marcarAvisoFT, quitarAvisoFT, setCompensacionFT, setRemedicionFT, setRutaFT } from '../actions/ft.js';
 import { codigoConSistema } from '../domain/listados.js';
 import { state } from '../state.js';
@@ -57,3 +58,6 @@ window.setResultadoField = (k, v) => { state.resultadoForm[k] = v; };
 // Seguimiento FT
 Object.assign(window, { abrirFT, cerrarFT, marcarAvisoFT, quitarAvisoFT, setRutaFT, setCompensacionFT, agregarNotaFT, setRemedicionFT });
 window.setFTNota = v => { state.ftNota = v; };
+
+// Gráficas de voltaje y corriente
+Object.assign(window, { verGraficas, cerrarGraficas, exportarSeries, moverCursorGrafica, salirCursorGrafica });
