@@ -85,6 +85,22 @@ test.describe('Inicio', () => {
     await expect(app$(page)).toContainText('Validaciones de TAP (1 campañas)');
   });
 
+  test('contar pendientes solo desde una fecha deja fuera lo viejo', async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await expect(page.locator('.pendiente')).toHaveCount(4);
+    await page.getByRole('button', { name: 'Contar solo desde hoy' }).click();
+    expect((await app.escrituras()).at(-1)).toEqual(['set', 'config/seguimientoDesde', '2026-09-23']);
+    // Quedan solo los que vencen desde hoy: la campaña de agosto, la descarga y el informe eran de antes
+    await expect(page.locator('.pendiente')).toHaveCount(1);
+    await expect(page.locator('.pendiente')).toContainText('Retirar SN-101');
+    await expect(page.locator('.desde')).toContainText('Cuenta desde el 23/09/2026');
+    await page.getByRole('button', { name: 'Cambiar' }).click();
+    await page.getByRole('button', { name: 'Contar todo' }).click();
+    expect((await app.escrituras()).at(-1)).toEqual(['set', 'config/seguimientoDesde', null]);
+    await expect(page.locator('.pendiente')).toHaveCount(4);
+  });
+
   test('un pendiente lleva a lo que hay que hacer', async ({ page }) => {
     app = await abrirApp(page);
     await cerrarAlerta(page);

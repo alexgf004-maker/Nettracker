@@ -198,6 +198,8 @@ Pendiente para las siguientes partes de la etapa 2: mapa para el contratista, mu
 - Requerimientos con `entregaLimite`
 - Campañas sin marcar como cargadas (vence el día 10 del mes siguiente)
 
+**Contar desde una fecha** (`config/seguimientoDesde`, compartido): lo que venció o se retiró antes de esa fecha no aparece en Pendientes (retiro programado, retiro real para descargas e informes, fecha límite de requerimientos y entrega de campañas). Sirve para no arrastrar mediciones viejas. Se pone desde el Inicio ("Contar solo desde hoy" o elegir fecha) y se quita con "Contar todo".
+
 Por defecto muestra el área del perfil; "Todas las áreas" (`state.areaFiltro`) aplica también a las pestañas de Trabajo.
 
 ---

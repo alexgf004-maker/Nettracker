@@ -21,5 +21,6 @@ export const historialAccesoriosRef = ref(db, 'historialAccesorios');
 export const validacionesRef = ref(db, 'validaciones');
 export const mantenimientoRef = ref(db, 'config/mantenimiento');
 export const campanasRef = ref(db, 'campanas');
+export const seguimientoDesdeRef = ref(db, 'config/seguimientoDesde'); // fecha desde la que el Inicio cuenta pendientes
 export const configCartasRef = ref(db, 'config/cartas'); // firmante, contacto y logo de las cartas al cliente // estado de cada campaña (entrega en el sistema CPT DELSUR)
 export { ref, onValue, push, update, remove, get, set };

@@ -2,7 +2,7 @@
 import { cerrarSesion, entrarComo } from '../actions/auth.js';
 import { desmarcarCampanaEntregada, desmarcarInformeEntregado, desmarcarRequerimientoEntregado, marcarCampanaEntregada, marcarInformeEntregado, marcarRequerimientoEntregado, setEntregaLimite } from '../actions/trabajo.js';
 import { userArea, userInstTab } from '../config.js';
-import { mantenimientoRef, set } from '../firebase.js';
+import { mantenimientoRef, seguimientoDesdeRef, set } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { emptyEF, emptyForm, eqSt } from '../utils.js';
@@ -121,6 +121,12 @@ window.entrarComo = entrarComo;
 
 // ── MENÚ Y TRABAJO ──
 window.toggleMas = () => { state.showMas = !state.showMas; render(); };
+window.toggleEditarDesde = () => { state.editandoDesde = !state.editandoDesde; render(); };
+window.guardarSeguimientoDesde = fecha => {
+  state.editandoDesde = false;
+  set(seguimientoDesdeRef, fecha || null).then(() => showToast(fecha ? 'Los pendientes se cuentan desde el ' + fecha.split('-').reverse().join('/') : 'Se cuentan todos los pendientes'));
+  render();
+};
 window.setAreaFiltro = f => { state.areaFiltro = f; render(); };
 window.abrirCampanaTrabajo = clave => { state.casosFiltro = 'todos'; state.casosBusqueda = ''; state.tab = 'campanas'; state.view = 'lista'; state.campanaClave = clave; state.showMas = false; render(); };
 Object.assign(window, { marcarCampanaEntregada, desmarcarCampanaEntregada, marcarInformeEntregado, desmarcarInformeEntregado, setEntregaLimite, marcarRequerimientoEntregado, desmarcarRequerimientoEntregado });

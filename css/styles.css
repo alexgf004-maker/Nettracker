@@ -381,6 +381,9 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
 .pendiente-fecha small { display: block; font-size: 10px; font-weight: 500; color: var(--text3); font-family: var(--mono); }
 .grupo-rojo .pendiente-fecha { color: var(--red); }
 .grupo-amarillo .pendiente-fecha { color: var(--yellow); }
+.desde { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--text3); margin: -4px 0 12px; }
+.desde label { display: inline-flex; align-items: center; gap: 8px; }
+.desde input { width: auto; padding: 5px 8px; font-size: 12px; }
 .todo-al-dia { display: flex; align-items: center; gap: 10px; padding: 14px; border-radius: 10px; background: var(--green-light); color: var(--green); font-size: 13px; font-weight: 600; }
 .todo-al-dia .ic { font-size: 20px; }
 .resumen-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
