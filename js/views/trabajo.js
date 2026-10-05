@@ -6,6 +6,7 @@ import {
   registrosDeTipo, subtipoCampana, urgencia,
 } from '../domain/trabajo.js';
 import { state } from '../state.js';
+import { areaHero, heroSeccion } from './componentes.js';
 import { escapeHtml, fmtDate } from '../utils.js';
 import { avancePrecampana, renderCasosCampana, renderPrecampana } from './casos.js';
 import { contarTipos, faltantes } from '../domain/listados.js';
@@ -20,14 +21,6 @@ const esc = s => escapeHtml(s ?? '');
 // Área que se está viendo: la del usuario o todas
 export const areaVista = () => (state.areaFiltro === 'todas' ? null : userArea());
 const delArea = r => !areaVista() || areaDeInstalacion(r) === areaVista();
-
-export function filtroArea() {
-  const mia = state.areaFiltro !== 'todas';
-  return `<div class="segmento">
-    <button class="${mia ? 'active' : ''}" onclick="setAreaFiltro('mia')">${userArea()}</button>
-    <button class="${!mia ? 'active' : ''}" onclick="setAreaFiltro('todas')">Todas las áreas</button>
-  </div>`;
-}
 
 // "faltan 3 días", "vence hoy", "venció hace 2 días"
 export function textoPlazo(fecha, hoy) {
@@ -97,7 +90,7 @@ export function renderCampanas() {
   let html = '<div class="content">';
   html += `<div class="hero"><div class="hero-top"><div><div class="hero-eyebrow">Trabajo</div><h1 class="hero-titulo">Campañas</h1>
     <div class="hero-sub">Casos CR, DA y DF por mes. La entrega en el sistema CPT DELSUR vence el día 10 del mes siguiente.</div></div></div>
-    <div class="hero-acciones page-hero-acciones"><button class="hero-btn blanco" onclick="abrirImportListados()"><i class="ic ic-subir"></i> Importar listados del ente</button>${filtroAreaHero()}</div></div>`;
+    <div class="hero-acciones page-hero-acciones"><button class="hero-btn blanco" onclick="abrirImportListados()"><i class="ic ic-subir"></i> Importar listados del ente</button>${areaHero(state.areaFiltro !== 'todas', userArea())}</div></div>`;
   if (!campanas.length) return html + vacio('campanas', 'Todavía no hay campañas. Importa los listados que manda el ente para empezar la precampaña.') + '</div>';
   html += '<div class="list">';
   campanas.forEach(c => {
@@ -120,12 +113,6 @@ export function renderCampanas() {
       </div></div>`;
   });
   return html + '</div></div>';
-}
-
-// Selector de área sobre fondo oscuro
-function filtroAreaHero() {
-  const mia = state.areaFiltro !== 'todas';
-  return `<button class="hero-btn" onclick="setAreaFiltro('${mia ? 'todas' : 'mia'}')"><i class="ic ic-capas"></i> ${mia ? `Solo ${userArea()}` : 'Todas las áreas'}</button>`;
 }
 
 function barraEtapas(r) {
@@ -210,13 +197,17 @@ export function renderReclamos() {
   const hoy = hoyLocal();
   const reclamos = registrosDeTipo(state.records, 'reclamo').filter(delArea);
   let html = '<div class="content">';
-  html += `<div class="page-head"><div><h1 class="page-title">Reclamos</h1><div class="page-sub">Casos RE. El informe se entrega 8 días calendario después del retiro.</div></div>${filtroArea()}</div>`;
-  if (!reclamos.length) return html + vacio('reclamos', 'No hay instalaciones con códigos de reclamo (RE).') + '</div>';
 
   const informe = reclamos.filter(r => r.retirado && !r.informeEntregado)
     .sort((a, b) => (fechaInformeReclamo(a.fechaRetiroReal) || '').localeCompare(fechaInformeReclamo(b.fechaRetiroReal) || ''));
   const enCampo = reclamos.filter(r => !r.retirado);
   const entregados = reclamos.filter(r => r.retirado && r.informeEntregado);
+  const vencidosInf = informe.filter(r => { const l = fechaInformeReclamo(r.fechaRetiroReal); return l && urgencia(l, hoy) === 'vencido'; }).length;
+  html += heroSeccion({
+    eyebrow: 'Trabajo', titulo: 'Reclamos', sub: 'Casos RE. El informe se entrega 8 días calendario después del retiro.', derecha: areaHero(state.areaFiltro !== 'todas', userArea()),
+    kpis: [{ v: informe.length, l: 'Informe pendiente', alerta: vencidosInf > 0 }, { v: enCampo.length, l: 'En campo' }, { v: entregados.length, l: 'Informe entregado' }],
+  });
+  if (!reclamos.length) return html + vacio('reclamos', 'No hay instalaciones con códigos de reclamo (RE).') + '</div>';
 
   html += seccion('Informe pendiente', informe.length, informe.map(r => {
     const limite = fechaInformeReclamo(r.fechaRetiroReal);
@@ -253,12 +244,16 @@ export function renderRequerimientos() {
   const hoy = hoyLocal();
   const reqs = registrosDeTipo(state.records, 'requerimiento').filter(delArea);
   let html = '<div class="content">';
-  html += `<div class="page-head"><div><h1 class="page-title">Requerimientos</h1><div class="page-sub">Mediciones esporádicas (otros códigos). La fecha de entrega se anota en cada una.</div></div>${filtroArea()}</div>`;
-  if (!reqs.length) return html + vacio('requerimientos', 'No hay requerimientos registrados.') + '</div>';
 
   const pendientes = reqs.filter(r => !r.entregaRealizada)
     .sort((a, b) => (a.entregaLimite || '9').localeCompare(b.entregaLimite || '9') || (b.fechaInstalacion || '').localeCompare(a.fechaInstalacion || ''));
   const entregados = reqs.filter(r => r.entregaRealizada);
+  const vencidosReq = pendientes.filter(r => r.entregaLimite && urgencia(r.entregaLimite, hoy) === 'vencido').length;
+  html += heroSeccion({
+    eyebrow: 'Trabajo', titulo: 'Requerimientos', sub: 'Mediciones esporádicas (otros códigos). La fecha de entrega se anota en cada una.', derecha: areaHero(state.areaFiltro !== 'todas', userArea()),
+    kpis: [{ v: pendientes.length, l: 'Por entregar' }, { v: vencidosReq, l: 'Entrega vencida', alerta: vencidosReq > 0 }, { v: entregados.length, l: 'Entregados' }],
+  });
+  if (!reqs.length) return html + vacio('requerimientos', 'No hay requerimientos registrados.') + '</div>';
 
   html += seccion('Por entregar', pendientes.length, pendientes.map(r => filaConAccion(r, hoy,
     `<label class="fecha-inline">Entrega <input type="date" value="${r.entregaLimite || ''}" onchange="setEntregaLimite('${r.id}', this.value)"></label>${r.entregaLimite ? ' ' + tagPlazo(r.entregaLimite, hoy) : ''}`,

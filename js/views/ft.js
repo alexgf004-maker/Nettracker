@@ -3,7 +3,9 @@ import { casosFT, DIAS_SOLUCION_FT, RUTAS_FT } from '../domain/ft.js';
 import { hoyLocal, nombreCampana } from '../domain/trabajo.js';
 import { state } from '../state.js';
 import { escapeHtml, fmtDate } from '../utils.js';
-import { areaVista, filtroArea, tagPlazo } from './trabajo.js';
+import { areaVista, tagPlazo } from './trabajo.js';
+import { areaHero } from './componentes.js';
+import { userArea } from '../config.js';
 
 const esc = s => escapeHtml(s ?? '');
 
@@ -23,7 +25,7 @@ export function renderFT() {
       <div class="hero-kpi ${vencidos ? 'alerta' : ''}"><b>${vencidos}</b><span>Plazo vencido</span></div>
       <div class="hero-kpi"><b>${cerrados.length}</b><span>Cerrados</span></div>
     </div>
-    <div class="hero-acciones page-hero-acciones">${filtroArea()}</div></div>`;
+    <div class="hero-acciones page-hero-acciones">${areaHero(state.areaFiltro !== 'todas', userArea())}</div></div>`;
   if (!lista.length) {
     return html + `<div class="empty"><i class="empty-icon ic ic-ft"></i><div class="empty-text">No hay casos fuera de tolerancia. Aparecen aquí cuando un resultado queda fuera de tolerancia en la pestaña Resultados de la campaña.</div></div></div>`;
   }

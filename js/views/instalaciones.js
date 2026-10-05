@@ -3,6 +3,7 @@ import { SEDES, USUARIOS, isAdmin, userArea } from '../config.js';
 import { state } from '../state.js';
 import { badgeSt } from '../ui.js';
 import { calcSt, daysUntil, fmtDate, today } from '../utils.js';
+import { heroSeccion } from './componentes.js';
 
 export function renderInstalaciones() {
   let html = '';
@@ -57,29 +58,22 @@ export function renderInstalaciones() {
       html += '</div>';
     }
 
-    html += `<div class="content">
+    const ua = userArea();
+    const miArea = state.records.filter(r => (r.areaInstalacion || 'CPT MT') === ua);
+    const nActivos = miArea.filter(r => calcSt(r) === 'ACTIVO').length;
+    const nHoy = miArea.filter(r => !r.retirado && r.fechaRetiro === today()).length;
+    const nSemana = miArea.filter(r => !r.retirado && daysUntil(r.fechaRetiro) <= 7 && daysUntil(r.fechaRetiro) > 0).length;
+    const fecha = new Date().toLocaleDateString('es-SV', { weekday: 'long', day: 'numeric', month: 'long' }).replace(/^./, c => c.toUpperCase());
+    html += `<div class="content">${heroSeccion({
+      eyebrow: 'Herramientas', titulo: 'Instalaciones', sub: fecha + (nHoy ? ` · <b>hay retiros de ${ua} programados para hoy</b>` : ''),
+      kpis: [{ v: nActivos, l: 'Activos ' + ua }, { v: nHoy, l: 'Retiros hoy', alerta: nHoy > 0 }, { v: nSemana, l: 'Retiros esta semana' }],
+    })}
         <div class="stats-bar">
           ${['TODOS','ACTIVO','PROXIMO','VENCIDO','RETIRADO'].map(s => `
             <div class="stat-chip ${state.filterStatus===s?'active':''}" onclick="setFilter('${s}')" style="color:${s==='TODOS'?'var(--blue)':s==='ACTIVO'?'var(--green)':s==='PROXIMO'?'var(--yellow)':s==='VENCIDO'?'var(--red)':'var(--gray)'}">
               <span class="stat-num">${countsFiltrados[s]??counts[s]}</span>
               <span class="stat-label">${s==='TODOS'?'Total':s==='ACTIVO'?'Activos':s==='VENCIDO'?'Vencidos':s==='PROXIMO'?'Próximos':'Retirados'}</span>
             </div>`).join('')}
-        </div>
-        <div style="background:linear-gradient(135deg,var(--primary-dark),var(--primary));border-radius:14px;padding:14px 16px;margin-bottom:12px;color:#fff">
-          <div style="font-size:11px;color:rgba(255,255,255,.7);margin-bottom:6px;font-weight:600"><i class=ic-calendario></i> ${new Date().toLocaleDateString("es-SV",{weekday:"long",day:"numeric",month:"long"}).replace(/^./,c=>c.toUpperCase())}</div>
-          ${(()=>{
-          const ua = userArea();
-          const miArea = state.records.filter(r => (r.areaInstalacion||'CPT MT') === ua);
-          const nActivos = miArea.filter(r=>calcSt(r)==='ACTIVO').length;
-          const nHoy = miArea.filter(r=>!r.retirado&&r.fechaRetiro===today()).length;
-          const nSemana = miArea.filter(r=>!r.retirado&&daysUntil(r.fechaRetiro)<=7&&daysUntil(r.fechaRetiro)>0).length;
-          return '<div style="display:flex;gap:16px">'
-            +'<div><div style="font-size:22px;font-weight:800">'+nActivos+'</div><div style="font-size:10px;color:rgba(255,255,255,.7)">Activos '+ua+'</div></div>'
-            +(nHoy>0?'<div><div style="font-size:22px;font-weight:800;color:#ffd700">'+nHoy+'</div><div style="font-size:10px;color:rgba(255,255,255,.7)">Vencen hoy</div></div>':'')
-            +(nSemana>0?'<div><div style="font-size:22px;font-weight:800;color:#7dd3fc">'+nSemana+'</div><div style="font-size:10px;color:rgba(255,255,255,.7)">Esta semana</div></div>':'')
-            +'</div>'
-            +(nHoy>0?'<div style="margin-top:8px;font-size:11px;color:#ffd700;font-weight:600"><i class=ic-alerta></i> Hay retiros de '+ua+' programados para hoy</div>':'');
-        })()}
         </div>
         <div class="search-wrap"><span class="search-icon"><i class=ic-buscar></i></span>
           <input class="search-input" placeholder="Buscar serie, caso, lugar..." value="${state.search}" oninput="setSearch(this.value)" ${state.search?'data-active="true"':''}>
