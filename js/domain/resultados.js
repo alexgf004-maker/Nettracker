@@ -4,7 +4,7 @@
 import { grupoDeEstado } from './multiplicadores.js';
 import { normalizarCodigo } from './trabajo.js';
 
-export const MEDICION = { valida: 'Válida', fallida: 'Fallida', no_medida: 'No medida' };
+export const MEDICION = { valida: 'Válida', fallida: 'Fallida', revisar: 'Por revisar', no_medida: 'No medida' };
 export const TOLERANCIA = { dentro: 'Dentro de tolerancia', fuera: 'Fuera de tolerancia (FT)' };
 
 // Instalación de la app que corresponde a un caso (por código, sin importar formato)
@@ -35,11 +35,11 @@ export function resultadoCaso(caso, inst) {
     if (ultima.medicionOk === true) medicion = 'valida';
     if (ultima.medicionOk === false) medicion = 'fallida';
   }
-  return { medicion, tolerancia: medicion === 'valida' ? r.tolerancia || '' : '', febNoPer: medicion === 'valida' ? r.febNoPer ?? '' : '', nota: r.nota || '', desdeDescarga: !r.medicion && !!medicion };
+  return { medicion, tolerancia: medicion === 'valida' ? r.tolerancia || '' : '', febNoPer: medicion === 'valida' ? r.febNoPer ?? '' : '', nota: r.nota || '', desdeDescarga: !r.medicion && !!medicion, analisis: r.origen === 'txt' ? r.analisis : null };
 }
 
 export function resumenResultados(filas) {
-  const n = { total: filas.length, valida: 0, fallida: 0, pendiente: 0, ft: 0, crValidas: 0, daValidas: 0, dfValidas: 0, sinMedir: 0 };
+  const n = { total: filas.length, valida: 0, fallida: 0, revisar: 0, pendiente: 0, ft: 0, crValidas: 0, daValidas: 0, dfValidas: 0, sinMedir: 0 };
   for (const f of filas) {
     if (f.resultado.medicion === 'valida') {
       n.valida++;
@@ -48,6 +48,7 @@ export function resumenResultados(filas) {
       if (f.caso.tipo === 'DF') n.dfValidas++;
       if (f.resultado.tolerancia === 'fuera') n.ft++;
     } else if (f.resultado.medicion === 'fallida') n.fallida++;
+    else if (f.resultado.medicion === 'revisar') n.revisar++;
     else if (f.resultado.medicion === 'no_medida' || f.situacion.clave === 'sin_medir') n.sinMedir++;
     else n.pendiente++;
   }
@@ -60,7 +61,7 @@ export function filasCuadroResumen(filas) {
   for (const f of filas) {
     const r = f.resultado;
     out.push([f.caso.codigo || f.caso.codigoEnte, /^\d+$/.test(f.caso.nc) ? Number(f.caso.nc) : f.caso.nc, f.caso.nombre || '', f.situacion.texto,
-      MEDICION[r.medicion] || (f.situacion.clave === 'sin_medir' ? 'No medida' : ''), TOLERANCIA[r.tolerancia] || '', r.febNoPer === '' ? '' : Number(r.febNoPer), r.nota]);
+      MEDICION[r.medicion] || (f.situacion.clave === 'sin_medir' ? 'No medida' : ''), TOLERANCIA[r.tolerancia] || '', r.febNoPer === '' ? '' : Number(r.febNoPer), r.nota || r.analisis?.detalle || '']);
   }
   return out;
 }

@@ -459,6 +459,8 @@ label.btn-accion { cursor: pointer; }
 .pestanas button.active { color: var(--primary); border-bottom-color: var(--primary); }
 .resumen-mult { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .resumen-4 { grid-template-columns: repeat(4, 1fr); }
+.resumen-5 { grid-template-columns: repeat(5, 1fr); }
+@media (max-width: 600px) { .resumen-5 { grid-template-columns: repeat(3, 1fr); } }
 .resumen-estado { border: 1px solid var(--border); background: var(--white); border-radius: 12px; padding: 10px; cursor: pointer; font-family: var(--font); display: flex; flex-direction: column; align-items: flex-start; gap: 2px; color: var(--text); }
 .resumen-estado b { font-size: 22px; font-family: var(--mono); }
 .resumen-estado span { font-size: 11px; color: var(--text3); }
@@ -535,4 +537,5 @@ label.btn-accion { cursor: pointer; }
   .toast { left: calc(50% + var(--sidebar) / 2); bottom: 32px; }
 
   .fechas-grid { grid-template-columns: repeat(3, 1fr); }
+  .modal-overlay > .modal-ancha { max-width: 1000px !important; }
 }

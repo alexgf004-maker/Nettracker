@@ -13,7 +13,7 @@ import { renderAlertaRetiros, renderCondicionModal, renderDescargaModal, renderG
 import { renderCasoModal, renderConfigCartas, renderDocsModal, renderImportListados } from './casos.js';
 import { renderProgramacionModal } from './fechas.js';
 import { renderMultModal } from './multiplicadores.js';
-import { renderResultadoModal } from './resultados.js';
+import { renderAnalisisModal, renderResultadoModal } from './resultados.js';
 import { renderFT, renderFTModal } from './ft.js';
 import { renderCampanas, renderReclamos, renderRequerimientos } from './trabajo.js';
 import { renderValidaciones } from './validaciones.js';
@@ -70,6 +70,7 @@ export function render() {
   if (state.multEdit) html += renderMultModal();
   if (state.importProgramacion) html += renderProgramacionModal();
   if (state.resultadoEdit) html += renderResultadoModal();
+  if (state.analisisTXT) html += renderAnalisisModal();
   if (state.ftEdit) html += renderFTModal();
   if (state.showConfigCartas) html += renderConfigCartas();
 

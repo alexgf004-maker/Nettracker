@@ -45,6 +45,7 @@ export const state = {
   multForm: {},
   ftEdit: null, // { clave, id }
   ftNota: '',
+  analisisTXT: null, // vista previa del análisis de los TXT { clave, filas, sinCaso }
   resultadoEdit: null, // { clave, id }
   resultadoForm: {},
   importProgramacion: null, // vista previa del Excel de programación de instalaciones

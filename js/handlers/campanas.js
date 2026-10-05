@@ -9,7 +9,7 @@ import {
 } from '../actions/documentos.js';
 import { abrirMultiplicador, cerrarMultiplicador, exportarMultiplicadores, guardarMultiplicador, usarHistorico } from '../actions/multiplicadores.js';
 import { asignarEquipo, asignarFecha, cerrarProgramacion, enviarFechaADespachos, exportarFecha, guardarProgramacion, importarProgramacion, procesarProgramacion, setDatoFecha } from '../actions/fechas.js';
-import { abrirResultado, cerrarResultado, exportarCuadroResumen, guardarResultado } from '../actions/resultados.js';
+import { abrirResultado, analizarArchivos, analizarTXT, cerrarAnalisis, cerrarResultado, exportarAnalisis, exportarCuadroResumen, guardarAnalisis, guardarResultado, recalcularTXT } from '../actions/resultados.js';
 import { abrirFT, agregarNotaFT, cerrarFT, marcarAvisoFT, quitarAvisoFT, setCompensacionFT, setRemedicionFT, setRutaFT } from '../actions/ft.js';
 import { codigoConSistema } from '../domain/listados.js';
 import { state } from '../state.js';
@@ -48,7 +48,7 @@ window.setMultField = (k, v) => {
 Object.assign(window, { asignarFecha, asignarEquipo, setDatoFecha, exportarFecha, enviarFechaADespachos, importarProgramacion, procesarProgramacion, guardarProgramacion, cerrarProgramacion });
 
 // Resultados
-Object.assign(window, { abrirResultado, cerrarResultado, guardarResultado, exportarCuadroResumen });
+Object.assign(window, { abrirResultado, cerrarResultado, guardarResultado, exportarCuadroResumen, analizarTXT, analizarArchivos, recalcularTXT, cerrarAnalisis, guardarAnalisis, exportarAnalisis });
 window.setResultadoOpcion = (k, v) => { state.resultadoForm[k] = v; render(); };
 window.setResultadoField = (k, v) => { state.resultadoForm[k] = v; };
 
