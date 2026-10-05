@@ -409,7 +409,6 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
   .nav-extra { display: flex; }
   .nav-mas, .mas-overlay { display: none; }
   .bottom-nav { gap: 2px; overflow-y: auto; }
-  .inicio-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 20px; align-items: start; }
   .fila:hover, .resumen:hover, .accion:hover, .equipo-dato:hover { border-color: var(--primary); }
 }
 
@@ -896,3 +895,34 @@ header { background-image: var(--onda), var(--degradado); background-repeat: rep
 .hero-kpi.alerta { animation: latido 2.4s ease-in-out infinite; }
 .hero-kpis[data-n="3"] { grid-template-columns: repeat(3, 1fr); }
 @media (max-width: 520px) { .hero-kpis[data-n="4"] { grid-template-columns: repeat(2, 1fr); } }
+
+/* ─── Inicio ─── */
+.inicio-layout { display: grid; grid-template-columns: 1fr; gap: 0 16px; grid-template-areas: "pend" "trabajo" "acciones" "equipos" "actividad"; }
+.ini-pend { grid-area: pend; } .ini-trabajo { grid-area: trabajo; } .ini-equipos { grid-area: equipos; } .ini-acciones { grid-area: acciones; } .ini-actividad { grid-area: actividad; }
+@media (min-width: 900px) {
+  .inicio-layout { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); grid-template-areas: "pend trabajo" "pend acciones" "equipos equipos" "actividad actividad"; align-items: start; }
+  .ini-pend .bloque { min-height: 100%; }
+}
+.ini-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.inicio .desde { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--border2); }
+.inicio .grupo { margin-bottom: 10px; }
+.ini-filas { display: flex; flex-direction: column; gap: 6px; }
+.ini-fila { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 10px 12px; border: 1px solid var(--border2); border-radius: 10px; background: var(--white); cursor: pointer; font-family: var(--font); color: var(--text); transition: border-color .15s, background .15s; }
+.ini-fila:hover { border-color: var(--accent); background: var(--primary-light); }
+.ini-fila-ic { width: 34px; height: 34px; border-radius: 10px; background: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
+.ini-fila-tx { flex: 1; min-width: 0; }
+.ini-fila-tx b { display: block; font-size: 13.5px; font-weight: 800; }
+.ini-fila-tx small { display: block; font-size: 11.5px; color: var(--text3); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ini-fila-n { font: 800 22px var(--mono); color: var(--primary-dark); }
+.ini-fila-go { color: var(--text3); }
+.ini-fila.alerta { border-color: #fca5a5; background: #fef2f2; }
+.ini-fila.alerta .ini-fila-ic { background: #dc2626; color: #fff; }
+.ini-fila.alerta .ini-fila-n { color: #dc2626; }
+.inicio .acciones { margin-bottom: 0; }
+.inicio .accion { box-shadow: none; border-color: var(--border2); }
+.inicio .equipos-grid { margin-bottom: 10px; }
+.inicio .equipo-dato { box-shadow: none; border: 1px solid var(--border2); border-top: 3px solid var(--border); padding: 12px 8px; }
+.inicio .equipo-dato b { font-size: 24px; }
+.inicio .instalaciones-area { margin-bottom: 0; }
+@media (min-width: 900px) { .inicio .equipos-grid { grid-template-columns: repeat(4, 1fr); } }
+.ini-calendario { padding-top: 4px; }
