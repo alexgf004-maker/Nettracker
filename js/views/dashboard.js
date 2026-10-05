@@ -53,25 +53,25 @@ export function renderDashboard() {
 
 function renderPendientes(hoy, lista) {
   const desde = state.seguimientoDesde;
-  const chips = GRUPOS.map(([k, titulo]) => [k, titulo, lista.filter(p => p.urgencia === k).length]).filter(([, , n]) => n)
-    .map(([k, titulo, n]) => `<span class="tg ${{ vencido: 'rojo', hoy: 'rojo', proximo: 'ambar', sin_fecha: 'gris' }[k]}">${n} ${titulo.toLowerCase()}</span>`).join('');
-  let html = `<div class="bloque"><div class="bloque-head"><div class="bloque-titulo">Pendientes${lista.length ? ` <span class="cuenta">${lista.length}</span>` : ''}</div><div class="ini-chips">${chips}</div></div>`;
+  let html = `<div class="bloque"><div class="bloque-head"><div class="bloque-titulo">Pendientes${lista.length ? ` <span class="cuenta">${lista.length}</span>` : ''}</div></div>`;
   if (!lista.length) {
     html += '<div class="todo-al-dia"><i class="ic ic-check"></i> Todo al día. No hay nada vencido ni por vencer en los próximos 3 días.</div>';
   } else {
     GRUPOS.forEach(([clave, titulo]) => {
       const items = lista.filter(p => p.urgencia === clave);
       if (!items.length) return;
-      html += `<div class="grupo grupo-${CLASE_GRUPO[clave]}"><div class="grupo-titulo">${titulo} <span>${items.length}</span></div>`;
+      html += `<div class="grupo grupo-${CLASE_GRUPO[clave]}"><div class="grupo-titulo"><i class="grupo-punto"></i>${titulo} <span>${items.length}</span></div><div class="pend-lista">`;
       items.forEach(p => {
-        html += `<div class="pendiente" onclick="${accionPendiente(p)}">
-          <i class="pendiente-icono ic ic-${ICONO_PENDIENTE[p.clase]}"></i>
+        const tgClase = { vencido: 'rojo', hoy: 'rojo', proximo: 'ambar', sin_fecha: 'gris' }[clave];
+        html += `<div class="pendiente pend-${CLASE_GRUPO[clave]}" onclick="${accionPendiente(p)}">
+          <span class="pend-ic"><i class="ic ic-${ICONO_PENDIENTE[p.clase]}"></i></span>
           <div class="pendiente-texto"><div class="pendiente-titulo">${esc(p.titulo)}</div>${p.detalle ? `<div class="pendiente-detalle">${esc(p.detalle)}</div>` : ''}</div>
-          ${p.fecha && clave !== 'sin_fecha' ? `<div class="pendiente-fecha">${textoPlazo(p.fecha, hoy)}<small>${fmtDate(p.fecha)}</small></div>` : ''}
-          ${clave === 'sin_fecha' && p.clase === 'informe' && p.fecha ? `<div class="pendiente-fecha">${fmtDate(p.fecha)}</div>` : ''}
+          ${p.fecha && clave !== 'sin_fecha' ? `<div class="pendiente-fecha"><span class="tg ${tgClase}">${textoPlazo(p.fecha, hoy)}</span><small>${fmtDate(p.fecha)}</small></div>` : ''}
+          ${clave === 'sin_fecha' && p.clase === 'informe' && p.fecha ? `<div class="pendiente-fecha"><small>${fmtDate(p.fecha)}</small></div>` : ''}
+          <i class="ic ic-chevron-right pend-go"></i>
         </div>`;
       });
-      html += '</div>';
+      html += '</div></div>';
     });
   }
   html += renderDesde(hoy, desde);
