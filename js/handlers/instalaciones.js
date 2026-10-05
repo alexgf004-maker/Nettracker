@@ -34,7 +34,7 @@ window.closeRetiroModal = closeRetiroModal;
 window.openRetiroModal = openRetiroModal;
 
 window.newInstall = () => {
-  if (state.equipos.filter(e => (eqSt(e) === 'disponible' || eqSt(e) === 'prestado') && (e.condicion||'bueno') !== 'fuera' && (e.condicion||'bueno') !== 'mantenimiento').length === 0) return showToast('⚠️ No hay equipos disponibles en inventario');
+  if (state.equipos.filter(e => (eqSt(e) === 'disponible' || eqSt(e) === 'prestado') && (e.condicion||'bueno') !== 'fuera' && (e.condicion||'bueno') !== 'mantenimiento').length === 0) return showToast('No hay equipos disponibles en inventario');
   state.form = emptyForm();
   state.form.areaInstalacion = state.instTab === 'cpt_mt' ? 'CPT MT' : state.instTab === 'cpt_bt' ? 'CPT BT' : 'Campos y Servicios';
   state.editId = null; state.view = 'form'; render();
@@ -44,7 +44,7 @@ window.saveInstall = handleSave;
 window.openDetail = id => { state.editId = id; state.view = 'detalle'; render(); };
 
 window.editInstall = id => {
-  if (!isAdmin()) return showToast('⚠️ Solo el administrador puede editar instalaciones');
+  if (!isAdmin()) return showToast('Solo el administrador puede editar instalaciones');
   const r = state.records.find(x => x.id === id); if (!r) return;
   state.form = { equipoId: r.equipoId, serie: r.serie, modelo: r.modelo||'', caso: r.caso, lugar: r.lugar||'', lat: r.lat||null, lng: r.lng||null, fechaInstalacion: r.fechaInstalacion, fechaRetiro: r.fechaRetiro, notas: r.notas||'' };
   state.editId = id; state.view = 'form'; render();
@@ -68,12 +68,12 @@ window.pickEquipo = id => {
   // Check active install (duplicate)
   const activa = state.records.find(r => r.equipoId === id && !r.retirado);
   if (activa) {
-    if (!confirm('⚠️ Este equipo ya tiene una instalación activa en caso #' + (activa.caso||'?') + '. ¿Deseas registrar otra de todas formas?')) return;
+    if (!confirm('Este equipo ya tiene una instalación activa en caso #' + (activa.caso||'?') + '. ¿Deseas registrar otra de todas formas?')) return;
   }
   // Check pending download
   const pendiente = state.records.find(r => r.equipoId === id && r.retirado && r.descargaPendiente);
   if (pendiente) {
-    if (!confirm('⚠️ Este equipo tiene una descarga pendiente del caso #' + (pendiente.caso||'') + '. ¿Deseas instalarlo de todas formas?')) return;
+    if (!confirm('Este equipo tiene una descarga pendiente del caso #' + (pendiente.caso||'') + '. ¿Deseas instalarlo de todas formas?')) return;
   }
   state.form.equipoId = id; state.form.serie = eq.serie; state.form.modelo = eq.modelo || '';
   state.showSelector = false; render();

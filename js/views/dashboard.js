@@ -1,125 +1,139 @@
-// Pestaña Inicio (dashboard)
-import { isAdmin, userArea } from '../config.js';
+// Pestaña Inicio: lo que hay que hacer (calculado de los datos), resumen del trabajo y de los equipos
+import { isAdmin } from '../config.js';
+import { GRUPOS, calcularPendientes } from '../domain/pendientes.js';
+import { agruparCampanas, areaDeInstalacion, hoyLocal, registrosDeTipo } from '../domain/trabajo.js';
 import { state } from '../state.js';
-import { calcSt, daysUntil, eqEnCampo, eqSt } from '../utils.js';
+import { calcSt, escapeHtml, eqEnCampo, eqSt, fmtDate } from '../utils.js';
+import { areaVista, filtroArea, textoPlazo } from './trabajo.js';
+
+const esc = s => escapeHtml(s ?? '');
+const ICONO_PENDIENTE = { retiro: 'ruta', descarga: 'descargar', informe: 'reclamos', requerimiento: 'requerimientos', campana: 'campanas' };
+const CLASE_GRUPO = { vencido: 'rojo', hoy: 'rojo', proximo: 'amarillo', sin_fecha: 'gris' };
 
 export function renderDashboard() {
-  let html = '';
-  const ua = userArea();
-  const activos = state.records.filter(r => calcSt(r) === 'ACTIVO');
-  const proximos = state.records.filter(r => !r.retirado && daysUntil(r.fechaRetiro) <= 7 && daysUntil(r.fechaRetiro) > 0).sort((a,b) => daysUntil(a.fechaRetiro)-daysUntil(b.fechaRetiro));
-  const vencidos = state.records.filter(r => !r.retirado && daysUntil(r.fechaRetiro) < 0);
-  const descPend = state.records.filter(r => r.retirado && r.descargaPendiente);
-  const enMant = state.equipos.filter(e => (e.condicion||'bueno') === 'mantenimiento');
-  const fuera = state.equipos.filter(e => (e.condicion||'bueno') === 'fuera');
-  const disponibles = state.equipos.filter(e => eqSt(e) === 'disponible');
-  const enCampo = state.equipos.filter(e => eqEnCampo(e));
+  const hoy = hoyLocal();
+  const area = areaVista();
+  const nombre = state.sesionUsuario?.nombre?.split(' ')[0] || '';
+  const fechaLarga = new Date().toLocaleDateString('es-SV', { weekday: 'long', day: 'numeric', month: 'long' }).replace(/^./, c => c.toUpperCase());
 
-  html += '<div class="content">';
-  html += '<div style="margin-bottom:16px">';
-  html += '<div style="font-size:20px;font-weight:800;color:var(--text)">Hola, '+(state.sesionUsuario?.nombre?.split(' ')[0]||'')+'! 👋</div>';
-  html += '<div style="font-size:12px;color:var(--text3);margin-top:2px">'+new Date().toLocaleDateString('es-SV',{weekday:'long',day:'numeric',month:'long'}).replace(/^./,c=>c.toUpperCase())+'</div>';
-  html += '</div>';
-
-  // Alerts
-  if (vencidos.length > 0) {
-    html += '<div onclick="switchTab(this.dataset.t)" data-t="instalaciones" style="background:var(--red-light);border:1px solid #fecaca;border-radius:12px;padding:12px 16px;margin-bottom:10px;cursor:pointer">';
-    html += '<div style="font-size:13px;font-weight:700;color:var(--red)">⚠️ '+vencidos.length+' retiro'+(vencidos.length>1?'s':'')+' vencido'+(vencidos.length>1?'s':'')+'</div>';
-    html += '<div style="font-size:11px;color:var(--red);margin-top:2px">Toca para ver</div></div>';
-  }
-  if (descPend.length > 0) {
-    html += '<div onclick="switchTab(this.dataset.t)" data-t="inventario" style="background:var(--yellow-light);border:1px solid #fcd34d;border-radius:12px;padding:12px 16px;margin-bottom:10px;cursor:pointer">';
-    html += '<div style="font-size:13px;font-weight:700;color:var(--yellow)">💾 '+descPend.length+' descarga'+(descPend.length>1?'s':'')+' pendiente'+(descPend.length>1?'s':'')+'</div>';
-    html += '<div style="font-size:11px;color:var(--yellow);margin-top:2px">Toca para ver inventario</div></div>';
-  }
-
-  // Active installs
-  html += '<div style="background:linear-gradient(135deg,var(--primary-dark),var(--primary));border-radius:14px;padding:16px;margin-bottom:12px;color:#fff">';
-  html += '<div style="font-size:11px;color:rgba(255,255,255,.7);margin-bottom:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Instalaciones activas</div>';
-  html += '<div style="display:flex;gap:12px">';
-  html += '<div style="flex:1;text-align:center"><div style="font-size:26px;font-weight:800;font-family:var(--mono)">'+activos.filter(r=>(r.areaInstalacion||'CPT MT')==='CPT MT').length+'</div><div style="font-size:10px;color:rgba(255,255,255,.7)">CPT MT</div></div>';
-  html += '<div style="width:1px;background:rgba(255,255,255,.2)"></div>';
-  html += '<div style="flex:1;text-align:center"><div style="font-size:26px;font-weight:800;font-family:var(--mono)">'+activos.filter(r=>(r.areaInstalacion||'CPT MT')==='CPT BT').length+'</div><div style="font-size:10px;color:rgba(255,255,255,.7)">CPT BT</div></div>';
-  html += '<div style="width:1px;background:rgba(255,255,255,.2)"></div>';
-  html += '<div style="flex:1;text-align:center"><div style="font-size:26px;font-weight:800;font-family:var(--mono)">'+activos.filter(r=>(r.areaInstalacion||'CPT MT')==='Campos y Servicios').length+'</div><div style="font-size:10px;color:rgba(255,255,255,.7)">C&S</div></div>';
+  let html = '<div class="content inicio">';
+  html += `<div class="page-head"><div><h1 class="page-title">Hola, ${esc(nombre)}</h1><div class="page-sub">${fechaLarga}</div></div>${filtroArea()}</div>`;
+  html += '<div class="inicio-grid"><div class="inicio-col">';
+  html += renderPendientes(hoy, area);
+  html += '</div><div class="inicio-col">';
+  html += renderResumenTrabajo(hoy, area);
+  html += renderEquipos();
+  html += renderAcciones();
   html += '</div></div>';
+  if (state.showReporteModal) html += renderReporteModal();
+  html += renderActividad();
+  html += '</div>';
+  return html;
+}
 
-  // Retiros proximos
-  html += '<div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Retiros próximos (' + proximos.length + ')</div>';
-  if (proximos.length === 0) {
-    html += '<div style="background:var(--green-light);border:1px solid var(--green);border-radius:12px;padding:12px 16px;margin-bottom:12px;font-size:13px;color:var(--green);font-weight:600">✅ Sin retiros próximos</div>';
-  } else {
-    html += '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">';
-    proximos.slice(0,5).forEach(r => {
-      const d = daysUntil(r.fechaRetiro);
-      const color = d===0?'var(--red)':d<=3?'var(--yellow)':'var(--text2)';
-      const label = d===0?'HOY':d===1?'Mañana':'en '+d+'d';
-      const rid = r.id;
-      html += '<div onclick="goToInstall(this.dataset.id)" data-id="'+rid+'" style="background:var(--white);border:1px solid var(--border);border-radius:10px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer">';
-      html += '<div><div style="font-family:var(--mono);font-size:13px;font-weight:700">'+r.serie+'</div><div style="font-size:11px;color:var(--text3)">'+(r.areaInstalacion||'CPT MT')+' · '+(r.lugar||'')+'</div></div>';
-      html += '<span style="font-size:12px;font-weight:800;color:'+color+'">'+label+'</span>';
-      html += '</div>';
-    });
-    if (proximos.length > 5) html += '<div style="font-size:11px;color:var(--text3);text-align:center;padding:4px">+'+(proximos.length-5)+' más</div>';
-    html += '</div>';
+function renderPendientes(hoy, area) {
+  const lista = calcularPendientes({ registros: state.records, campanasGuardadas: state.campanas || {}, hoy, area });
+  let html = `<div class="panel"><div class="panel-titulo"><i class="ic ic-campana"></i> Pendientes${lista.length ? ` <span class="contador">${lista.length}</span>` : ''}</div>`;
+  if (!lista.length) {
+    return html + '<div class="todo-al-dia"><i class="ic ic-check"></i> Todo al día. No hay nada vencido ni por vencer en los próximos 3 días.</div></div>';
   }
-
-  // Equipment grid
-  html += '<div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Estado del inventario</div>';
-  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">';
-  [
-    {n:disponibles.length, label:'Disponibles', color:'var(--green)'},
-    {n:enCampo.length, label:'En campo', color:'var(--yellow)'},
-    {n:enMant.length, label:'En mantenimiento', color:'#7c3aed'},
-    {n:fuera.length, label:'Fuera de servicio', color:'var(--red)'}
-  ].forEach(item => {
-    html += '<div onclick="switchTab(\"inventario\")" style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px;cursor:pointer">';
-    html += '<div style="font-size:22px;font-weight:800;color:'+item.color+';font-family:var(--mono)">'+item.n+'</div>';
-    html += '<div style="font-size:11px;color:var(--text3);margin-top:2px">'+item.label+'</div>';
+  GRUPOS.forEach(([clave, titulo]) => {
+    const items = lista.filter(p => p.urgencia === clave);
+    if (!items.length) return;
+    html += `<div class="grupo grupo-${CLASE_GRUPO[clave]}"><div class="grupo-titulo">${titulo} <span>${items.length}</span></div>`;
+    items.forEach(p => {
+      html += `<div class="pendiente" onclick="${accionPendiente(p)}">
+        <i class="pendiente-icono ic ic-${ICONO_PENDIENTE[p.clase]}"></i>
+        <div class="pendiente-texto"><div class="pendiente-titulo">${esc(p.titulo)}</div>${p.detalle ? `<div class="pendiente-detalle">${esc(p.detalle)}</div>` : ''}</div>
+        ${p.fecha && clave !== 'sin_fecha' ? `<div class="pendiente-fecha">${textoPlazo(p.fecha, hoy)}<small>${fmtDate(p.fecha)}</small></div>` : ''}
+        ${clave === 'sin_fecha' && p.clase === 'informe' && p.fecha ? `<div class="pendiente-fecha">${fmtDate(p.fecha)}</div>` : ''}
+      </div>`;
+    });
     html += '</div>';
   });
-  html += '</div>';
+  return html + '</div>';
+}
 
-  // Quick actions
-  html += '<div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Acciones rápidas</div>';
-  html += '<div style="display:flex;gap:8px">';
-  html += '<button onclick="newInstallFromDash()" style="flex:1;padding:12px;border:1.5px solid var(--primary);border-radius:12px;background:var(--primary-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">⚡ Nueva instalación</button>';
-  html += '<button onclick="switchTab(this.dataset.t)" data-t="carga" style="flex:1;padding:12px;border:1.5px solid var(--border);border-radius:12px;background:var(--white);color:var(--text2);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">📤 Despacho</button>';
-  html += '</div>';
-  html += '<div style="margin-top:10px">';
-  html += '<button onclick="switchTab(\'validaciones\')" style="width:100%;padding:12px;border:1.5px solid #7c3aed;border-radius:12px;background:#f3f0ff;color:#7c3aed;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">🔌 Validaciones de TAP' + (state.validaciones.length > 0 ? ' (' + state.validaciones.length + ' campañas)' : '') + '</button>';
-  html += '</div>';
-  html += '<div style="margin-top:8px;display:flex;gap:8px">';
-  html += '<button onclick="abrirReporteModal()" style="flex:1;padding:12px;border:1.5px solid #0891b2;border-radius:12px;background:#ecfeff;color:#0891b2;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">📊 Reporte</button>';
-  html += '</div>';
-  if (state.showReporteModal) {
-    const MESES_RM = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-    html += '<div class="modal-overlay" style="position:fixed;inset:0;background:#00000088;z-index:300;display:flex;align-items:flex-end"><div style="background:var(--white);border-radius:20px 20px 0 0;width:100%;padding:20px;font-family:var(--font);max-height:90vh;overflow-y:auto">';
-    html += '<div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:14px">📊 Reporte mensual</div>';
-    html += '<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">MES</div><div style="display:flex;gap:4px;flex-wrap:wrap">';
-    MESES_RM.forEach((m,i) => { const ms=i+1; html += '<div onclick="setReporteMes('+ms+')" style="padding:5px 9px;border-radius:8px;border:2px solid '+(state.reporteMes===ms?'#0891b2':'var(--border)')+';background:'+(state.reporteMes===ms?'#ecfeff':'#fff')+';color:'+(state.reporteMes===ms?'#0891b2':'var(--text3)')+';font-size:11px;font-weight:700;cursor:pointer">'+m+'</div>'; });
-    html += '</div></div>';
-    const aNow = new Date().getFullYear();
-    html += '<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">AÑO</div><div style="display:flex;gap:6px">';
-    [aNow-1,aNow,aNow+1].forEach(a => { html += '<div onclick="setReporteAnio('+a+')" style="padding:6px 14px;border-radius:8px;border:2px solid '+(state.reporteAnio===a?'#0891b2':'var(--border)')+';background:'+(state.reporteAnio===a?'#ecfeff':'#fff')+';color:'+(state.reporteAnio===a?'#0891b2':'var(--text3)')+';font-size:12px;font-weight:700;cursor:pointer">'+a+'</div>'; });
-    html += '</div></div>';
-    html += '<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">ÁREA</div><div style="display:flex;gap:6px;flex-wrap:wrap">';
-    ['TODOS','CPT MT','CPT BT','Campos y Servicios'].forEach(ar => { html += '<div onclick="setReporteArea(this.dataset.a)" data-a="'+ar+'" style="padding:6px 10px;border-radius:8px;border:2px solid '+(state.reporteArea===ar?'#0891b2':'var(--border)')+';background:'+(state.reporteArea===ar?'#ecfeff':'#fff')+';color:'+(state.reporteArea===ar?'#0891b2':'var(--text3)')+';font-size:11px;font-weight:700;cursor:pointer">'+(ar==='TODOS'?'Todas':ar)+'</div>'; });
-    html += '</div></div>';
-    html += '<button onclick="generarReporteMensual()" style="width:100%;padding:13px;border:none;border-radius:10px;background:#0891b2;color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px">⬇️ Generar Excel</button>';
-    html += '<button onclick="cerrarReporteModal()" style="width:100%;padding:11px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--text3);font-family:var(--font);font-size:13px;cursor:pointer">Cancelar</button>';
-    html += '</div></div>';
-  }
-  if (isAdmin()) {
-    html += '<div style="margin-top:8px">';
-    html += '<button onclick="toggleMantenimiento()" style="width:100%;padding:10px;border:1.5px solid '+(state.modoMantenimiento?'var(--red)':'var(--border)')+';border-radius:12px;background:'+(state.modoMantenimiento?'var(--red-light)':'#fff')+';color:'+(state.modoMantenimiento?'var(--red)':'var(--text3)')+';font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer">'+(state.modoMantenimiento?'🔧 Desactivar mantenimiento':'🔧 Activar mantenimiento')+'</button>';
-    html += '</div>';
-  }
+function accionPendiente(p) {
+  if (p.clase === 'campana') return `abrirCampanaTrabajo('${p.clave}')`;
+  if (p.clase === 'informe') return "switchTab('reclamos')";
+  if (p.clase === 'requerimiento') return "switchTab('requerimientos')";
+  return `goToInstall('${p.id}')`;
+}
 
+function renderResumenTrabajo(hoy, area) {
+  const delArea = r => !area || areaDeInstalacion(r) === area;
+  const campanas = agruparCampanas(state.records, hoy).filter(c => !area || c.area === area);
+  const campAbiertas = campanas.filter(c => !state.campanas?.[c.clave]?.entrega);
+  const reclamos = registrosDeTipo(state.records, 'reclamo').filter(delArea);
+  const reqs = registrosDeTipo(state.records, 'requerimiento').filter(delArea);
+  const tarjeta = (tab, icono, titulo, num, sub) => `<button class="resumen" onclick="switchTab('${tab}')">
+      <i class="ic ic-${icono}"></i><div class="resumen-num">${num}</div><div class="resumen-titulo">${titulo}</div><div class="resumen-sub">${sub}</div></button>`;
+  let html = '<div class="section-title">Trabajo</div><div class="resumen-grid">';
+  html += tarjeta('campanas', 'campanas', 'Campañas', campAbiertas.length, 'sin entregar');
+  html += tarjeta('reclamos', 'reclamos', 'Reclamos', reclamos.filter(r => !r.informeEntregado).length,
+    `${reclamos.filter(r => !r.retirado).length} en campo · ${reclamos.filter(r => r.retirado && !r.informeEntregado).length} con informe pendiente`);
+  html += tarjeta('requerimientos', 'requerimientos', 'Requerimientos', reqs.filter(r => !r.entregaRealizada).length, 'por entregar');
+  return html + '</div>';
+}
+
+function renderEquipos() {
+  const activos = state.records.filter(r => calcSt(r) === 'ACTIVO' || calcSt(r) === 'PROXIMO' || calcSt(r) === 'VENCIDO');
+  const cond = e => e.condicion || 'bueno';
+  const items = [
+    ['disponible', state.equipos.filter(e => eqSt(e) === 'disponible').length, 'Disponibles', 'verde'],
+    ['campo', state.equipos.filter(e => eqEnCampo(e)).length, 'En campo', 'azul'],
+    ['mant', state.equipos.filter(e => cond(e) === 'mantenimiento').length, 'En mantenimiento', 'morado'],
+    ['fuera', state.equipos.filter(e => cond(e) === 'fuera').length, 'Fuera de servicio', 'rojo'],
+  ];
+  let html = '<div class="section-title">Equipos</div><div class="equipos-grid">';
+  items.forEach(([, n, label, color]) => { html += `<button class="equipo-dato" onclick="switchTab('inventario')"><b class="txt-${color}">${n}</b><span>${label}</span></button>`; });
+  html += '</div>';
+  html += '<div class="instalaciones-area"><span>Instalaciones en campo</span>';
+  ['CPT MT', 'CPT BT', 'Campos y Servicios'].forEach(a => {
+    html += `<span class="chip-dato"><b>${activos.filter(r => (r.areaInstalacion || 'CPT MT') === a).length}</b> ${a === 'Campos y Servicios' ? 'C&S' : a}</span>`;
+  });
+  return html + '</div>';
+}
+
+function renderAcciones() {
+  const accion = (onclick, icono, texto) => `<button class="accion" onclick="${onclick}"><i class="ic ic-${icono}"></i><span>${texto}</span></button>`;
+  let html = '<div class="section-title">Acciones rápidas</div><div class="acciones">';
+  html += accion('newInstallFromDash()', 'instalaciones', 'Nueva instalación');
+  html += accion("switchTab('carga')", 'despachos', 'Despacho');
+  html += accion("switchTab('validaciones')", 'validacion', 'Validaciones de TAP' + (state.validaciones.length ? ` (${state.validaciones.length} campañas)` : ''));
+  html += accion('abrirReporteModal()', 'excel', 'Reporte mensual');
+  if (isAdmin()) html += accion('toggleMantenimiento()', 'ajustes', state.modoMantenimiento ? 'Desactivar mantenimiento' : 'Activar mantenimiento');
+  return html + '</div>';
+}
+
+function renderReporteModal() {
+  let html = '';
+  const MESES_RM = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  html += '<div class="modal-overlay" style="position:fixed;inset:0;background:#00000088;z-index:300;display:flex;align-items:flex-end"><div style="background:var(--white);border-radius:20px 20px 0 0;width:100%;padding:20px;font-family:var(--font);max-height:90vh;overflow-y:auto">';
+  html += '<div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:14px"><i class=ic-grafica></i> Reporte mensual</div>';
+  html += '<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">MES</div><div style="display:flex;gap:4px;flex-wrap:wrap">';
+  MESES_RM.forEach((m,i) => { const ms=i+1; html += '<div onclick="setReporteMes('+ms+')" style="padding:5px 9px;border-radius:8px;border:2px solid '+(state.reporteMes===ms?'#0891b2':'var(--border)')+';background:'+(state.reporteMes===ms?'#ecfeff':'#fff')+';color:'+(state.reporteMes===ms?'#0891b2':'var(--text3)')+';font-size:11px;font-weight:700;cursor:pointer">'+m+'</div>'; });
+  html += '</div></div>';
+  const aNow = new Date().getFullYear();
+  html += '<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">AÑO</div><div style="display:flex;gap:6px">';
+  [aNow-1,aNow,aNow+1].forEach(a => { html += '<div onclick="setReporteAnio('+a+')" style="padding:6px 14px;border-radius:8px;border:2px solid '+(state.reporteAnio===a?'#0891b2':'var(--border)')+';background:'+(state.reporteAnio===a?'#ecfeff':'#fff')+';color:'+(state.reporteAnio===a?'#0891b2':'var(--text3)')+';font-size:12px;font-weight:700;cursor:pointer">'+a+'</div>'; });
+  html += '</div></div>';
+  html += '<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">ÁREA</div><div style="display:flex;gap:6px;flex-wrap:wrap">';
+  ['TODOS','CPT MT','CPT BT','Campos y Servicios'].forEach(ar => { html += '<div onclick="setReporteArea(this.dataset.a)" data-a="'+ar+'" style="padding:6px 10px;border-radius:8px;border:2px solid '+(state.reporteArea===ar?'#0891b2':'var(--border)')+';background:'+(state.reporteArea===ar?'#ecfeff':'#fff')+';color:'+(state.reporteArea===ar?'#0891b2':'var(--text3)')+';font-size:11px;font-weight:700;cursor:pointer">'+(ar==='TODOS'?'Todas':ar)+'</div>'; });
+  html += '</div></div>';
+  html += '<button onclick="generarReporteMensual()" style="width:100%;padding:13px;border:none;border-radius:10px;background:#0891b2;color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px"><i class=ic-descargar></i> Generar Excel</button>';
+  html += '<button onclick="cerrarReporteModal()" style="width:100%;padding:11px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--text3);font-family:var(--font);font-size:13px;cursor:pointer">Cancelar</button>';
+  html += '</div></div>';
+  return html;
+}
+
+function renderActividad() {
+  let html = '';
   // ── CALENDARIO DE ACTIVIDAD ──
   html += '<div style="margin-top:14px">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">';
-  html += '<div style="font-size:13px;font-weight:700;color:var(--text)">📅 Actividad</div>';
+  html += '<div style="font-size:13px;font-weight:700;color:var(--text)"><i class=ic-calendario></i> Actividad</div>';
   html += '<button onclick="toggleCal()" style="font-size:11px;font-weight:700;padding:5px 12px;border:1px solid var(--border);border-radius:20px;background:var(--white);color:var(--text3);cursor:pointer">'+(state.calView?'Ocultar':'Ver calendario')+'</button>';
   html += '</div>';
 
@@ -135,21 +149,21 @@ export function renderDashboard() {
     // Instalaciones y retiros
     state.records.forEach(r => {
       const sub = [r.lugar||r.nombre||r.usuario||'', r.idUsuario||r.id_usuario||r.nc||'', r.direccion||''].filter(Boolean).join(' · ');
-      if (r.fechaInstalacion) addAct(r.fechaInstalacion, 'install', '⚡ Instalación: '+(r.caso||r.serie||''), sub);
-      if (r.retirado && r.fechaRetiroReal) addAct(r.fechaRetiroReal, 'retiro', '📤 Retiro: '+(r.caso||r.serie||''), sub);
+      if (r.fechaInstalacion) addAct(r.fechaInstalacion, 'install', '<i class=ic-instalaciones></i> Instalación: '+(r.caso||r.serie||''), sub);
+      if (r.retirado && r.fechaRetiroReal) addAct(r.fechaRetiroReal, 'retiro', '<i class=ic-subir></i> Retiro: '+(r.caso||r.serie||''), sub);
       // Descargas
       (r.descargas||[]).forEach(dsc => {
-        if (dsc.fecha) addAct(dsc.fecha, 'descarga', '💾 Descarga: '+(r.caso||r.serie||'')+(dsc.medicionOk===false?' ❌':''), sub);
+        if (dsc.fecha) addAct(dsc.fecha, 'descarga', '<i class=ic-descargar></i> Descarga: '+(r.caso||r.serie||'')+(dsc.medicionOk===false?' <i class=ic-x></i>':''), sub);
       });
     });
     // Despachos
     state.historialCargas.forEach(h => {
-      if (h.fecha) addAct(h.fecha, 'despacho', '📦 Despacho: '+(h.total||'')+(h.total?' equipos':''), h.areaOrigen||'');
+      if (h.fecha) addAct(h.fecha, 'despacho', '<i class=ic-equipos></i> Despacho: '+(h.total||'')+(h.total?' equipos':''), h.areaOrigen||'');
     });
     // Validaciones
     state.validaciones.forEach(v => {
       (v.usuarios||[]).forEach(u => {
-        if (u.fechaValidacion) addAct(u.fechaValidacion, 'validacion', '🔌 Validación: '+(u.siget||u.nombre||''));
+        if (u.fechaValidacion) addAct(u.fechaValidacion, 'validacion', '<i class=ic-validacion></i> Validación: '+(u.siget||u.nombre||''));
       });
     });
 
@@ -223,7 +237,5 @@ export function renderDashboard() {
     html += '</div>'; // end calendar card
   }
   html += '</div>'; // end actividad section
-
-  html += '</div>';
   return html;
 }

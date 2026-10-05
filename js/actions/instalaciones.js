@@ -16,7 +16,7 @@ export function getGPS() {
     state.form.lng = pos.coords.longitude.toFixed(6);
     if (!state.form.lugar) state.form.lugar = `${(+state.form.lat).toFixed(4)}, ${(+state.form.lng).toFixed(4)}`;
     render();
-    showToast('📍 Ubicación capturada');
+    showToast('Ubicación capturada');
   }, () => { showToast('No se pudo obtener ubicación GPS'); render(); }, { enableHighAccuracy: true, timeout: 12000 });
 }
 
@@ -29,13 +29,13 @@ export function handleSave() {
   // Validación de duplicados
   if (!state.editId) {
     const activa = state.records.find(r => r.equipoId === state.form.equipoId && !r.retirado);
-    if (activa) return showToast('⚠️ Este equipo ya tiene instalación activa en #' + (activa.caso||'?'));
+    if (activa) return showToast('Este equipo ya tiene instalación activa en #' + (activa.caso||'?'));
   }
   // #13 Duplicate series check
   const eq = state.equipos.find(e => e.id === state.form.equipoId);
   if (eq) {
     const yaActivo = state.records.find(r => r.serie === eq.serie && !r.retirado && r.id !== state.editId);
-    if (yaActivo) return showToast('⚠️ La serie ' + eq.serie + ' ya está instalada en caso #' + (yaActivo.caso||'?'));
+    if (yaActivo) return showToast('La serie ' + eq.serie + ' ya está instalada en caso #' + (yaActivo.caso||'?'));
   }
   const usuario = state.sesionUsuario?.nombre || 'Desconocido';
   const energiaInst = state.form.energiaTipoInst === 'una'
@@ -47,12 +47,12 @@ export function handleSave() {
   if (state.editId) {
     const id = state.editId;
     state.editId = null; state.view = 'lista'; state.form = emptyForm();
-    update(ref(db, `analizadores/${id}`), { ...payload, editadoPor: usuario, fechaEdicion: today() }).then(() => showToast('✅ Actualizado'));
+    update(ref(db, `analizadores/${id}`), { ...payload, editadoPor: usuario, fechaEdicion: today() }).then(() => showToast('Actualizado'));
   } else {
     const savedPayload = {...payload};
     state.view = 'lista'; state.form = emptyForm();
     push(installsRef, savedPayload).then(newRef => {
-      showToast('✅ Instalación registrado');
+      showToast('Instalación registrado');
       setTimeout(() => {
         if (confirm('¿Quieres agregar el recordatorio de retiro a Google Calendar?')) {
           addToGoogleCalendar(savedPayload);
@@ -81,7 +81,7 @@ export function toggleSinProblema() {
 }
 
 export function handleRetiro() {
-  if (state.retiroForm.descargaConfirmada === null) return showToast('⚠️ Indica si ya descargaste la medición');
+  if (state.retiroForm.descargaConfirmada === null) return showToast('Indica si ya descargaste la medición');
   if (state.retiroForm.sinProblema === null && state.retiroForm.fallas.length === 0) return showToast('Indica si hubo algún problema');
   const energiaRet = state.retiroForm.energiaTipo === 'una'
     ? { tipo: 'una', una: state.retiroForm.energiaUna }
@@ -116,7 +116,7 @@ export function handleRetiro() {
       }
       update(ref(db, `equipos/${deployRec.equipoId}`), eqUpdates);
     }
-    showToast('✅ Equipo marcado como retirado');
+    showToast('Equipo marcado como retirado');
   });
 }
 
@@ -143,13 +143,13 @@ export function handleDescarga() {
   state.showDescargaModal = false; state.descargaId = null;
   // Mark descargaPendiente as resolved
   update(ref(db, 'analizadores/' + id), { descargas, descargaPendiente: false }).then(() => {
-    showToast(state.descargaForm.medicionOk ? '💾 Descarga registrada correctamente' : '💾 Descarga registrada · Fallo anotado');
+    showToast(state.descargaForm.medicionOk ? 'Descarga registrada correctamente' : 'Descarga registrada · Fallo anotado');
   });
 }
 
 // ── DELETE DEPLOY ──
 export function handleDelInstall(id) {
-  if (!isAdmin()) return showToast('⚠️ Solo el administrador puede eliminar registros');
+  if (!isAdmin()) return showToast('Solo el administrador puede eliminar registros');
   if (!confirm('¿Eliminar este instalación?')) return;
   state.view = 'lista';
   remove(ref(db, `analizadores/${id}`)).then(() => showToast('Eliminado'));

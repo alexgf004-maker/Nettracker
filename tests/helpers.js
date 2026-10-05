@@ -38,6 +38,7 @@ async function abrirApp(page, { usuario = 'David García', datos = fixture } = {
 
   await page.goto('/');
   await expect(page.locator('#app .loading')).toHaveCount(0);
+  await page.waitForFunction(() => window.__PENDIENTES__ === 0); // todos los nodos cargados
 
   return {
     errores,

@@ -1,5 +1,6 @@
 // Handlers globales (onclick): navegación, búsqueda, tema, calendario, reportes, login
-import { cerrarSesion, doLogin } from '../actions/auth.js';
+import { cerrarSesion, entrarComo } from '../actions/auth.js';
+import { desmarcarCampanaEntregada, desmarcarInformeEntregado, desmarcarRequerimientoEntregado, marcarCampanaEntregada, marcarInformeEntregado, marcarRequerimientoEntregado, setEntregaLimite } from '../actions/trabajo.js';
 import { userArea, userInstTab } from '../config.js';
 import { mantenimientoRef, set } from '../firebase.js';
 import { state } from '../state.js';
@@ -29,6 +30,8 @@ window.setGlobalSearch = v => {
 
 window.goToInstall = el => {
   const id = typeof el === 'string' ? el : el.dataset.id;
+  // Desde Inicio o Trabajo, "volver" regresa a donde estaba
+  state.volverA = state.tab !== 'instalaciones' ? { tab: state.tab, campanaClave: state.campanaClave } : null;
   state.showGlobalSearch = false; state.tab = 'instalaciones'; state.view = 'detalle'; state.editId = id;
   const r = state.records.find(x => x.id === id);
   if (r) state.instTab = (r.areaInstalacion||'CPT MT')==='CPT BT'?'cpt_bt':(r.areaInstalacion==='Campos y Servicios'?'campos':'cpt_mt');
@@ -49,7 +52,7 @@ window.newInstallFromDash = () => {
 window.toggleMantenimiento = () => {
   const nuevo = !state.modoMantenimiento;
   set(mantenimientoRef, nuevo).then(() => {
-    showToast(nuevo ? '🔧 Modo mantenimiento activado' : '✅ Mantenimiento desactivado');
+    showToast(nuevo ? 'Modo mantenimiento activado' : 'Mantenimiento desactivado');
   });
 };
 
@@ -58,8 +61,8 @@ window.toggleCal = () => { state.calView = !state.calView; state.calDiaSeleccion
 
 window.calNav = dir => {
   state.calMonth += dir;
-  if (state.calMonth > 11) { state.calMonth = 0; state.calYearalYear++; }
-  if (state.calMonth < 0) { state.calMonth = 11; state.calYearalYear--; }
+  if (state.calMonth > 11) { state.calMonth = 0; state.calYear++; }
+  if (state.calMonth < 0) { state.calMonth = 11; state.calYear--; }
   state.calDiaSeleccionado = null;
   render();
 };
@@ -69,6 +72,7 @@ window.selCal = ds => {
   render();
 };
 
+window.abrirReporteModal = () => { state.showReporteModal = true; render(); };
 window.cerrarReporteModal = () => { state.showReporteModal = false; render(); };
 window.setReporteMes = m => { state.reporteMes = m; render(); };
 window.setReporteAnio = a => { state.reporteAnio = a; render(); };
@@ -93,13 +97,17 @@ window.generarReporteMensual = () => {
   const wb=XLSX.utils.book_new();const aS=(n,d)=>{const ws=XLSX.utils.aoa_to_sheet(d);ws['!cols']=Array(10).fill({wch:20});XLSX.utils.book_append_sheet(wb,ws,n);};
   aS('Resumen',RES);aS('Instalaciones',iR);aS('Retiros',rtR);aS('Descargas',dR);aS('Despachos',dpR);aS('Validaciones',vR);
   XLSX.writeFile(wb,'Reporte_'+MN[mes-1]+'_'+anio+(area!=='TODOS'?'_'+area.replace(/ /g,'_'):'')+'.xlsx');
-  state.showReporteModal=false;showToast('📊 Reporte generado');render();
+  state.showReporteModal=false;showToast('Reporte generado');render();
 };
 
-window.goBack = () => { state.view = 'lista'; state.editId = null; state.editEqId = null; state.form = emptyForm(); state.equipoForm = emptyEF(); state.showSelector = false; render(); };
+window.goBack = () => {
+  if (state.view === 'lista' && state.campanaClave) { state.campanaClave = null; render(); return; }
+  if (state.view === 'detalle' && state.volverA) { Object.assign(state, state.volverA, { view: 'lista', editId: null, volverA: null }); render(); return; }
+  state.view = 'lista'; state.editId = null; state.editEqId = null; state.form = emptyForm(); state.equipoForm = emptyEF(); state.showSelector = false; render(); };
 
 window.switchTab = t => {
   state.tab = t; state.view = 'lista'; state.editId = null; state.editEqId = null;
+  state.showMas = false; state.campanaClave = null; state.volverA = null;
   if (t === 'instalaciones') state.filterStatus = 'TODOS';
   if (t === 'validaciones') { state.valView = 'lista'; state.valCampanaId = null; state.valUsuarioIdx = null; }
   state.showGlobalSearch = false; state.globalSearch = '';
@@ -109,7 +117,11 @@ window.switchTab = t => {
 window.cerrarAlerta = () => { state.showAlertaRetiros = false; render(); };
 window.setMapaFiltro = f => { state.mapaFiltro = f; render(); };
 window.verRetiros = () => { state.showAlertaRetiros = false; state.tab = 'instalaciones'; state.filterStatus = 'PROXIMO'; render(); };
-window.selectLoginUser = n => { state.loginForm.nombre = n; state.loginForm.pin = ''; state.loginForm.error = ''; render(); };
-window.setLoginPin = v => { state.loginForm.pin = v; state.loginForm.error = ''; };
-window.doLogin = doLogin;
+window.entrarComo = entrarComo;
+
+// ── MENÚ Y TRABAJO ──
+window.toggleMas = () => { state.showMas = !state.showMas; render(); };
+window.setAreaFiltro = f => { state.areaFiltro = f; render(); };
+window.abrirCampanaTrabajo = clave => { state.tab = 'campanas'; state.view = 'lista'; state.campanaClave = clave; state.showMas = false; render(); };
+Object.assign(window, { marcarCampanaEntregada, desmarcarCampanaEntregada, marcarInformeEntregado, desmarcarInformeEntregado, setEntregaLimite, marcarRequerimientoEntregado, desmarcarRequerimientoEntregado });
 window.cerrarSesion = cerrarSesion;

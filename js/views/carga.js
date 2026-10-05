@@ -8,15 +8,15 @@ export function renderCarga() {
   html += '<div class="content">';
   // Toggle between subir and historial
   html += '<div style="display:flex;gap:8px;margin-bottom:16px">';
-  html += '<button onclick="setCargaSubView(\'subir\')" style="flex:1;padding:10px;border-radius:10px;border:2px solid '+(state.cargaSubView==='subir'?'var(--primary)':'var(--border)')+';background:'+(state.cargaSubView==='subir'?'var(--primary-light)':'#fff')+';color:'+(state.cargaSubView==='subir'?'var(--primary)':'var(--text3)')+';font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer">📥 Subir archivo</button>';
-  html += '<button onclick="setCargaSubView(\'historial\')" style="flex:1;padding:10px;border-radius:10px;border:2px solid '+(state.cargaSubView==='historial'?'var(--primary)':'var(--border)')+';background:'+(state.cargaSubView==='historial'?'var(--primary-light)':'#fff')+';color:'+(state.cargaSubView==='historial'?'var(--primary)':'var(--text3)')+';font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer">📋 Historial '+(state.historialCargas.length>0?'('+state.historialCargas.length+')':'')+'</button>';
-  html += '<button onclick="setCargaSubView(\'accesorios\')" style="flex:1;padding:10px;border-radius:10px;border:2px solid '+(state.cargaSubView==='accesorios'?'var(--primary)':'var(--border)')+';background:'+(state.cargaSubView==='accesorios'?'var(--primary-light)':'#fff')+';color:'+(state.cargaSubView==='accesorios'?'var(--primary)':'var(--text3)')+';font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer">🔒 Accesorios</button>';
+  html += '<button onclick="setCargaSubView(\'subir\')" style="flex:1;padding:10px;border-radius:10px;border:2px solid '+(state.cargaSubView==='subir'?'var(--primary)':'var(--border)')+';background:'+(state.cargaSubView==='subir'?'var(--primary-light)':'#fff')+';color:'+(state.cargaSubView==='subir'?'var(--primary)':'var(--text3)')+';font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer"><i class=ic-bandeja></i> Subir archivo</button>';
+  html += '<button onclick="setCargaSubView(\'historial\')" style="flex:1;padding:10px;border-radius:10px;border:2px solid '+(state.cargaSubView==='historial'?'var(--primary)':'var(--border)')+';background:'+(state.cargaSubView==='historial'?'var(--primary-light)':'#fff')+';color:'+(state.cargaSubView==='historial'?'var(--primary)':'var(--text3)')+';font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer"><i class=ic-clipboard></i> Historial '+(state.historialCargas.length>0?'('+state.historialCargas.length+')':'')+'</button>';
+  html += '<button onclick="setCargaSubView(\'accesorios\')" style="flex:1;padding:10px;border-radius:10px;border:2px solid '+(state.cargaSubView==='accesorios'?'var(--primary)':'var(--border)')+';background:'+(state.cargaSubView==='accesorios'?'var(--primary-light)':'#fff')+';color:'+(state.cargaSubView==='accesorios'?'var(--primary)':'var(--text3)')+';font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer"><i class=ic-candado></i> Accesorios</button>';
   html += '</div>';
 
   if (state.cargaSubView === 'historial') {
-    html += '<div class="page-title">📋 Historial de despachos</div>';
+    html += '<div class="page-title"><i class=ic-clipboard></i> Historial de despachos</div>';
     if (state.historialCargas.length === 0) {
-      html += '<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Sin despachos registrados</div></div>';
+      html += '<div class="empty"><div class="empty-icon"><i class=ic-clipboard></i></div><div class="empty-text">Sin despachos registrados</div></div>';
     } else {
       state.historialCargas.forEach((c, i) => {
         html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px">';
@@ -24,7 +24,7 @@ export function renderCarga() {
         html += '<div style="font-size:13px;font-weight:700;color:var(--text)">' + fmtDate(c.fecha) + ' · ' + (c.hora||'') + '</div>';
         html += '<span style="background:var(--primary-light);color:var(--primary);font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px">' + c.total + ' eq.</span>';
         html += '</div>';
-        html += '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">' + (c.areaOrigen||'CPT BT') + ' → Campos y Serv.' + (c.realizadoPor ? ' · 👤 ' + c.realizadoPor : '') + '</div>';
+        html += '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">' + (c.areaOrigen||'CPT BT') + ' → Campos y Serv.' + (c.realizadoPor ? ' · <i class=ic-usuario></i> ' + c.realizadoPor : '') + '</div>';
         // Check retiro status
         const instDespacho = c.instalacionIds ? state.records.filter(r => c.instalacionIds.includes(r.id)) : [];
         const retirados = instDespacho.filter(r => r.retirado).length;
@@ -41,11 +41,11 @@ export function renderCarga() {
         }
 
         html += '<div style="display:flex;gap:6px;margin-bottom:6px">';
-        html += '<button onclick="verMemo(\''+c.id+'\')" style="flex:1;padding:9px;border:1px solid var(--primary);border-radius:8px;background:var(--primary-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">📄 Ver memo</button>';
-        html += '<button onclick="emailDespacho(\''+c.id+'\')" style="flex-shrink:0;padding:9px 12px;border:1px solid var(--accent);border-radius:8px;background:var(--accent-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">📧</button>';
+        html += '<button onclick="verMemo(\''+c.id+'\')" style="flex:1;padding:9px;border:1px solid var(--primary);border-radius:8px;background:var(--primary-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer"><i class=ic-archivo></i> Ver memo</button>';
+        html += '<button onclick="emailDespacho(\''+c.id+'\')" style="flex-shrink:0;padding:9px 12px;border:1px solid var(--accent);border-radius:8px;background:var(--accent-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer"><i class=ic-correo></i></button>';
         html += '</div>';
-        html += '<button onclick="gestionarRetiro(\''+c.id+'\')" style="width:100%;padding:9px;border:1px solid var(--yellow);border-radius:8px;background:var(--yellow-light);color:var(--yellow);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;margin-bottom:6px">📦 Gestionar retiro</button>';
-        html += isAdmin() ? '<button onclick="eliminarDespacho(\''+c.id+'\')" style="width:100%;padding:8px;border:1px solid var(--red);border-radius:8px;background:var(--red-light);color:var(--red);font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer">🗑 Eliminar despacho</button>' : '';
+        html += '<button onclick="gestionarRetiro(\''+c.id+'\')" style="width:100%;padding:9px;border:1px solid var(--yellow);border-radius:8px;background:var(--yellow-light);color:var(--yellow);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;margin-bottom:6px"><i class=ic-equipos></i> Gestionar retiro</button>';
+        html += isAdmin() ? '<button onclick="eliminarDespacho(\''+c.id+'\')" style="width:100%;padding:8px;border:1px solid var(--red);border-radius:8px;background:var(--red-light);color:var(--red);font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer"><i class=ic-borrar></i> Eliminar despacho</button>' : '';
         html += '</div>';
       });
     }
@@ -71,7 +71,7 @@ export function renderCarga() {
 
       // Retiro masivo button
       if (pendientes > 0) {
-        html += '<button onclick="retiroMasivo(\''+c.id+'\')" style="width:100%;padding:11px;border:none;border-radius:10px;background:var(--primary);color:#fff;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;margin-bottom:12px">✅ Marcar todos como retirados (' + pendientes + ')</button>';
+        html += '<button onclick="retiroMasivo(\''+c.id+'\')" style="width:100%;padding:11px;border:none;border-radius:10px;background:var(--primary);color:#fff;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;margin-bottom:12px"><i class=ic-check></i> Marcar todos como retirados (' + pendientes + ')</button>';
       }
 
       // List of installations
@@ -84,21 +84,21 @@ export function renderCarga() {
         html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">';
         html += '<div style="font-family:var(--mono);font-size:13px;font-weight:700">' + (r.serie||'—') + '</div>';
         if (r.retirado) {
-          if (descPend) html += '<span class="badge badge-yellow" style="font-size:10px">⚠️ Desc. pendiente</span>';
-          else if (descOk) html += '<span class="badge badge-green" style="font-size:10px">✅ Descargado</span>';
-          else html += '<span class="badge badge-green" style="font-size:10px">✅ Retirado</span>';
+          if (descPend) html += '<span class="badge badge-yellow" style="font-size:10px"><i class=ic-alerta></i> Desc. pendiente</span>';
+          else if (descOk) html += '<span class="badge badge-green" style="font-size:10px"><i class=ic-check></i> Descargado</span>';
+          else html += '<span class="badge badge-green" style="font-size:10px"><i class=ic-check></i> Retirado</span>';
         } else {
-          html += '<span class="badge badge-gray" style="font-size:10px">🔄 En campo</span>';
+          html += '<span class="badge badge-gray" style="font-size:10px"><i class=ic-repetir></i> En campo</span>';
         }
         html += '</div>';
         html += '<div style="font-size:11px;color:var(--text3)">#' + (r.caso||'—') + ' · ' + (r.lugar||'—') + '</div>';
         if (r.retirado) html += '<div style="font-size:11px;color:var(--text3);margin-top:2px">Retirado: ' + fmtDate(r.fechaRetiroReal) + '</div>';
         html += '<div style="display:flex;gap:6px;margin-top:8px">';
         if (!r.retirado) {
-          html += '<button onclick="openRetiroModal(\''+r.id+'\')" style="flex:1;padding:7px;border:1px solid var(--primary);border-radius:8px;background:var(--primary-light);color:var(--primary);font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer">📥 Marcar retirado</button>';
+          html += '<button onclick="openRetiroModal(\''+r.id+'\')" style="flex:1;padding:7px;border:1px solid var(--primary);border-radius:8px;background:var(--primary-light);color:var(--primary);font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer"><i class=ic-bandeja></i> Marcar retirado</button>';
         }
         if (r.retirado && descPend) {
-          html += '<button onclick="openDescargaModal(\''+r.id+'\')" style="flex:1;padding:7px;border:1px solid var(--yellow);border-radius:8px;background:var(--yellow-light);color:var(--yellow);font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer">💾 Registrar descarga</button>';
+          html += '<button onclick="openDescargaModal(\''+r.id+'\')" style="flex:1;padding:7px;border:1px solid var(--yellow);border-radius:8px;background:var(--yellow-light);color:var(--yellow);font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer"><i class=ic-descargar></i> Registrar descarga</button>';
         }
         html += '</div></div>';
       });
@@ -106,7 +106,7 @@ export function renderCarga() {
     }
   } else if (state.cargaSubView === 'accesorios') {
     // Static form - reads values from DOM on submit, no oninput render
-    html += '<div class="page-title">🔒 Memo de Accesorios</div>';
+    html += '<div class="page-title"><i class=ic-candado></i> Memo de Accesorios</div>';
     html += '<div style="font-size:12px;color:var(--text3);margin-bottom:16px">Genera un memo de entrega de accesorios</div>';
 
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">';
@@ -122,7 +122,7 @@ export function renderCarga() {
 
     // Candados
     html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px">';
-    html += '<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px">🔒 Candados con llave</div>';
+    html += '<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px"><i class=ic-candado></i> Candados con llave</div>';
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
     html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Cantidad</div><input id="acc-candados" type="number" min="0" placeholder="0" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:14px;outline:none"></div>';
     html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Notas (opcional)</div><input id="acc-candados-notas" type="text" placeholder="Ej: cuello largo" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:13px;outline:none"></div>';
@@ -130,7 +130,7 @@ export function renderCarga() {
 
     // Cadenas
     html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px">';
-    html += '<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px">⛓️ Cadenas</div>';
+    html += '<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px"><i class=ic-enlace></i> Cadenas</div>';
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
     html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Cantidad</div><input id="acc-cadenas" type="number" min="0" placeholder="0" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:14px;outline:none"></div>';
     html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Notas (opcional)</div><input id="acc-cadenas-notas" type="text" placeholder="Ej: con argollas" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:13px;outline:none"></div>';
@@ -138,7 +138,7 @@ export function renderCarga() {
 
     // Sellos
     html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:16px">';
-    html += '<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px">🏷️ Sellos de seguridad</div>';
+    html += '<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px"><i class=ic-etiqueta></i> Sellos de seguridad</div>';
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">';
     html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Cantidad</div><input id="acc-sellos" type="number" min="0" placeholder="0" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:14px;outline:none"></div>';
     html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Notas (opcional)</div><input id="acc-sellos-notas" type="text" placeholder="Ej: con distintivo rojo" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--font);font-size:13px;outline:none"></div>';
@@ -148,7 +148,7 @@ export function renderCarga() {
     html += '<div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Serie hasta</div><input id="acc-serie-hasta" type="text" placeholder="Ej: 136700" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;outline:none"></div>';
     html += '</div></div>';
 
-    html += '<button onclick="generarMemoAccesorios()" style="width:100%;padding:14px;border:none;border-radius:12px;background:var(--primary);color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;margin-bottom:20px">📄 Generar y guardar memo</button>';
+    html += '<button onclick="generarMemoAccesorios()" style="width:100%;padding:14px;border:none;border-radius:12px;background:var(--primary);color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;margin-bottom:20px"><i class=ic-archivo></i> Generar y guardar memo</button>';
 
     // Historial de accesorios
     if (state.historialAccesorios.length > 0) {
@@ -165,20 +165,20 @@ export function renderCarga() {
         });
         html += '</div>';
         html += '<div style="display:flex;gap:6px">';
-        html += '<button onclick="reimprimirMemoAcc(this.dataset.id)" data-id="' + m.id + '" style="flex:1;padding:8px;border:1px solid var(--primary);border-radius:8px;background:var(--primary-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">📄 Reimprimir</button>';
-        if (isAdmin()) html += '<button onclick="eliminarMemoAcc(this.dataset.id)" data-id="' + m.id + '" style="padding:8px 12px;border:1px solid var(--red);border-radius:8px;background:var(--red-light);color:var(--red);font-family:var(--font);font-size:12px;cursor:pointer">🗑</button>';
+        html += '<button onclick="reimprimirMemoAcc(this.dataset.id)" data-id="' + m.id + '" style="flex:1;padding:8px;border:1px solid var(--primary);border-radius:8px;background:var(--primary-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer"><i class=ic-archivo></i> Reimprimir</button>';
+        if (isAdmin()) html += '<button onclick="eliminarMemoAcc(this.dataset.id)" data-id="' + m.id + '" style="padding:8px 12px;border:1px solid var(--red);border-radius:8px;background:var(--red-light);color:var(--red);font-family:var(--font);font-size:12px;cursor:pointer"><i class=ic-borrar></i></button>';
         html += '</div></div>';
       });
     }
 
   } else {
-  html += '<div class="page-title">📤 Despachos a C&S</div>';
+  html += '<div class="page-title"><i class=ic-subir></i> Despachos a C&S</div>';
   html += '<div style="font-size:13px;color:var(--text3);margin-bottom:20px">Importa instalaciones para <strong style="color:var(--primary)">Campos y Servicios</strong> desde un archivo Excel.</div>';
 
   if (state.cargaView === 'upload') {
     // Upload area
     html += '<div style="border:2px dashed var(--border);border-radius:var(--radius);padding:40px 20px;text-align:center;background:var(--white);margin-bottom:16px">';
-    html += '<div style="font-size:40px;margin-bottom:12px">📊</div>';
+    html += '<div style="font-size:40px;margin-bottom:12px"><i class=ic-grafica></i></div>';
     html += '<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px">Selecciona tu archivo Excel</div>';
     html += '<div style="font-size:12px;color:var(--text3);margin-bottom:20px">.xlsx o .xls</div>';
     html += '<label style="display:inline-block;background:var(--primary);color:#fff;padding:12px 24px;border-radius:10px;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer">Elegir archivo<input type="file" accept=".xlsx,.xls" onchange="handleFileUpload(event)" style="display:none"></label>';
@@ -226,7 +226,7 @@ export function renderCarga() {
     html += '</div>';
 
     if (err > 0) {
-      html += '<div style="background:var(--red-light);border:1px solid #fecaca;border-radius:10px;padding:12px;margin-bottom:12px;font-size:12px;color:var(--red);font-weight:600">⚠️ Hay ' + err + ' equipo' + (err>1?'s':'') + ' bloqueado' + (err>1?'s':'') + '. Se registrarán solo los válidos y con advertencia.</div>';
+      html += '<div style="background:var(--red-light);border:1px solid #fecaca;border-radius:10px;padding:12px;margin-bottom:12px;font-size:12px;color:var(--red);font-weight:600"><i class=ic-alerta></i> Hay ' + err + ' equipo' + (err>1?'s':'') + ' bloqueado' + (err>1?'s':'') + '. Se registrarán solo los válidos y con advertencia.</div>';
     }
 
     // Rows preview
@@ -234,7 +234,7 @@ export function renderCarga() {
     state.cargaData.forEach((r, i) => {
       const bg = r.status==='ok' ? 'var(--white)' : r.status==='warning' ? 'var(--yellow-light)' : 'var(--red-light)';
       const border = r.status==='ok' ? 'var(--green)' : r.status==='warning' ? 'var(--yellow)' : 'var(--red)';
-      const icon = r.status==='ok' ? '✅' : r.status==='warning' ? '⚠️' : '❌';
+      const icon = r.status==='ok' ? '<i class=ic-check></i>' : r.status==='warning' ? '<i class=ic-alerta></i>' : '<i class=ic-x></i>';
       html += '<div style="background:' + bg + ';border:1px solid ' + border + ';border-left:4px solid ' + border + ';border-radius:10px;padding:12px">';
       html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">';
       html += '<div style="font-family:var(--mono);font-size:13px;font-weight:700">' + (r.serie||'Sin serie') + '</div>';
@@ -249,7 +249,7 @@ export function renderCarga() {
 
     // Action buttons
     if (ok + warn > 0) {
-      html += '<button onclick="confirmarCarga()" style="width:100%;background:var(--primary);color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">✅ Confirmar e importar (' + (ok+warn) + ' equipos)</button>';
+      html += '<button onclick="confirmarCarga()" style="width:100%;background:var(--primary);color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px"><i class=ic-check></i> Confirmar e importar (' + (ok+warn) + ' equipos)</button>';
     }
     html += '<button onclick="cancelarCarga()" style="width:100%;background:var(--white);color:var(--text3);border:1px solid var(--border);border-radius:10px;padding:13px;font-family:var(--font);font-size:14px;cursor:pointer">Cancelar</button>';
   }

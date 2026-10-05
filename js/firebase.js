@@ -20,4 +20,5 @@ export const historialCargasRef = ref(db, 'historialCargas');
 export const historialAccesoriosRef = ref(db, 'historialAccesorios');
 export const validacionesRef = ref(db, 'validaciones');
 export const mantenimientoRef = ref(db, 'config/mantenimiento');
+export const campanasRef = ref(db, 'campanas'); // estado de cada campaña (entrega en el sistema CPT DELSUR)
 export { ref, onValue, push, update, remove, get, set };

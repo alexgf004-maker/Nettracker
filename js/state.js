@@ -25,9 +25,13 @@ export const state = {
   valImportData: [],
   valTipo: 'monofasico',
   // ── SESSION ──
-  sesionUsuario: null, // { nombre, pin }
-  loginForm: { nombre: '', pin: '', error: '' },
+  sesionUsuario: null, // { nombre }
   tab: 'dashboard',
+  showMas: false, // hoja "Más" del menú en celular
+  areaFiltro: 'mia', // mia | todas (Inicio y pestañas de Trabajo)
+  campanas: {}, // campanas/{clave} en Firebase: { entrega: { fecha, por } }
+  campanaClave: null, // campaña abierta en la pestaña Campañas
+  volverA: null, // { tab, campanaClave } para regresar desde el detalle de una instalación
   globalSearch: '',
   showGlobalSearch: false,
   showAlertaRetiros: false,

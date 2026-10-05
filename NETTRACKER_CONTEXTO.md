@@ -21,6 +21,7 @@ index.html               Solo el <head>, el <div id="app"> y la carga de js/main
 manifest.webmanifest     Manifest de la PWA
 icons/icon.svg           Ícono de la app
 css/styles.css           Todos los estilos (variables de tema claro/oscuro incluidas)
+css/icons.css            Íconos de línea (Lucide), generado con `npm run icons` (tools/gen-icons.js)
 js/
   main.js                Punto de entrada: registra handlers y arranca (sesión, sync, tema)
   firebase.js            Config de Firebase, `db` y las refs a cada nodo
@@ -29,13 +30,18 @@ js/
   utils.js               Funciones puras: fechas, calcSt(), eqSt(), formularios vacíos
   ui.js                  showToast(), badges, abrirDoc()/descargarDoc(), tema, monitor de conexión
   data/sync.js           Listeners onValue() de Firebase → actualizan `state` y llaman render()
+  domain/                Reglas del trabajo, funciones puras (sin Firebase ni estado)
+    trabajo.js           Tipo de caso (campaña/reclamo/requerimiento), periodo, plazos, urgencia
+    pendientes.js        Lista de pendientes del Inicio (vencido / hoy / próximos días / por hacer)
   actions/               Lógica de negocio (guardar, retirar, préstamos, carga Excel, login)
-    auth.js · instalaciones.js · inventario.js · carga.js
+    auth.js · instalaciones.js · inventario.js · carga.js · revision.js · danio.js
+    trabajo.js           Marcar entregas: campaña, informe de reclamo, requerimiento
   pdf/memos.js           Plantillas HTML de memorándums (movimiento, lote, carga masiva)
   views/                 Funciones que devuelven HTML (string) según el estado
     render.js            render(): arma header + modales + pestaña activa + nav
-    layout.js            Header y barra de navegación inferior
-    login.js             Pantalla de login y de mantenimiento
+    layout.js            Header y menú (SECCIONES: Inicio · Trabajo · Recursos · Herramientas)
+    login.js             Pantalla de perfiles y de mantenimiento
+    trabajo.js           Pestañas Campañas, Reclamos, Requerimientos y Seguimiento FT
     modals.js            Todos los modales
     dashboard.js · instalaciones.js · inventario.js · validaciones.js · mapa.js · carga.js
   handlers/              Funciones `window.*` que llaman los onclick/onchange del HTML
@@ -47,7 +53,7 @@ js/
 
 ### Vista de PC
 Pantallas de 1024px o más (todo en `css/styles.css`, bloque `@media (min-width: 1024px)`):
-- La barra inferior se convierte en menú lateral izquierdo; el header ocupa todo el ancho
+- La barra inferior se convierte en menú lateral izquierdo con todas las secciones (en celular solo caben Inicio, Campañas, Reclamos y Equipos; el resto va en la hoja "Más")
 - El contenido se centra (máx. 1180px) y las listas (`.list`, `.eq-lista`) pasan a varias columnas
 - Los modales (`.modal-overlay`) se muestran como ventana centrada en vez de hoja inferior
 - Detalles y formularios se limitan a 860px; `render()` pone `data-view` en `#app` para eso
@@ -76,6 +82,11 @@ projectId: "pqfind"
 | `historialAccesoriosRef` | `historialAccesorios` | Historial de despachos de accesorios |
 | `validacionesRef` | `validaciones` | Validaciones de tap guardadas |
 | `mantenimientoRef` | `config/mantenimiento` | Flag de modo mantenimiento (bool) |
+| `campanasRef` | `campanas/{AAAA-MM_AREA}` | `{ entrega: { fecha, por } }` cuando la campaña se cargó en el sistema CPT DELSUR |
+
+Campos de seguimiento dentro de `analizadores/{id}`: `informeEntregado: { fecha, por }` (reclamos), `entregaLimite: 'AAAA-MM-DD'` y `entregaRealizada: { fecha, por }` (requerimientos).
+
+Los nodos `cases`, `campaigns`, `servicePoints`, `caseCodeIndex`, `caseIdsByCampaign` y `equipmentEvents` los creó una prueba anterior (ChatGPT, revertida): la app no los usa y no tienen datos reales.
 
 ---
 
@@ -128,22 +139,40 @@ const tSel = (id, opts)    => `<select id="${id}" ...>${opts}</select>`   // tri
 ---
 
 ## Tabs de navegación
-| Tab | Descripción |
-|---|---|
-| `dashboard` | Vista principal — acciones rápidas, alertas, resumen |
-| `instalaciones` | Registro de instalaciones activas de analizadores |
-| `inventario` | Inventario de equipos (analizadores + accesorios) |
-| `validaciones` | Validaciones de tap (mono/bi/trifásico) |
-| `mapa` | Mapa con ubicación GPS de instalaciones activas |
-| `carga` | Despachos y movimientos de equipos entre áreas |
+El menú se arma con `SECCIONES` en `js/views/layout.js`; cada pestaña tiene su vista en `TAB_VIEWS` (`js/views/render.js`).
+
+| Sección | Tab | Descripción |
+|---|---|---|
+| | `dashboard` | Inicio: pendientes, resumen del trabajo y de equipos, acciones rápidas, calendario |
+| Trabajo | `campanas` | Casos CR/DA/DF agrupados por mes y área; entrega el día 10 del mes siguiente |
+| Trabajo | `reclamos` | Casos RE; informe 8 días calendario después del retiro real |
+| Trabajo | `requerimientos` | Otros códigos; fecha de entrega anotada a mano |
+| Trabajo | `ft` | Seguimiento FT (pendiente de definir, próxima etapa) |
+| Recursos | `inventario` | Equipos (analizadores + accesorios) |
+| Herramientas | `instalaciones` | Registro de instalaciones de analizadores |
+| Herramientas | `validaciones` | Validaciones de tap (mono/bi/trifásico) |
+| Herramientas | `carga` | Despachos y movimientos de equipos entre áreas |
+| Herramientas | `mapa` | Mapa con ubicación GPS de instalaciones activas |
 
 ---
 
-## Área: Dashboard
-Muestra acciones rápidas y alertas. `dashAction(accion)` ejecuta navegación rápida a sub-vistas:
-- `'nueva-validacion'` → abre el flujo de validación de tap
-- `'nueva-instalacion'` → formulario de nueva instalación
-- Alertas de retiros pendientes, vencimientos próximos
+## Trabajo (campañas, reclamos, requerimientos)
+No hay registros aparte: todo se deduce de las instalaciones según el código del caso (`js/domain/trabajo.js`).
+- **Campaña**: código que empieza con CR (regulación de tensión), DA (armónicos) o DF (flicker). Formato `CR` + nº de medición + mes (1-9, O, N, D) + año de 4 dígitos + … (ej. `CR112026201` = enero 2026). Se agrupa por mes/año y área (`2026-01_CPT-MT`).
+- **Reclamo**: código que empieza con RE.
+- **Requerimiento**: cualquier otro código.
+- El área de una instalación de Campos y Servicios es su `areaBeneficiaria`.
+- Etapa de cada instalación: programada → en campo → descarga pendiente → retirada.
+
+## Área: Inicio (dashboard)
+`calcularPendientes()` (`js/domain/pendientes.js`) arma la lista; avisa desde 3 días antes (`DIAS_AVISO`):
+- Retiros programados vencidos / de hoy / próximos
+- Descargas pendientes después del retiro ("Por hacer", sin fecha)
+- Informe de reclamo (vence 8 días calendario después de `fechaRetiroReal`)
+- Requerimientos con `entregaLimite`
+- Campañas sin marcar como cargadas (vence el día 10 del mes siguiente)
+
+Por defecto muestra el área del perfil; "Todas las áreas" (`state.areaFiltro`) aplica también a las pestañas de Trabajo.
 
 ---
 
@@ -286,12 +315,12 @@ Permite:
 
 ---
 
-## Autenticación
-Login por PIN, sin Firebase Auth (solo local en `sesionUsuario`).
+## Perfiles
+Sin PIN ni Firebase Auth: al entrar se elige el perfil (`entrarComo(nombre)`), se guarda en `localStorage` (`cpt_session`) y el botón del header vuelve a la pantalla de perfiles. Sirve para saber quién registra cada cosa.
 ```js
-sesionUsuario = { nombre, pin, area }  // null = no logueado
+sesionUsuario = { nombre }  // null = pantalla de perfiles
 ```
-`ADMIN = 'David García'` tiene acceso a funciones extra (modo mantenimiento, toggle dark mode global).
+`ADMIN = 'David García'` tiene acceso a funciones extra (modo mantenimiento, eliminar registros).
 
 **Modo mantenimiento**: cuando está activo (`modoMantenimiento = true`), todos los usuarios excepto el admin ven una pantalla bloqueada.
 
@@ -306,3 +335,5 @@ sesionUsuario = { nombre, pin, area }  // null = no logueado
 5. **`render()` debe llamarse** al final de cualquier handler que cambie estado visible
 6. **Correr `npm test`** antes de publicar; si agregas una función importante, agrega su prueba en `tests/app.spec.js`
 7. Probar en local con `npm run serve` (o `python3 -m http.server`)
+8. **Sin emojis** en la interfaz: usar íconos `<i class="ic ic-nombre"></i>` (o `<i class=ic-nombre></i>` dentro de textos JS). Para uno nuevo, agregarlo a `tools/gen-icons.js` y correr `npm run icons`. En avisos (`showToast`, `confirm`) y documentos generados (memos, Excel), solo texto
+9. **Reglas del trabajo** (plazos, tipos de caso) van en `js/domain/` como funciones puras, con su prueba en "Reglas del trabajo"
