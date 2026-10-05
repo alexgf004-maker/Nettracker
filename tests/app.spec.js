@@ -181,3 +181,19 @@ test('abre la precampaña mensual y guarda la recepción estimada del contratist
   await expect(page.locator('#app')).toContainText('Mapa de precampaña');
   expect(app.errores).toEqual([]);
 });
+
+test('elimina una campaña vacía y protege las campañas con casos', async ({ page }) => {
+  const app = await abrirApp(page);
+  await cerrarAlerta(page);
+  await app.ejecutar(() => openCampaign('MT_2026_04'));
+  await expect(page.getByRole('button', { name: 'Eliminar campaña', exact: true })).toBeDisabled();
+  await app.ejecutar(() => deleteCampaign());
+  expect(await app.escrituras()).toEqual([]);
+  await app.ejecutar(() => { newCampaign(); setCampaignField('year', 2026); setCampaignField('month', 8); });
+  await page.getByRole('button', { name: 'Crear campaña' }).click();
+  await page.getByRole('button', { name: 'Eliminar campaña', exact: true }).click();
+  await expect(page.locator('#app')).not.toContainText('Agosto 2026');
+  const writes = await app.escrituras();
+  expect(writes.some(([operation, path, values]) => operation === 'update' && path === '' && Object.hasOwn(values, 'campaigns/MT_2026_08') && values['campaigns/MT_2026_08'] === null)).toBe(true);
+  expect(app.errores).toEqual([]);
+});

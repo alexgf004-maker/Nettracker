@@ -1,4 +1,4 @@
-import { openNewCampaign, saveCampaign, setCampaignStage } from '../actions/campaigns.js';
+import { deleteCampaign, openNewCampaign, saveCampaign, setCampaignStage } from '../actions/campaigns.js';
 import { openCampaignImport, readCampaignFiles, saveCampaignImport, toggleCampaignImportRow } from '../actions/campaign-import.js';
 import { downloadPreCampaignMap, exportPreCampaignList, openPreCampaign, printPreCampaignInspections, printPreCampaignLetters, savePreCampaign, setPreCampaignField } from '../actions/pre-campaign.js';
 import { state } from '../state.js';
@@ -7,6 +7,7 @@ import { render } from '../views/render.js';
 window.newCampaign = openNewCampaign;
 window.saveCampaign = saveCampaign;
 window.setCampaignStage = setCampaignStage;
+window.deleteCampaign = deleteCampaign;
 window.openCampaignImport = openCampaignImport;
 window.readCampaignFiles = readCampaignFiles;
 window.saveCampaignImport = saveCampaignImport;

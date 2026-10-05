@@ -1,4 +1,4 @@
-import { campaignDueDate, campaignIdFor, CAMPAIGN_STAGES } from '../domain/campaigns.js';
+import { campaignDueDate, campaignIdFor, campaignLabel, CAMPAIGN_STAGES } from '../domain/campaigns.js';
 import { db, get, push, ref, update } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
@@ -69,5 +69,36 @@ export async function setCampaignStage(stage) {
     showToast('Etapa actualizada');
   } catch (error) {
     showToast('No se pudo actualizar la etapa: ' + error.message);
+  }
+}
+
+export async function deleteCampaign() {
+  const campaign = state.campaigns.find(item => item.id === state.selectedCampaignId);
+  if (!campaign) return;
+  if (state.cases.some(item => item.campaignId === campaign.id)) {
+    return showToast('La campaña tiene casos vinculados y no se puede eliminar');
+  }
+  if (!window.confirm(`¿Eliminar la campaña ${campaignLabel(campaign)} de ${campaign.ownerArea}? Esta acción no se puede deshacer.`)) return;
+  try {
+    const [cases, index] = await Promise.all([
+      get(ref(db, 'cases')), get(ref(db, `caseIdsByCampaign/${campaign.id}`)),
+    ]);
+    if (Object.values(cases.val() || {}).some(item => item.campaignId === campaign.id) ||
+        Object.values(index.val() || {}).some(Boolean)) {
+      return showToast('La campaña tiene casos vinculados y no se puede eliminar');
+    }
+    await update(ref(db), {
+      [`campaigns/${campaign.id}`]: null,
+      [`caseIdsByCampaign/${campaign.id}`]: null,
+    });
+    state.campaigns = state.campaigns.filter(item => item.id !== campaign.id);
+    state.selectedCampaignId = null;
+    state.preCampaignDraft = null;
+    state.campaignImport = null;
+    state.view = 'lista';
+    showToast('Campaña eliminada');
+    render();
+  } catch (error) {
+    showToast('No se pudo eliminar la campaña: ' + error.message);
   }
 }
