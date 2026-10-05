@@ -8,10 +8,10 @@ export const ADMIN = 'David García';
 export const isAdmin = () => state.sesionUsuario?.nombre === ADMIN;
 
 export const USUARIOS = [
-  { nombre: 'David García', area: 'CPT MT' },
-  { nombre: 'Bryan Francia', area: 'CPT MT' },
-  { nombre: 'Francisco Chulo', area: 'CPT BT' },
-  { nombre: 'Vicente Ramos', area: 'CPT BT' },
+  { nombre: 'David García', pin: '2442', area: 'CPT MT' },
+  { nombre: 'Bryan Francia', pin: '8250', area: 'CPT MT' },
+  { nombre: 'Francisco Chulo', pin: '0177', area: 'CPT BT' },
+  { nombre: 'Vicente Ramos', pin: '1190', area: 'CPT BT' },
 ];
 
 export const userArea = () => { const u = USUARIOS.find(x => x.nombre === state.sesionUsuario?.nombre); return u?.area || 'CPT MT'; };

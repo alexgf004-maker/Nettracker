@@ -8,7 +8,6 @@ import { abrirDoc, showToast } from '../ui.js';
 import { calcSt, emptyEF, eqPrestado, fmtDate, today } from '../utils.js';
 import { render } from '../views/render.js';
 import { closeRevisionModal, confirmRevision, editarRevision, openRevisionModal, reimprimirMemoRevision } from '../actions/revision.js';
-import { buildEquipmentEvent, writeTraceUpdate } from '../services/traceability.js';
 
 window.exportHojaVida = eqId => {
   const eq = state.equipos.find(x => x.id === eqId);
@@ -243,7 +242,7 @@ window.openMantModal = id => {
 window.closeMantModal = () => { state.showMantModal = false; state.mantEqId = null; render(); };
 window.setMantForm = (k, v) => { state.mantForm[k] = v; if (k === 'resultado') render(); };
 
-window.guardarMant = async () => {
+window.guardarMant = () => {
   const eq = state.equipos.find(x => x.id === state.mantEqId);
   if (!eq) return;
   if (!state.mantForm.descripcion.trim()) return showToast('Ingresa la descripción del problema');
@@ -252,23 +251,7 @@ window.guardarMant = async () => {
   const updates = { historialMantenimiento };
   if (state.mantForm.resultado === 'resuelto') updates.condicion = 'bueno';
   state.showMantModal = false; state.mantEqId = null;
-  const writes = {};
-  Object.entries(updates).forEach(([key, value]) => { writes[`equipos/${eq.id}/${key}`] = value; });
-  if (state.mantForm.resultado === 'resuelto') writes[`equipos/${eq.id}/operationalState`] = 'available';
-  const related = state.records
-    .filter(r => r.equipoId === eq.id)
-    .sort((a, b) => (b.fechaRetiroReal || b.fechaRetiro || b.fechaRegistro || '').localeCompare(a.fechaRetiroReal || a.fechaRetiro || a.fechaRegistro || ''))[0];
-  const event = buildEquipmentEvent({
-    type: state.mantForm.resultado === 'resuelto' ? 'maintenance_completed' : 'maintenance_started',
-    equipmentId: eq.id, caseId: related?.caseId || null, caseCode: related?.caso || '',
-    installationId: related?.id || null, eventDate: ficha.fechaResolucion || ficha.fechaInicio || today(),
-    location: eq.sede || '',
-    from: { state: eq.operationalState || 'maintenance', condition: eq.condicion || 'mantenimiento' },
-    to: { state: state.mantForm.resultado === 'resuelto' ? 'available' : 'maintenance', condition: state.mantForm.resultado === 'resuelto' ? 'bueno' : eq.condicion || 'mantenimiento' },
-    notes: [ficha.descripcion, ficha.accion, ficha.observaciones].filter(Boolean).join(' · '),
-  });
-  await writeTraceUpdate({ writes, event });
-  showToast('🔧 Ficha guardada' + (state.mantForm.resultado === 'resuelto' ? ' · Equipo marcado como Bueno' : ''));
+  update(ref(db, 'equipos/' + eq.id), updates).then(() => showToast('🔧 Ficha guardada' + (state.mantForm.resultado === 'resuelto' ? ' · Equipo marcado como Bueno' : '')));
 };
 
 window.eliminarCondicion = (eqId, idx) => {

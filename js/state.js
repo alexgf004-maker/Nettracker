@@ -1,4 +1,3 @@
-import { emptyCaseForm } from './domain/cases.js';
 import { emptyEF, emptyForm } from './utils.js';
 
 // Estado global de la app. Todo lo que cambia en pantalla vive aquí;
@@ -6,24 +5,6 @@ import { emptyEF, emptyForm } from './utils.js';
 export const state = {
   records: [],
   equipos: [],
-  cases: [],
-  campaigns: [],
-  selectedCampaignId: null,
-  campaignImport: null,
-  preCampaignDraft: null,
-  campaignForm: { year: new Date().getFullYear(), month: new Date().getMonth() + 1, ownerArea: 'CPT MT', receivedAt: '' },
-  servicePoints: [],
-  equipmentEvents: [],
-  selectedCaseId: null,
-  instSection: 'installations', // installations | campaigns | cases
-  caseFilter: 'ALL', // ALL | campaign | complaint | special
-  caseAreaFilter: 'TODOS',
-  caseSearch: '',
-  complaintSearch: '',
-  campaignAreaView: 'mine',
-  caseEntryMode: null,
-  caseForm: emptyCaseForm(),
-  editCaseId: null,
   historialAccesorios: [],
   validaciones: [], // { id, nombre, fecha, tipo, usuarios: [{...datos, estado, resultado}] }
   valView: 'lista', // lista | detalle | form
@@ -44,8 +25,8 @@ export const state = {
   valImportData: [],
   valTipo: 'monofasico',
   // ── SESSION ──
-  sesionUsuario: null, // { nombre }
-  loginForm: { nombre: '', error: '' },
+  sesionUsuario: null, // { nombre, pin }
+  loginForm: { nombre: '', pin: '', error: '' },
   tab: 'dashboard',
   globalSearch: '',
   showGlobalSearch: false,

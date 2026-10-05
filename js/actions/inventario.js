@@ -5,7 +5,6 @@ import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { emptyEF, sedeDestinoMovimiento, today } from '../utils.js';
 import { render } from '../views/render.js';
-import { buildEquipmentEvent, writeTraceUpdate } from '../services/traceability.js';
 
 // ── SAVE EQUIPO ──
 export function handleSaveEq() {
@@ -51,7 +50,7 @@ export function handleDevolucion(id) {
   render();
 }
 
-export async function confirmMovimiento() {
+export function confirmMovimiento() {
   const eq = state.equipos.find(x => x.id === state.prestamoId);
   if (!eq) return;
   // Prevent duplicate movimiento
@@ -68,22 +67,9 @@ export async function confirmMovimiento() {
     ? { prestado: true, prestadoFecha: today(), sede: sedeDest, movimientos }
     : { prestado: false, prestadoFecha: null, sede: sedeDest, movimientos };
   state.showPrestamoModal = false; state.prestamoId = null;
-  const writes = {};
-  Object.entries(updateData).forEach(([key, value]) => { writes[`equipos/${eq.id}/${key}`] = value; });
-  writes[`equipos/${eq.id}/operationalState`] = esPrestamo ? 'loaned' : 'available';
-  const event = buildEquipmentEvent({
-    type: esPrestamo ? 'dispatched' : 'returned', equipmentId: eq.id,
-    location: sedeDest,
-    from: { state: esPrestamo ? 'available' : 'loaned', location: state.prestamoForm.de },
-    to: { state: esPrestamo ? 'loaned' : 'available', location: sedeDest },
-    notes: state.prestamoForm.nota || `${state.prestamoForm.de} → ${state.prestamoForm.a}`,
-  });
-  try {
-    await writeTraceUpdate({ writes, event });
-    showToast(esPrestamo ? '🔄 Préstamo registrado' : '✅ Devolución registrada');
-  } catch (error) {
-    showToast('❌ No se pudo registrar el movimiento: ' + error.message);
-  }
+  update(ref(db, `equipos/${eq.id}`), updateData).then(() =>
+    showToast(esPrestamo ? '🔄 Préstamo registrado' : '✅ Devolución registrada')
+  );
 }
 
 export function openCondicionModal(id) {
@@ -95,29 +81,14 @@ export function openCondicionModal(id) {
   render();
 }
 
-export async function confirmCondicion() {
+export function confirmCondicion() {
   const eq = state.equipos.find(x => x.id === state.condicionEqId);
   if (!eq) return;
   const cambio = { fecha: today(), condicionAnterior: eq.condicion || 'bueno', condicionNueva: state.condicionForm.condicion, nota: state.condicionForm.nota, registradoPor: state.sesionUsuario?.nombre || 'Desconocido' };
   const historialCondicion = [...(eq.historialCondicion || []), cambio];
   const id = state.condicionEqId;
   state.showCondicionModal = false; state.condicionEqId = null;
-  const writes = {
-    [`equipos/${id}/condicion`]: state.condicionForm.condicion,
-    [`equipos/${id}/historialCondicion`]: historialCondicion,
-  };
-  const event = buildEquipmentEvent({
-    type: 'condition_changed', equipmentId: id, location: eq.sede || '',
-    from: { condition: eq.condicion || 'bueno' },
-    to: { condition: state.condicionForm.condicion },
-    notes: state.condicionForm.nota,
-  });
-  try {
-    await writeTraceUpdate({ writes, event });
-    showToast('✅ Condición actualizada');
-  } catch (error) {
-    showToast('❌ No se pudo actualizar la condición: ' + error.message);
-  }
+  update(ref(db, `equipos/${id}`), { condicion: state.condicionForm.condicion, historialCondicion }).then(() => showToast('✅ Condición actualizada'));
 }
 
 export function procesarExcelInventario(file) {

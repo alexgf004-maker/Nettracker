@@ -8,7 +8,6 @@ import { showToast } from '../ui.js';
 import { today } from '../utils.js';
 import { render } from '../views/render.js';
 import { generateMemoDanio } from '../pdf/memos.js';
-import { buildEquipmentEvent, writeTraceUpdate } from '../services/traceability.js';
 
 // Condiciones que se pueden asignar al equipo dañado
 export const CONDICIONES_DANIO = CONDICIONES.filter(c => c.key === 'fuera' || c.key === 'detalles');
@@ -82,7 +81,7 @@ function guardarEdicionDanio(r) {
   showToast('✏️ Memo actualizado');
 }
 
-export async function confirmDanio() {
+export function confirmDanio() {
   const r = state.records.find(x => x.id === state.danioId);
   if (!r) return;
   const f = state.danioForm;
@@ -116,7 +115,7 @@ export async function confirmDanio() {
   render();
   generateMemoDanio(memo);
 
-  const writes = { [`analizadores/${r.id}/memoDanio`]: memo };
+  update(ref(db, 'analizadores/' + r.id), { memoDanio: memo });
   if (eq) {
     const cond = CONDICIONES.find(c => c.key === memo.condicion);
     const eqUpdates = { sede: SEDE_CUCUMACAYAN, condicion: memo.condicion };
@@ -126,20 +125,9 @@ export async function confirmDanio() {
         nota: 'Dañado en campo por Campos y Servicios (caso ' + memo.caso + '): ' + memo.descripcion, registradoPor: usuario,
       }];
     }
-    Object.entries(eqUpdates).forEach(([key, value]) => { writes[`equipos/${eq.id}/${key}`] = value; });
-    const event = buildEquipmentEvent({
-      type: 'incident_reported', equipmentId: eq.id, caseId: r.caseId || null,
-      caseCode: r.caso, installationId: r.id, eventDate: memo.fechaDanio,
-      location: r.lugar,
-      from: { condition: eq.condicion || 'bueno', location: r.lugar },
-      to: { condition: memo.condicion, location: SEDE_CUCUMACAYAN },
-      failure: { category: 'equipment', description: memo.descripcion, causedMeasurementFailure: null },
-      notes: 'Memo de equipo dañado generado',
-    });
-    await writeTraceUpdate({ writes, event });
-    showToast('📝 Memo generado · Equipo ' + (cond ? cond.label : memo.condicion));
+    update(ref(db, 'equipos/' + eq.id), eqUpdates)
+      .then(() => showToast('📝 Memo generado · Equipo ' + (cond ? cond.label : memo.condicion)));
   } else {
-    await writeTraceUpdate({ writes });
     showToast('📝 Memo generado');
   }
 }

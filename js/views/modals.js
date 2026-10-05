@@ -281,7 +281,6 @@ export function renderGlobalSearch() {
   const q = state.globalSearch.toLowerCase().trim();
   const instRes = q.length >= 2 ? state.records.filter(r => (r.serie||'').toLowerCase().includes(q) || (r.caso||'').toLowerCase().includes(q) || (r.lugar||'').toLowerCase().includes(q)).slice(0,6) : [];
   const eqRes = q.length >= 2 ? state.equipos.filter(e => (e.serie||'').toLowerCase().includes(q) || (e.modelo||'').toLowerCase().includes(q) || (e.vineta||'').toLowerCase().includes(q)).slice(0,6) : [];
-  const caseRes = q.length >= 2 ? state.cases.filter(c => (c.code||'').toLowerCase().includes(q) || (c.placeSnapshot||'').toLowerCase().includes(q)).slice(0,6) : [];
   html += '<div class="modal-overlay" style="position:fixed;inset:0;background:#00000088;z-index:300;display:flex;flex-direction:column;padding:60px 16px 16px">';
   html += '<div style="background:var(--white);border-radius:16px;overflow:hidden;max-height:80vh;display:flex;flex-direction:column">';
   html += '<div style="padding:14px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center">';
@@ -291,17 +290,9 @@ export function renderGlobalSearch() {
   html += '<div style="overflow-y:auto;padding:12px">';
   if (q.length < 2) {
     html += '<div style="text-align:center;color:var(--text3);padding:30px;font-size:14px">Escribe al menos 2 caracteres</div>';
-  } else if (instRes.length === 0 && eqRes.length === 0 && caseRes.length === 0) {
+  } else if (instRes.length === 0 && eqRes.length === 0) {
     html += '<div style="text-align:center;color:var(--text3);padding:30px;font-size:14px">Sin resultados para "'+q+'"</div>';
   } else {
-    if (caseRes.length > 0) {
-      html += '<div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Expedientes</div>';
-      caseRes.forEach(c => {
-        html += '<div onclick="openCase(this.dataset.id)" data-id="'+c.id+'" style="padding:12px;border:1px solid var(--border);border-radius:10px;margin-bottom:6px;cursor:pointer">';
-        html += '<div style="font-family:var(--mono);font-weight:700;color:var(--primary)">#'+c.code+'</div>';
-        html += '<div style="font-size:12px;color:var(--text3)">'+(c.caseType||'')+' · '+(c.ownerArea||'')+(c.placeSnapshot?' · '+c.placeSnapshot:'')+'</div></div>';
-      });
-    }
     if (instRes.length > 0) {
       html += '<div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Instalaciones</div>';
       instRes.forEach(r => {

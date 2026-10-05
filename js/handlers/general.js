@@ -29,7 +29,7 @@ window.setGlobalSearch = v => {
 
 window.goToInstall = el => {
   const id = typeof el === 'string' ? el : el.dataset.id;
-  state.showGlobalSearch = false; state.tab = 'instalaciones'; state.instSection = 'installations'; state.view = 'detalle'; state.editId = id;
+  state.showGlobalSearch = false; state.tab = 'instalaciones'; state.view = 'detalle'; state.editId = id;
   const r = state.records.find(x => x.id === id);
   if (r) state.instTab = (r.areaInstalacion||'CPT MT')==='CPT BT'?'cpt_bt':(r.areaInstalacion==='Campos y Servicios'?'campos':'cpt_mt');
   render();
@@ -40,19 +40,8 @@ window.goToEquipo = el => {
   state.showGlobalSearch = false; state.tab = 'inventario'; state.view = 'equipo_detalle'; state.editEqId = id; state.eqDetalleTab = 'general'; render();
 };
 
-window.openCase = id => {
-  state.showGlobalSearch = false;
-  const caseRecord = state.cases.find(item => item.id === id);
-  state.tab = caseRecord?.workflowType === 'campaign' ? 'campaigns' : caseRecord?.workflowType === 'complaint' ? 'complaints' : 'case_archive';
-  state.instSection = caseRecord?.workflowType === 'campaign' ? 'campaigns' : 'cases';
-  state.view = 'caso_detalle';
-  state.selectedCaseId = id;
-  state.editId = null;
-  render();
-};
-
 window.newInstallFromDash = () => {
-  state.tab = 'instalaciones'; state.instSection = 'installations'; state.instTab = userInstTab();
+  state.tab = 'instalaciones'; state.instTab = userInstTab();
   if (state.equipos.filter(e => (eqSt(e)==='disponible'||eqSt(e)==='prestado') && (e.condicion||'bueno')!=='fuera' && (e.condicion||'bueno')!=='mantenimiento').length===0) return showToast('No hay equipos disponibles');
   state.form = emptyForm(); state.form.areaInstalacion = userArea(); state.editId = null; state.view = 'form'; render();
 };
@@ -107,16 +96,11 @@ window.generarReporteMensual = () => {
   state.showReporteModal=false;showToast('📊 Reporte generado');render();
 };
 
-window.goBack = () => { state.view = 'lista'; state.editId = null; state.editEqId = null; state.editCaseId = null; state.caseEntryMode = null; state.selectedCaseId = null; state.selectedCampaignId = null; state.form = emptyForm(); state.equipoForm = emptyEF(); state.showSelector = false; render(); };
+window.goBack = () => { state.view = 'lista'; state.editId = null; state.editEqId = null; state.form = emptyForm(); state.equipoForm = emptyEF(); state.showSelector = false; render(); };
 
 window.switchTab = t => {
   state.tab = t; state.view = 'lista'; state.editId = null; state.editEqId = null;
-  state.selectedCaseId = null;
-  state.selectedCampaignId = null;
-  state.editCaseId = null;
-  state.caseEntryMode = null;
-  if (t === 'instalaciones') { state.instSection = 'installations'; state.filterStatus = 'TODOS'; }
-  if (t === 'campaigns') state.instSection = 'campaigns';
+  if (t === 'instalaciones') state.filterStatus = 'TODOS';
   if (t === 'validaciones') { state.valView = 'lista'; state.valCampanaId = null; state.valUsuarioIdx = null; }
   state.showGlobalSearch = false; state.globalSearch = '';
   render();
@@ -125,6 +109,7 @@ window.switchTab = t => {
 window.cerrarAlerta = () => { state.showAlertaRetiros = false; render(); };
 window.setMapaFiltro = f => { state.mapaFiltro = f; render(); };
 window.verRetiros = () => { state.showAlertaRetiros = false; state.tab = 'instalaciones'; state.filterStatus = 'PROXIMO'; render(); };
-window.selectLoginUser = n => { state.loginForm.nombre = n; state.loginForm.error = ''; render(); };
+window.selectLoginUser = n => { state.loginForm.nombre = n; state.loginForm.pin = ''; state.loginForm.error = ''; render(); };
+window.setLoginPin = v => { state.loginForm.pin = v; state.loginForm.error = ''; };
 window.doLogin = doLogin;
 window.cerrarSesion = cerrarSesion;

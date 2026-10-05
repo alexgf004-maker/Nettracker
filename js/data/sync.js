@@ -1,38 +1,10 @@
 // Sincronización en tiempo real con Firebase
-import { campaignsRef, casesRef, equipmentEventsRef, equiposRef, historialAccesoriosRef, historialCargasRef, installsRef, mantenimientoRef, onValue, servicePointsRef, validacionesRef } from '../firebase.js';
+import { equiposRef, historialAccesoriosRef, historialCargasRef, installsRef, mantenimientoRef, onValue, validacionesRef } from '../firebase.js';
 import { state } from '../state.js';
 import { render } from '../views/render.js';
 
 // Cada listener actualiza su arreglo en el estado y vuelve a renderizar
-// Los callbacks de DataSnapshot.forEach no deben devolver el resultado de push:
-// Firebase lo interpreta como una señal para detenerse después del primer hijo.
 export function iniciarSync() {
-  onValue(campaignsRef, snap => {
-    state.campaigns = [];
-    snap.forEach(child => { state.campaigns.push({ id: child.key, ...child.val() }); });
-    state.campaigns.sort((a, b) => Number(b.year) - Number(a.year) || Number(b.month) - Number(a.month) || (a.ownerArea || '').localeCompare(b.ownerArea || ''));
-    render();
-  });
-  onValue(casesRef, snap => {
-    state.cases = [];
-    snap.forEach(child => { state.cases.push({ id: child.key, ...child.val() }); });
-    state.cases.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-    render();
-  });
-
-  onValue(servicePointsRef, snap => {
-    state.servicePoints = [];
-    snap.forEach(child => { state.servicePoints.push({ id: child.key, ...child.val() }); });
-    render();
-  });
-
-  onValue(equipmentEventsRef, snap => {
-    state.equipmentEvents = [];
-    snap.forEach(child => { state.equipmentEvents.push({ id: child.key, ...child.val() }); });
-    state.equipmentEvents.sort((a, b) => (b.occurredAt || 0) - (a.occurredAt || 0));
-    render();
-  });
-
   onValue(installsRef, snap => {
     state.records = [];
     snap.forEach(child => {
