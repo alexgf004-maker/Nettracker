@@ -39,6 +39,10 @@ export const state = {
   casosFiltro: 'todos', // todos | CR | DA | DF | faltantes
   casosBusqueda: '',
   casoEdit: null, // { clave, id }
+  campanaVista: 'precampana', // precampana | casos | multiplicadores | mediciones
+  multFiltro: 'todos', // todos | listos | por_resolver | no_se_miden
+  multEdit: null, // { clave, id }
+  multForm: {},
   casoForm: {},
   configCartas: null, // config/cartas: firmante, contacto, contratista y logo
   showConfigCartas: false,

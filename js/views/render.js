@@ -11,6 +11,7 @@ import { renderLogin, renderMantenimiento } from './login.js';
 import { renderMapa } from './mapa.js';
 import { renderAlertaRetiros, renderCondicionModal, renderDescargaModal, renderGlobalSearch, renderImportModal, renderMantModal, renderPrestamoModal, renderDanioModal, renderRetiroModal, renderRevisionModal, renderSelectorModal } from './modals.js';
 import { renderCasoModal, renderConfigCartas, renderDocsModal, renderImportListados } from './casos.js';
+import { renderMultModal } from './multiplicadores.js';
 import { renderCampanas, renderFT, renderReclamos, renderRequerimientos } from './trabajo.js';
 import { renderValidaciones } from './validaciones.js';
 
@@ -63,6 +64,7 @@ export function render() {
   if (state.showImportListados) html += renderImportListados();
   if (state.casoEdit) html += renderCasoModal();
   if (state.docsModal) html += renderDocsModal();
+  if (state.multEdit) html += renderMultModal();
   if (state.showConfigCartas) html += renderConfigCartas();
 
   const tabView = TAB_VIEWS[state.tab];

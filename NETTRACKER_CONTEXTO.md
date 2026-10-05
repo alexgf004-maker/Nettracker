@@ -35,11 +35,13 @@ js/
     pendientes.js        Lista de pendientes del Inicio (vencido / hoy / próximos días / por hacer)
     listados.js          Lectura de listados del ente, control de puntos y base de coordenadas; códigos DA/DF
     documentos.js        Cartas al cliente y hojas de inspección (HTML tamaño carta, una página por caso)
+    multiplicadores.js   Estados, opciones y fórmulas de la hoja Multiplicadores; histórico por NC
   actions/               Lógica de negocio (guardar, retirar, préstamos, carga Excel, login)
     auth.js · instalaciones.js · inventario.js · carga.js · revision.js · danio.js
     trabajo.js           Marcar entregas: campaña, informe de reclamo, requerimiento
     campanas.js          Precampaña: importar listados, completar datos, editar casos, exportar listado
     documentos.js        Generar cartas y hojas, pasos de la precampaña, datos de las cartas (config/cartas)
+    multiplicadores.js   Editar el multiplicador de un caso, usar el histórico y exportar la hoja
   pdf/memos.js           Plantillas HTML de memorándums (movimiento, lote, carga masiva)
   views/                 Funciones que devuelven HTML (string) según el estado
     render.js            render(): arma header + modales + pestaña activa + nav
@@ -47,6 +49,7 @@ js/
     login.js             Pantalla de perfiles y de mantenimiento
     trabajo.js           Pestañas Campañas, Reclamos, Requerimientos y Seguimiento FT
     casos.js             Tabla de casos de una campaña, ventana de importación y edición de un caso
+    multiplicadores.js   Pestaña Multiplicadores de la campaña y su editor
     modals.js            Todos los modales
     dashboard.js · instalaciones.js · inventario.js · validaciones.js · mapa.js · carga.js
   handlers/              Funciones `window.*` que llaman los onclick/onchange del HTML
@@ -188,7 +191,15 @@ En el detalle de la campaña:
 - Se abren como página para imprimir o guardar como PDF (`abrirDoc`).
 - Seguimiento en `campanas/{clave}/precampana/{paso}` = `{ fecha, por }`: cartas y hojas se marcan al generarlas (con `total`); firma solicitada, cartas firmadas, entrega al contratista y evidencias recibidas se marcan a mano. "Listados importados" y "Datos completos" se calculan solos.
 
-Pendiente para las siguientes partes de la etapa 2: mapa para el contratista, multiplicadores con sus estados y Fechas 1, 2 y 3.
+**Multiplicadores** (pestaña de la campaña; el detalle tiene pestañas Precampaña · Casos · Multiplicadores · Mediciones). Se guardan en `campanas/{clave}/casos/{id}/mult`:
+- Estado: Realizado, Pendiente de validar, Validado con histórico, Cliente de baja, Revisar, Validado con usuario, Acceso denegado; los DF además "Conexión no posible" (como en el Excel).
+- Configuración (Monofásico, Bifásico, Estrella, Delta, Estrella 2 hilos), posición de TAP (1-5, MP, Tapón, Interno), tensión según TAP (de la placa del trafo vista en campo), tensión de baja, X medidor, Testblock, lecturas Vab/Vbc/Vac opcionales y notas.
+- Cálculos iguales a la hoja: ECAMEC = "tensión TAP/tensión baja"; DRANETZ = tensión TAP ÷ tensión baja; TI = MP → (X/120)·5 "/5", X ≠ 1 → X·5 "/5", X = 1 → "1/1"; proyección al primario = lectura × DRANETZ.
+- Resumen: listos para medir (Realizado, Validado con histórico, Validado con usuario), por resolver (Pendiente de validar, Revisar, Acceso denegado, sin estado) y no se medirán (Cliente de baja, Conexión no posible). En CPT MT muestra los CR listos contra los 38 obligatorios.
+- Histórico: si el mismo NC tuvo multiplicador en una campaña anterior registrada en la app, se ofrece "Usar", que copia la configuración y deja el estado "Validado con histórico".
+- Exportar: Excel con las columnas de la hoja Multiplicadores (las de fechas, equipo y elementos quedan vacías hasta Fechas 1, 2 y 3).
+
+Pendiente: verificar los cálculos con un Excel de multiplicadores ya lleno, importar el histórico que tiene el equipo, Fechas 1, 2 y 3 y el mapa para el contratista.
 
 ## Área: Inicio (dashboard)
 `calcularPendientes()` (`js/domain/pendientes.js`) arma la lista; avisa desde 3 días antes (`DIAS_AVISO`):

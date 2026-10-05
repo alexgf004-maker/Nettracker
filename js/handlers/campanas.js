@@ -7,8 +7,10 @@ import {
   abrirConfigCartas, abrirDocumentos, cargarLogo, cerrarConfigCartas, cerrarDocumentos, desmarcarPaso, excluirTodos, generarDocumentos,
   guardarConfigCartas, marcarPaso, toggleExcluirCaso,
 } from '../actions/documentos.js';
+import { abrirMultiplicador, cerrarMultiplicador, exportarMultiplicadores, guardarMultiplicador, usarHistorico } from '../actions/multiplicadores.js';
 import { codigoConSistema } from '../domain/listados.js';
 import { state } from '../state.js';
+import { htmlCalculo } from '../views/multiplicadores.js';
 import { render } from '../views/render.js';
 
 Object.assign(window, {
@@ -26,3 +28,15 @@ window.setCasosBusqueda = v => { state.casosBusqueda = v; render(); };
 // Los campos de texto no redibujan para no perder el foco
 window.setCasoField = (k, v) => { state.casoForm[k] = v; };
 window.setCasoSistema = s => { state.casoForm.codigo = codigoConSistema(state.casoForm.codigo, s); render(); };
+
+// Multiplicadores
+Object.assign(window, { abrirMultiplicador, cerrarMultiplicador, guardarMultiplicador, usarHistorico, exportarMultiplicadores });
+window.setCampanaVista = v => { state.campanaVista = v; render(); };
+window.setMultFiltro = f => { state.multFiltro = f; render(); };
+window.setMultSelect = (k, v) => { state.multForm[k] = v; render(); };
+// Mientras se escribe solo se actualiza el cálculo, para no perder el foco
+window.setMultField = (k, v) => {
+  state.multForm[k] = v;
+  const el = document.getElementById('mult-calculo');
+  if (el) el.innerHTML = htmlCalculo(state.multForm);
+};

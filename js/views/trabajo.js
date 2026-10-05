@@ -8,6 +8,7 @@ import {
 import { state } from '../state.js';
 import { escapeHtml, fmtDate } from '../utils.js';
 import { renderCasosCampana, renderPrecampana } from './casos.js';
+import { renderMultiplicadores } from './multiplicadores.js';
 
 const esc = s => escapeHtml(s ?? '');
 
@@ -111,14 +112,25 @@ function renderCampanaDetalle(c, hoy) {
     html += `<button class="btn btn-primary" onclick="marcarCampanaEntregada('${c.clave}')"><i class="ic ic-check"></i> Marcar como cargada en CPT DELSUR</button>`;
   }
   html += '</div>';
-  if (c.casos.length) html += renderPrecampana(c) + renderCasosCampana(c);
-  if (!c.registros.length) return html + '</div>';
-  html += '<div class="section-title" style="margin-top:16px">Mediciones</div>';
-  html += barraEtapas(c.resumen);
-  html += '<div class="filas">';
-  [...c.registros].sort((a, b) => (a.caso || '').localeCompare(b.caso || ''))
-    .forEach(r => { html += filaInstalacion(r, hoy, `<span class="tag tag-gris">${subtipoCampana(r.caso)}</span>`); });
-  return html + '</div></div>';
+  // Secciones de la campaña
+  const secciones = [['precampana', 'Precampaña'], ['casos', 'Casos'], ['multiplicadores', 'Multiplicadores'], ['mediciones', 'Mediciones']]
+    .filter(([k]) => c.casos.length || k === 'mediciones');
+  const vista = secciones.some(([k]) => k === state.campanaVista) ? state.campanaVista : secciones[0][0];
+  if (secciones.length > 1) {
+    html += `<div class="pestanas">${secciones.map(([k, label]) => `<button class="${vista === k ? 'active' : ''}" onclick="setCampanaVista('${k}')">${label}${k === 'mediciones' ? ` (${c.registros.length})` : ''}</button>`).join('')}</div>`;
+  }
+  if (vista === 'precampana') html += renderPrecampana(c);
+  if (vista === 'casos') html += renderCasosCampana(c);
+  if (vista === 'multiplicadores') html += renderMultiplicadores(c);
+  if (vista === 'mediciones') {
+    if (!c.registros.length) return html + vacio('instalaciones', 'Todavía no hay instalaciones registradas con códigos de esta campaña.') + '</div>';
+    html += barraEtapas(c.resumen);
+    html += '<div class="filas">';
+    [...c.registros].sort((a, b) => (a.caso || '').localeCompare(b.caso || ''))
+      .forEach(r => { html += filaInstalacion(r, hoy, `<span class="tag tag-gris">${subtipoCampana(r.caso)}</span>`); });
+    html += '</div>';
+  }
+  return html + '</div>';
 }
 
 // ── RECLAMOS ──

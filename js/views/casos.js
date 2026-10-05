@@ -21,8 +21,7 @@ export function renderCasosCampana(c) {
   const n = contarTipos(c.casos);
   const importado = state.campanas?.[c.clave]?.importado;
 
-  let html = '<div class="section-title" style="margin-top:16px">Casos de la campaña</div>';
-  html += '<div class="panel">';
+  let html = '<div class="panel">';
   html += `<div class="chips-linea" style="margin-top:0">${['CR', 'DA', 'DF'].filter(t => n[t]).map(t => `<span class="chip-dato"><b>${n[t]}</b> ${t}</span>`).join('')}
     ${conFaltantes.length ? `<span class="tag tag-amarillo"><i class="ic ic-alerta"></i> ${conFaltantes.length} con datos faltantes</span>` : '<span class="tag tag-verde"><i class="ic ic-check"></i> Datos completos</span>'}</div>`;
   if (importado) html += `<div class="page-sub">Importado el ${fmtDate(importado.fecha)} por ${esc(importado.por)}</div>`;
@@ -130,7 +129,7 @@ export function renderPrecampana(c) {
     datos: c.casos.length && !conFaltantes ? 'Todos los casos tienen sus datos' : null,
   };
   const hechos = PASOS_PRECAMPANA.filter(([k]) => estado[k] || p[k]).length;
-  let html = '<div class="section-title" style="margin-top:16px">Precampaña</div><div class="panel">';
+  let html = '<div class="panel">';
   html += `<div class="panel-titulo"><i class="ic ic-clipboard"></i> ${hechos} de ${PASOS_PRECAMPANA.length} pasos<span class="progreso"><span style="width:${Math.round(hechos * 100 / PASOS_PRECAMPANA.length)}%"></span></span></div>`;
   html += '<div class="pasos">';
   PASOS_PRECAMPANA.forEach(([k, label, tipo]) => {
