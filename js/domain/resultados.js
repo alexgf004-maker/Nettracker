@@ -55,20 +55,26 @@ export function resumenResultados(filas) {
   return n;
 }
 
-// Estado de cada caso en el cuadro resumen (lo que se pinta)
+// Estado de cada caso en el cuadro resumen (mismos textos y colores que el cuadro que entrega el equipo).
+// CR: DT / FT / Fallida / No instalada. DA y DF: Válida / Fallida / No instalada. '' = todavía sin resultado.
 export const ESTADOS_CUADRO = {
-  dt: { texto: 'Dentro de tolerancia (DT)', color: '22C55E' },
-  ft: { texto: 'Fuera de tolerancia (FT)', color: 'EF4444' },
-  fallida: { texto: 'Fallida', color: 'F97316' },
-  no_instalada: { texto: 'No instalada', color: '9CA3AF' },
-  '': { texto: 'Sin resultado', color: null },
+  DT: { fill: '00B050' }, FT: { fill: 'FF0000' }, 'Válida': { fill: '00B050' },
+  Fallida: { fill: 'FFFF00' }, 'No instalada': { font: 'FF0000' },
 };
 export function estadoCuadro(f) {
   const r = f.resultado;
-  if (r.medicion === 'valida') return r.tolerancia === 'fuera' ? 'ft' : 'dt';
-  if (r.medicion === 'fallida') return 'fallida';
-  if (r.medicion === 'revisar') return ''; // por revisar: todavía sin resultado final
-  if (r.medicion === 'no_medida' || f.situacion.clave === 'sin_instalar' || f.situacion.clave === 'sin_medir') return 'no_instalada';
+  if (r.medicion === 'valida') return f.caso.tipo === 'CR' ? (r.tolerancia === 'fuera' ? 'FT' : 'DT') : 'Válida';
+  if (r.medicion === 'fallida') return 'Fallida';
+  if (r.medicion === 'revisar') return '';
+  // No instalada: no se va a medir (acceso denegado, cliente de baja…) o se marcó como no medida.
+  // Lo programado que aún no tiene resultado queda en blanco.
+  if (r.medicion === 'no_medida' || f.situacion.clave === 'sin_medir') return 'No instalada';
+  return '';
+}
+// Comentario: por qué falló o por qué no se instaló
+export function comentarioCuadro(f, estado) {
+  if (estado === 'Fallida') return f.resultado.nota || f.resultado.analisis?.detalle || '';
+  if (estado === 'No instalada') return f.resultado.nota || (f.situacion.clave === 'sin_medir' ? f.situacion.texto : '');
   return '';
 }
 
@@ -84,11 +90,8 @@ export function corteSubida(filas, obligatorios) {
   return { codigo: null, contados: n, faltan: obligatorios - n };
 }
 
-// Cuadro resumen: los códigos en cuadrícula (columnas), cada uno con su estado
-export function cuadroResumen(filas, columnas = 6) {
-  const celdas = filas.map(f => ({ codigo: f.caso.codigo || f.caso.codigoEnte, estado: estadoCuadro(f) }));
-  const grilla = [];
-  for (let i = 0; i < celdas.length; i += columnas) grilla.push(celdas.slice(i, i + columnas));
-  const cuenta = Object.fromEntries(Object.keys(ESTADOS_CUADRO).map(k => [k, celdas.filter(c => c.estado === k).length]));
-  return { grilla, cuenta };
+// Filas del cuadro resumen: CR por un lado y DA/DF por otro
+export function cuadroResumen(filas) {
+  const fila = f => { const estado = estadoCuadro(f); return { codigo: f.caso.codigo || f.caso.codigoEnte, estado, comentario: comentarioCuadro(f, estado) }; };
+  return { cr: filas.filter(f => f.caso.tipo === 'CR').map(fila), otros: filas.filter(f => f.caso.tipo !== 'CR').map(fila) };
 }

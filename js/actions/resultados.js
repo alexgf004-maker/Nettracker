@@ -5,7 +5,7 @@ import { showToast } from '../ui.js';
 import { analizarMedicion, filasResumenAnalisis, resultadoDeAnalisis } from '../domain/analisis.js';
 import { corteSubida, cuadroResumen, ESTADOS_CUADRO } from '../domain/resultados.js';
 import { CR_OBLIGATORIOS_MT } from '../domain/multiplicadores.js';
-import { BORDES, COLOR, ESTILO_ENCABEZADO, hojaConEstilo } from '../excel.js';
+import { hojaConEstilo } from '../excel.js';
 import { agruparCampanas, hoyLocal, MESES } from '../domain/trabajo.js';
 import { filasResultados } from '../views/resultados.js';
 import { render } from '../views/render.js';
@@ -41,48 +41,84 @@ export function guardarResultado() {
   render();
 }
 
+// Cuadro resumen con el formato que entrega el equipo: CR a la izquierda (CASO, ESTADO, COMENTARIO), DA/DF a la
+// derecha, conteos con fórmulas y, en MT, el caso hasta el que se cargan las 38 mediciones.
 export function exportarCuadroResumen(clave) {
   const c = agruparCampanas(state.records, hoyLocal(), state.campanas).find(x => x.clave === clave);
   if (!c) return;
   const filas = filasResultados(c);
-  const COLUMNAS = 6;
-  const { grilla, cuenta } = cuadroResumen(filas, COLUMNAS);
-  const corte = c.area === 'CPT MT' ? corteSubida(filas, CR_OBLIGATORIOS_MT) : null;
-  const aoa = [[`Cuadro resumen · ${MESES[c.mes - 1]} ${c.anio} · ${c.area}`]];
-  aoa.push([corte ? (corte.codigo ? `Se sube al sistema hasta ${corte.codigo} (${CR_OBLIGATORIOS_MT} CR con medición válida)` : `Faltan ${corte.faltan} CR con medición válida para llegar a ${CR_OBLIGATORIOS_MT} (van ${corte.contados})`) : '']);
-  aoa.push([]);
-  const inicio = aoa.length;
-  grilla.forEach(fila => aoa.push(fila.map(x => x.codigo)));
-  aoa.push([]);
-  const inicioLeyenda = aoa.length;
-  aoa.push(['Leyenda', 'Casos']);
-  Object.entries(ESTADOS_CUADRO).forEach(([k, e]) => aoa.push([e.texto, cuenta[k]]));
-
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = Array(COLUMNAS).fill({ wch: 19 });
-  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: COLUMNAS - 1 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: COLUMNAS - 1 } }];
-  const pinta = (r, col, color, extra = {}) => {
-    const celda = ws[XLSX.utils.encode_cell({ r, c: col })] || (ws[XLSX.utils.encode_cell({ r, c: col })] = { t: 's', v: '' });
-    celda.s = {
-      font: { bold: true, sz: 10, color: { rgb: color ? 'FFFFFF' : COLOR.texto } },
-      fill: color ? { patternType: 'solid', fgColor: { rgb: color } } : undefined,
-      alignment: { horizontal: 'center', vertical: 'center' }, border: BORDES, ...extra,
-    };
+  const { cr, otros } = cuadroResumen(filas);
+  const esMT = c.area === 'CPT MT';
+  const corte = esMT ? corteSubida(filas, CR_OBLIGATORIOS_MT) : null;
+  const ws = {};
+  const AZUL = '002060';
+  const fin = Math.max(2, cr.length + 1); // última fila de CR
+  const rango = col => `${col}2:${col}${fin}`;
+  const borde = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+  const pon = (ref, v, s = {}, f = null) => {
+    ws[ref] = { t: typeof v === 'number' ? 'n' : 's', v: v ?? '', s: { font: { sz: 11, ...(s.font || {}) }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true, ...(s.alignment || {}) }, ...s } };
+    if (s.font) ws[ref].s.font = { sz: 11, ...s.font };
+    if (f) ws[ref].f = f;
   };
-  ws.A1.s = { font: { bold: true, sz: 14, color: { rgb: COLOR.oscuro } } };
-  if (ws.A2) ws.A2.s = { font: { bold: true, sz: 11, color: { rgb: corte?.codigo ? COLOR.petroleo : 'B45309' } } };
-  const gruesa = { style: 'medium', color: { rgb: COLOR.oscuro } };
-  grilla.forEach((fila, i) => fila.forEach((x, j) => {
-    const esCorte = corte?.codigo && x.codigo === corte.codigo;
-    pinta(inicio + i, j, ESTADOS_CUADRO[x.estado].color, esCorte ? { border: { top: gruesa, bottom: gruesa, left: gruesa, right: gruesa } } : {});
-  }));
-  ws['!rows'] = aoa.map((_, r) => (r >= inicio && r < inicio + grilla.length ? { hpt: 22 } : null));
-  ws[XLSX.utils.encode_cell({ r: inicioLeyenda, c: 0 })].s = ESTILO_ENCABEZADO;
-  ws[XLSX.utils.encode_cell({ r: inicioLeyenda, c: 1 })].s = ESTILO_ENCABEZADO;
-  Object.values(ESTADOS_CUADRO).forEach((e, i) => {
-    pinta(inicioLeyenda + 1 + i, 0, e.color);
-    pinta(inicioLeyenda + 1 + i, 1, null);
+  const titulo = { fill: { patternType: 'solid', fgColor: { rgb: AZUL } }, font: { bold: true, color: { rgb: 'FFFFFF' } } };
+  const colorEstado = e => {
+    const x = ESTADOS_CUADRO[e] || {};
+    return { border: borde, ...(x.fill ? { fill: { patternType: 'solid', fgColor: { rgb: x.fill } } } : {}), ...(x.font ? { font: { color: { rgb: x.font } } } : {}) };
+  };
+  // Encabezados
+  ['A', 'H'].forEach(col => {
+    const [c1, c2, c3] = col === 'A' ? ['A', 'B', 'C'] : ['H', 'I', 'J'];
+    pon(c1 + '1', 'CASO', titulo); pon(c2 + '1', 'ESTADO', titulo); pon(c3 + '1', 'COMENTARIO', titulo);
   });
+  // CR, con la columna K que acumula las válidas (DT o FT) para encontrar el caso 38
+  let acumulado = 0;
+  cr.forEach((x, i) => {
+    const r = i + 2;
+    pon('A' + r, x.codigo, { border: borde, font: { bold: true } });
+    pon('B' + r, x.estado, colorEstado(x.estado));
+    pon('C' + r, x.comentario, { border: borde });
+    if (x.estado === 'DT' || x.estado === 'FT') acumulado++;
+    pon('K' + r, acumulado, {}, r === 2 ? 'IF(OR(B2="DT",B2="FT"),1,0)' : `IF(OR(B${r}="DT",B${r}="FT"),1,0)+K${r - 1}`);
+  });
+  const n = e => cr.filter(x => x.estado === e).length;
+  pon('E2', 'DT', colorEstado('DT')); pon('F2', n('DT'), { font: { color: { rgb: AZUL } } }, `COUNTIFS(${rango('B')},"DT")`);
+  pon('E3', 'FT', colorEstado('FT')); pon('F3', n('FT'), { font: { color: { rgb: AZUL } } }, `COUNTIFS(${rango('B')},"FT")`);
+  pon('E4', 'VÁLIDAS', { ...titulo, border: borde, font: { bold: true, sz: 12, color: { rgb: 'FFFFFF' } } }); pon('F4', n('DT') + n('FT'), { ...titulo, font: { bold: true, sz: 12, color: { rgb: 'FFFF00' } } }, 'SUM(F2:F3)');
+  pon('E6', 'Fallida', colorEstado('Fallida')); pon('F6', n('Fallida'), { font: { color: { rgb: AZUL } } }, `COUNTIFS(${rango('B')},"Fallida")`);
+  pon('E7', 'No instalada', { ...colorEstado('No instalada'), font: { bold: true, color: { rgb: 'FF0000' } } }); pon('F7', n('No instalada'), { font: { color: { rgb: AZUL } } }, `COUNTIFS(${rango('B')},"No instalada")`);
+  pon('E8', 'NO VÁLIDAS', { ...titulo, border: borde, font: { bold: true, sz: 12, color: { rgb: 'FFFFFF' } } }); pon('F8', n('Fallida') + n('No instalada'), { ...titulo, font: { bold: true, sz: 12, color: { rgb: 'FF4747' } } }, 'SUM(F6:F7)');
+  const merges = [];
+  if (esMT) {
+    pon('E11', 'Número de mediciones a subir', titulo); merges.push({ s: { r: 10, c: 4 }, e: { r: 10, c: 5 } });
+    pon('G11', CR_OBLIGATORIOS_MT, { fill: { patternType: 'solid', fgColor: { rgb: '00B050' } }, font: { bold: true, color: { rgb: 'FFFF00' } } });
+    pon('E12', 'Número de caso hasta que se cargará', { fill: { patternType: 'solid', fgColor: { rgb: '8497B0' } }, font: { bold: true, color: { rgb: 'FFFFFF' } } }); merges.push({ s: { r: 11, c: 4 }, e: { r: 12, c: 4 } });
+    pon('F12', corte.codigo || `Faltan ${corte.faltan}`, { fill: { patternType: 'solid', fgColor: { rgb: '000000' } }, font: { bold: true, sz: 14, color: { rgb: 'FFFF00' } } },
+      `IFERROR(INDEX(${rango('A')},MATCH(G11,${rango('K')},0)),"Faltan "&(G11-MAX(${rango('K')})))`);
+    merges.push({ s: { r: 11, c: 5 }, e: { r: 12, c: 6 } });
+  }
+  // DA y DF
+  otros.forEach((x, i) => {
+    const r = i + 2;
+    pon('H' + r, x.codigo, { border: borde, font: { bold: true } });
+    pon('I' + r, x.estado, colorEstado(x.estado));
+    pon('J' + r, x.comentario, { border: borde });
+  });
+  if (otros.length) {
+    const finO = otros.length + 1; const rO = `I2:I${finO}`;
+    const base = Math.max(9, finO + 2);
+    const m = e => otros.filter(x => x.estado === e).length;
+    const lineas = [['Válidas', '00B050', 'FFFFFF', '00B050'], ['Fallida', 'FFC000', '000000', 'FFC000'], ['No instalada', 'FF0000', '000000', 'C00000']];
+    lineas.forEach(([e, fondo, letra, num], i) => {
+      pon('I' + (base + i), e, { border: borde, fill: { patternType: 'solid', fgColor: { rgb: fondo } }, font: { bold: true, color: { rgb: letra } } });
+      pon('J' + (base + i), m(e === 'Válidas' ? 'Válida' : e), { font: { bold: true, color: { rgb: num } } }, `COUNTIFS(${rO},"${e === 'Válidas' ? 'Válida' : e}")`);
+    });
+    pon('I' + (base + 3), 'TOTAL', { ...titulo, border: borde, font: { bold: true, sz: 12, color: { rgb: 'FFFFFF' } } });
+    pon('J' + (base + 3), m('Válida') + m('Fallida') + m('No instalada'), { ...titulo, font: { bold: true, sz: 12, color: { rgb: 'FFFF00' } } }, `SUM(J${base}:J${base + 2})`);
+  }
+  const ultima = Math.max(fin, otros.length + 1, otros.length ? Math.max(9, otros.length + 3) + 3 : 0, esMT ? 13 : 8);
+  ws['!ref'] = `A1:K${ultima}`;
+  ws['!merges'] = merges;
+  ws['!cols'] = [17.3, 15.7, 44.6, 11.9, 28.4, 19.9, 11.4, 17.4, 15, 30.7, 11.7].map(wch => ({ wch }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Cuadro resumen');
   XLSX.writeFile(wb, `Cuadro_resumen_${MESES[c.mes - 1]}_${c.anio}_${c.area.replace(/\s+/g, '_')}.xlsx`);
