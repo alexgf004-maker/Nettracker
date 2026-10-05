@@ -1,7 +1,8 @@
 // Pestaña Inicio: lo que hay que hacer (calculado de los datos), resumen del trabajo y de los equipos
 import { isAdmin, userArea } from '../config.js';
 import { GRUPOS, calcularPendientes } from '../domain/pendientes.js';
-import { agruparCampanas, areaDeInstalacion, hoyLocal, registrosDeTipo } from '../domain/trabajo.js';
+import { agruparCampanas, areaDeInstalacion, diasEntre, hoyLocal, registrosDeTipo } from '../domain/trabajo.js';
+import { casosFT } from '../domain/ft.js';
 import { state } from '../state.js';
 import { calcSt, escapeHtml, eqEnCampo, eqSt, fmtDate } from '../utils.js';
 import { areaVista, textoPlazo } from './trabajo.js';
@@ -16,51 +17,67 @@ export function renderDashboard() {
   const area = areaVista();
   const nombre = state.sesionUsuario?.nombre?.split(' ')[0] || '';
   const fechaLarga = new Date().toLocaleDateString('es-SV', { weekday: 'long', day: 'numeric', month: 'long' }).replace(/^./, c => c.toUpperCase());
+  const pend = calcularPendientes({ registros: state.records, campanasGuardadas: state.campanas || {}, hoy, area, desde: state.seguimientoDesde });
+  const cuenta = u => pend.filter(p => p.urgencia === u).length;
+  const resumen = [[cuenta('vencido'), 'vencido', 'vencidos'], [cuenta('hoy'), 'para hoy', 'para hoy'], [cuenta('proximo'), 'próximo', 'próximos']]
+    .filter(([n]) => n).map(([n, uno, varios]) => `${n} ${n === 1 ? uno : varios}`).join(' · ');
+
+  // Estado del trabajo (no repite los pendientes)
+  const delArea = r => !area || areaDeInstalacion(r) === area;
+  const enCampo = state.records.filter(r => delArea(r) && !r.retirado && (r.fechaInstalacion || '') <= hoy).length;
+  const retirosSemana = state.records.filter(r => delArea(r) && !r.retirado && r.fechaRetiro && r.fechaRetiro >= hoy && diasEntre(hoy, r.fechaRetiro) <= 7).length;
+  const campAbiertas = agruparCampanas(state.records, hoy, state.campanas).filter(c => (!area || c.area === area) && !state.campanas?.[c.clave]?.entrega).length;
+  const ftAbiertos = casosFT(state.campanas, state.records, hoy).filter(x => !x.cerrado && (!area || x.area === area)).length;
 
   let html = '<div class="content inicio">';
-  const pend = calcularPendientes({ registros: state.records, campanasGuardadas: state.campanas || {}, hoy, area, desde: state.seguimientoDesde });
-  const n = u => pend.filter(p => p.urgencia === u).length;
-  const ftAbiertos = pend.filter(p => p.clase === 'ft').length;
   html += heroSeccion({
-    eyebrow: fechaLarga, titulo: `Hola, ${nombre}`, sub: pend.length ? 'Esto es lo que tienes pendiente.' : 'Todo al día.',
+    eyebrow: fechaLarga, titulo: `Hola, ${nombre}`, sub: pend.length ? `Tienes ${pend.length} ${pend.length === 1 ? 'pendiente' : 'pendientes'}${resumen ? ': ' + resumen : ''}.` : 'Todo al día.',
     derecha: areaHero(state.areaFiltro !== 'todas', userArea()),
-    kpis: [{ v: n('vencido'), l: 'Vencidos', alerta: n('vencido') > 0 }, { v: n('hoy'), l: 'Para hoy' }, { v: n('proximo'), l: 'Próximos días' }, { v: ftAbiertos, l: 'Avisos FT', alerta: ftAbiertos > 0, onclick: "switchTab('ft')" }],
+    kpis: [
+      { v: enCampo, l: 'Mediciones en campo', onclick: "switchTab('instalaciones')" },
+      { v: retirosSemana, l: 'Retiros esta semana', onclick: "switchTab('instalaciones')" },
+      { v: campAbiertas, l: 'Campañas sin entregar', onclick: "switchTab('campanas')" },
+      { v: ftAbiertos, l: 'Casos FT abiertos', alerta: ftAbiertos > 0, onclick: "switchTab('ft')" },
+    ],
   });
-  html += '<div class="inicio-grid"><div class="inicio-col">';
-  html += renderPendientes(hoy, area);
-  html += '</div><div class="inicio-col">';
-  html += renderResumenTrabajo(hoy, area);
-  html += renderEquipos();
-  html += renderAcciones();
-  html += '</div></div>';
-  if (state.showReporteModal) html += renderReporteModal();
-  html += renderActividad();
+  html += '<div class="inicio-layout">';
+  html += `<div class="ini-pend">${renderPendientes(hoy, pend)}</div>`;
+  html += `<div class="ini-trabajo">${renderResumenTrabajo(hoy, area, ftAbiertos)}</div>`;
+  html += `<div class="ini-equipos">${renderEquipos()}</div>`;
+  html += `<div class="ini-acciones">${renderAcciones()}</div>`;
+  html += `<div class="ini-actividad">${renderActividad()}</div>`;
   html += '</div>';
-  return html;
+  if (state.showReporteModal) html += renderReporteModal();
+  return html + '</div>';
 }
 
-function renderPendientes(hoy, area) {
+function renderPendientes(hoy, lista) {
   const desde = state.seguimientoDesde;
-  const lista = calcularPendientes({ registros: state.records, campanasGuardadas: state.campanas || {}, hoy, area, desde });
-  let html = `<div class="panel"><div class="panel-titulo"><i class="ic ic-campana"></i> Pendientes${lista.length ? ` <span class="contador">${lista.length}</span>` : ''}</div>`;
-  html += renderDesde(hoy, desde);
+  let html = `<div class="bloque pend-estilo-tiempo"><div class="bloque-head"><div class="bloque-titulo">Pendientes${lista.length ? ` <span class="cuenta">${lista.length}</span>` : ''}</div></div>`;
   if (!lista.length) {
-    return html + '<div class="todo-al-dia"><i class="ic ic-check"></i> Todo al día. No hay nada vencido ni por vencer en los próximos 3 días.</div></div>';
-  }
-  GRUPOS.forEach(([clave, titulo]) => {
-    const items = lista.filter(p => p.urgencia === clave);
-    if (!items.length) return;
-    html += `<div class="grupo grupo-${CLASE_GRUPO[clave]}"><div class="grupo-titulo">${titulo} <span>${items.length}</span></div>`;
-    items.forEach(p => {
-      html += `<div class="pendiente" onclick="${accionPendiente(p)}">
-        <i class="pendiente-icono ic ic-${ICONO_PENDIENTE[p.clase]}"></i>
-        <div class="pendiente-texto"><div class="pendiente-titulo">${esc(p.titulo)}</div>${p.detalle ? `<div class="pendiente-detalle">${esc(p.detalle)}</div>` : ''}</div>
-        ${p.fecha && clave !== 'sin_fecha' ? `<div class="pendiente-fecha">${textoPlazo(p.fecha, hoy)}<small>${fmtDate(p.fecha)}</small></div>` : ''}
-        ${clave === 'sin_fecha' && p.clase === 'informe' && p.fecha ? `<div class="pendiente-fecha">${fmtDate(p.fecha)}</div>` : ''}
-      </div>`;
+    html += '<div class="todo-al-dia"><i class="ic ic-check"></i> Todo al día. No hay nada vencido ni por vencer en los próximos 3 días.</div>';
+  } else {
+    GRUPOS.forEach(([clave, titulo]) => {
+      const items = lista.filter(p => p.urgencia === clave);
+      if (!items.length) return;
+      html += `<div class="grupo grupo-${CLASE_GRUPO[clave]}"><div class="grupo-titulo"><i class="grupo-punto"></i>${titulo} <span>${items.length}</span></div><div class="pend-lista">`;
+      items.forEach(p => {
+        const tgClase = { vencido: 'rojo', hoy: 'rojo', proximo: 'ambar', sin_fecha: 'gris' }[clave];
+        const [, mm, dd] = (p.fecha || '').split('-');
+        const MES = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
+        html += `<div class="pendiente pend-${CLASE_GRUPO[clave]}" onclick="${accionPendiente(p)}">
+          <span class="pend-dia">${dd ? `<b>${Number(dd)}</b><span>${MES[Number(mm) - 1]}</span>` : '<b>—</b><span>sin fecha</span>'}</span>
+          <span class="pend-ic"><i class="ic ic-${ICONO_PENDIENTE[p.clase]}"></i></span>
+          <div class="pendiente-texto"><div class="pendiente-titulo">${esc(p.titulo)}</div>${p.detalle ? `<div class="pendiente-detalle">${esc(p.detalle)}</div>` : ''}</div>
+          ${p.fecha && clave !== 'sin_fecha' ? `<div class="pendiente-fecha"><span class="tg ${tgClase}">${textoPlazo(p.fecha, hoy)}</span><small>${fmtDate(p.fecha)}</small></div>` : ''}
+          ${clave === 'sin_fecha' && p.clase === 'informe' && p.fecha ? `<div class="pendiente-fecha"><small>${fmtDate(p.fecha)}</small></div>` : ''}
+          <i class="ic ic-chevron-right pend-go"></i>
+        </div>`;
+      });
+      html += '</div></div>';
     });
-    html += '</div>';
-  });
+  }
+  html += renderDesde(hoy, desde);
   return html + '</div>';
 }
 
@@ -84,49 +101,53 @@ function accionPendiente(p) {
   return `goToInstall('${p.id}')`;
 }
 
-function renderResumenTrabajo(hoy, area) {
+// Trabajo: una fila por tipo, con su número y lo que significa
+function renderResumenTrabajo(hoy, area, ftAbiertos) {
   const delArea = r => !area || areaDeInstalacion(r) === area;
   const campanas = agruparCampanas(state.records, hoy, state.campanas).filter(c => !area || c.area === area);
   const campAbiertas = campanas.filter(c => !state.campanas?.[c.clave]?.entrega);
   const reclamos = registrosDeTipo(state.records, 'reclamo').filter(delArea);
   const reqs = registrosDeTipo(state.records, 'requerimiento').filter(delArea);
-  const tarjeta = (tab, icono, titulo, num, sub) => `<button class="resumen" onclick="switchTab('${tab}')">
-      <i class="ic ic-${icono}"></i><div class="resumen-num">${num}</div><div class="resumen-titulo">${titulo}</div><div class="resumen-sub">${sub}</div></button>`;
-  let html = '<div class="section-title">Trabajo</div><div class="resumen-grid">';
-  html += tarjeta('campanas', 'campanas', 'Campañas', campAbiertas.length, 'sin entregar');
-  html += tarjeta('reclamos', 'reclamos', 'Reclamos', reclamos.filter(r => !r.informeEntregado).length,
+  const fila = (tab, icono, titulo, num, sub, alerta = false) => `<button class="ini-fila ${alerta ? 'alerta' : ''}" onclick="switchTab('${tab}')">
+      <span class="ini-fila-ic"><i class="ic ic-${icono}"></i></span><span class="ini-fila-tx"><b>${titulo}</b><small>${sub}</small></span><span class="ini-fila-n">${num}</span><i class="ic ic-chevron-right ini-fila-go"></i></button>`;
+  let html = '<div class="bloque"><div class="bloque-head"><div class="bloque-titulo">Trabajo</div></div><div class="ini-filas">';
+  html += fila('campanas', 'campanas', 'Campañas', campAbiertas.length, campAbiertas.length === 1 ? 'sin entregar' : 'sin entregar');
+  html += fila('reclamos', 'reclamos', 'Reclamos', reclamos.filter(r => !r.informeEntregado).length,
     `${reclamos.filter(r => !r.retirado).length} en campo · ${reclamos.filter(r => r.retirado && !r.informeEntregado).length} con informe pendiente`);
-  html += tarjeta('requerimientos', 'requerimientos', 'Requerimientos', reqs.filter(r => !r.entregaRealizada).length, 'por entregar');
-  return html + '</div>';
+  html += fila('requerimientos', 'requerimientos', 'Requerimientos', reqs.filter(r => !r.entregaRealizada).length, 'por entregar');
+  html += fila('ft', 'ft', 'Seguimiento FT', ftAbiertos, ftAbiertos ? 'abiertos: se penalizan' : 'sin casos abiertos', ftAbiertos > 0);
+  return html + '</div></div>';
 }
 
 function renderEquipos() {
   const activos = state.records.filter(r => calcSt(r) === 'ACTIVO' || calcSt(r) === 'PROXIMO' || calcSt(r) === 'VENCIDO');
   const cond = e => e.condicion || 'bueno';
   const items = [
-    ['disponible', state.equipos.filter(e => eqSt(e) === 'disponible').length, 'Disponibles', 'verde'],
-    ['campo', state.equipos.filter(e => eqEnCampo(e)).length, 'En campo', 'azul'],
-    ['mant', state.equipos.filter(e => cond(e) === 'mantenimiento').length, 'En mantenimiento', 'morado'],
-    ['fuera', state.equipos.filter(e => cond(e) === 'fuera').length, 'Fuera de servicio', 'rojo'],
+    [state.equipos.filter(e => eqSt(e) === 'disponible').length, 'Disponibles', 'verde'],
+    [state.equipos.filter(e => eqEnCampo(e)).length, 'En campo', 'azul'],
+    [state.equipos.filter(e => cond(e) === 'mantenimiento').length, 'En mantenimiento', 'morado'],
+    [state.equipos.filter(e => cond(e) === 'fuera').length, 'Fuera de servicio', 'rojo'],
   ];
-  let html = '<div class="section-title">Equipos</div><div class="equipos-grid">';
-  items.forEach(([, n, label, color]) => { html += `<button class="equipo-dato" onclick="switchTab('inventario')"><b class="txt-${color}">${n}</b><span>${label}</span></button>`; });
+  let html = `<div class="bloque"><div class="bloque-head"><div class="bloque-titulo">Equipos <span class="cuenta">${state.equipos.length}</span></div><button class="b b-l" onclick="switchTab('inventario')">Ver equipos</button></div>`;
+  html += '<div class="equipos-grid">';
+  items.forEach(([n, label, color]) => { html += `<button class="equipo-dato" onclick="switchTab('inventario')"><b class="txt-${color}">${n}</b><span>${label}</span></button>`; });
   html += '</div>';
   html += '<div class="instalaciones-area"><span>Instalaciones en campo</span>';
   ['CPT MT', 'CPT BT', 'Campos y Servicios'].forEach(a => {
     html += `<span class="chip-dato"><b>${activos.filter(r => (r.areaInstalacion || 'CPT MT') === a).length}</b> ${a === 'Campos y Servicios' ? 'C&S' : a}</span>`;
   });
-  return html + '</div>';
+  return html + '</div></div>';
 }
 
 function renderAcciones() {
   const accion = (onclick, icono, texto) => `<button class="accion" onclick="${onclick}"><i class="ic ic-${icono}"></i><span>${texto}</span></button>`;
-  let html = '<div class="section-title">Acciones rápidas</div><div class="acciones">';
+  let html = '<div class="bloque"><div class="bloque-head"><div class="bloque-titulo">Acciones rápidas</div></div><div class="acciones">';
   html += accion('newInstallFromDash()', 'instalaciones', 'Nueva instalación');
   html += accion("switchTab('carga')", 'despachos', 'Despacho');
   html += accion("switchTab('validaciones')", 'validacion', 'Validaciones de TAP' + (state.validaciones.length ? ` (${state.validaciones.length} campañas)` : ''));
   html += accion('abrirReporteModal()', 'excel', 'Reporte mensual');
-  if (isAdmin()) html += accion('toggleMantenimiento()', 'ajustes', state.modoMantenimiento ? 'Desactivar mantenimiento' : 'Activar mantenimiento');
+  html += '</div>';
+  if (isAdmin()) html += `<button class="b b-l" style="margin-top:8px" onclick="toggleMantenimiento()"><i class="ic ic-ajustes"></i> ${state.modoMantenimiento ? 'Desactivar' : 'Activar'} modo mantenimiento de la app</button>`;
   return html + '</div>';
 }
 
@@ -154,10 +175,9 @@ function renderReporteModal() {
 function renderActividad() {
   let html = '';
   // ── CALENDARIO DE ACTIVIDAD ──
-  html += '<div style="margin-top:14px">';
-  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">';
-  html += '<div style="font-size:13px;font-weight:700;color:var(--text)"><i class=ic-calendario></i> Actividad</div>';
-  html += '<button onclick="toggleCal()" style="font-size:11px;font-weight:700;padding:5px 12px;border:1px solid var(--border);border-radius:20px;background:var(--white);color:var(--text3);cursor:pointer">'+(state.calView?'Ocultar':'Ver calendario')+'</button>';
+  html += '<div class="bloque">';
+  html += '<div class="bloque-head" style="margin-bottom:' + (state.calView ? '12px' : '0') + '"><div class="bloque-titulo">Actividad</div>';
+  html += '<button class="b b-g" onclick="toggleCal()"><i class="ic ic-calendario"></i> ' + (state.calView ? 'Ocultar calendario' : 'Ver calendario') + '</button>';
   html += '</div>';
 
   if (state.calView) {
@@ -198,7 +218,7 @@ function renderActividad() {
     const today2 = new Date();
     const todayStr = today2.getFullYear()+'-'+String(today2.getMonth()+1).padStart(2,'0')+'-'+String(today2.getDate()).padStart(2,'0');
 
-    html += '<div style="background:var(--white);border:1px solid var(--border);border-radius:14px;padding:14px">';
+    html += '<div class="ini-calendario">';
     // Month nav
     html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
     html += '<button onclick="calNav(-1)" style="width:28px;height:28px;border:1px solid var(--border);border-radius:8px;background:var(--white);cursor:pointer;font-size:14px">‹</button>';
@@ -235,7 +255,6 @@ function renderActividad() {
 
     // Selected day detail
     if (state.calDiaSeleccionado) {
-      console.log('DEBUG selActs for', state.calDiaSeleccionado, ':', JSON.stringify((actMap[state.calDiaSeleccionado]||[]).map(a=>({label:a.label,sub:a.sub}))));
       const selActs = actMap[state.calDiaSeleccionado] || [];
       const [sy,sm,sd] = state.calDiaSeleccionado.split('-');
       html += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border2)">';
