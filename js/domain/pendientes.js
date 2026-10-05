@@ -3,6 +3,7 @@
 import {
   agruparCampanas, areaDeInstalacion, fechaInformeReclamo, nombreCampana, tipoDeTrabajo, urgencia,
 } from './trabajo.js';
+import { casosFT } from './ft.js';
 
 // Orden de las urgencias en pantalla
 export const GRUPOS = [
@@ -54,6 +55,17 @@ export function calcularPendientes({ registros, campanasGuardadas = {}, hoy, are
     if (campanasGuardadas[c.clave]?.entrega || !cuenta(c.fechaEntrega)) continue;
     const u = urgencia(c.fechaEntrega, hoy);
     if (u !== 'ok') lista.push({ clase: 'campana', clave: c.clave, tipo: 'campana', urgencia: u, fecha: c.fechaEntrega, titulo: `Cargar la campaña ${nombreCampana(c)} en el sistema CPT DELSUR`, detalle: `${c.area} · ${c.casos.length || c.resumen.total} ${(c.casos.length || c.resumen.total) === 1 ? 'caso' : 'casos'}` });
+  }
+
+  // Casos fuera de tolerancia: avisar a DELSUR de inmediato y no pasar los 90 días
+  for (const x of casosFT(campanasGuardadas, registros, hoy)) {
+    if (x.cerrado || (area && x.area !== area)) continue;
+    const ref = { clase: 'ft', tipo: 'campana', clave: x.clave, id: x.id, caso: x.codigo };
+    if (!x.ft.aviso) lista.push({ ...ref, urgencia: 'hoy', fecha: hoy, titulo: `Avisar a DELSUR del caso FT ${x.codigo}`, detalle: x.caso.nombre || '' });
+    if (x.limite && cuenta(x.limite)) {
+      const u = urgencia(x.limite, hoy);
+      if (u !== 'ok') lista.push({ ...ref, urgencia: u, fecha: x.limite, titulo: `Plazo de 90 días del caso FT ${x.codigo}`, detalle: x.caso.nombre || '' });
+    }
   }
 
   const orden = Object.fromEntries(GRUPOS.map(([k], i) => [k, i]));

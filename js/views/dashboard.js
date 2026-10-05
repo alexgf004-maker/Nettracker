@@ -7,7 +7,7 @@ import { calcSt, escapeHtml, eqEnCampo, eqSt, fmtDate } from '../utils.js';
 import { areaVista, filtroArea, textoPlazo } from './trabajo.js';
 
 const esc = s => escapeHtml(s ?? '');
-const ICONO_PENDIENTE = { retiro: 'ruta', descarga: 'descargar', informe: 'reclamos', requerimiento: 'requerimientos', campana: 'campanas' };
+const ICONO_PENDIENTE = { ft: 'ft', retiro: 'ruta', descarga: 'descargar', informe: 'reclamos', requerimiento: 'requerimientos', campana: 'campanas' };
 const CLASE_GRUPO = { vencido: 'rojo', hoy: 'rojo', proximo: 'amarillo', sin_fecha: 'gris' };
 
 export function renderDashboard() {
@@ -70,6 +70,7 @@ function renderDesde(hoy, desde) {
 
 function accionPendiente(p) {
   if (p.clase === 'campana') return `abrirCampanaTrabajo('${p.clave}')`;
+  if (p.clase === 'ft') return `switchTab('ft'); abrirFT('${p.clave}', '${p.id}')`;
   if (p.clase === 'informe') return "switchTab('reclamos')";
   if (p.clase === 'requerimiento') return "switchTab('requerimientos')";
   return `goToInstall('${p.id}')`;

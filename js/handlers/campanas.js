@@ -9,6 +9,8 @@ import {
 } from '../actions/documentos.js';
 import { abrirMultiplicador, cerrarMultiplicador, exportarMultiplicadores, guardarMultiplicador, usarHistorico } from '../actions/multiplicadores.js';
 import { asignarEquipo, asignarFecha, cerrarProgramacion, enviarFechaADespachos, exportarFecha, guardarProgramacion, importarProgramacion, procesarProgramacion, setDatoFecha } from '../actions/fechas.js';
+import { abrirResultado, cerrarResultado, exportarCuadroResumen, guardarResultado } from '../actions/resultados.js';
+import { abrirFT, agregarNotaFT, cerrarFT, marcarAvisoFT, quitarAvisoFT, setCompensacionFT, setRemedicionFT, setRutaFT } from '../actions/ft.js';
 import { codigoConSistema } from '../domain/listados.js';
 import { state } from '../state.js';
 import { htmlCalculo } from '../views/multiplicadores.js';
@@ -44,3 +46,12 @@ window.setMultField = (k, v) => {
 
 // Fechas 1, 2 y 3
 Object.assign(window, { asignarFecha, asignarEquipo, setDatoFecha, exportarFecha, enviarFechaADespachos, importarProgramacion, procesarProgramacion, guardarProgramacion, cerrarProgramacion });
+
+// Resultados
+Object.assign(window, { abrirResultado, cerrarResultado, guardarResultado, exportarCuadroResumen });
+window.setResultadoOpcion = (k, v) => { state.resultadoForm[k] = v; render(); };
+window.setResultadoField = (k, v) => { state.resultadoForm[k] = v; };
+
+// Seguimiento FT
+Object.assign(window, { abrirFT, cerrarFT, marcarAvisoFT, quitarAvisoFT, setRutaFT, setCompensacionFT, agregarNotaFT, setRemedicionFT });
+window.setFTNota = v => { state.ftNota = v; };

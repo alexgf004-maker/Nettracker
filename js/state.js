@@ -39,10 +39,14 @@ export const state = {
   casosFiltro: 'todos', // todos | CR | DA | DF | faltantes
   casosBusqueda: '',
   casoEdit: null, // { clave, id }
-  campanaVista: 'precampana', // precampana | casos | multiplicadores | fechas | mediciones
+  campanaVista: 'precampana', // precampana | casos | multiplicadores | fechas | resultados | mediciones
   multFiltro: 'todos', // todos | listos | por_resolver | no_se_miden
   multEdit: null, // { clave, id }
   multForm: {},
+  ftEdit: null, // { clave, id }
+  ftNota: '',
+  resultadoEdit: null, // { clave, id }
+  resultadoForm: {},
   importProgramacion: null, // vista previa del Excel de programación de instalaciones
   casoForm: {},
   configCartas: null, // config/cartas: firmante, contacto, contratista y logo
