@@ -264,6 +264,9 @@ export function analizarArmonicos(texto, nf) {
 export function resumenGuardado(tension, arm) {
   const out = {};
   if (tension?.resumen) out.tension = { febNoPer: tension.resumen.febNoPer, estado: tension.resumen.estado };
+  // Flicker: no cumple si el percentil 95 del PST de alguna fase pasa de 1 (tabla de la macro)
+  const pst = Object.values(tension?.pstP95 || {}).filter(v => v !== null);
+  if (pst.length) out.flicker = pst.some(v => v > LIMITE_PST) ? 'NO CUMPLE' : 'CUMPLE';
   if (arm?.n) {
     const todas = obj => Object.values(obj).every(Boolean);
     out.armonicos = { tension: todas(arm.cumpleTension) ? 'CUMPLE' : 'NO CUMPLE', corriente: todas(arm.cumpleCorriente) ? 'CUMPLE' : 'NO CUMPLE' };

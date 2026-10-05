@@ -5,7 +5,9 @@ import { showToast } from '../ui.js';
 import { hoyLocal } from '../domain/trabajo.js';
 import { render } from '../views/render.js';
 
-const ruta = (clave, id) => `campanas/${clave}/casos/${id}/ft`;
+// clave 'reclamo': el FT es de un expediente de reclamo (reclamos/{id}/ft)
+const ruta = (clave, id) => (clave === 'reclamo' ? `reclamos/${id}/ft` : `campanas/${clave}/casos/${id}/ft`);
+const ftActual = (clave, id) => (clave === 'reclamo' ? state.reclamos?.[id]?.ft : state.campanas?.[clave]?.casos?.[id]?.ft);
 const firma = () => ({ fecha: hoyLocal(), por: state.sesionUsuario?.nombre || '' });
 
 export function abrirFT(clave, id) { state.ftEdit = { clave, id }; state.ftNota = ''; render(); }
@@ -28,8 +30,7 @@ export function setCompensacionFT(clave, id, valor) {
 export function agregarNotaFT(clave, id) {
   const texto = String(state.ftNota || '').trim();
   if (!texto) return;
-  const caso = state.campanas?.[clave]?.casos?.[id];
-  const notas = [...(caso?.ft?.notas || []), { ...firma(), texto }];
+  const notas = [...(ftActual(clave, id)?.notas || []), { ...firma(), texto }];
   update(ref(db, ruta(clave, id)), { notas }).then(() => showToast('Nota agregada'));
   state.ftNota = '';
   render();

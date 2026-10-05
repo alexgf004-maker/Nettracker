@@ -21,6 +21,7 @@ export const historialAccesoriosRef = ref(db, 'historialAccesorios');
 export const validacionesRef = ref(db, 'validaciones');
 export const mantenimientoRef = ref(db, 'config/mantenimiento');
 export const campanasRef = ref(db, 'campanas');
+export const reclamosRef = ref(db, 'reclamos'); // expedientes de reclamo
 export const seguimientoDesdeRef = ref(db, 'config/seguimientoDesde'); // fecha desde la que el Inicio cuenta pendientes
 // Base de coordenadas por NC: coordenadas/{NC} = [latitud, longitud] (se importa como JSON desde la consola de Firebase)
 export const coordenadasRef = ref(db, 'coordenadas');

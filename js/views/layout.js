@@ -18,7 +18,7 @@ const LOGO = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect 
 const todasLasPestanas = () => SECCIONES.flatMap(s => s.items);
 
 export function renderHeader() {
-  const showBack = state.view !== 'lista' || (state.tab === 'campanas' && state.campanaClave);
+  const showBack = state.view !== 'lista' || (state.tab === 'campanas' && state.campanaClave) || (state.tab === 'reclamos' && state.expedienteId);
   const titulo = todasLasPestanas().find(([t]) => t === state.tab)?.[1] || '';
   const nombre = state.sesionUsuario?.nombre || '';
   let acciones = '';
