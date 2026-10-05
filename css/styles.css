@@ -899,9 +899,15 @@ header { background-image: var(--onda), var(--degradado); background-repeat: rep
 /* ─── Inicio ─── */
 .inicio-layout { display: grid; grid-template-columns: 1fr; gap: 0 16px; grid-template-areas: "pend" "trabajo" "acciones" "equipos" "actividad"; }
 .ini-pend { grid-area: pend; } .ini-trabajo { grid-area: trabajo; } .ini-equipos { grid-area: equipos; } .ini-acciones { grid-area: acciones; } .ini-actividad { grid-area: actividad; }
+/* Una sola columna también en PC: cada sección a lo ancho, una debajo de otra */
+.inicio-layout { grid-template-areas: "pend" "trabajo" "acciones" "equipos" "actividad"; }
 @media (min-width: 900px) {
-  .inicio-layout { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); grid-template-areas: "pend trabajo" "pend acciones" "equipos equipos" "actividad actividad"; align-items: start; }
-  .ini-pend .bloque { min-height: 100%; }
+  .inicio .ini-filas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .inicio .ini-filas .ini-fila { flex-direction: column; align-items: flex-start; gap: 8px; padding: 14px; position: relative; }
+  .inicio .ini-filas .ini-fila-n { font-size: 28px; line-height: 1; order: 2; }
+  .inicio .ini-filas .ini-fila-tx { order: 3; width: 100%; }
+  .inicio .ini-filas .ini-fila-go { position: absolute; right: 12px; top: 16px; }
+  .inicio .acciones { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 .ini-chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .inicio .desde { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--border2); }
