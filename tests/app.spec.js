@@ -2,6 +2,29 @@
 const { test, expect } = require('@playwright/test');
 const { abrirApp, cerrarAlerta } = require('./helpers');
 
+test('interfaz sin emojis decorativos y sin desbordamiento en móvil y escritorio', async ({ page }, testInfo) => {
+  const app = await abrirApp(page);
+  await cerrarAlerta(page);
+  for (const width of [390, 1280]) {
+    await page.setViewportSize({ width, height: 850 });
+    await app.ejecutar(() => switchTab('dashboard'));
+    await expect(page.locator('nav.bottom-nav .nav-icon svg')).toHaveCount(5);
+    await expect(page.getByRole('button', { name: 'Buscar', exact: true })).toBeVisible();
+    expect(await page.locator('#app').innerText()).not.toMatch(/\p{Extended_Pictographic}/u);
+    await page.screenshot({ path: testInfo.outputPath(`inicio-${width}.png`), fullPage: true });
+    await app.ejecutar(() => openCampaign('MT_2026_04'));
+    await expect(page.locator('#app')).toContainText('Casos vinculados (2)');
+    await expect(page.locator('details.campaign-progress')).not.toHaveAttribute('open', '');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath(`campana-${width}.png`), fullPage: true });
+  }
+  await page.setViewportSize({ width: 390, height: 850 });
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+  await app.ejecutar(() => switchTab('dashboard'));
+  await page.screenshot({ path: testInfo.outputPath('inicio-oscuro.png'), fullPage: true });
+  expect(app.errores).toEqual([]);
+});
+
 test('permite seleccionar un perfil y entrar', async ({ page }) => {
   const app = await abrirApp(page, { usuario: null });
   await page.locator('#app [onclick^="selectLoginUser"]').first().click();

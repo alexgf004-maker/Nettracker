@@ -25,7 +25,7 @@ const STATUS_LABELS = {
 
 export function renderInstallSectionSwitch() {
   return `<div style="display:flex;gap:6px;padding:10px 16px;background:var(--white);border-bottom:1px solid var(--border)">
-    ${[['installations', '⚡ Instalaciones'], ['campaigns', '🗓 Campañas'], ['cases', '📁 Casos']].map(([key, label]) => `<button onclick="setInstSection('${key}')" style="flex:1;padding:9px 4px;border-radius:10px;border:1.5px solid ${state.instSection === key ? 'var(--primary)' : 'var(--border)'};background:${state.instSection === key ? 'var(--primary)' : '#fff'};color:${state.instSection === key ? '#fff' : 'var(--text3)'};font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer">${label}</button>`).join('')}
+    ${[['installations', ' Instalaciones'], ['campaigns', ' Campañas'], ['cases', ' Casos']].map(([key, label]) => `<button onclick="setInstSection('${key}')" style="flex:1;padding:9px 4px;border-radius:10px;border:1.5px solid ${state.instSection === key ? 'var(--primary)' : 'var(--border)'};background:${state.instSection === key ? 'var(--primary)' : '#fff'};color:${state.instSection === key ? '#fff' : 'var(--text3)'};font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer">${label}</button>`).join('')}
   </div>`;
 }
 
@@ -58,10 +58,10 @@ export function renderCaseList() {
     <div style="display:flex;gap:6px;margin-bottom:10px">
       ${['TODOS', 'CPT MT', 'CPT BT'].map(area => `<button onclick="setCaseAreaFilter('${area}')" style="padding:6px 12px;border-radius:20px;border:1.5px solid ${state.caseAreaFilter === area ? 'var(--primary)' : 'var(--border)'};background:${state.caseAreaFilter === area ? 'var(--primary)' : '#fff'};color:${state.caseAreaFilter === area ? '#fff' : 'var(--text3)'};font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer">${area === 'TODOS' ? 'Todas las áreas' : area}</button>`).join('')}
     </div>
-    <div class="search-wrap"><span class="search-icon">🔍</span><input id="case-search" class="search-input" placeholder="Código, cliente, NC, medidor..." value="${escapeHtml(state.caseSearch)}" oninput="setCaseSearch(this.value)"></div>`;
+    <div class="search-wrap"><span class="search-icon"></span><input id="case-search" class="search-input" placeholder="Código, cliente, NC, medidor..." value="${escapeHtml(state.caseSearch)}" oninput="setCaseSearch(this.value)"></div>`;
 
   if (!filtered.length) {
-    html += `<div class="empty"><div class="empty-icon">📁</div><div class="empty-text">${state.cases.length ? 'No hay casos con estos filtros' : 'Todavía no hay expedientes'}</div>${state.cases.length ? '' : '<button class="btn btn-primary" style="max-width:240px;margin:12px auto 0" onclick="newCase()">+ Crear primer caso</button>'}</div>`;
+    html += `<div class="empty"><div class="empty-icon"></div><div class="empty-text">${state.cases.length ? 'No hay casos con estos filtros' : 'Todavía no hay expedientes'}</div>${state.cases.length ? '' : '<button class="btn btn-primary" style="max-width:240px;margin:12px auto 0" onclick="newCase()">+ Crear primer caso</button>'}</div>`;
   } else {
     html += '<div class="list">';
     filtered.forEach(caseRecord => {
@@ -74,9 +74,9 @@ export function renderCaseList() {
           <div><div style="font-family:var(--mono);font-size:14px;font-weight:800;color:var(--text)">#${escapeHtml(caseRecord.code)}</div><div style="font-size:11px;color:var(--text3);margin-top:2px">${TYPE_LABELS[caseRecord.caseType] || 'Caso'} · ${escapeHtml(caseRecord.ownerArea || 'CPT MT')}</div></div>
           <span style="font-size:10px;font-weight:700;color:${caseRecord.lifecycleStatus === 'follow_up' ? 'var(--red)' : 'var(--primary)'};background:var(--primary-light);padding:4px 7px;border-radius:12px;white-space:nowrap">${escapeHtml(status)}</span>
         </div>
-        <div style="font-size:12px;color:var(--text2);margin-top:8px">👤 ${escapeHtml(point?.customerName || 'Cliente pendiente')}</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:3px">📍 ${escapeHtml(point?.address || caseRecord.placeSnapshot || 'Dirección pendiente')}${point?.contractNumber ? ' · NC ' + escapeHtml(point.contractNumber) : ''}</div>
-        <div style="display:flex;gap:14px;margin-top:9px;padding-top:8px;border-top:1px solid var(--border2);font-size:10px;color:var(--text3)"><span>📏 ${installations} medición${installations === 1 ? '' : 'es'}</span><span>⚠️ ${incidents} incidencia${incidents === 1 ? '' : 's'}</span><span style="margin-left:auto">${escapeHtml(caseRecord.source || '')}</span></div>
+        <div style="font-size:12px;color:var(--text2);margin-top:8px"> ${escapeHtml(point?.customerName || 'Cliente pendiente')}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px"> ${escapeHtml(point?.address || caseRecord.placeSnapshot || 'Dirección pendiente')}${point?.contractNumber ? ' · NC ' + escapeHtml(point.contractNumber) : ''}</div>
+        <div style="display:flex;gap:14px;margin-top:9px;padding-top:8px;border-top:1px solid var(--border2);font-size:10px;color:var(--text3)"><span> ${installations} medición${installations === 1 ? '' : 'es'}</span><span> ${incidents} incidencia${incidents === 1 ? '' : 's'}</span><span style="margin-left:auto">${escapeHtml(caseRecord.source || '')}</span></div>
       </div>`;
     });
     html += '</div>';

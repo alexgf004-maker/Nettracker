@@ -18,7 +18,7 @@ export function abrirMemo(html) {
 export function badgeSt(st) {
   if (st === 'ACTIVO') return '<span class="badge badge-green">Activo</span>';
   if (st === 'PROXIMO') return '<span class="badge badge-yellow">Retiro próximo</span>';
-  if (st === 'VENCIDO') return '<span class="badge badge-red badge-vencido">⚠️ Vencido</span>';
+  if (st === 'VENCIDO') return '<span class="badge badge-red badge-vencido"> Vencido</span>';
   if (st === 'PROGRAMADO') return '<span class="badge" style="background:#f3f0ff;color:#7c3aed">Programado</span>';
   return '<span class="badge badge-gray">Retirado</span>';
 }

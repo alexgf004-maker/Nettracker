@@ -22,6 +22,12 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm test
       - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: interfaz-cpt
+          path: test-results/**/*.png
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: reporte-pruebas

@@ -34,14 +34,14 @@ window.closeRetiroModal = closeRetiroModal;
 window.openRetiroModal = openRetiroModal;
 
 window.newInstall = () => {
-  if (state.equipos.filter(e => (eqSt(e) === 'disponible' || eqSt(e) === 'prestado') && (e.condicion||'bueno') !== 'fuera' && (e.condicion||'bueno') !== 'mantenimiento').length === 0) return showToast('⚠️ No hay equipos disponibles en inventario');
+  if (state.equipos.filter(e => (eqSt(e) === 'disponible' || eqSt(e) === 'prestado') && (e.condicion||'bueno') !== 'fuera' && (e.condicion||'bueno') !== 'mantenimiento').length === 0) return showToast('No hay equipos disponibles en inventario');
   state.form = emptyForm();
   state.form.areaInstalacion = state.instTab === 'cpt_mt' ? 'CPT MT' : state.instTab === 'cpt_bt' ? 'CPT BT' : 'Campos y Servicios';
   state.editId = null; state.view = 'form'; render();
 };
 
 window.newInstallForCase = id => {
-  if (state.equipos.filter(e => (eqSt(e) === 'disponible' || eqSt(e) === 'prestado') && (e.condicion||'bueno') !== 'fuera' && (e.condicion||'bueno') !== 'mantenimiento').length === 0) return showToast('⚠️ No hay equipos disponibles en inventario');
+  if (state.equipos.filter(e => (eqSt(e) === 'disponible' || eqSt(e) === 'prestado') && (e.condicion||'bueno') !== 'fuera' && (e.condicion||'bueno') !== 'mantenimiento').length === 0) return showToast('No hay equipos disponibles en inventario');
   const caseRecord = state.cases.find(item => item.id === id);
   if (!caseRecord) return;
   const point = state.servicePoints.find(item => item.id === caseRecord.servicePointId);
@@ -60,7 +60,7 @@ window.saveInstall = handleSave;
 window.openDetail = id => { state.editId = id; state.view = 'detalle'; render(); };
 
 window.editInstall = id => {
-  if (!isAdmin()) return showToast('⚠️ Solo el administrador puede editar instalaciones');
+  if (!isAdmin()) return showToast('Solo el administrador puede editar instalaciones');
   const r = state.records.find(x => x.id === id); if (!r) return;
   state.form = { equipoId: r.equipoId, serie: r.serie, modelo: r.modelo||'', caso: r.caso, lugar: r.lugar||'', lat: r.lat||null, lng: r.lng||null, fechaInstalacion: r.fechaInstalacion, fechaRetiro: r.fechaRetiro, notas: r.notas||'' };
   state.editId = id; state.view = 'form'; render();

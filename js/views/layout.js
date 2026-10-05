@@ -1,57 +1,40 @@
-// Header y barra de navegación inferior
 import { state } from '../state.js';
+import { escapeHtml } from '../utils.js';
+import { icon } from './icons.js';
 
 export function renderHeader() {
-  let html = '';
   const showBack = state.view !== 'lista';
-  html += `<header>
-    <div class="header-left">
-      ${showBack ? `<button class="back-btn" onclick="goBack()">←</button>` : ''}
-      <div style="position:relative;display:inline-block">
-        <div id="conn-dot" style="position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:50%;background:#22c55e;border:1.5px solid rgba(255,255,255,.7);z-index:10"></div>
-        <div class="logo-mark">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="2" width="18" height="20" rx="2" stroke="white" stroke-width="1.8" fill="none"/><path d="M8 7h8M8 10h5" stroke="white" stroke-width="1.5" stroke-linecap="round"/><path d="M12 14l-2 4h4l-2 4" stroke="#7dd3fc" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </div>
-      </div>
-      <div>
-        <div class="logo-text">CPT INNOVA</div>
-        <div class="logo-sub">Analizadores de Red</div>
-      </div>
-    </div>
-    <div style="display:flex;align-items:center;gap:8px">
-      ${state.view === 'lista' && state.tab === 'instalaciones' && state.instSection === 'installations' ? `<button class="btn-small" onclick="newInstall()">+ Nuevo</button>` : ''}
-      ${state.view === 'lista' && state.tab === 'instalaciones' && state.instSection === 'cases' ? `<button class="btn-small" onclick="newCase()">+ Caso</button>` : ''}
-      ${state.view === 'lista' && state.tab === 'instalaciones' && state.instSection === 'campaigns' ? `<button class="btn-small" onclick="newCampaign()">+ Campaña</button>` : ''}
-      ${state.view === 'lista' && state.tab === 'campaigns' ? `<button class="btn-small" onclick="newCampaign()">+ Campaña</button>` : ''}
-      ${state.view === 'lista' && state.tab === 'complaints' ? `<button class="btn-small" onclick="newComplaint()">+ Reclamo</button>` : ''}
-      ${state.view === 'lista' && state.tab === 'case_archive' ? `<button class="btn-small" onclick="newCase()">+ Caso</button>` : ''}
-      ${state.view === 'lista' && state.tab === 'inventario' && !state.modoSeleccionLote ? `<button class="btn-small" onclick="newEquipo()">+ Equipo</button>` : ''}
-      ${state.view === 'lista' && state.tab === 'inventario' && state.modoSeleccionLote ? `<button class="btn-small" style="background:rgba(255,255,255,.3)" onclick="cancelarLote()">✕ Cancelar</button>` : ''}
-      <button onclick="toggleGlobalSearch()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:10px;width:32px;height:32px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center">🔍</button>
-      <div onclick="cerrarSesion()" title="Cerrar sesión" style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.25);border:2px solid rgba(255,255,255,.4);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;font-weight:800;color:#fff;flex-shrink:0">${(state.sesionUsuario?.nombre||' ').split(' ').map(w=>w[0]).slice(0,2).join('')}</div>
-    </div>
-  </header>`;
-  return html;
+  const initials = (state.sesionUsuario?.nombre || '').split(' ').map(word => word[0]).slice(0, 2).join('');
+  const add = state.view !== 'lista' ? ''
+    : state.tab === 'campaigns' ? '<button class="btn-small" onclick="newCampaign()">+ Campaña</button>'
+    : state.tab === 'complaints' ? '<button class="btn-small" onclick="newComplaint()">+ Reclamo</button>'
+    : state.tab === 'inventario' ? (state.modoSeleccionLote
+      ? '<button class="btn-small" onclick="cancelarLote()">Cancelar</button>'
+      : '<button class="btn-small" onclick="newEquipo()">+ Equipo</button>')
+    : state.tab === 'case_archive' ? '<button class="btn-small" onclick="newCase()">+ Caso</button>'
+    : state.tab === 'instalaciones' ? (state.instSection === 'cases'
+      ? '<button class="btn-small" onclick="newCase()">+ Caso</button>'
+      : state.instSection === 'campaigns' ? '<button class="btn-small" onclick="newCampaign()">+ Campaña</button>'
+        : '<button class="btn-small" onclick="newInstall()">+ Nuevo</button>') : '';
+  return `<header><div class="header-left">
+    ${showBack ? `<button class="back-btn" onclick="goBack()" aria-label="Volver">${icon('back')}</button>` : ''}
+    <div class="logo-mark">${icon('activity')}<span id="conn-dot" class="connection-dot" title="Estado de conexión"></span></div>
+    <div><div class="logo-text">CPT <span>INNOVA</span></div><div class="logo-sub">Calidad del producto técnico</div></div>
+    </div><div class="header-actions">${add}
+    <button class="header-icon-button" onclick="toggleGlobalSearch()" aria-label="Buscar">${icon('search')}</button>
+    <button class="profile-button" onclick="cerrarSesion()" aria-label="Cambiar perfil" title="${escapeHtml(state.sesionUsuario?.nombre || '')}">${escapeHtml(initials)}</button>
+    </div></header>`;
 }
 
 export function renderBottomNav() {
-  let html = '';
-  html += `<nav class="bottom-nav">
-    <button class="nav-btn ${state.tab==='dashboard'?'active':''}" onclick="switchTab('dashboard')">
-      <span class="nav-icon">🏠</span><span class="nav-label">Inicio</span>
-    </button>
-    <button class="nav-btn ${state.tab==='campaigns'?'active':''}" onclick="switchTab('campaigns')">
-      <span class="nav-icon">🗓</span><span class="nav-label">Campañas</span>
-    </button>
-    <button class="nav-btn ${state.tab==='complaints'?'active':''}" onclick="switchTab('complaints')">
-      <span class="nav-icon">📋</span><span class="nav-label">Reclamos</span>
-    </button>
-    <button class="nav-btn ${state.tab==='inventario'?'active':''}" onclick="switchTab('inventario')">
-      <span class="nav-icon">📦</span><span class="nav-label">Equipos</span>
-    </button>
-    <button class="nav-btn ${['operations','instalaciones','validaciones','carga','mapa','case_archive','operational_dashboard'].includes(state.tab)?'active':''}" onclick="switchTab('operations')">
-      <span class="nav-icon">⚡</span><span class="nav-label">Operación</span>
-    </button>
-  </nav>`;
-  return html;
+  const tabs = [
+    ['dashboard', 'Inicio', 'home'], ['campaigns', 'Campañas', 'calendar'],
+    ['complaints', 'Reclamos', 'clipboard'], ['inventario', 'Equipos', 'equipment'],
+    ['operations', 'Operación', 'activity'],
+  ];
+  const inOperations = ['operations', 'instalaciones', 'validaciones', 'carga', 'mapa', 'case_archive', 'operational_dashboard'].includes(state.tab);
+  return `<nav class="bottom-nav" aria-label="Navegación principal">${tabs.map(([tab, label, symbol]) => {
+    const active = state.tab === tab || tab === 'operations' && inOperations;
+    return `<button class="nav-btn ${active ? 'active' : ''}" onclick="switchTab('${tab}')" ${active ? 'aria-current="page"' : ''}><span class="nav-icon">${icon(symbol)}</span><span class="nav-label">${label}</span></button>`;
+  }).join('')}</nav>`;
 }

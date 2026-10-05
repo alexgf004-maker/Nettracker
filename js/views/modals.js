@@ -1,5 +1,5 @@
 // Modales (retiro, descarga, importar, mantenimiento, condición, préstamo, selector, búsqueda, alerta)
-import { AREAS, CONDICIONES, FALLAS_GRAVES, FALLAS_RETIRO, SEDES, userArea } from '../config.js';
+import { AREAS, CONDICIONES, FALLAS_GRAVES, FALLAS_RETIRO, SEDES, TECNICOS, userArea } from '../config.js';
 import { state } from '../state.js';
 import { badgeSt } from '../ui.js';
 import { calcSt, daysUntil, eqSt, escapeHtml, sedeDestinoMovimiento } from '../utils.js';
@@ -18,17 +18,17 @@ export function renderRetiroModal() {
         <div style="font-size:13px;color:#6b7280;margin-bottom:14px">¿El equipo presentó algún problema?</div>
 
         <div onclick="toggleSinProblema()" style="padding:13px 16px;border:2px solid ${state.retiroForm.sinProblema ? '#3b6cf4' : '#e5e7eb'};border-radius:12px;margin-bottom:8px;cursor:pointer;font-size:15px;font-weight:600;color:${state.retiroForm.sinProblema ? '#3b6cf4' : '#374151'};background:${state.retiroForm.sinProblema ? '#eef2ff' : '#fff'};display:flex;align-items:center;gap:10px">
-          <span style="font-size:18px">${state.retiroForm.sinProblema ? '✅' : '⬜'}</span> Sin problemas
+          <span style="font-size:18px">${state.retiroForm.sinProblema ? '✓' : '○'}</span> Sin problemas
         </div>
 
         ${FAULT_TYPES.map(f => `
         <div onclick="toggleFalla('${f}')" style="padding:13px 16px;border:2px solid ${state.retiroForm.fallas.includes(f) ? '#ef4444' : '#e5e7eb'};border-radius:12px;margin-bottom:8px;cursor:pointer;font-size:15px;font-weight:600;color:${state.retiroForm.fallas.includes(f) ? '#ef4444' : '#374151'};background:${state.retiroForm.fallas.includes(f) ? '#fef2f2' : '#fff'};display:flex;align-items:center;gap:10px">
-          <span style="font-size:18px">${state.retiroForm.fallas.includes(f) ? '🔴' : '⬜'}</span> ${f}
+          <span style="font-size:18px">${state.retiroForm.fallas.includes(f) ? '' : '○'}</span> ${f}
         </div>`).join('')}
-        <div style="font-size:11px;font-weight:700;color:var(--red);letter-spacing:1px;text-transform:uppercase;margin:12px 0 8px;padding-top:8px;border-top:1px solid #fecaca">⚠ Fallas graves — marcan equipo como Fuera de servicio</div>
+        <div style="font-size:11px;font-weight:700;color:var(--red);letter-spacing:1px;text-transform:uppercase;margin:12px 0 8px;padding-top:8px;border-top:1px solid #fecaca"> Fallas graves — marcan equipo como Fuera de servicio</div>
         ${FAULT_GRAVES.map(f => `
         <div onclick="toggleFalla('${f}')" style="padding:13px 16px;border:2px solid ${state.retiroForm.fallas.includes(f) ? '#991b1b' : '#e5e7eb'};border-radius:12px;margin-bottom:8px;cursor:pointer;font-size:15px;font-weight:600;color:${state.retiroForm.fallas.includes(f) ? '#991b1b' : '#374151'};background:${state.retiroForm.fallas.includes(f) ? '#fee2e2' : '#fff'};display:flex;align-items:center;gap:10px">
-          <span style="font-size:18px">${state.retiroForm.fallas.includes(f) ? '💀' : '⬜'}</span> ${f}
+          <span style="font-size:18px">${state.retiroForm.fallas.includes(f) ? '' : '○'}</span> ${f}
         </div>`).join('')}
 
         <div style="margin-top:8px;margin-bottom:16px">
@@ -39,10 +39,10 @@ export function renderRetiroModal() {
         <div style="margin-bottom:16px">
           <div style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:8px">¿YA DESCARGASTE LA MEDICIÓN?</div>
           <div style="display:flex;gap:8px">
-            <div onclick="setRetiroDescarga(true)" style="flex:1;padding:11px;border-radius:10px;border:2px solid ${state.retiroForm.descargaConfirmada===true?'var(--green)':'#e5e7eb'};background:${state.retiroForm.descargaConfirmada===true?'var(--green-light)':'#fff'};text-align:center;cursor:pointer;font-size:13px;font-weight:700;color:${state.retiroForm.descargaConfirmada===true?'var(--green)':'#6b7280'}">✅ Sí, ya descargué</div>
-            <div onclick="setRetiroDescarga(false)" style="flex:1;padding:11px;border-radius:10px;border:2px solid ${state.retiroForm.descargaConfirmada===false?'var(--red)':'#e5e7eb'};background:${state.retiroForm.descargaConfirmada===false?'var(--red-light)':'#fff'};text-align:center;cursor:pointer;font-size:13px;font-weight:700;color:${state.retiroForm.descargaConfirmada===false?'var(--red)':'#6b7280'}">⚠️ No descargué</div>
+            <div onclick="setRetiroDescarga(true)" style="flex:1;padding:11px;border-radius:10px;border:2px solid ${state.retiroForm.descargaConfirmada===true?'var(--green)':'#e5e7eb'};background:${state.retiroForm.descargaConfirmada===true?'var(--green-light)':'#fff'};text-align:center;cursor:pointer;font-size:13px;font-weight:700;color:${state.retiroForm.descargaConfirmada===true?'var(--green)':'#6b7280'}">✓ Sí, ya descargué</div>
+            <div onclick="setRetiroDescarga(false)" style="flex:1;padding:11px;border-radius:10px;border:2px solid ${state.retiroForm.descargaConfirmada===false?'var(--red)':'#e5e7eb'};background:${state.retiroForm.descargaConfirmada===false?'var(--red-light)':'#fff'};text-align:center;cursor:pointer;font-size:13px;font-weight:700;color:${state.retiroForm.descargaConfirmada===false?'var(--red)':'#6b7280'}"> No descargué</div>
           </div>
-          ${state.retiroForm.descargaConfirmada===false?'<div style="margin-top:8px;padding:8px 12px;background:var(--red-light);border-radius:8px;font-size:12px;color:var(--red);font-weight:600">⚠️ El equipo quedará marcado con descarga pendiente</div>':''}
+          ${state.retiroForm.descargaConfirmada===false?'<div style="margin-top:8px;padding:8px 12px;background:var(--red-light);border-radius:8px;font-size:12px;color:var(--red);font-weight:600"> El equipo quedará marcado con descarga pendiente</div>':''}
         </div>
         <div style="margin-bottom:12px">
           ${(()=>{
@@ -83,28 +83,28 @@ export function renderDescargaModal() {
   let html = '';
   html += '<div class="modal-overlay" style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">';
   html += '<div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:90vh;overflow-y:auto;padding:20px;font-family:var(--font)">';
-  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:17px;font-weight:700;color:var(--text)">💾 Registrar descarga</div><button onclick="closeDescargaModal()" style="background:none;border:none;font-size:24px;color:var(--text3);cursor:pointer">✕</button></div>';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-size:17px;font-weight:700;color:var(--text)"> Registrar descarga</div><button onclick="closeDescargaModal()" style="background:none;border:none;font-size:24px;color:var(--text3);cursor:pointer">✕</button></div>';
   html += '<div style="font-size:12px;font-weight:700;color:var(--text3);margin-bottom:10px">¿QUIÉN REALIZÓ LA DESCARGA?</div>';
-  html += '<div onclick="setDescargaTecnico(\'David García\')" style="padding:10px 14px;border:2px solid '+(state.descargaForm.tecnico==='David García'?'var(--primary)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:14px;font-weight:600;color:'+(state.descargaForm.tecnico==='David García'?'var(--primary)':'var(--text2)')+';background:'+(state.descargaForm.tecnico==='David García'?'var(--primary-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(state.descargaForm.tecnico==='David García'?'✅':'⬜')+'</span> David García</div>';
-  html += '<div onclick="setDescargaTecnico(\'Bryan Francia\')" style="padding:10px 14px;border:2px solid '+(state.descargaForm.tecnico==='Bryan Francia'?'var(--primary)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:14px;font-weight:600;color:'+(state.descargaForm.tecnico==='Bryan Francia'?'var(--primary)':'var(--text2)')+';background:'+(state.descargaForm.tecnico==='Bryan Francia'?'var(--primary-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(state.descargaForm.tecnico==='Bryan Francia'?'✅':'⬜')+'</span> Bryan Francia</div>';
-  html += '<div onclick="setDescargaTecnico(\'Francisco Chulo\')" style="padding:10px 14px;border:2px solid '+(state.descargaForm.tecnico==='Francisco Chulo'?'var(--primary)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:14px;font-weight:600;color:'+(state.descargaForm.tecnico==='Francisco Chulo'?'var(--primary)':'var(--text2)')+';background:'+(state.descargaForm.tecnico==='Francisco Chulo'?'var(--primary-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(state.descargaForm.tecnico==='Francisco Chulo'?'✅':'⬜')+'</span> Francisco Chulo</div>';
-  html += '<div onclick="setDescargaTecnico(\'Vicente Ramos\')" style="padding:10px 14px;border:2px solid '+(state.descargaForm.tecnico==='Vicente Ramos'?'var(--primary)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:14px;font-weight:600;color:'+(state.descargaForm.tecnico==='Vicente Ramos'?'var(--primary)':'var(--text2)')+';background:'+(state.descargaForm.tecnico==='Vicente Ramos'?'var(--primary-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(state.descargaForm.tecnico==='Vicente Ramos'?'✅':'⬜')+'</span> Vicente Ramos</div>';
+  html += TECNICOS.map(nombre => {
+    const selected = state.descargaForm.tecnico === nombre;
+    return `<button class="download-technician" data-name="${escapeHtml(nombre)}" onclick="setDescargaTecnico(this.dataset.name)" aria-pressed="${selected}"><span>${selected ? '✓' : '○'}</span>${escapeHtml(nombre)}</button>`;
+  }).join('');
   html += '<div style="margin:14px 0 8px;font-size:12px;font-weight:700;color:var(--text3)">¿LA MEDICIÓN FUE CORRECTA?</div>';
   html += '<div style="display:flex;gap:8px;margin-bottom:12px">';
-  html += '<div onclick="setDescargaMedicion(true)" style="flex:1;padding:11px;border-radius:10px;border:2px solid '+(state.descargaForm.medicionOk===true?'var(--green)':'var(--border)')+';background:'+(state.descargaForm.medicionOk===true?'var(--green-light)':'#fff')+';text-align:center;cursor:pointer;font-size:13px;font-weight:700;color:'+(state.descargaForm.medicionOk===true?'var(--green)':'var(--text3)')+'">✅ Sí, correcta</div>';
-  html += '<div onclick="setDescargaMedicion(false)" style="flex:1;padding:11px;border-radius:10px;border:2px solid '+(state.descargaForm.medicionOk===false?'var(--red)':'var(--border)')+';background:'+(state.descargaForm.medicionOk===false?'var(--red-light)':'#fff')+';text-align:center;cursor:pointer;font-size:13px;font-weight:700;color:'+(state.descargaForm.medicionOk===false?'var(--red)':'var(--text3)')+'">⚠️ Tuvo fallos</div>';
+  html += '<div onclick="setDescargaMedicion(true)" style="flex:1;padding:11px;border-radius:10px;border:2px solid '+(state.descargaForm.medicionOk===true?'var(--green)':'var(--border)')+';background:'+(state.descargaForm.medicionOk===true?'var(--green-light)':'#fff')+';text-align:center;cursor:pointer;font-size:13px;font-weight:700;color:'+(state.descargaForm.medicionOk===true?'var(--green)':'var(--text3)')+'">✓ Sí, correcta</div>';
+  html += '<div onclick="setDescargaMedicion(false)" style="flex:1;padding:11px;border-radius:10px;border:2px solid '+(state.descargaForm.medicionOk===false?'var(--red)':'var(--border)')+';background:'+(state.descargaForm.medicionOk===false?'var(--red-light)':'#fff')+';text-align:center;cursor:pointer;font-size:13px;font-weight:700;color:'+(state.descargaForm.medicionOk===false?'var(--red)':'var(--text3)')+'"> Tuvo fallos</div>';
   html += '</div>';
   if (state.descargaForm.medicionOk === false) {
     html += '<div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:8px">TIPO DE FALLO (puede ser más de uno)</div>';
-    html += '<div onclick="toggleFallaMedicion(\'Pocas mediciones (incompleta)\')" style="padding:10px 14px;border:2px solid '+(state.descargaForm.fallasMedicion.includes('Pocas mediciones (incompleta)')?'var(--red)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:12px;font-weight:600;color:'+(state.descargaForm.fallasMedicion.includes('Pocas mediciones (incompleta)')?'var(--red)':'var(--text2)')+';background:'+(state.descargaForm.fallasMedicion.includes('Pocas mediciones (incompleta)')?'var(--red-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(state.descargaForm.fallasMedicion.includes('Pocas mediciones (incompleta)')?'🔴':'⬜')+'</span> Pocas mediciones (incompleta)</div>';
-    html += '<div onclick="toggleFallaMedicion(\'Valores repetidos / pegados\')" style="padding:10px 14px;border:2px solid '+(state.descargaForm.fallasMedicion.includes('Valores repetidos / pegados')?'var(--red)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:12px;font-weight:600;color:'+(state.descargaForm.fallasMedicion.includes('Valores repetidos / pegados')?'var(--red)':'var(--text2)')+';background:'+(state.descargaForm.fallasMedicion.includes('Valores repetidos / pegados')?'var(--red-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(state.descargaForm.fallasMedicion.includes('Valores repetidos / pegados')?'🔴':'⬜')+'</span> Valores repetidos / pegados</div>';
-    html += '<div onclick="toggleFallaMedicion(\'No midio (archivo vacio)\')" style="padding:10px 14px;border:2px solid '+(state.descargaForm.fallasMedicion.includes('No midio (archivo vacio)')?'var(--red)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:12px;font-weight:600;color:'+(state.descargaForm.fallasMedicion.includes('No midio (archivo vacio)')?'var(--red)':'var(--text2)')+';background:'+(state.descargaForm.fallasMedicion.includes('No midio (archivo vacio)')?'var(--red-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(state.descargaForm.fallasMedicion.includes('No midio (archivo vacio)')?'🔴':'⬜')+'</span> No midio (archivo vacio)</div>';
-    html += '<div onclick="toggleFallaMedicion(\'Archivo demasiado pesado\')" style="padding:10px 14px;border:2px solid '+(state.descargaForm.fallasMedicion.includes('Archivo demasiado pesado')?'var(--red)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:12px;font-weight:600;color:'+(state.descargaForm.fallasMedicion.includes('Archivo demasiado pesado')?'var(--red)':'var(--text2)')+';background:'+(state.descargaForm.fallasMedicion.includes('Archivo demasiado pesado')?'var(--red-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(state.descargaForm.fallasMedicion.includes('Archivo demasiado pesado')?'🔴':'⬜')+'</span> Archivo demasiado pesado</div>';
-    html += '<div onclick="toggleFallaMedicion(\'Archivo demasiado liviano\')" style="padding:10px 14px;border:2px solid '+(state.descargaForm.fallasMedicion.includes('Archivo demasiado liviano')?'var(--red)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:12px;font-weight:600;color:'+(state.descargaForm.fallasMedicion.includes('Archivo demasiado liviano')?'var(--red)':'var(--text2)')+';background:'+(state.descargaForm.fallasMedicion.includes('Archivo demasiado liviano')?'var(--red-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(state.descargaForm.fallasMedicion.includes('Archivo demasiado liviano')?'🔴':'⬜')+'</span> Archivo demasiado liviano</div>';
+    html += '<div onclick="toggleFallaMedicion(\'Pocas mediciones (incompleta)\')" style="padding:10px 14px;border:2px solid '+(state.descargaForm.fallasMedicion.includes('Pocas mediciones (incompleta)')?'var(--red)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:12px;font-weight:600;color:'+(state.descargaForm.fallasMedicion.includes('Pocas mediciones (incompleta)')?'var(--red)':'var(--text2)')+';background:'+(state.descargaForm.fallasMedicion.includes('Pocas mediciones (incompleta)')?'var(--red-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(state.descargaForm.fallasMedicion.includes('Pocas mediciones (incompleta)')?'':'○')+'</span> Pocas mediciones (incompleta)</div>';
+    html += '<div onclick="toggleFallaMedicion(\'Valores repetidos / pegados\')" style="padding:10px 14px;border:2px solid '+(state.descargaForm.fallasMedicion.includes('Valores repetidos / pegados')?'var(--red)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:12px;font-weight:600;color:'+(state.descargaForm.fallasMedicion.includes('Valores repetidos / pegados')?'var(--red)':'var(--text2)')+';background:'+(state.descargaForm.fallasMedicion.includes('Valores repetidos / pegados')?'var(--red-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(state.descargaForm.fallasMedicion.includes('Valores repetidos / pegados')?'':'○')+'</span> Valores repetidos / pegados</div>';
+    html += '<div onclick="toggleFallaMedicion(\'No midio (archivo vacio)\')" style="padding:10px 14px;border:2px solid '+(state.descargaForm.fallasMedicion.includes('No midio (archivo vacio)')?'var(--red)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:12px;font-weight:600;color:'+(state.descargaForm.fallasMedicion.includes('No midio (archivo vacio)')?'var(--red)':'var(--text2)')+';background:'+(state.descargaForm.fallasMedicion.includes('No midio (archivo vacio)')?'var(--red-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(state.descargaForm.fallasMedicion.includes('No midio (archivo vacio)')?'':'○')+'</span> No midio (archivo vacio)</div>';
+    html += '<div onclick="toggleFallaMedicion(\'Archivo demasiado pesado\')" style="padding:10px 14px;border:2px solid '+(state.descargaForm.fallasMedicion.includes('Archivo demasiado pesado')?'var(--red)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:12px;font-weight:600;color:'+(state.descargaForm.fallasMedicion.includes('Archivo demasiado pesado')?'var(--red)':'var(--text2)')+';background:'+(state.descargaForm.fallasMedicion.includes('Archivo demasiado pesado')?'var(--red-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(state.descargaForm.fallasMedicion.includes('Archivo demasiado pesado')?'':'○')+'</span> Archivo demasiado pesado</div>';
+    html += '<div onclick="toggleFallaMedicion(\'Archivo demasiado liviano\')" style="padding:10px 14px;border:2px solid '+(state.descargaForm.fallasMedicion.includes('Archivo demasiado liviano')?'var(--red)':'var(--border)')+';border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:12px;font-weight:600;color:'+(state.descargaForm.fallasMedicion.includes('Archivo demasiado liviano')?'var(--red)':'var(--text2)')+';background:'+(state.descargaForm.fallasMedicion.includes('Archivo demasiado liviano')?'var(--red-light)':'#fff')+';display:flex;align-items:center;gap:8px"><span>'+(state.descargaForm.fallasMedicion.includes('Archivo demasiado liviano')?'':'○')+'</span> Archivo demasiado liviano</div>';
     html += '<div style="margin-top:8px"><div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px">DESCRIPCIÓN ADICIONAL</div><textarea placeholder="Describe el fallo..." oninput="setDescargaFallaDesc(this.value)" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none;min-height:60px">'+state.descargaForm.descripcionFalla+'</textarea></div>';
   }
   html += '<div style="margin:12px 0"><div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px">NOTAS GENERALES (OPCIONAL)</div><textarea placeholder="Observaciones adicionales..." oninput="setDescargaNotas(this.value)" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none;min-height:60px">'+state.descargaForm.notas+'</textarea></div>';
-  html += '<button onclick="doDescarga()" style="width:100%;background:var(--primary);color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">💾 Confirmar descarga</button>';
+  html += '<button onclick="doDescarga()" style="width:100%;background:var(--primary);color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px"> Confirmar descarga</button>';
   html += '<button onclick="closeDescargaModal()" style="width:100%;background:#fff;color:var(--text3);border:1px solid var(--border);border-radius:10px;padding:13px;font-family:var(--font);font-size:15px;cursor:pointer">Cancelar</button>';
   html += '</div></div>';
   return html;
@@ -130,17 +130,17 @@ export function renderImportModal() {
           ${state.importData.map(r => {
           const bg = r.status==='ok'?'var(--white)':r.status==='duplicado'?'var(--yellow-light)':'var(--red-light)';
           const border = r.status==='ok'?'var(--green)':r.status==='duplicado'?'var(--yellow)':'var(--red)';
-          const icon = r.status==='ok'?'✅':r.status==='duplicado'?'⚠️':'❌';
+          const icon = r.status==='ok'?'✓':r.status==='duplicado'?'!':'×';
           return '<div style="background:'+bg+';border:1px solid '+border+';border-left:4px solid '+border+';border-radius:10px;padding:10px;margin-bottom:6px">'+
             '<div style="display:flex;justify-content:space-between"><div style="font-family:var(--mono);font-size:13px;font-weight:700">'+r.serie+'</div><span>'+icon+'</span></div>'+
-            '<div style="font-size:11px;color:var(--text2)">'+r.modelo+(r.vineta?' · 🏷 '+r.vineta:'')+'</div>'+
+            '<div style="font-size:11px;color:var(--text2)">'+r.modelo+(r.vineta?' ·  '+r.vineta:'')+'</div>'+
             '<div style="font-size:11px;color:var(--text3)">'+r.sede+'</div>'+
             (r.problema?'<div style="font-size:11px;font-weight:600;color:'+border+';margin-top:3px">'+r.problema+'</div>':'')+
             '</div>';
         }).join('')}
         </div>
         <div style="flex-shrink:0">
-          ${nuevos > 0 ? `<button onclick="confirmarImport()" style="width:100%;background:var(--primary);color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">✅ Importar ${nuevos} equipos nuevos</button>` : ''}
+          ${nuevos > 0 ? `<button onclick="confirmarImport()" style="width:100%;background:var(--primary);color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">✓ Importar ${nuevos} equipos nuevos</button>` : ''}
           <button onclick="closeImportModal()" style="width:100%;background:var(--white);color:var(--text3);border:1px solid var(--border);border-radius:10px;padding:13px;font-family:var(--font);font-size:14px;cursor:pointer">Cancelar</button>
         </div>
       </div>
@@ -153,7 +153,7 @@ export function renderMantModal() {
   html += `<div class="modal-overlay" style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
       <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:90vh;overflow-y:auto;padding:20px;font-family:var(--font)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-          <div style="font-size:17px;font-weight:700;color:var(--text)">🔧 Ficha de mantenimiento</div>
+          <div style="font-size:17px;font-weight:700;color:var(--text)"> Ficha de mantenimiento</div>
           <button onclick="closeMantModal()" style="background:none;border:none;font-size:24px;color:var(--text3);cursor:pointer">✕</button>
         </div>
         <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px">DESCRIPCIÓN DEL PROBLEMA</div>
@@ -164,9 +164,9 @@ export function renderMantModal() {
         <textarea placeholder="Indicaciones del soporte remoto..." oninput="setMantForm('observaciones',this.value)" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none;min-height:60px;margin-bottom:12px">${state.mantForm.observaciones}</textarea>
         <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:8px">RESULTADO</div>
         <div style="display:flex;gap:8px;margin-bottom:12px">
-          <div onclick="setMantForm('resultado','pendiente')" style="flex:1;padding:9px 4px;border-radius:10px;border:2px solid ${state.mantForm.resultado==='pendiente'?'#f59e0b':'var(--border)'};background:${state.mantForm.resultado==='pendiente'?'#fffbeb':'#fff'};text-align:center;cursor:pointer;font-size:11px;font-weight:700;color:${state.mantForm.resultado==='pendiente'?'#f59e0b':'var(--text3)'}">⏳ Pendiente</div>
-          <div onclick="setMantForm('resultado','resuelto')" style="flex:1;padding:9px 4px;border-radius:10px;border:2px solid ${state.mantForm.resultado==='resuelto'?'var(--green)':'var(--border)'};background:${state.mantForm.resultado==='resuelto'?'var(--green-light)':'#fff'};text-align:center;cursor:pointer;font-size:11px;font-weight:700;color:${state.mantForm.resultado==='resuelto'?'var(--green)':'var(--text3)'}">✅ Resuelto</div>
-          <div onclick="setMantForm('resultado','sin_solucion')" style="flex:1;padding:9px 4px;border-radius:10px;border:2px solid ${state.mantForm.resultado==='sin_solucion'?'var(--red)':'var(--border)'};background:${state.mantForm.resultado==='sin_solucion'?'var(--red-light)':'#fff'};text-align:center;cursor:pointer;font-size:11px;font-weight:700;color:${state.mantForm.resultado==='sin_solucion'?'var(--red)':'var(--text3)'}">❌ Sin solución</div>
+          <div onclick="setMantForm('resultado','pendiente')" style="flex:1;padding:9px 4px;border-radius:10px;border:2px solid ${state.mantForm.resultado==='pendiente'?'#f59e0b':'var(--border)'};background:${state.mantForm.resultado==='pendiente'?'#fffbeb':'#fff'};text-align:center;cursor:pointer;font-size:11px;font-weight:700;color:${state.mantForm.resultado==='pendiente'?'#f59e0b':'var(--text3)'}"> Pendiente</div>
+          <div onclick="setMantForm('resultado','resuelto')" style="flex:1;padding:9px 4px;border-radius:10px;border:2px solid ${state.mantForm.resultado==='resuelto'?'var(--green)':'var(--border)'};background:${state.mantForm.resultado==='resuelto'?'var(--green-light)':'#fff'};text-align:center;cursor:pointer;font-size:11px;font-weight:700;color:${state.mantForm.resultado==='resuelto'?'var(--green)':'var(--text3)'}">✓ Resuelto</div>
+          <div onclick="setMantForm('resultado','sin_solucion')" style="flex:1;padding:9px 4px;border-radius:10px;border:2px solid ${state.mantForm.resultado==='sin_solucion'?'var(--red)':'var(--border)'};background:${state.mantForm.resultado==='sin_solucion'?'var(--red-light)':'#fff'};text-align:center;cursor:pointer;font-size:11px;font-weight:700;color:${state.mantForm.resultado==='sin_solucion'?'var(--red)':'var(--text3)'}">× Sin solución</div>
         </div>
         <div style="display:flex;gap:10px;margin-bottom:16px">
           <div style="flex:1"><div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px">FECHA INICIO</div>
@@ -176,7 +176,7 @@ export function renderMantModal() {
             <input type="date" value="${state.mantForm.fechaResolucion}" oninput="setMantForm('fechaResolucion',this.value)" style="width:100%;padding:11px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:13px;outline:none">
           </div>
         </div>
-        <button onclick="guardarMant()" style="width:100%;background:linear-gradient(135deg,#7c3aed,#a78bfa);color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">🔧 Guardar ficha</button>
+        <button onclick="guardarMant()" style="width:100%;background:linear-gradient(135deg,#7c3aed,#a78bfa);color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px"> Guardar ficha</button>
         <button onclick="closeMantModal()" style="width:100%;background:#fff;color:var(--text3);border:1px solid var(--border);border-radius:10px;padding:13px;font-family:var(--font);font-size:15px;cursor:pointer">Cancelar</button>
       </div>
     </div>`;
@@ -193,7 +193,7 @@ export function renderCondicionModal() {
         </div>
         ${CONDICIONES.map(c => `
           <div onclick="setCondicionField('condicion','${c.key}')" style="padding:13px 16px;border:2px solid ${state.condicionForm.condicion===c.key?c.color:'var(--border)'};border-radius:12px;margin-bottom:8px;cursor:pointer;background:${state.condicionForm.condicion===c.key?c.bg:'#fff'};display:flex;align-items:center;gap:12px">
-            <span style="font-size:20px">${c.icon}</span>
+            <span style="font-size:20px"><span class="condition-dot" aria-hidden="true" style="background:${c.color}"></span></span>
             <span style="font-size:15px;font-weight:700;color:${state.condicionForm.condicion===c.key?c.color:'var(--text2)'}">${c.label}</span>
           </div>`).join('')}
         <div style="margin:12px 0">
@@ -213,7 +213,7 @@ export function renderPrestamoModal() {
   html += `<div class="modal-overlay" style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
       <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:85vh;overflow-y:auto;padding:20px;font-family:var(--font)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-          <div style="font-size:17px;font-weight:700;color:var(--text)">${esPrestamo ? '🔄 Registrar préstamo' : '✅ Registrar devolución'}</div>
+          <div style="font-size:17px;font-weight:700;color:var(--text)">${esPrestamo ? ' Registrar préstamo' : '✓ Registrar devolución'}</div>
           <button onclick="closePrestamoModal()" style="background:none;border:none;font-size:24px;color:var(--text3);cursor:pointer">✕</button>
         </div>
         <div style="display:flex;gap:10px;margin-bottom:16px">
@@ -234,7 +234,7 @@ export function renderPrestamoModal() {
           <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px">NOTA (OPCIONAL)</div>
           <textarea placeholder="Observaciones del movimiento..." oninput="setPrestamoNota(this.value)" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none;min-height:60px">${state.prestamoForm.nota}</textarea>
         </div>
-        <button onclick="doMovimiento()" style="width:100%;background:var(--primary);color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">${esPrestamo ? '🔄 Confirmar préstamo' : '✅ Confirmar devolución'}</button>
+        <button onclick="doMovimiento()" style="width:100%;background:var(--primary);color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">${esPrestamo ? ' Confirmar préstamo' : '✓ Confirmar devolución'}</button>
         <button onclick="closePrestamoModal()" style="width:100%;background:#fff;color:var(--text3);border:1px solid var(--border);border-radius:10px;padding:13px;font-family:var(--font);font-size:15px;cursor:pointer">Cancelar</button>
       </div>
     </div>`;
@@ -253,7 +253,7 @@ export function renderSelectorModal() {
           <button onclick="closeSelector()" style="background:none;border:none;font-size:22px;color:var(--text3);cursor:pointer">✕</button>
         </div>
         <div style="position:relative;margin-bottom:12px;flex-shrink:0">
-          <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--text3)">🔍</span>
+          <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--text3)"></span>
           <input id="sel-search" style="width:100%;padding:10px 10px 10px 36px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none;box-shadow:var(--shadow)"
             placeholder="Buscar por serie o modelo..." value="${state.selectorSearch}" oninput="setSelectorSearch(this.value)">
         </div>
@@ -318,7 +318,7 @@ export function renderGlobalSearch() {
       eqRes.forEach(e => {
         const eid = e.id;
         html += '<div onclick="goToEquipo(this.dataset.id)" data-id="'+eid+'" style="padding:12px;border:1px solid var(--border);border-radius:10px;margin-bottom:6px;cursor:pointer">';
-        html += '<div style="font-family:var(--mono);font-weight:700">'+e.serie+(e.vineta?' <span style=&quot;font-size:11px;color:var(--text3)&quot;>🏷'+e.vineta+'</span>':'')+'</div>';
+        html += '<div style="font-family:var(--mono);font-weight:700">'+e.serie+(e.vineta?' <span style=&quot;font-size:11px;color:var(--text3)&quot;>'+e.vineta+'</span>':'')+'</div>';
         html += '<div style="font-size:12px;color:var(--text3)">'+(e.modelo||'')+'</div>';
         html += '</div>';
       });
@@ -335,7 +335,7 @@ export function renderAlertaRetiros() {
   html += '<div class="modal-overlay" style="position:fixed;inset:0;background:#00000088;z-index:300;display:flex;align-items:center;justify-content:center;padding:24px">';
   html += '<div style="background:#fff;border-radius:20px;width:100%;max-width:380px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">';
   html += '<div style="background:linear-gradient(135deg,#ff6b35,#f7c948);padding:20px 20px 16px">';
-  html += '<div style="font-size:22px;margin-bottom:4px">🔔</div>';
+  html += '<div style="font-size:22px;margin-bottom:4px"></div>';
   html += '<div style="font-size:17px;font-weight:800;color:#fff">Retiros próximos</div>';
   html += '<div style="font-size:12px;color:rgba(255,255,255,.8);margin-top:2px">' + proximos.length + ' instalacion' + (proximos.length>1?'es':'') + ' requieren atención</div>';
   html += '</div>';
@@ -343,7 +343,7 @@ export function renderAlertaRetiros() {
   proximos.forEach(r => {
     const d = daysUntil(r.fechaRetiro);
     const color = d === 0 ? 'var(--red)' : d === 1 ? 'var(--yellow)' : 'var(--text2)';
-    const label = d === 0 ? '⚠️ Hoy' : d === 1 ? '⚠️ Mañana' : 'en ' + d + 'd';
+    const label = d === 0 ? ' Hoy' : d === 1 ? ' Mañana' : 'en ' + d + 'd';
     html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border2)">';
     html += '<div>';
     html += '<div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--text)">' + (r.serie||'—') + '</div>';
@@ -390,7 +390,7 @@ export function renderRevisionModal() {
         <div style="background:#f3f0ff;border-radius:10px;padding:10px 12px;font-size:12px;color:#5b21b6;margin-bottom:14px;line-height:1.5">
           ${editando ? 'Se corrigen los datos del memo y de su ficha de mantenimiento. La sede y la condición del equipo no cambian.' : 'Al confirmar se genera el memo y el equipo pasa a <b>Subestación Cucumacayán</b> con condición <b>En mantenimiento</b> y una ficha pendiente.'}
         </div>
-        <button onclick="doEnvioRevision()" style="width:100%;background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">${editando ? '💾 Guardar cambios' : '📤 Enviar y generar memo'}</button>
+        <button onclick="doEnvioRevision()" style="width:100%;background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">${editando ? ' Guardar cambios' : ' Enviar y generar memo'}</button>
         <button onclick="closeRevisionModal()" style="width:100%;background:#fff;color:var(--text3);border:1px solid var(--border);border-radius:10px;padding:13px;font-family:var(--font);font-size:15px;cursor:pointer">Cancelar</button>
       </div>
     </div>`;
@@ -422,7 +422,7 @@ export function renderDanioModal() {
         <div style="margin-bottom:12px">
           <div style="${etiqueta}">¿EN QUÉ CONDICIÓN QUEDA EL EQUIPO?</div>
           <div style="display:flex;gap:8px">
-            ${condiciones.map(c => `<div onclick="setDanioField('condicion','${c.key}')" style="flex:1;padding:11px;border:2px solid ${f.condicion === c.key ? c.color : 'var(--border)'};border-radius:10px;cursor:pointer;background:${f.condicion === c.key ? c.bg : '#fff'};text-align:center;font-size:14px;font-weight:700;color:${f.condicion === c.key ? c.color : 'var(--text2)'}">${c.icon} ${c.label}</div>`).join('')}
+            ${condiciones.map(c => `<div onclick="setDanioField('condicion','${c.key}')" style="flex:1;padding:11px;border:2px solid ${f.condicion === c.key ? c.color : 'var(--border)'};border-radius:10px;cursor:pointer;background:${f.condicion === c.key ? c.bg : '#fff'};text-align:center;font-size:14px;font-weight:700;color:${f.condicion === c.key ? c.color : 'var(--text2)'}"><span class="condition-dot" aria-hidden="true" style="background:${c.color}"></span> ${c.label}</div>`).join('')}
           </div>
         </div>
         <div style="margin-bottom:16px">
@@ -432,7 +432,7 @@ export function renderDanioModal() {
         <div style="background:#fef2f2;border-radius:10px;padding:10px 12px;font-size:12px;color:#991b1b;margin-bottom:14px;line-height:1.5">
           ${state.danioEditando ? 'Se corrige el memo. Si cambias la condición, el equipo también cambia y queda en su historial.' : 'Al confirmar se genera el memo con firmas de CPT, Subestación Cucumacayán y Campos y Servicios. El equipo queda en la <b>Cucumacayán</b> con la condición elegida.'}
         </div>
-        <button onclick="doMemoDanio()" style="width:100%;background:#dc2626;color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">${state.danioEditando ? '💾 Guardar cambios' : '📝 Generar memo'}</button>
+        <button onclick="doMemoDanio()" style="width:100%;background:#dc2626;color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">${state.danioEditando ? ' Guardar cambios' : ' Generar memo'}</button>
         <button onclick="closeDanioModal()" style="width:100%;background:#fff;color:var(--text3);border:1px solid var(--border);border-radius:10px;padding:13px;font-family:var(--font);font-size:15px;cursor:pointer">Cancelar</button>
       </div>
     </div>`;

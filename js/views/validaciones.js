@@ -6,11 +6,11 @@ export function renderValidaciones() {
   html += '<div class="content">';
   if (state.valView === 'lista') {
     html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">';
-    html += '<div style="font-size:18px;font-weight:800;color:var(--text)">🔌 Validaciones de TAP</div>';
+    html += '<div style="font-size:18px;font-weight:800;color:var(--text)"> Validaciones de TAP</div>';
     html += '<button onclick="abrirNuevaValidacion()" style="padding:8px 14px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">+ Nueva campaña</button>';
     html += '</div>';
     if (state.validaciones.length === 0) {
-      html += '<div class="empty"><div class="empty-icon">🔌</div><div class="empty-text">Sin campañas de validación</div><div style="font-size:12px;color:var(--text3);margin-top:8px">Crea una nueva campaña subiendo<br>el listado de usuarios a validar</div></div>';
+      html += '<div class="empty"><div class="empty-icon"></div><div class="empty-text">Sin campañas de validación</div><div style="font-size:12px;color:var(--text3);margin-top:8px">Crea una nueva campaña subiendo<br>el listado de usuarios a validar</div></div>';
     } else {
       state.validaciones.forEach(v => {
         const total = (v.usuarios||[]).length;
@@ -36,9 +36,9 @@ export function renderValidaciones() {
       html += '<input id="val-nombre" type="text" placeholder="Ej: Campaña Abril 2026" style="width:100%;padding:11px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none"></div>';
 
       html += '<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">ARCHIVO EXCEL</div>';
-      html += '<label style="display:block;padding:14px;border:2px dashed var(--border);border-radius:10px;text-align:center;cursor:pointer;color:var(--text3);font-size:13px">📂 Seleccionar archivo Excel<input type="file" accept=".xlsx,.xls" onchange="procesarExcelVal(this)" style="display:none"></label></div>';
+      html += '<label style="display:block;padding:14px;border:2px dashed var(--border);border-radius:10px;text-align:center;cursor:pointer;color:var(--text3);font-size:13px"> Seleccionar archivo Excel<input type="file" accept=".xlsx,.xls" onchange="procesarExcelVal(this)" style="display:none"></label></div>';
       if (state.valImportData.length > 0) {
-        html += '<div style="background:var(--green-light);border:1px solid var(--green);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--green);font-weight:600">✅ '+state.valImportData.length+' usuarios cargados</div>';
+        html += '<div style="background:var(--green-light);border:1px solid var(--green);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--green);font-weight:600">✓ '+state.valImportData.length+' usuarios cargados</div>';
         html += '<button onclick="confirmarNuevaValidacion()" style="width:100%;padding:13px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px">Crear campaña</button>';
       }
       html += '<button onclick="cerrarValImport()" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--text3);font-family:var(--font);font-size:14px;cursor:pointer">Cancelar</button>';
@@ -60,7 +60,7 @@ export function renderValidaciones() {
       html += '<div style="height:8px;background:var(--border2);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct2+'%;background:'+(pct2===100?'var(--green)':'#7c3aed')+';border-radius:4px"></div></div>';
       html += '</div>';
       if (valCount > 0) {
-        html += '<button onclick="exportarValidaciones(this.dataset.id)" data-id="'+camp.id+'" style="width:100%;padding:11px;border:1px solid var(--green);border-radius:10px;background:var(--green-light);color:var(--green);font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;margin-bottom:12px">📊 Exportar Excel de respaldo</button>';
+        html += '<button onclick="exportarValidaciones(this.dataset.id)" data-id="'+camp.id+'" style="width:100%;padding:11px;border:1px solid var(--green);border-radius:10px;background:var(--green-light);color:var(--green);font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;margin-bottom:12px"> Exportar Excel de respaldo</button>';
       }
       html += '<div style="display:flex;flex-direction:column;gap:8px">';
       usrs.forEach((u, idx) => {
@@ -71,12 +71,12 @@ export function renderValidaciones() {
         html += '<div style="font-size:11px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(u.nombre||'—')+'</div>';
         html += '<div style="font-size:10px;color:var(--text3);margin-top:2px">'+(u.ct||'—')+' · '+(u.medidor||'—')+'</div></div>';
         if (ok) {
-          html += '<div style="text-align:right;flex-shrink:0;margin-left:8px"><span style="background:var(--green-light);color:var(--green);font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px">✅ Validado</span>';
+          html += '<div style="text-align:right;flex-shrink:0;margin-left:8px"><span style="background:var(--green-light);color:var(--green);font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px">✓ Validado</span>';
           if (u.resultado) html += '<div style="font-size:10px;color:var(--text3);margin-top:4px">TAP '+u.resultado.tap+' · '+u.resultado.multiplicador+'</div>';
           if (u.fechaValidacion) html += '<div style="font-size:9px;color:var(--text3);margin-top:2px">'+u.fechaValidacion+(u.validadoPor?' · '+u.validadoPor:'')+'</div>';
           html += '</div>';
         } else {
-          html += '<span style="background:var(--yellow-light);color:var(--yellow);font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;flex-shrink:0;margin-left:8px">⏳ Pendiente</span>';
+          html += '<span style="background:var(--yellow-light);color:var(--yellow);font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;flex-shrink:0;margin-left:8px"> Pendiente</span>';
         }
         html += '</div></div>';
       });
@@ -137,7 +137,7 @@ export function renderValidaciones() {
         html += '<div style="font-size:10px;color:var(--text3);margin-bottom:4px">TAPs de la placa (volt. primario por TAP, separados por coma)</div>';
         html += '<input id="vf-taps" type="text" placeholder="Ej: 14400,13800,13200,12870,12540" value="'+(state.valForm.taps||'')+'" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;outline:none">';
         html += '</div>';
-        html += '<button onclick="calcularValidacion()" style="width:100%;padding:13px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px">🔌 Calcular TAP estimado</button>';
+        html += '<button onclick="calcularValidacion()" style="width:100%;padding:13px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px"> Calcular TAP estimado</button>';
         if (state.valForm.resultado) {
           const res = state.valForm.resultado;
           html += '<div style="background:#f3f0ff;border:2px solid #7c3aed;border-radius:12px;padding:16px;margin-bottom:12px">';
@@ -147,7 +147,7 @@ export function renderValidaciones() {
           html += '<div style="text-align:center"><div style="font-size:18px;font-weight:800;color:var(--text);font-family:var(--mono)">'+res.multiplicador+'</div><div style="font-size:10px;color:var(--text3);font-weight:600">MULTIPLICADOR</div></div>';
           html += '</div>';
           html += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px">Prim. proyectado: <b>'+res.primarioProyectado.toFixed(1)+' V</b> · Relación calc.: <b>'+res.relacionCalc.toFixed(4)+'</b></div>';
-          html += '<button onclick="guardarValidacion()" style="width:100%;padding:11px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer">✅ Guardar validación</button>';
+          html += '<button onclick="guardarValidacion()" style="width:100%;padding:11px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer">✓ Guardar validación</button>';
           html += '</div>';
         }
       } else if (state.valTipoUsuario === 'bifasico') {
@@ -190,7 +190,7 @@ export function renderValidaciones() {
         html += '<input id="vf-taps" type="text" placeholder="Ej: 14400,13800,13200,12870,12540" value="'+(state.valForm.taps||'')+'" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;outline:none"></div>';
         html += '</div>';
 
-        html += '<button onclick="calcularValidacion()" style="width:100%;padding:13px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px">🔌 Calcular TAP estimado</button>';
+        html += '<button onclick="calcularValidacion()" style="width:100%;padding:13px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px"> Calcular TAP estimado</button>';
         if (state.valForm.resultado) {
           const res = state.valForm.resultado;
           html += '<div style="background:#f3f0ff;border:2px solid #7c3aed;border-radius:12px;padding:16px;margin-bottom:12px">';
@@ -200,7 +200,7 @@ export function renderValidaciones() {
           html += '<div style="text-align:center"><div style="font-size:18px;font-weight:800;color:var(--text);font-family:var(--mono)">'+res.multiplicador+'</div><div style="font-size:10px;color:var(--text3);font-weight:600">MULTIPLICADOR</div></div>';
           html += '</div>';
           html += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px">Relación prom. calculada: <b>'+res.relacionCalc.toFixed(4)+'</b></div>';
-          html += '<button onclick="guardarValidacion()" style="width:100%;padding:11px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer">✅ Guardar validación</button>';
+          html += '<button onclick="guardarValidacion()" style="width:100%;padding:11px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer">✓ Guardar validación</button>';
           html += '</div>';
         }
 
@@ -246,7 +246,7 @@ export function renderValidaciones() {
         html += '<input id="vf-taps" type="text" placeholder="Ej: 24940,23900,22900,22290,21755" value="'+(state.valForm.taps||'')+'" style="width:100%;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-family:var(--mono);font-size:13px;outline:none"></div>';
         html += '</div>';
 
-        html += '<button onclick="calcularValidacion()" style="width:100%;padding:13px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px">🔌 Calcular TAP estimado</button>';
+        html += '<button onclick="calcularValidacion()" style="width:100%;padding:13px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px"> Calcular TAP estimado</button>';
         if (state.valForm.resultado) {
           const res = state.valForm.resultado;
           html += '<div style="background:#f3f0ff;border:2px solid #7c3aed;border-radius:12px;padding:16px;margin-bottom:12px">';
@@ -256,7 +256,7 @@ export function renderValidaciones() {
           html += '<div style="text-align:center"><div style="font-size:18px;font-weight:800;color:var(--text);font-family:var(--mono)">'+res.multiplicador+'</div><div style="font-size:10px;color:var(--text3);font-weight:600">MULTIPLICADOR</div></div>';
           html += '</div>';
           html += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px">Relación prom. calculada: <b>'+res.relacionCalc.toFixed(4)+'</b></div>';
-          html += '<button onclick="guardarValidacion()" style="width:100%;padding:11px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer">✅ Guardar validación</button>';
+          html += '<button onclick="guardarValidacion()" style="width:100%;padding:11px;border:none;border-radius:10px;background:#7c3aed;color:#fff;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer">✓ Guardar validación</button>';
           html += '</div>';
         }
       }

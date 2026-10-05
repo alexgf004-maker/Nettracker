@@ -17,19 +17,19 @@ export function renderDashboard() {
 
   html += '<div class="content">';
   html += '<div style="margin-bottom:16px">';
-  html += '<div style="font-size:20px;font-weight:800;color:var(--text)">Hola, '+(state.sesionUsuario?.nombre?.split(' ')[0]||'')+'! 👋</div>';
+  html += '<div style="font-size:20px;font-weight:800;color:var(--text)">Hola, '+(state.sesionUsuario?.nombre?.split(' ')[0]||'')+'! </div>';
   html += '<div style="font-size:12px;color:var(--text3);margin-top:2px">'+new Date().toLocaleDateString('es-SV',{weekday:'long',day:'numeric',month:'long'}).replace(/^./,c=>c.toUpperCase())+'</div>';
   html += '</div>';
 
   // Alerts
   if (vencidos.length > 0) {
     html += '<div onclick="switchTab(this.dataset.t)" data-t="instalaciones" style="background:var(--red-light);border:1px solid #fecaca;border-radius:12px;padding:12px 16px;margin-bottom:10px;cursor:pointer">';
-    html += '<div style="font-size:13px;font-weight:700;color:var(--red)">⚠️ '+vencidos.length+' retiro'+(vencidos.length>1?'s':'')+' vencido'+(vencidos.length>1?'s':'')+'</div>';
+    html += '<div style="font-size:13px;font-weight:700;color:var(--red)"> '+vencidos.length+' retiro'+(vencidos.length>1?'s':'')+' vencido'+(vencidos.length>1?'s':'')+'</div>';
     html += '<div style="font-size:11px;color:var(--red);margin-top:2px">Toca para ver</div></div>';
   }
   if (descPend.length > 0) {
     html += '<div onclick="switchTab(this.dataset.t)" data-t="inventario" style="background:var(--yellow-light);border:1px solid #fcd34d;border-radius:12px;padding:12px 16px;margin-bottom:10px;cursor:pointer">';
-    html += '<div style="font-size:13px;font-weight:700;color:var(--yellow)">💾 '+descPend.length+' descarga'+(descPend.length>1?'s':'')+' pendiente'+(descPend.length>1?'s':'')+'</div>';
+    html += '<div style="font-size:13px;font-weight:700;color:var(--yellow)"> '+descPend.length+' descarga'+(descPend.length>1?'s':'')+' pendiente'+(descPend.length>1?'s':'')+'</div>';
     html += '<div style="font-size:11px;color:var(--yellow);margin-top:2px">Toca para ver inventario</div></div>';
   }
 
@@ -47,7 +47,7 @@ export function renderDashboard() {
   // Retiros proximos
   html += '<div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Retiros próximos (' + proximos.length + ')</div>';
   if (proximos.length === 0) {
-    html += '<div style="background:var(--green-light);border:1px solid var(--green);border-radius:12px;padding:12px 16px;margin-bottom:12px;font-size:13px;color:var(--green);font-weight:600">✅ Sin retiros próximos</div>';
+    html += '<div style="background:var(--green-light);border:1px solid var(--green);border-radius:12px;padding:12px 16px;margin-bottom:12px;font-size:13px;color:var(--green);font-weight:600">✓ Sin retiros próximos</div>';
   } else {
     html += '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">';
     proximos.slice(0,5).forEach(r => {
@@ -83,19 +83,19 @@ export function renderDashboard() {
   // Quick actions
   html += '<div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Acciones rápidas</div>';
   html += '<div style="display:flex;gap:8px">';
-  html += '<button onclick="newInstallFromDash()" style="flex:1;padding:12px;border:1.5px solid var(--primary);border-radius:12px;background:var(--primary-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">⚡ Nueva instalación</button>';
-  html += '<button onclick="switchTab(this.dataset.t)" data-t="carga" style="flex:1;padding:12px;border:1.5px solid var(--border);border-radius:12px;background:var(--white);color:var(--text2);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">📤 Despacho</button>';
+  html += '<button onclick="newInstallFromDash()" style="flex:1;padding:12px;border:1.5px solid var(--primary);border-radius:12px;background:var(--primary-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer"> Nueva instalación</button>';
+  html += '<button onclick="switchTab(this.dataset.t)" data-t="carga" style="flex:1;padding:12px;border:1.5px solid var(--border);border-radius:12px;background:var(--white);color:var(--text2);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer"> Despacho</button>';
   html += '</div>';
   html += '<div style="margin-top:10px">';
-  html += '<button onclick="switchTab(\'validaciones\')" style="width:100%;padding:12px;border:1.5px solid #7c3aed;border-radius:12px;background:#f3f0ff;color:#7c3aed;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">🔌 Validaciones de TAP' + (state.validaciones.length > 0 ? ' (' + state.validaciones.length + ' campañas)' : '') + '</button>';
+  html += '<button onclick="switchTab(\'validaciones\')" style="width:100%;padding:12px;border:1.5px solid #7c3aed;border-radius:12px;background:#f3f0ff;color:#7c3aed;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer"> Validaciones de TAP' + (state.validaciones.length > 0 ? ' (' + state.validaciones.length + ' campañas)' : '') + '</button>';
   html += '</div>';
   html += '<div style="margin-top:8px;display:flex;gap:8px">';
-  html += '<button onclick="abrirReporteModal()" style="flex:1;padding:12px;border:1.5px solid #0891b2;border-radius:12px;background:#ecfeff;color:#0891b2;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer">📊 Reporte</button>';
+  html += '<button onclick="abrirReporteModal()" style="flex:1;padding:12px;border:1.5px solid #0891b2;border-radius:12px;background:#ecfeff;color:#0891b2;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer"> Reporte</button>';
   html += '</div>';
   if (state.showReporteModal) {
     const MESES_RM = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
     html += '<div class="modal-overlay" style="position:fixed;inset:0;background:#00000088;z-index:300;display:flex;align-items:flex-end"><div style="background:var(--white);border-radius:20px 20px 0 0;width:100%;padding:20px;font-family:var(--font);max-height:90vh;overflow-y:auto">';
-    html += '<div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:14px">📊 Reporte mensual</div>';
+    html += '<div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:14px"> Reporte mensual</div>';
     html += '<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">MES</div><div style="display:flex;gap:4px;flex-wrap:wrap">';
     MESES_RM.forEach((m,i) => { const ms=i+1; html += '<div onclick="setReporteMes('+ms+')" style="padding:5px 9px;border-radius:8px;border:2px solid '+(state.reporteMes===ms?'#0891b2':'var(--border)')+';background:'+(state.reporteMes===ms?'#ecfeff':'#fff')+';color:'+(state.reporteMes===ms?'#0891b2':'var(--text3)')+';font-size:11px;font-weight:700;cursor:pointer">'+m+'</div>'; });
     html += '</div></div>';
@@ -106,20 +106,20 @@ export function renderDashboard() {
     html += '<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">ÁREA</div><div style="display:flex;gap:6px;flex-wrap:wrap">';
     ['TODOS','CPT MT','CPT BT','Campos y Servicios'].forEach(ar => { html += '<div onclick="setReporteArea(this.dataset.a)" data-a="'+ar+'" style="padding:6px 10px;border-radius:8px;border:2px solid '+(state.reporteArea===ar?'#0891b2':'var(--border)')+';background:'+(state.reporteArea===ar?'#ecfeff':'#fff')+';color:'+(state.reporteArea===ar?'#0891b2':'var(--text3)')+';font-size:11px;font-weight:700;cursor:pointer">'+(ar==='TODOS'?'Todas':ar)+'</div>'; });
     html += '</div></div>';
-    html += '<button onclick="generarReporteMensual()" style="width:100%;padding:13px;border:none;border-radius:10px;background:#0891b2;color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px">⬇️ Generar Excel</button>';
+    html += '<button onclick="generarReporteMensual()" style="width:100%;padding:13px;border:none;border-radius:10px;background:#0891b2;color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px"> Generar Excel</button>';
     html += '<button onclick="cerrarReporteModal()" style="width:100%;padding:11px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--text3);font-family:var(--font);font-size:13px;cursor:pointer">Cancelar</button>';
     html += '</div></div>';
   }
   if (isAdmin()) {
     html += '<div style="margin-top:8px">';
-    html += '<button onclick="toggleMantenimiento()" style="width:100%;padding:10px;border:1.5px solid '+(state.modoMantenimiento?'var(--red)':'var(--border)')+';border-radius:12px;background:'+(state.modoMantenimiento?'var(--red-light)':'#fff')+';color:'+(state.modoMantenimiento?'var(--red)':'var(--text3)')+';font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer">'+(state.modoMantenimiento?'🔧 Desactivar mantenimiento':'🔧 Activar mantenimiento')+'</button>';
+    html += '<button onclick="toggleMantenimiento()" style="width:100%;padding:10px;border:1.5px solid '+(state.modoMantenimiento?'var(--red)':'var(--border)')+';border-radius:12px;background:'+(state.modoMantenimiento?'var(--red-light)':'#fff')+';color:'+(state.modoMantenimiento?'var(--red)':'var(--text3)')+';font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer">'+(state.modoMantenimiento?' Desactivar mantenimiento':' Activar mantenimiento')+'</button>';
     html += '</div>';
   }
 
   // ── CALENDARIO DE ACTIVIDAD ──
   html += '<div style="margin-top:14px">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">';
-  html += '<div style="font-size:13px;font-weight:700;color:var(--text)">📅 Actividad</div>';
+  html += '<div style="font-size:13px;font-weight:700;color:var(--text)"> Actividad</div>';
   html += '<button onclick="toggleCal()" style="font-size:11px;font-weight:700;padding:5px 12px;border:1px solid var(--border);border-radius:20px;background:var(--white);color:var(--text3);cursor:pointer">'+(state.calView?'Ocultar':'Ver calendario')+'</button>';
   html += '</div>';
 
@@ -135,21 +135,21 @@ export function renderDashboard() {
     // Instalaciones y retiros
     state.records.forEach(r => {
       const sub = [r.lugar||r.nombre||r.usuario||'', r.idUsuario||r.id_usuario||r.nc||'', r.direccion||''].filter(Boolean).join(' · ');
-      if (r.fechaInstalacion) addAct(r.fechaInstalacion, 'install', '⚡ Instalación: '+(r.caso||r.serie||''), sub);
-      if (r.retirado && r.fechaRetiroReal) addAct(r.fechaRetiroReal, 'retiro', '📤 Retiro: '+(r.caso||r.serie||''), sub);
+      if (r.fechaInstalacion) addAct(r.fechaInstalacion, 'install', ' Instalación: '+(r.caso||r.serie||''), sub);
+      if (r.retirado && r.fechaRetiroReal) addAct(r.fechaRetiroReal, 'retiro', ' Retiro: '+(r.caso||r.serie||''), sub);
       // Descargas
       (r.descargas||[]).forEach(dsc => {
-        if (dsc.fecha) addAct(dsc.fecha, 'descarga', '💾 Descarga: '+(r.caso||r.serie||'')+(dsc.medicionOk===false?' ❌':''), sub);
+        if (dsc.fecha) addAct(dsc.fecha, 'descarga', ' Descarga: '+(r.caso||r.serie||'')+(dsc.medicionOk===false?' ×':''), sub);
       });
     });
     // Despachos
     state.historialCargas.forEach(h => {
-      if (h.fecha) addAct(h.fecha, 'despacho', '📦 Despacho: '+(h.total||'')+(h.total?' equipos':''), h.areaOrigen||'');
+      if (h.fecha) addAct(h.fecha, 'despacho', ' Despacho: '+(h.total||'')+(h.total?' equipos':''), h.areaOrigen||'');
     });
     // Validaciones
     state.validaciones.forEach(v => {
       (v.usuarios||[]).forEach(u => {
-        if (u.fechaValidacion) addAct(u.fechaValidacion, 'validacion', '🔌 Validación: '+(u.siget||u.nombre||''));
+        if (u.fechaValidacion) addAct(u.fechaValidacion, 'validacion', ' Validación: '+(u.siget||u.nombre||''));
       });
     });
 

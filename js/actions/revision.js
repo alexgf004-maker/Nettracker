@@ -80,7 +80,7 @@ function guardarEdicionRevision(eq, idx) {
   state.showRevisionModal = false; state.revisionEqId = null; state.revisionFichaIdx = null;
   render();
   generateMemoRevision(eq, envio);
-  update(ref(db, 'equipos/' + eq.id), { historialMantenimiento: fichas }).then(() => showToast('✏️ Memo de envío actualizado'));
+  update(ref(db, 'equipos/' + eq.id), { historialMantenimiento: fichas }).then(() => showToast('Memo de envío actualizado'));
 }
 
 export async function confirmRevision() {
@@ -144,7 +144,7 @@ export async function confirmRevision() {
     notes: envio.motivo,
   });
   await writeTraceUpdate({ writes, event });
-  showToast('📤 Enviado a revisión · Memo generado');
+  showToast('Enviado a revisión · Memo generado');
 }
 
 // Vuelve a generar el memo de un envío ya registrado (desde su ficha de mantenimiento)

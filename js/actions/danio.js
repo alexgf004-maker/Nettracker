@@ -79,7 +79,7 @@ function guardarEdicionDanio(r) {
       }],
     });
   }
-  showToast('✏️ Memo actualizado');
+  showToast('Memo actualizado');
 }
 
 export async function confirmDanio() {
@@ -137,10 +137,10 @@ export async function confirmDanio() {
       notes: 'Memo de equipo dañado generado',
     });
     await writeTraceUpdate({ writes, event });
-    showToast('📝 Memo generado · Equipo ' + (cond ? cond.label : memo.condicion));
+    showToast('Memo generado · Equipo ' + (cond ? cond.label : memo.condicion));
   } else {
     await writeTraceUpdate({ writes });
-    showToast('📝 Memo generado');
+    showToast('Memo generado');
   }
 }
 

@@ -5,6 +5,7 @@ import { estimatedFieldReturn } from '../domain/pre-campaign.js';
 import { state } from '../state.js';
 import { daysUntil, escapeHtml, fmtDate } from '../utils.js';
 import { renderInstalaciones } from './instalaciones.js';
+import { icon } from './icons.js';
 
 function stageLabel(stage) {
   return CAMPAIGN_STAGES.find(([key]) => key === stage)?.[1] || 'Precampaña';
@@ -23,15 +24,9 @@ export function renderWorkHome() {
   const dueCampaigns = campaigns.filter(item => daysUntil(item.submissionDueAt) <= 10).sort((a, b) => (a.submissionDueAt || '').localeCompare(b.submissionDueAt || ''));
   const awaitingField = campaigns.map(item => ({ item, due: estimatedFieldReturn(item.preCampaign?.contractorDeliveredAt) }))
     .filter(({ item, due }) => due && !item.preCampaign?.fieldReturnedAt && daysUntil(due) <= 3);
-  const name = escapeHtml(state.sesionUsuario?.nombre?.split(' ')[0] || 'equipo');
 
   return `<main class="content work-home">
-    <div class="work-welcome"><div class="work-eyebrow">Mi espacio de trabajo · ${escapeHtml(area)}</div><h1>Hola, ${name}</h1><p>Campañas, reclamos y trabajo de campo en un solo lugar.</p></div>
-    <div class="work-paths">
-      <button class="work-path campaign" onclick="switchTab('campaigns')"><span class="work-path-icon">🗓</span><span class="work-path-text"><strong>Campañas</strong><small>${campaigns.length} en curso · CR, armónicos y flicker</small></span><span class="work-path-arrow">→</span></button>
-      <button class="work-path complaint" onclick="switchTab('complaints')"><span class="work-path-icon">📋</span><span class="work-path-text"><strong>Reclamos</strong><small>${complaints.length} abiertos · medición e informe</small></span><span class="work-path-arrow">→</span></button>
-      <button class="work-path operations" onclick="switchTab('operations')"><span class="work-path-icon">⚡</span><span class="work-path-text"><strong>Trabajo de campo</strong><small>Instalaciones, retiros, validaciones y despachos</small></span><span class="work-path-arrow">→</span></button>
-    </div>
+    <div class="work-welcome"><div class="work-eyebrow">Mi espacio de trabajo · ${escapeHtml(area)}</div><h1>Resumen de trabajo</h1><p>Entregas, trabajo de campo y campañas de tu área.</p></div>
     <div class="work-section-head"><h2>Atención pendiente</h2><span>${overdue.length + downloads.length + dueCampaigns.length + awaitingField.length}</span></div>
     ${overdue.length || downloads.length || dueCampaigns.length || awaitingField.length ? `<div class="work-alert-list">
       ${overdue.length ? `<button onclick="switchTab('instalaciones')" class="work-alert danger"><strong>${overdue.length} retiro${overdue.length === 1 ? '' : 's'} vencido${overdue.length === 1 ? '' : 's'}</strong><small>Revisar equipos en campo</small><span>→</span></button>` : ''}
@@ -44,6 +39,12 @@ export function renderWorkHome() {
       const count = state.cases.filter(caseRecord => caseRecord.campaignId === item.id).length;
       return `<button class="work-campaign-card" onclick="openCampaign('${escapeHtml(item.id)}')"><span class="work-eyebrow">${escapeHtml(item.ownerArea)} · ${count} casos</span><strong>${escapeHtml(campaignLabel(item))}</strong><span class="work-stage">${escapeHtml(stageLabel(item.stage))}</span><small>Entrega ${fmtDate(item.submissionDueAt)}</small></button>`;
     }).join('')}</div>` : '<div class="work-empty">Aún no hay campañas abiertas de tu área. Puedes crear la primera desde Campañas.</div>'}
+    <div class="work-section-head"><h2>Accesos de trabajo</h2></div>
+    <div class="work-paths">
+      <button class="work-path campaign" onclick="switchTab('campaigns')"><span class="work-path-icon">${icon('calendar')}</span><span class="work-path-text"><strong>Campañas</strong><small>${campaigns.length} en curso · CR, armónicos y flicker</small></span><span class="work-path-arrow">${icon('arrow')}</span></button>
+      <button class="work-path complaint" onclick="switchTab('complaints')"><span class="work-path-icon">${icon('clipboard')}</span><span class="work-path-text"><strong>Reclamos</strong><small>${complaints.length} abiertos · medición e informe</small></span><span class="work-path-arrow">${icon('arrow')}</span></button>
+      <button class="work-path operations" onclick="switchTab('operations')"><span class="work-path-icon">${icon('activity')}</span><span class="work-path-text"><strong>Trabajo de campo</strong><small>Instalaciones, retiros, validaciones y despachos</small></span><span class="work-path-arrow">${icon('arrow')}</span></button>
+    </div>
     <div class="work-footer-actions"><button onclick="switchTab('complaints')">Ver reclamos →</button><button onclick="switchTab('inventario')">Ver equipos →</button></div>
   </main>`;
 }
@@ -58,7 +59,7 @@ export function renderComplaints() {
   return `<main class="content work-list-page">
     <div class="work-page-heading"><div><div class="work-eyebrow">Atención de usuarios · ${escapeHtml(area)}</div><h1>Reclamos</h1><p>Desde la solicitud hasta el informe y la remedición, cuando corresponda.</p></div><button class="work-primary-action" onclick="newComplaint()">+ Registrar reclamo</button></div>
     <div class="work-summary-row"><div><strong>${complaints.length}</strong><span>En tu área</span></div><div><strong>${complaints.filter(item => item.lifecycleStatus !== 'closed').length}</strong><span>Abiertos</span></div><div><strong>${complaints.filter(item => caseInstallations(item.id).some(record => record.retirado)).length}</strong><span>Con retiro</span></div></div>
-    <div class="search-wrap"><span class="search-icon">🔍</span><input class="search-input" id="complaint-search" placeholder="Buscar código o usuario..." value="${escapeHtml(state.complaintSearch)}" oninput="setComplaintSearch(this.value)"></div>
+    <div class="search-wrap"><span class="search-icon">${icon('search')}</span><input class="search-input" id="complaint-search" placeholder="Buscar código o usuario..." value="${escapeHtml(state.complaintSearch)}" oninput="setComplaintSearch(this.value)"></div>
     ${complaints.length ? `<div class="work-case-list">${complaints.map(item => {
       const point = state.servicePoints.find(entry => entry.id === item.servicePointId);
       const installations = caseInstallations(item.id);
@@ -70,11 +71,11 @@ export function renderComplaints() {
 
 export function renderOperationsHub() {
   return `<main class="content work-list-page"><div class="work-page-heading"><div><div class="work-eyebrow">Herramientas de campo</div><h1>Operación</h1><p>Registra el trabajo físico y consulta las herramientas existentes.</p></div></div>
-    <div class="work-paths"><button class="work-path operations" onclick="switchTab('instalaciones')"><span class="work-path-icon">⚡</span><span class="work-path-text"><strong>Instalaciones y retiros</strong><small>Equipos colocados, descargas y fechas</small></span><span class="work-path-arrow">→</span></button>
-      <button class="work-path operations" onclick="switchTab('validaciones')"><span class="work-path-icon">🔌</span><span class="work-path-text"><strong>Validaciones de TAP</strong><small>Proyecciones y resultados de campo</small></span><span class="work-path-arrow">→</span></button>
-      <button class="work-path operations" onclick="switchTab('carga')"><span class="work-path-icon">📤</span><span class="work-path-text"><strong>Despachos</strong><small>Cargas masivas y memos</small></span><span class="work-path-arrow">→</span></button>
-      <button class="work-path operations" onclick="switchTab('mapa')"><span class="work-path-icon">📍</span><span class="work-path-text"><strong>Mapa</strong><small>Ubicación de instalaciones</small></span><span class="work-path-arrow">→</span></button>
-      <button class="work-path operations" onclick="openCaseArchive()"><span class="work-path-icon">📁</span><span class="work-path-text"><strong>Otros expedientes</strong><small>Requerimientos especiales y archivo de casos</small></span><span class="work-path-arrow">→</span></button>
-      <button class="work-path operations" onclick="switchTab('operational_dashboard')"><span class="work-path-icon">📊</span><span class="work-path-text"><strong>Reportes y calendario</strong><small>Actividad mensual y estado del inventario</small></span><span class="work-path-arrow">→</span></button>
+    <div class="work-paths"><button class="work-path operations" onclick="switchTab('instalaciones')"><span class="work-path-icon">${icon('activity')}</span><span class="work-path-text"><strong>Instalaciones y retiros</strong><small>Equipos colocados, descargas y fechas</small></span><span class="work-path-arrow">${icon('arrow')}</span></button>
+      <button class="work-path operations" onclick="switchTab('validaciones')"><span class="work-path-icon">${icon('settings')}</span><span class="work-path-text"><strong>Validaciones de TAP</strong><small>Proyecciones y resultados de campo</small></span><span class="work-path-arrow">${icon('arrow')}</span></button>
+      <button class="work-path operations" onclick="switchTab('carga')"><span class="work-path-icon">${icon('upload')}</span><span class="work-path-text"><strong>Despachos</strong><small>Cargas masivas y memos</small></span><span class="work-path-arrow">${icon('arrow')}</span></button>
+      <button class="work-path operations" onclick="switchTab('mapa')"><span class="work-path-icon">${icon('map')}</span><span class="work-path-text"><strong>Mapa</strong><small>Ubicación de instalaciones</small></span><span class="work-path-arrow">${icon('arrow')}</span></button>
+      <button class="work-path operations" onclick="openCaseArchive()"><span class="work-path-icon">${icon('folder')}</span><span class="work-path-text"><strong>Otros expedientes</strong><small>Requerimientos especiales y archivo de casos</small></span><span class="work-path-arrow">${icon('arrow')}</span></button>
+      <button class="work-path operations" onclick="switchTab('operational_dashboard')"><span class="work-path-icon">${icon('chart')}</span><span class="work-path-text"><strong>Reportes y calendario</strong><small>Actividad mensual y estado del inventario</small></span><span class="work-path-arrow">${icon('arrow')}</span></button>
     </div></main>`;
 }
