@@ -897,7 +897,8 @@ header { background-image: var(--onda), var(--degradado); background-repeat: rep
 @media (max-width: 520px) { .hero-kpis[data-n="4"] { grid-template-columns: repeat(2, 1fr); } }
 
 /* ─── Inicio ─── */
-.inicio-layout { display: grid; grid-template-columns: 1fr; gap: 0 16px; grid-template-areas: "pend" "trabajo" "acciones" "equipos" "actividad"; }
+.inicio-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 16px; grid-template-areas: "pend" "trabajo" "acciones" "equipos" "actividad"; }
+.inicio-layout > * { min-width: 0; } /* un texto largo no estira la página más que la pantalla */
 .ini-pend { grid-area: pend; } .ini-trabajo { grid-area: trabajo; } .ini-equipos { grid-area: equipos; } .ini-acciones { grid-area: acciones; } .ini-actividad { grid-area: actividad; }
 /* Una sola columna también en PC: cada sección a lo ancho, una debajo de otra */
 .inicio-layout { grid-template-areas: "pend" "trabajo" "acciones" "equipos" "actividad"; }
