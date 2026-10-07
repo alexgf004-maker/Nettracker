@@ -85,6 +85,14 @@ test.describe('Inicio', () => {
     await expect(app$(page)).toContainText('Validaciones de TAP (1 campañas)');
   });
 
+  test('en celular un nombre largo no hace la página más ancha que la pantalla', async ({ page }) => {
+    const datos = JSON.parse(JSON.stringify(fixture));
+    datos.analizadores.largo = { serie: 'SN-900', caso: 'CR1O2026299', lugar: 'INMOBILIARIA DE PRUEBA SOCIEDAD ANONIMA DE CAPITAL VARIABLE CON UN NOMBRE MUY LARGO', fechaInstalacion: '2026-09-18', fechaRetiro: '2026-09-25', areaInstalacion: 'CPT MT' };
+    app = await abrirApp(page, { datos });
+    await expect(page.locator('.pendiente', { hasText: 'Retirar SN-900' })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(400);
+  });
+
   test('contar pendientes solo desde una fecha deja fuera lo viejo', async ({ page }) => {
     app = await abrirApp(page);
     await cerrarAlerta(page);
