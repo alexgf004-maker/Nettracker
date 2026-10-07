@@ -2,7 +2,7 @@
 import { CONDICIONES, SEDES, isAdmin } from '../config.js';
 import { state } from '../state.js';
 import { badgeSt } from '../ui.js';
-import { calcSt, eqEnCampo, eqPrestado, eqSt, fmtDate } from '../utils.js';
+import { calcSt, elegibleLote, eqEnCampo, eqPrestado, eqSt, fmtDate } from '../utils.js';
 import { heroSeccion } from './componentes.js';
 
 export function renderInventario() {
@@ -34,8 +34,9 @@ export function renderInventario() {
     if (state.modoSeleccionLote) {
       html += '<div style="background:var(--primary);border-radius:12px;padding:12px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">';
       html += '<div style="color:#fff;font-size:13px;font-weight:700"><i class=ic-archivo></i> ' + (state.tipoLote==='prestamo'?'Memo préstamo':'Memo devolución') + ' · ' + state.seleccionLote.length + ' equipo' + (state.seleccionLote.length !== 1 ? 's' : '') + '</div>';
-      html += '<button onclick="generarLotePDF()" ' + (state.seleccionLote.length === 0 ? 'disabled' : '') + ' style="background:#fff;color:var(--primary);border:none;border-radius:8px;padding:8px 14px;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;opacity:' + (state.seleccionLote.length === 0 ? '.5' : '1') + '">Generar PDF</button>';
+      html += '<button onclick="generarLotePDF()" ' + (state.seleccionLote.length === 0 ? 'disabled' : '') + ' style="background:#fff;color:var(--primary);border:none;border-radius:8px;padding:8px 14px;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;opacity:' + (state.seleccionLote.length === 0 ? '.5' : '1') + '">Registrar y generar memo</button>';
       html += '</div>';
+      html += '<div class="lote-ayuda">' + (state.tipoLote === 'prestamo' ? 'Toca los equipos disponibles que vas a prestar.' : 'Toca los equipos prestados que regresan.') + ' Al generar el memo se registra el movimiento de todos. Los que no aplican se ven atenuados.</div>';
     }
     html += '<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">';
     html += '<div class="search-wrap" style="margin-bottom:0;flex:1"><span class="search-icon"><i class=ic-buscar></i></span><input class="search-input" placeholder="Buscar por serie o modelo..." value="' + state.inventarioSearch + '" oninput="setInvSearch(this.value)" ' + (state.inventarioSearch ? 'data-active="true"' : '') + '></div>';
@@ -82,23 +83,14 @@ if (state.inventarioSearch) {
             const eqId = eq.id;
             const isSelected = state.seleccionLote.includes(eqId);
             // Determine if eligible for current lote type
-            let elegible = false;
-        
-    if (state.modoSeleccionLote) {
-              if (state.tipoLote === 'prestamo') elegible = eqPrestado(eq);
-              else {
-                const movs = eq.movimientos || [];
-                const last = movs[movs.length-1];
-                elegible = last && last.tipo === 'devolucion';
-              }
-            }
+            const elegible = state.modoSeleccionLote && elegibleLote(eq, state.tipoLote);
             const clickable = state.modoSeleccionLote ? (elegible ? `toggleLoteCard('${eqId}')` : '') : `openEqDetalle('${eqId}')`;
 
             const cardOpacity = state.modoSeleccionLote && !elegible ? '0.35' : '1';
             const cardBorder = isSelected ? '2px solid var(--primary)' : '1px solid var(--border)';
             if (state.vistaInventario === 'lista') {
               // List view
-              html += '<div onclick="' + clickable + '" style="background:' + (isSelected?'var(--primary-light)':'var(--white)') + ';border-left:4px solid ' + c + ';border:' + cardBorder + ';border-left:4px solid ' + c + ';border-radius:10px;padding:10px 14px;cursor:' + (state.modoSeleccionLote&&!elegible?'default':'pointer') + ';box-shadow:var(--shadow);display:flex;align-items:center;gap:10px;margin-bottom:6px">';
+              html += '<div onclick="' + clickable + '" style="background:' + (isSelected?'var(--primary-light)':'var(--white)') + ';border-left:4px solid ' + c + ';border:' + cardBorder + ';border-left:4px solid ' + c + ';border-radius:10px;padding:10px 14px;cursor:' + (state.modoSeleccionLote&&!elegible?'default':'pointer') + ';box-shadow:var(--shadow);display:flex;align-items:center;gap:10px;margin-bottom:6px;opacity:' + cardOpacity + '">';
               if (isSelected) html += '<div style="width:20px;height:20px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;flex-shrink:0">✓</div>';
 
               html += '<div style="flex:1;min-width:0">';

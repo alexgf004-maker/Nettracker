@@ -5,7 +5,7 @@ import { db, ref, update } from '../firebase.js';
 import { generateLotePDF, generateMemoPDF } from '../pdf/memos.js';
 import { state } from '../state.js';
 import { abrirDoc, showToast } from '../ui.js';
-import { calcSt, emptyEF, eqPrestado, fmtDate, today } from '../utils.js';
+import { calcSt, elegibleLote, emptyEF, eqPrestado, fmtDate, today } from '../utils.js';
 import { render } from '../views/render.js';
 import { closeRevisionModal, confirmRevision, editarRevision, openRevisionModal, reimprimirMemoRevision } from '../actions/revision.js';
 
@@ -272,7 +272,7 @@ window.setCondicionField = (k, v) => { state.condicionForm[k] = v; render(); };
 window.setCondicionNota = v => { state.condicionForm.nota = v; };
 window.doCondicion = confirmCondicion;
 window.openCondicionModal = openCondicionModal;
-window.closePrestamoModal = () => { state.showPrestamoModal = false; state.prestamoId = null; render(); };
+window.closePrestamoModal = () => { state.showPrestamoModal = false; state.prestamoId = null; state.loteMovimiento = false; render(); };
 window.setPrestamoField = (k, v) => { state.prestamoForm[k] = v; render(); };
 window.setPrestamoNota = v => { state.prestamoForm.nota = v; };
 window.doMovimiento = confirmMovimiento;
@@ -294,28 +294,21 @@ window.toggleLote = id => {
 
 window.toggleLoteCard = id => {
   const eq = state.equipos.find(x => x.id === id);
-  if (!eq) return;
-  // For prestamo: must have prestado=true. For devolucion: must have last movimiento=devolucion
-  if (state.tipoLote === 'prestamo' && !eqPrestado(eq)) return;
-  if (state.tipoLote === 'devolucion') {
-    const movs = eq.movimientos || [];
-    const last = movs[movs.length - 1];
-    if (!last || last.tipo !== 'devolucion') return;
-  }
+  if (!eq || !elegibleLote(eq, state.tipoLote)) return;
   toggleLote(id);
 };
 
+// Pide una sola vez los datos del movimiento (de, para, nota); al confirmar se registra en todos y sale un memo
 window.generarLotePDF = () => {
   if (state.seleccionLote.length === 0) return showToast('Selecciona al menos un equipo');
-  const items = state.seleccionLote.map(id => {
-    const eq = state.equipos.find(x => x.id === id);
-    if (!eq) return null;
-    const movs = (eq.movimientos||[]).filter(m => m.tipo === state.tipoLote);
-    const mov = movs.length > 0 ? movs[movs.length-1] : null;
-    return { eq, movimiento: mov };
-  }).filter(Boolean);
-  generateLotePDF(items, state.tipoLote);
-  state.modoSeleccionLote = false; state.seleccionLote = []; render();
+  const primero = state.equipos.find(x => x.id === state.seleccionLote[0]);
+  const movs = primero?.movimientos || [];
+  const ultimo = movs[movs.length - 1];
+  state.prestamoForm = state.tipoLote === 'devolucion'
+    ? { de: ultimo ? ultimo.a : 'Campos y Servicios', a: ultimo ? ultimo.de : 'CPT BT', nota: '', tipo: 'devolucion' }
+    : { de: 'CPT BT', a: 'CPT MT', nota: '', tipo: 'prestamo' };
+  state.prestamoId = null; state.loteMovimiento = true; state.showPrestamoModal = true;
+  render();
 };
 
 window.generarMemo = (eqId, movIdx) => {

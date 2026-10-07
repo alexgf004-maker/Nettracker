@@ -98,6 +98,7 @@ export const state = {
   prestamoId: null,
   prestamoForm: { de: 'CPT BT', a: 'CPT MT', nota: '', tipo: 'prestamo' },
   modoSeleccionLote: false,
+  loteMovimiento: false, // el modal de préstamo/devolución registra el movimiento de todo el lote
   cargaData: [], // preview rows from excel
   cargaView: 'upload', // upload | preview
   cargaSubView: 'subir', // subir | historial | accesorios
