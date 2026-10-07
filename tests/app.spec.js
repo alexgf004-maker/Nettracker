@@ -1566,6 +1566,23 @@ test.describe('Análisis de reclamos', () => {
     await expect(modal.locator('.tile', { hasText: 'FebNoPer' })).toContainText('6.94 %');
   });
 
+  test('Graficar: subir un TXT en la pestaña rápida muestra DT o FT sin guardar nada', async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await nav(page, 'Graficar');
+    await page.locator('.graf-pagina input[type=file]').setInputFiles({ name: 'CR192026100.txt', mimeType: 'text/plain', buffer: Buffer.from(txtTension()) });
+    await expect(page.locator('#ar-nominal')).toHaveValue('13200');
+    await expect(page.locator('.veredicto-dtft')).toContainText('FT');
+    await expect(page.locator('.veredicto-dtft')).toContainText('FebNoPer 6.94 %');
+    await page.locator('#ar-red').selectOption('rural_bt');
+    await expect(page.locator('.veredicto-dtft')).toContainText('DT');
+    await expect(page.getByRole('button', { name: 'Guardar en el reclamo' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Excel de tensión' })).toBeVisible();
+    expect((await app.escrituras()).length).toBe(0);
+    await page.getByRole('button', { name: 'Empezar de nuevo' }).click();
+    await expect(page.locator('.arch-slot.lleno')).toHaveCount(0);
+  });
+
   test('descarga los Excel de tensión y armónicos con sus gráficas', async ({ page }) => {
     const XLSX = require('xlsx-js-style');
     app = await abrirApp(page, { excel: true });

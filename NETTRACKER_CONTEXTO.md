@@ -269,6 +269,10 @@ En el detalle de la campaña:
 - Armónicos o flicker (P95 del PST > 1) fuera de límite: solo aviso en el expediente; le compete al usuario (confirmado).
 - Pendientes del Inicio: "Ubicar e instalar el reclamo" mientras no hay instalación, "Entregar informe del reclamo" por medición retirada y los de FT.
 
+## Graficar (Herramientas)
+
+- Pestaña para revisar rápido una medición en campo: se sube el TXT (de tensión, de armónicos o de campaña), se ponen nominal y red, y se ven el veredicto DT/FT con el FebNoPer, los valores y todas las gráficas del análisis de reclamos, con los dos Excel. No se guarda nada (`state.graficar`, `renderGraficar`; mismo cuerpo que el análisis del reclamo con `analisisActivo()`).
+
 ## Análisis de reclamos (macros Graficar y Armónicos)
 
 - En reclamo se mide con doble intervalo y el equipo genera dos TXT de 10 minutos del mismo periodo: el de **tensión** (74 columnas, con máximos y mínimos; STOTAL en la columna 75 cuando viene) y el de **armónicos** (197 columnas: `Uarm{n}-{fase}`, `Iarm{n}-{fase}`, PST). La app reconoce cuál es cuál por los encabezados.

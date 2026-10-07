@@ -11,6 +11,7 @@ import { abrirMultiplicador, cerrarImportMultiplicadores, cerrarMultiplicador, e
 import { asignarEquipo, asignarFecha, cerrarProgramacion, enviarFechaADespachos, exportarFecha, guardarProgramacion, importarProgramacion, procesarProgramacion, setDatoFecha } from '../actions/fechas.js';
 import { abrirResultado, analizarArchivos, analizarTXT, cerrarAnalisis, cerrarGraficas, cerrarResultado, exportarAnalisis, exportarCuadroResumen, exportarSeries, guardarAnalisis, guardarResultado, recalcularTXT, verGraficas } from '../actions/resultados.js';
 import { moverCursorGrafica, salirCursorGrafica } from '../views/graficas.js';
+import { limpiarGraficar } from '../actions/analisis-reclamo.js';
 import { abrirAnalisisReclamo, cargarTXTReclamo, cerrarAnalisisReclamo, guardarAnalisisReclamo, setParamReclamo, setVistaReclamo, subirTXTReclamo } from '../actions/analisis-reclamo.js';
 import { exportarArmonicosReclamo, exportarTensionReclamo } from '../actions/excel-reclamo.js';
 import { cursorReclamo, salirCursorReclamo } from '../views/analisis-reclamo.js';
@@ -73,3 +74,4 @@ Object.assign(window, { abrirAnalisisReclamo, cerrarAnalisisReclamo, subirTXTRec
 // Expedientes de reclamo
 Object.assign(window, { abrirNuevoReclamo, cerrarNuevoReclamo, leerCorreoNuevoReclamo, setCampoNuevoReclamo, guardarNuevoReclamo, abrirExpediente, cerrarExpediente, setExpedienteVista, guardarDatoExpediente, completarCoordenadasReclamo, registrarInstalacionReclamo, eliminarExpediente });
 Object.assign(window, { abrirPuntoReclamo, cerrarPuntoReclamo, setNombrePunto, registrarPuntoReclamo, vincularPuntoReclamo, desvincularPuntoReclamo });
+Object.assign(window, { limpiarGraficar });

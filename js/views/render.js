@@ -14,7 +14,8 @@ import { renderCasoModal, renderConfigCartas, renderDocsModal, renderImportLista
 import { renderProgramacionModal } from './fechas.js';
 import { renderImportMultModal, renderMultModal } from './multiplicadores.js';
 import { renderGraficasModal } from './graficas.js';
-import { renderAnalisisReclamo } from './analisis-reclamo.js';
+import { renderAnalisisReclamo, renderGraficar } from './analisis-reclamo.js';
+import { nuevoGraficar } from '../actions/analisis-reclamo.js';
 import { renderAnalisisModal, renderResultadoModal } from './resultados.js';
 import { renderFT, renderFTModal } from './ft.js';
 import { renderCampanas, renderRequerimientos } from './trabajo.js';
@@ -31,6 +32,7 @@ export const TAB_VIEWS = {
   inventario: renderInventario,
   validaciones: renderValidaciones,
   mapa: renderMapa,
+  graficar: () => { state.graficar ??= nuevoGraficar(); return renderGraficar(); },
   carga: renderCarga,
 };
 

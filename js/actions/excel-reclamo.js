@@ -5,7 +5,7 @@ import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { ARMONICAS, CARGA_ALERTA, DATI_LIM, LIMITE_PST, PERC_MAX, TIPOS_RED, VDAT_LIM } from '../domain/reclamo.js';
 import { descargarXlsx, escribirConGraficas, rango } from '../excel-graficas.js';
-import { calculoReclamo } from '../views/analisis-reclamo.js';
+import { analisisActivo, calculoReclamo } from '../views/analisis-reclamo.js';
 
 // Colores de fase de los informes CPT (los de las macros)
 const COLOR_FASE = { 1: 'FFC000', 2: '0070C0', 3: 'FF0000' };
@@ -85,7 +85,7 @@ function hojaPerfil({ fechas, t, series, limites = [], titulo, usuario, escalaY 
 }
 
 export function exportarTensionReclamo() {
-  const a = state.analisisReclamo; const c = calculoReclamo(a);
+  const a = analisisActivo(); const c = calculoReclamo(a);
   if (!c?.d) return showToast('Sube el TXT de tensión');
   const { d, t, tol } = c; const p = a.params; const fases = t.fases;
   const nominal = Number(p.nominal) || 0; const usuario = p.usuario || '';
@@ -266,7 +266,7 @@ function hojaCompacta(arm, tipoTxt) {
 }
 
 export function exportarArmonicosReclamo() {
-  const a = state.analisisReclamo; const c = calculoReclamo(a);
+  const a = analisisActivo(); const c = calculoReclamo(a);
   const arm = c?.arm;
   if (!arm?.n) return showToast('Sube el TXT de armónicos');
   const { fases, nf } = arm;
