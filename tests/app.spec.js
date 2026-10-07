@@ -1635,6 +1635,21 @@ test.describe('Expedientes de reclamo', () => {
     expect(r).toEqual({ codigo: 'RE182026999', wo: 'WO-123456', ct: 'CT20001', motivo: 'Se requiere el estudio de voltaje', zona: 'COLONIA PRUEBA, MUNICIPIO PRUEBA LA LIBERTAD', nc: '900999', nombre: 'USUARIO INVENTADO', direccion: 'CALLE INVENTADA 5, SAN SALVADOR', corte: 'DS999999', medidor: '999999-XT' });
   });
 
+  test('acepta los códigos de octubre, noviembre y diciembre (O, N, D)', async ({ page }) => {
+    app = await abrirApp(page);
+    const r = await page.evaluate(async c => {
+      const m = await import('/js/domain/expedientes.js');
+      return {
+        partes: ['RE1O2026201', 'RE1N2026201', 'RE2D2026201', 'RE182026201', 'RE-2026-01'].map(m.partesCodigoRE),
+        clave: m.claveExpediente('RE1O2026201'),
+        correo: m.leerCorreoReclamo(c.replace('RE182026999', 'RE1O2026999').replace('RE182026999', 'RE1O2026999')).codigo,
+      };
+    }, CORREO);
+    expect(r.partes).toEqual([{ n: 1, resto: 'O2026201' }, { n: 1, resto: 'N2026201' }, { n: 2, resto: 'D2026201' }, { n: 1, resto: '82026201' }, null]);
+    expect(r.clave).toBe('RE-O2026201');
+    expect(r.correo).toBe('RE1O2026999');
+  });
+
   test('nuevo reclamo desde el correo: crea el expediente y lleva a registrar la instalación', async ({ page }) => {
     app = await abrirApp(page);
     await cerrarAlerta(page);

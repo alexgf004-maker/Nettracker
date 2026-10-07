@@ -18,9 +18,11 @@ export const MAX_MEDICIONES = 6;
 export const CAMPOS_RECLAMO = ['codigo', 'wo', 'ct', 'motivo', 'zona', 'nc', 'nombre', 'direccion', 'corte', 'medidor'];
 export const DIAS_RETIRO_RECLAMO = 8; // el equipo se retira normalmente al 8.º día
 
-// RE + nº de medición + resto (RE182026201 → { n: 1, resto: '82026201' })
+// RE + nº de medición + mes + año + correlativo. El mes va de 1 a 9 y O, N, D para octubre,
+// noviembre y diciembre (como en campañas): RE182026201 → { n: 1, resto: '82026201' }, RE1O2026201 → { n: 1, resto: 'O2026201' }
+const CODIGO_RE = /\bRE\d[1-9OND]20\d{2}\d+\b/i;
 export function partesCodigoRE(codigo) {
-  const m = /^RE(\d)(\d+)$/.exec(normalizarCodigo(codigo));
+  const m = /^RE(\d)([1-9OND]20\d{2}\d+)$/.exec(normalizarCodigo(codigo));
   return m ? { n: Number(m[1]), resto: m[2] } : null;
 }
 export const codigoMedicion = (resto, n) => `RE${n}${resto}`;
@@ -42,7 +44,7 @@ export function leerCorreoReclamo(texto) {
   const lineas = String(texto || '').split(/\r?\n/).map(l => l.replace(/ /g, ' ').trim());
   const out = { codigo: '', wo: '', ct: '', motivo: '', zona: '', nc: '', nombre: '', direccion: '', corte: '', medidor: '' };
   const todo = lineas.join('\n');
-  out.codigo = (/\bRE\d{7,}\b/i.exec(todo) || [''])[0].toUpperCase();
+  out.codigo = (CODIGO_RE.exec(todo) || [''])[0].toUpperCase();
   // Asunto: la línea con el código y comas (la que trae WO y CT)
   const asunto = lineas.find(l => out.codigo && l.toUpperCase().includes(out.codigo) && l.includes(',')) || '';
   if (asunto) {
@@ -50,7 +52,7 @@ export function leerCorreoReclamo(texto) {
     const wo = /\bWO\s*-?\s*(\d+)/i.exec(asunto); if (wo) out.wo = `WO-${wo[1]}`;
     const ct = /\bCT\s*-?\s*(\d+)/i.exec(asunto); if (ct) out.ct = `CT${ct[1]}`;
     // Lo que viene después de WO y CT: primero el motivo y luego la zona
-    const resto = partes.filter(p => !/\bRE\d{7,}\b/i.test(p) && !/^CT\s*-?\s*\d+$/i.test(p) && !/^WO\s*-?\s*\d+$/i.test(p));
+    const resto = partes.filter(p => !CODIGO_RE.test(p) && !/^CT\s*-?\s*\d+$/i.test(p) && !/^WO\s*-?\s*\d+$/i.test(p));
     out.motivo = resto[0] || '';
     out.zona = resto.slice(1).join(', ');
   }
