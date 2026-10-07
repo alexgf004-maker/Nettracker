@@ -6,7 +6,8 @@ import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { fasesConTension, leerTension, resumenGuardado, sugerirNominal, tipoDeTXT } from '../domain/reclamo.js';
 import { hoyLocal, normalizarCodigo } from '../domain/trabajo.js';
-import { calculoReclamo } from '../views/analisis-reclamo.js';
+import { analisisActivo, calculoReclamo } from '../views/analisis-reclamo.js';
+import { userArea } from '../config.js';
 import { render } from '../views/render.js';
 
 // ── Compresión (gzip + base64) para no guardar 2 MB de texto por reclamo ──
@@ -60,7 +61,7 @@ export async function subirTXTReclamo(files) {
 
 // archivos: [{ nombre, texto }] (separado de la lectura para poder probarlo sin archivos)
 export function cargarTXTReclamo(archivos) {
-  const a = state.analisisReclamo; if (!a) return;
+  const a = analisisActivo(); if (!a) return;
   const r = state.records.find(x => x.id === a.id) || {};
   const codigo = r.reclamo?.id ? '' : normalizarCodigo(r.caso); // los puntos adicionales llevan un nombre libre
   const avisos = [];
@@ -82,12 +83,12 @@ export function cargarTXTReclamo(archivos) {
 }
 
 export function setParamReclamo(campo, valor) {
-  const a = state.analisisReclamo; if (!a) return;
+  const a = analisisActivo(); if (!a) return;
   a.params[campo] = campo === 'fases' ? Number(valor) : String(valor).trim();
   a.cambios = true;
   render();
 }
-export function setVistaReclamo(vista) { if (state.analisisReclamo) { state.analisisReclamo.vista = vista; render(); } }
+export function setVistaReclamo(vista) { const a = analisisActivo(); if (a) { a.vista = vista; render(); } }
 
 export async function guardarAnalisisReclamo() {
   const a = state.analisisReclamo; if (!a || a.guardando) return;
@@ -114,3 +115,7 @@ export async function guardarAnalisisReclamo() {
   a.guardando = false;
   render();
 }
+
+// ── Graficar (pestaña rápida, sin reclamo y sin guardar) ──
+export const nuevoGraficar = () => ({ id: null, params: paramsIniciales({ areaInstalacion: userArea() }), tension: null, armonicos: null });
+export function limpiarGraficar() { state.graficar = nuevoGraficar(); render(); }

@@ -8,7 +8,7 @@ export const SECCIONES = [
   { titulo: null, items: [['dashboard', 'Inicio', 'home']] },
   { titulo: 'Trabajo', items: [['campanas', 'Campañas', 'campanas'], ['reclamos', 'Reclamos', 'reclamos'], ['requerimientos', 'Requerimientos', 'requerimientos'], ['ft', 'Seguimiento FT', 'ft']] },
   { titulo: 'Recursos', items: [['inventario', 'Equipos', 'equipos']] },
-  { titulo: 'Herramientas', items: [['instalaciones', 'Instalaciones', 'instalaciones'], ['validaciones', 'Validación de TAP', 'validacion'], ['carga', 'Despachos', 'despachos'], ['mapa', 'Mapa', 'mapa']] },
+  { titulo: 'Herramientas', items: [['graficar', 'Graficar', 'grafica'], ['instalaciones', 'Instalaciones', 'instalaciones'], ['validaciones', 'Validación de TAP', 'validacion'], ['carga', 'Despachos', 'despachos'], ['mapa', 'Mapa', 'mapa']] },
 ];
 // En celular solo caben estas; el resto va en "Más"
 export const PRINCIPALES = ['dashboard', 'campanas', 'reclamos', 'inventario'];

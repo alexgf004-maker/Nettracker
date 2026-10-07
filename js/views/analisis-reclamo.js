@@ -7,6 +7,7 @@ import {
 import { state } from '../state.js';
 import { escapeHtml, fmtDate } from '../utils.js';
 import { COLOR_FASE } from './graficas.js';
+import { heroSeccion } from './componentes.js';
 
 const esc = s => escapeHtml(s ?? '');
 const W = 1000; const H = 240;
@@ -21,7 +22,10 @@ function memorizar(caja, entradas, calcular) {
   caja.entradas = entradas; caja.valor = calcular();
   return caja.valor;
 }
-export function calculoReclamo(a = state.analisisReclamo) {
+// Análisis activo: el del reclamo abierto o, en la pestaña Graficar, el rápido (sin guardar)
+export const analisisActivo = () => state.analisisReclamo || (state.tab === 'graficar' ? state.graficar : null);
+
+export function calculoReclamo(a = analisisActivo()) {
   if (!a) return null;
   const p = a.params || {};
   const tol = TIPOS_RED[p.red]?.tol || 0;
@@ -221,6 +225,7 @@ function seccionTension(a, c) {
   const r = t.resumen;
   if (r) {
     const ft = r.estado === 'FUERA DE TOLERANCIA'; const err = r.validos === 0;
+    html += `<div class="veredicto-dtft ${err ? 'error' : ft ? 'ft' : 'dt'}"><b>${err ? 'Revisar' : ft ? 'FT' : 'DT'}</b><span>${err ? 'Ningún registro válido: revisa la tensión nominal' : ft ? 'Fuera de tolerancia' : 'Dentro de tolerancia'} · FebNoPer ${fmt(r.febNoPer * 100, 2)} %</span></div>`;
     html += `<div class="tiles">
       <div class="tile t-azul"><span class="v">${fmt(r.total)}</span><span class="l">Registros totales</span></div>
       <div class="tile ${r.invalidos ? 't-ambar' : 't-gris'}"><span class="v">${fmt(r.invalidos)}</span><span class="l">Inválidos (&lt; 70 %)</span></div>
@@ -286,6 +291,23 @@ export function renderAnalisisReclamo() {
   const g = r.analisisReclamo;
   html += `<div class="modal-head"><div><div class="modal-titulo mono">${esc(r.caso)}</div><div class="page-sub">${esc(r.lugar)}${g ? ` · guardado el ${fmtDate(g.fecha)}${g.por ? ' por ' + esc(g.por) : ''}` : ''}</div></div><button class="modal-cerrar" onclick="cerrarAnalisisReclamo()" title="Cerrar">✕</button></div>`;
   if (a.cargando) return html + '<div class="graf-vacio">Cargando los archivos guardados…</div></div></div>';
+  return html + cuerpoAnalisis(a, { guardar: true }) + '</div></div>';
+}
+
+// Pestaña Graficar: lo mismo, rápido y sin guardar (para revisar una medición en campo)
+export function renderGraficar() {
+  const a = state.graficar;
+  let html = '<div class="content">';
+  html += heroSeccion({
+    eyebrow: 'Herramientas', titulo: 'Graficar',
+    sub: 'Sube el TXT de la medición y revisa al instante los valores, las gráficas y si queda dentro (DT) o fuera de tolerancia (FT). No se guarda nada.',
+    acciones: a.tension || a.armonicos ? '<button class="hero-btn blanco" onclick="limpiarGraficar()">Empezar de nuevo</button>' : '',
+  });
+  return html + `<div class="graf-modal graf-pagina">${cuerpoAnalisis(a, { guardar: false })}</div></div>`;
+}
+
+function cuerpoAnalisis(a, { guardar }) {
+  let html = '';
   if (a.error) html += aviso(`No se pudieron cargar los archivos guardados: ${esc(a.error)}`);
   const c = calculoReclamo(a);
   html += bloqueArchivos(a, c);
@@ -298,10 +320,9 @@ export function renderAnalisisReclamo() {
     html += '<div class="graf-tooltip" id="graf-tooltip" hidden></div>';
     html += vista === 'tension' ? seccionTension(a, c) : seccionArmonicos(a, c);
     html += `<div class="barra-acciones analisis-acciones">
-      <button class="b b-p" onclick="guardarAnalisisReclamo()" ${a.guardando ? 'disabled' : ''}><i class="ic ic-check"></i> ${a.guardando ? 'Guardando…' : 'Guardar en el reclamo'}</button>
+      ${guardar ? `<button class="b b-p" onclick="guardarAnalisisReclamo()" ${a.guardando ? 'disabled' : ''}><i class="ic ic-check"></i> ${a.guardando ? 'Guardando…' : 'Guardar en el reclamo'}</button>` : ''}
       ${c.d ? '<button class="b b-g" onclick="exportarTensionReclamo()"><i class="ic ic-excel"></i> Excel de tensión</button>' : ''}
       ${c.arm?.n ? '<button class="b b-g" onclick="exportarArmonicosReclamo()"><i class="ic ic-excel"></i> Excel de armónicos</button>' : ''}</div>`;
   }
-  return html + '</div></div>';
+  return html;
 }
-
