@@ -43,6 +43,14 @@ export function eqSt(eq) {
 export function eqEnCampo(eq) { return !!state.records.find(r => r.equipoId === eq.id && !r.retirado); }
 export function eqPrestado(eq) { return !!eq.prestado; }
 
+// ¿Se puede elegir el equipo en un lote? Préstamo: disponible (no prestado, no instalado, en buen estado).
+// Devolución: prestado y sin instalación activa. El movimiento se registra al generar el memo del lote.
+export function elegibleLote(eq, tipo) {
+  if (eqEnCampo(eq)) return false;
+  if (tipo === 'devolucion') return eqPrestado(eq);
+  return !eqPrestado(eq) && !['fuera', 'mantenimiento'].includes(eq.condicion || 'bueno');
+}
+
 // Escapa texto escrito por el usuario antes de meterlo en HTML
 export function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

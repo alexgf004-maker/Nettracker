@@ -5,6 +5,7 @@ import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { emptyEF, sedeDestinoMovimiento, today } from '../utils.js';
 import { render } from '../views/render.js';
+import { generateLotePDF } from '../pdf/memos.js';
 
 // ── SAVE EQUIPO ──
 export function handleSaveEq() {
@@ -50,7 +51,26 @@ export function handleDevolucion(id) {
   render();
 }
 
+// Lote: registra el mismo movimiento en todos los equipos elegidos y genera un solo memo
+function confirmarMovimientoLote() {
+  const f = state.prestamoForm; const tipo = f.tipo;
+  const esPrestamo = tipo === 'prestamo';
+  const sedeDest = sedeDestinoMovimiento(f);
+  const movimiento = { tipo, de: f.de, a: f.a, fecha: today(), nota: f.nota, registradoPor: state.sesionUsuario?.nombre || 'Desconocido' };
+  const items = state.seleccionLote.map(id => state.equipos.find(x => x.id === id)).filter(Boolean).map(eq => {
+    const movimientos = [...(eq.movimientos || []), movimiento];
+    const datos = esPrestamo ? { prestado: true, prestadoFecha: today(), sede: sedeDest, movimientos } : { prestado: false, prestadoFecha: null, sede: sedeDest, movimientos };
+    update(ref(db, `equipos/${eq.id}`), datos);
+    return { eq: { ...eq, ...datos }, movimiento };
+  });
+  generateLotePDF(items, tipo);
+  showToast(`${esPrestamo ? 'Préstamo' : 'Devolución'} registrado para ${items.length} ${items.length === 1 ? 'equipo' : 'equipos'}`);
+  Object.assign(state, { showPrestamoModal: false, loteMovimiento: false, modoSeleccionLote: false, seleccionLote: [] });
+  render();
+}
+
 export function confirmMovimiento() {
+  if (state.loteMovimiento) return confirmarMovimientoLote();
   const eq = state.equipos.find(x => x.id === state.prestamoId);
   if (!eq) return;
   // Prevent duplicate movimiento

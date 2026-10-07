@@ -324,6 +324,23 @@ test.describe('Inventario', () => {
     expect(push[2]).toMatchObject({ serie: 'SN-777', modelo: 'PQ-9' });
   });
 
+  test('lote de devolución: se eligen los prestados y se registra la devolución de todos con un memo', async ({ page }) => {
+    await page.getByRole('button', { name: 'Lote devolución' }).first().click();
+    await expect(app$(page)).toContainText('Toca los equipos prestados que regresan');
+    // SN-104 está prestado pero instalado: no se puede elegir; SN-103 está prestado y libre
+    await page.locator('#app div[onclick^="toggleLoteCard"]', { hasText: 'SN-103' }).click();
+    await page.locator('#app div', { hasText: /^SN-104/ }).first().click({ force: true });
+    await expect(app$(page)).toContainText('Memo devolución · 1 equipo');
+    await page.getByRole('button', { name: 'Registrar y generar memo' }).click();
+    await expect(page.locator('.modal-overlay')).toContainText('Registrar devolución de 1 equipo');
+    await page.getByRole('button', { name: /Confirmar devolución y generar memo/ }).click();
+    const esc = (await app.escrituras()).filter(([op, ruta]) => op === 'update' && ruta.startsWith('equipos/'));
+    expect(esc.map(e => e[1])).toEqual(['equipos/e4']);
+    expect(esc[0][2]).toMatchObject({ prestado: false, prestadoFecha: null });
+    expect(esc[0][2].movimientos.at(-1)).toMatchObject({ tipo: 'devolucion', fecha: '2026-09-23', registradoPor: 'David García' });
+    await expect(app$(page)).not.toContainText('Memo devolución');
+  });
+
   test('modo lote', async ({ page }) => {
     await app.ejecutar(() => { activarModoLote('prestamo'); toggleLote('e6'); });
     await expect(app$(page)).toContainText('Cancelar');

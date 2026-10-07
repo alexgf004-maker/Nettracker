@@ -354,7 +354,7 @@ Catálogo de equipos físicos del equipo.
 **Funciones clave**:
 - `doMovimiento()` — registrar préstamo o devolución
 - `generarMemo(id)` — genera PDF del memo de movimiento
-- `generarLotePDF()` — memo de múltiples equipos a la vez
+- `generarLotePDF()` — memo de múltiples equipos a la vez. Lote préstamo: se eligen equipos disponibles (no prestados, sin instalación activa, sin falla ni mantenimiento); lote devolución: equipos prestados sin instalación activa (`elegibleLote`). Al generar, se piden una vez De/Para/nota, se registra el movimiento en todos los elegidos (igual que uno por uno) y sale un solo memo.
 - `doCondicion()` — registrar condición del equipo
 - `guardarMant()` — registrar mantenimiento
 - `doRetiro()` / `doDescarga()` — retiro/descarga de campo
