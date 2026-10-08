@@ -107,13 +107,13 @@ Los nodos `cases`, `campaigns`, `servicePoints`, `caseCodeIndex`, `caseIdsByCamp
 ## Constantes globales
 ```js
 SEDES    = ['Plantel Central', 'Subestación Cucumacayán']
-TECNICOS = ['David García', 'Bryan Francia', 'Francisco Chulo', 'Vicente Ramos']
+TECNICOS = ['David García', 'Bryan Francia', 'Francisco Chulo', 'Samuel Villalobos']
 ADMIN    = 'David García'
 USUARIOS = [
-  { nombre: 'David García',    pin: '2442', area: 'CPT MT' },
-  { nombre: 'Bryan Francia',   pin: '8250', area: 'CPT MT' },
-  { nombre: 'Francisco Chulo', pin: '0177', area: 'CPT BT' },
-  { nombre: 'Vicente Ramos',   pin: '1190', area: 'CPT BT' },
+  { nombre: 'David García',      area: 'CPT MT' },
+  { nombre: 'Bryan Francia',     area: 'CPT MT' },
+  { nombre: 'Francisco Chulo',   area: 'CPT BT' },
+  { nombre: 'Samuel Villalobos', area: 'CPT BT' },
 ]
 ```
 
@@ -455,7 +455,8 @@ Permite:
 ---
 
 ## Perfiles
-Sin PIN ni Firebase Auth: al entrar se elige el perfil (`entrarComo(nombre)`), se guarda en `localStorage` (`cpt_session`) y el botón del header vuelve a la pantalla de perfiles. Sirve para saber quién registra cada cosa.
+Entrada con PIN de 4 dígitos (`js/actions/auth.js`): se elige el perfil y se pone su PIN. La primera vez cada quien crea el suyo (dos veces); el administrador puede borrar el PIN de alguien desde el menú del perfil (encabezado) y esa persona crea uno nuevo al entrar. En Firebase (`pines/{perfil}`) va `{ sal, hash }` con SHA-256 de "sal:pin", nunca el PIN. 5 intentos fallidos bloquean un minuto. La sesión queda guardada en el dispositivo (`localStorage` `cpt_session`) hasta "Cambiar de perfil".
+Ojo: sin Firebase Auth ni reglas en la base, el PIN evita que alguien entre a otro perfil desde la app, pero no protege los datos de alguien con conocimientos técnicos. Para eso faltan Firebase Auth y reglas (pendiente).
 ```js
 sesionUsuario = { nombre }  // null = pantalla de perfiles
 ```

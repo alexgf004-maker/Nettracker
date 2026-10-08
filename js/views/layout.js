@@ -1,5 +1,5 @@
 // Header y menú de navegación (barra inferior en celular, menú lateral en PC)
-import { userArea } from '../config.js';
+import { isAdmin, userArea, USUARIOS } from '../config.js';
 import { state } from '../state.js';
 import { iniciales } from './login.js';
 
@@ -41,10 +41,16 @@ export function renderHeader() {
     <div class="header-right">
       ${acciones}
       <button class="icon-btn" onclick="toggleGlobalSearch()" title="Buscar"><i class="ic ic-buscar"></i></button>
-      <button class="user-chip" onclick="cerrarSesion()" title="Cambiar de perfil">
+      <div class="perfil-menu-wrap">
+      <button class="user-chip" onclick="toggleMenuPerfil()" title="Perfil">
         <span class="user-avatar">${iniciales(nombre)}</span>
         <span class="user-name">${nombre.split(' ')[0]}<small>${userArea()}</small></span>
       </button>
+      ${state.menuPerfil ? `<div class="perfil-menu-fondo" onclick="toggleMenuPerfil()"></div><div class="perfil-menu">
+        <button onclick="cerrarSesion()"><i class="ic ic-chevron-left"></i> Cambiar de perfil</button>
+        ${isAdmin() ? `<div class="perfil-menu-t">Borrar PIN (si alguien lo olvidó)</div>${USUARIOS.filter(u => u.nombre !== nombre).map(u => `<button onclick="borrarPin('${u.nombre}')">${u.nombre}</button>`).join('')}` : ''}
+      </div>` : ''}
+      </div>
     </div>
   </header>`;
 }

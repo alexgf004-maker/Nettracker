@@ -19,21 +19,52 @@ test.afterEach(async () => {
 });
 
 test.describe('Perfiles', () => {
-  test('se entra eligiendo el perfil, sin PIN', async ({ page }) => {
+  // PIN de prueba (inventado) guardado como lo guarda la app: SHA-256 de "sal:pin"
+  const conPin = (perfil, pin) => {
+    const sal = 'sal-de-prueba';
+    const hash = require('crypto').createHash('sha256').update(`${sal}:${pin}`).digest('hex');
+    return { ...fixture, pines: { [perfil]: { sal, hash, creado: '2026-01-01' } } };
+  };
+  const marcar = async (page, pin) => { for (const d of pin) await page.locator('.pin-tecla', { hasText: new RegExp(`^${d}$`) }).click(); };
+
+  test('la primera vez cada quien crea su PIN (dos veces) y entra', async ({ page }) => {
     app = await abrirApp(page, { usuario: null });
     await expect(app$(page)).toContainText('¿Quién eres?');
     await page.getByText('David García').first().click();
+    await expect(app$(page)).toContainText('Crea tu PIN');
+    await marcar(page, '1234');
+    await expect(app$(page)).toContainText('Confirma tu PIN');
+    await marcar(page, '9999');
+    await expect(page.locator('.pin-error')).toContainText('no coinciden');
+    await marcar(page, '1234'); await marcar(page, '1234');
     await expect(app$(page)).toContainText('Hola, David');
+    const guardado = (await app.escrituras()).find(([op, ruta]) => op === 'set' && ruta === 'pines/david-garcia')[2];
+    expect(guardado.hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(JSON.stringify(guardado)).not.toContain('1234'); // el PIN no se guarda tal cual
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('cpt_session')))).toEqual({ nombre: 'David García' });
   });
 
-  test('cambiar de perfil vuelve a la pantalla de perfiles', async ({ page }) => {
+  test('con PIN: uno equivocado no deja entrar y el correcto sí', async ({ page }) => {
+    app = await abrirApp(page, { usuario: null, datos: conPin('samuel-villalobos', '4321') });
+    await page.getByText('Samuel Villalobos').click();
+    await expect(app$(page)).toContainText('Pon tu PIN');
+    await marcar(page, '1111');
+    await expect(page.locator('.pin-error')).toContainText('PIN incorrecto');
+    await expect(app$(page)).not.toContainText('Hola, Samuel');
+    await marcar(page, '4321');
+    await expect(app$(page)).toContainText('Hola, Samuel');
+  });
+
+  test('cambiar de perfil vuelve a la pantalla de perfiles; el administrador puede borrar un PIN', async ({ page }) => {
     app = await abrirApp(page);
     await cerrarAlerta(page);
-    await page.locator('[title="Cambiar de perfil"]').click();
+    await page.locator('.user-chip').click();
+    await page.locator('.perfil-menu button', { hasText: 'Samuel Villalobos' }).click();
+    expect((await app.escrituras()).at(-1)).toEqual(['remove', 'pines/samuel-villalobos']);
+    await page.locator('.user-chip').click();
+    await page.getByRole('button', { name: 'Cambiar de perfil' }).click();
     await expect(app$(page)).toContainText('¿Quién eres?');
-    await page.getByText('Vicente Ramos').click();
-    await expect(app$(page)).toContainText('Hola, Vicente');
+    await expect(app$(page)).not.toContainText('Vicente Ramos');
   });
 });
 
