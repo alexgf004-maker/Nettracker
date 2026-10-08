@@ -4,22 +4,15 @@ import { SEDE_CUCUMACAYAN, isAdmin } from '../config.js';
 import { db, get, ref, remove, update } from '../firebase.js';
 import { state } from '../state.js';
 import { abrirDoc, abrirMemo, showToast } from '../ui.js';
-import { fmtDate, today } from '../utils.js';
+import { buildMemoAccesorios } from '../pdf/memos.js';
+import { today } from '../utils.js';
 import { render } from '../views/render.js';
 
 window.reimprimirMemoAcc = el => {
   const id = typeof el === 'string' ? el : el.dataset.id;
   const m = state.historialAccesorios.find(x => x.id === id);
   if (!m) return;
-  // Rebuild memo HTML from saved data
-  const fecha = fmtDate(m.fecha);
-  const itemRows = (m.items||[]).map(item => '<tr><td>'+item.label+'</td><td style="text-align:center"><span style="font-family:Courier New,monospace;font-weight:700;font-size:13px;color:#0057b8">'+item.qty+'</span></td><td style="color:#64748b">'+( item.detalle||'—')+'</td></tr>').join('');
-  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;color:#0a1628;padding:16px;font-size:10px}.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;border-bottom:2px solid #0057b8;padding-bottom:8px}.logo-box{width:36px;height:36px;background:linear-gradient(135deg,#003d8f,#0077cc);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}.company-name{font-size:14px;font-weight:800;color:#0057b8}.section-title{font-size:9px;font-weight:700;color:#0057b8;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #e8f0fb}table{width:100%;border-collapse:collapse;margin-bottom:16px}thead{background:#0057b8}thead th{padding:6px 8px;text-align:left;font-size:9px;font-weight:700;color:#fff}tbody td{padding:8px;font-size:11px;border-bottom:1px solid #e2e8f0}.firma-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:8px}.firma-line{border-top:1.5px solid #0a1628;margin-top:28px;padding-top:6px;text-align:center}.footer{margin-top:10px;padding-top:6px;border-top:1px solid #e2e8f0;text-align:center;font-size:8px;color:#94a3b8}@media print{body{padding:8px}@page{margin:8mm 6mm}}</style></head><body><div class="header"><div style="display:flex;align-items:center;gap:12px"><div class="logo-box"><svg width="30" height="30" viewBox="0 0 24 24" fill="none"><rect x="3" y="2" width="18" height="20" rx="2" stroke="white" stroke-width="1.8" fill="none"/><path d="M8 7h8M8 10h5" stroke="white" stroke-width="1.5" stroke-linecap="round"/><path d="M12 14l-2 4h4l-2 4" stroke="#7dd3fc" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div><div class="company-name">CPT INNOVA</div><div style="font-size:9px;color:#94a3b8">Calidad del Producto Técnico · Analizadores de Red</div></div></div><div style="text-align:right"><div style="font-size:8px;color:#94a3b8;letter-spacing:2px;text-transform:uppercase">Memorándum de</div><div style="font-size:13px;font-weight:800;color:#0057b8">ENTREGA DE ACCESORIOS</div><div style="font-size:9px;color:#64748b;text-align:right;margin-top:4px">Para: ${m.para} · ${fecha}</div></div></div><div style="margin-bottom:16px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0"><div><div style="font-size:8px;color:#94a3b8;text-transform:uppercase">Entrega</div><div style="font-size:12px;font-weight:700;margin-top:2px">${m.de}</div></div><div><div style="font-size:8px;color:#94a3b8;text-transform:uppercase">Recibe</div><div style="font-size:12px;font-weight:700;margin-top:2px">${m.para}</div></div></div></div><div class="section-title">Accesorios entregados</div><table><thead><tr><th>Accesorio</th><th style="text-align:center;width:80px">Cantidad</th><th>Detalle</th></tr></thead><tbody>${itemRows}</tbody></table><div class="section-title">Firmas de conformidad</div><div class="firma-grid"><div class="firma-line"><div style="font-size:10px;color:#64748b">Entrega</div><div style="font-size:13px;font-weight:700;margin-top:2px">${m.de}</div></div><div class="firma-line"><div style="font-size:10px;color:#64748b">Recibe</div><div style="font-size:13px;font-weight:700;margin-top:2px">${m.para}</div></div></div><div class="footer">Documento generado por CPT INNOVA · Sistema de Gestión de Analizadores de Red · ${fecha}</div></body></html>`;
-  const container = document.createElement('div');
-  container.innerHTML = html;
-  document.body.appendChild(container);
-  const opt = { margin:[8,6,8,6], filename:'memo_accesorios_'+m.fecha+'.pdf', image:{type:'jpeg',quality:0.98}, html2canvas:{scale:2}, jsPDF:{unit:'mm',format:'letter',orientation:'portrait'} };
-  html2pdf().set(opt).from(container).save().then(() => { document.body.removeChild(container); });
+  abrirDoc(buildMemoAccesorios(m, m.items || [], m.fecha), 'memo_accesorios_' + m.fecha + '.html');
 };
 
 window.eliminarMemoAcc = el => {
@@ -96,87 +89,7 @@ window.generarMemoAccesorios = () => {
     items.push({ label: 'Sellos de seguridad', qty: parseInt(f.sellos), detalle: det });
   }
   if (items.length === 0) return showToast('Ingresa al menos un accesorio');
-  const fecha = new Date().toLocaleDateString('es-SV', {day:'2-digit',month:'2-digit',year:'numeric'});
-  const html = `<!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8">
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Inter',Arial,sans-serif;color:#0a1628;padding:16px;font-size:10px}
-  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;border-bottom:2px solid #0057b8;padding-bottom:8px}
-  .logo-box{width:36px;height:36px;background:linear-gradient(135deg,#003d8f,#0077cc);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-  .company-name{font-size:14px;font-weight:800;color:#0057b8}
-  .company-sub{font-size:10px;color:#94a3b8;margin-top:2px}
-  .memo-type{font-size:14px;font-weight:800;color:#0057b8;text-align:right}
-  .memo-label{font-size:10px;color:#94a3b8;letter-spacing:2px;text-transform:uppercase;text-align:right}
-  .section-title{font-size:9px;font-weight:700;color:#0057b8;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #e8f0fb}
-  table{width:100%;border-collapse:collapse;margin-bottom:16px}
-  thead{background:#0057b8}
-  thead th{padding:6px 8px;text-align:left;font-size:9px;font-weight:700;color:#fff;letter-spacing:.5px;text-transform:uppercase}
-  tbody td{padding:8px 8px;font-size:11px;border-bottom:1px solid #e2e8f0}
-  .qty{font-family:'Courier New',monospace;font-weight:700;font-size:13px;color:#0057b8}
-  .firma-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:8px}
-  .firma-line{border-top:1.5px solid #0a1628;margin-top:28px;padding-top:6px;text-align:center}
-  .firma-label{font-size:10px;color:#64748b}
-  .firma-name{font-size:13px;font-weight:700;margin-top:2px}
-  .footer{margin-top:10px;padding-top:6px;border-top:1px solid #e2e8f0;text-align:center;font-size:8px;color:#94a3b8}
-  @media print{body{padding:8px}@page{margin:8mm 6mm}}
-</style></head><body>
-<div class="header">
-  <div style="display:flex;align-items:center;gap:12px">
-    <div class="logo-box">
-      <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
-        <rect x="3" y="2" width="18" height="20" rx="2" stroke="white" stroke-width="1.8" fill="none"/>
-        <path d="M8 7h8M8 10h5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M12 14l-2 4h4l-2 4" stroke="#7dd3fc" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </div>
-    <div>
-      <div class="company-name">CPT INNOVA</div>
-      <div class="company-sub">Calidad del Producto Técnico · Analizadores de Red</div>
-    </div>
-  </div>
-  <div>
-    <div class="memo-label">Memorándum de</div>
-    <div class="memo-type">ENTREGA DE ACCESORIOS</div>
-    <div style="font-size:11px;color:#64748b;text-align:right;margin-top:4px">Para: ${f.para} · ${fecha}</div>
-  </div>
-</div>
-
-<div style="margin-bottom:16px">
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0">
-    <div><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px">Entrega</div><div style="font-size:12px;font-weight:700;margin-top:2px">${f.de}</div></div>
-    <div><div style="font-size:8px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px">Recibe</div><div style="font-size:12px;font-weight:700;margin-top:2px">${f.para}</div></div>
-  </div>
-</div>
-
-<div class="section-title">Accesorios entregados</div>
-<table>
-  <thead><tr><th>Accesorio</th><th style="text-align:center;width:80px">Cantidad</th><th>Detalle</th></tr></thead>
-  <tbody>
-    ${items.map(item => `<tr>
-      <td>${item.label}</td>
-      <td style="text-align:center"><span class="qty">${item.qty}</span></td>
-      <td style="color:#64748b">${item.detalle||'—'}</td>
-    </tr>`).join('')}
-  </tbody>
-</table>
-
-<div class="section-title">Firmas de conformidad</div>
-<div class="firma-grid">
-  <div class="firma-line">
-    <div class="firma-label">Entrega</div>
-    <div class="firma-name">${f.de}</div>
-  </div>
-  <div class="firma-line">
-    <div class="firma-label">Recibe</div>
-    <div class="firma-name">${f.para}</div>
-  </div>
-</div>
-
-<div class="footer">Documento generado por CPT INNOVA · Sistema de Gestión de Analizadores de Red · ${fecha}</div>
-</body></html>`;
-  abrirDoc(html, 'documento.html');
+  abrirDoc(buildMemoAccesorios(f, items), 'documento.html');
 };
 
 window.getInstDespacho = (c) => {

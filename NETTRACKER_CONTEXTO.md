@@ -47,7 +47,8 @@ js/
     documentos.js        Generar cartas y hojas, pasos de la precampaña, datos de las cartas (config/cartas)
     multiplicadores.js   Editar el multiplicador de un caso, usar el histórico y exportar la hoja
     fechas.js            Asignar fecha y equipo a cada caso, exportar la fecha y enviarla a Despachos
-  pdf/memos.js           Plantillas HTML de memorándums (movimiento, lote, carga masiva)
+  pdf/memos.js           Plantillas HTML de memorándums (movimiento, lote, carga masiva, revisión, daño, accesorios)
+  pdf/memo-base.js       Hoja común de los memos: estilo, encabezado, bloques (datos, movimiento, firmas) y pie
   views/                 Funciones que devuelven HTML (string) según el estado
     render.js            render(): arma header + modales + pestaña activa + nav
     layout.js            Header y menú (SECCIONES: Inicio · Trabajo · Recursos · Herramientas)
@@ -375,6 +376,9 @@ Cuando un equipo asignado falla, la Subestación Cucumacayán es el primer filtr
 **Memo de movimiento** (`generateMemoPDF`):
 - Caja "Entrega": muestra nombre de quien registró el movimiento (`registradoPor`)
 - Caja "Recibe": queda en blanco para firma manual del receptor
+- En el memo de lote, el nombre de quien registró va bajo la firma de su área (igual que en el de un equipo)
+
+**Diseño de los memos** (`js/pdf/memo-base.js`): todos usan `docMemo()`, una hoja A4 con el encabezado degradado petróleo → turquesa de la app (rojo en equipo dañado), una franja de datos clave (fecha, equipo, quién registra), secciones con título turquesa, datos en cuadrícula, caja origen → destino, firmas y pie. Botón "Imprimir o guardar PDF" (no sale impreso). El de asignación (carga masiva) va en A4 horizontal y compacto por la cantidad de columnas. En celular la hoja se acomoda en una columna.
 
 ---
 

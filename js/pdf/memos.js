@@ -1,642 +1,222 @@
-// Plantillas HTML de memorándums (movimientos, lotes, carga masiva)
+// Plantillas HTML de memorándums (movimientos, lotes, carga masiva, revisión y daño).
+// El estilo y los bloques comunes viven en memo-base.js.
 import { CONDICIONES, USUARIOS } from '../config.js';
 import { state } from '../state.js';
 import { abrirDoc } from '../ui.js';
-import { areaToSede, escapeHtml, fmtDate } from '../utils.js';
+import { areaToSede, escapeHtml as e, fmtDate } from '../utils.js';
+import { cuenta, dato, datos, docMemo, firmas, movimiento as bloqueMovimiento, seccion, texto } from './memo-base.js';
+
+const nombreArchivo = (prefijo, serie) => prefijo + '-' + String(serie || 'equipo').replace(/[^\w-]+/g, '_') + '.html';
+const hora = () => new Date().toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' });
 
 export function generateLotePDF(equiposLote, tipo) {
-  const esTipo = tipo === 'prestamo' ? 'PRÉSTAMO' : 'DEVOLUCIÓN';
-  const fecha = new Date().toLocaleDateString('es-SV');
+  const esTipo = tipo === 'prestamo' ? 'Préstamo' : 'Devolución';
+  const mov0 = equiposLote[0]?.movimiento || {};
+  const de = mov0.de || (tipo === 'prestamo' ? 'CPT BT' : 'CPT MT');
+  const a = mov0.a || (tipo === 'prestamo' ? 'CPT MT' : 'CPT BT');
+  const registrado = mov0.registradoPor || '';
+  const areaRegistro = USUARIOS.find(x => x.nombre === registrado)?.area; // el nombre va bajo el área de quien registra
 
-  const filas = equiposLote.map(item => {
+  const filas = equiposLote.map((item, i) => {
     const mov = item.movimiento;
     return `<tr>
-      <td style="padding:10px 14px;font-size:12px;color:#64748b;border-bottom:1px solid #e2e8f0;font-family:'Courier New',monospace">${item.eq.vineta||'—'}</td>
-      <td style="padding:10px 14px;font-family:'Courier New',monospace;font-weight:700;font-size:13px;color:#0a1628;border-bottom:1px solid #e2e8f0">${item.eq.serie}</td>
-      <td style="padding:10px 14px;font-size:13px;color:#4a5568;border-bottom:1px solid #e2e8f0">${item.eq.modelo||'—'}</td>
-      <td style="padding:10px 14px;font-size:13px;color:#4a5568;border-bottom:1px solid #e2e8f0;text-align:center">${mov ? fmtDate(mov.fecha) : '—'}</td>
-      <td style="padding:10px 14px;font-size:13px;color:#4a5568;border-bottom:1px solid #e2e8f0">${mov ? (mov.de||'') : '—'} → ${mov ? (mov.a||'') : '—'}</td>
+      <td class="num">${i + 1}</td>
+      <td class="mono"><b>${e(item.eq.serie)}</b></td>
+      <td class="mono">${e(item.eq.vineta || '—')}</td>
+      <td>${e(item.eq.modelo || '—')}</td>
+      <td class="c">${mov ? fmtDate(mov.fecha) : '—'}</td>
     </tr>`;
   }).join('');
 
-  const html = `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: Arial, sans-serif; color: #0a1628; background: #fff; padding: 40px; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; border-bottom: 3px solid #0057b8; padding-bottom: 20px; }
-  .logo-area { display: flex; align-items: center; gap: 14px; }
-  .logo-box { width: 56px; height: 56px; background: linear-gradient(135deg, #003d8f, #0077cc); border-radius: 12px; display: flex; align-items: center; justify-content: center; }
-  .company-name { font-size: 22px; font-weight: 800; color: #0057b8; }
-  .company-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
-  .memo-title { text-align: right; }
-  .memo-label { font-size: 11px; font-weight: 700; color: #94a3b8; letter-spacing: 2px; text-transform: uppercase; }
-  .memo-type { font-size: 24px; font-weight: 800; color: #0057b8; margin-top: 4px; }
-  .memo-date { font-size: 12px; color: #64748b; margin-top: 4px; }
-  .section { margin-bottom: 28px; }
-  .section-title { font-size: 10px; font-weight: 700; color: #0057b8; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid #e8f0fb; }
-  table { width: 100%; border-collapse: collapse; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
-  thead { background: #0057b8; }
-  thead th { padding: 12px 14px; text-align: left; font-size: 11px; font-weight: 700; color: #fff; letter-spacing: 1px; text-transform: uppercase; }
-  thead th:last-child { text-align: center; }
-  tbody tr:nth-child(even) { background: #f8fafc; }
-  .transfer-row { display: flex; align-items: center; gap: 16px; margin: 16px 0; }
-  .transfer-box { flex: 1; background: #e8f0fb; border: 2px solid #0057b8; border-radius: 10px; padding: 12px 16px; text-align: center; }
-  .transfer-box.dest { background: #ecfdf5; border-color: #059669; }
-  .transfer-label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px; }
-  .transfer-name { font-size: 15px; font-weight: 800; }
-  .arrow { font-size: 26px; color: #0057b8; }
-  .firma-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; margin-top: 8px; }
-  .firma-box { text-align: center; }
-  .firma-line { border-top: 1.5px solid #0a1628; margin-top: 60px; padding-top: 8px; }
-  .firma-label { font-size: 11px; color: #64748b; }
-  .firma-name { font-size: 13px; font-weight: 700; margin-top: 2px; }
-  .footer { margin-top: 40px; padding-top: 14px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 10px; color: #94a3b8; }
-  .badge-count { display: inline-block; background: #e8f0fb; color: #0057b8; border-radius: 20px; padding: 3px 12px; font-size: 12px; font-weight: 700; margin-left: 8px; }
-<\/style>
-  <\/head>
-<body>
-  <div class="header">
-    <div class="logo-area">
-      <div class="logo-box">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-          <rect x="3" y="2" width="18" height="20" rx="2" stroke="white" stroke-width="1.8" fill="none"/>
-          <path d="M8 7h8M8 10h5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
-          <path d="M12 14l-2 4h4l-2 4" stroke="#7dd3fc" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
-      <div>
-        <div class="company-name">CPT INNOVA</div>
-        <div class="company-sub">Analizadores de Red · Calidad de Energía</div>
-      </div>
+  const cuerpo =
+    seccion('Movimiento', bloqueMovimiento({ eti: 'Área que entrega', val: e(de) }, { eti: 'Área que recibe', val: e(a) }))
+    + seccion('Equipos incluidos', `<div class="tabla-wrap"><table class="tabla">
+        <thead><tr><th>#</th><th>N° de serie</th><th>Viñeta</th><th>Modelo</th><th class="c">Fecha</th></tr></thead>
+        <tbody>${filas}</tbody></table></div>`, cuenta(equiposLote.length))
+    + seccion('Firmas de conformidad', firmas([
+      { eti: 'Entrega', nom: e(de), sub: areaRegistro === de ? e(registrado) : '' },
+      { eti: 'Recibe', nom: e(a), sub: areaRegistro === a ? e(registrado) : '' },
+    ]));
 
-    </div>
-    <div class="memo-title">
-      <div class="memo-label">Memorándum de</div>
-      <div class="memo-type">${esTipo} DE LOTE</div>
-      <div class="memo-date">Generado el ${fecha}</div>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Equipos incluidos <span class="badge-count">${equiposLote.length} equipos</span></div>
-    <table>
-      <thead>
-        <tr>
-          <th>Viñeta</th>
-          <th>N° de Serie</th>
-          <th>Modelo</th>
-          <th style="text-align:center">Fecha</th>
-          <th>Área entrega → Área recibe</th>
-        </tr>
-      </thead>
-      <tbody>${filas}</tbody>
-    </table>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Firmas de conformidad</div>
-    <div class="firma-grid">
-      <div class="firma-box">
-        <div class="firma-line">
-          <div class="firma-label">Entrega</div>
-          <div class="firma-name">${equiposLote[0]?.movimiento?.de || (tipo === 'prestamo' ? 'CPT BT' : 'CPT MT')}</div>
-          ${equiposLote[0]?.movimiento?.registradoPor && (equiposLote[0]?.movimiento?.de || '') !== 'Campos y Servicios' ? `<div style="font-size:11px;color:#64748b;margin-top:3px">${equiposLote[0].movimiento.registradoPor}</div>` : ''}
-        </div>
-      </div>
-      <div class="firma-box">
-        <div class="firma-line">
-          <div class="firma-label">Recibe</div>
-          <div class="firma-name">${equiposLote[0]?.movimiento?.a || (tipo === 'prestamo' ? 'CPT MT' : 'CPT BT')}</div>
-          ${equiposLote[0]?.movimiento?.registradoPor && (equiposLote[0]?.movimiento?.a || '') !== 'Campos y Servicios' ? `<div style="font-size:11px;color:#64748b;margin-top:3px">${equiposLote[0].movimiento.registradoPor}</div>` : ''}
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="footer">
-    Documento generado por CPT INNOVA · Sistema de Gestión de Analizadores de Red · ${fecha}
-  </div>
-<\/body>
-<\/html>`;
-
-  abrirDoc(html, 'documento.html');
+  abrirDoc(docMemo({
+    titulo: `${esTipo} de lote · ${equiposLote.length} equipos`,
+    tipo: `${esTipo} de lote`,
+    meta: [['Fecha', fmtDate(mov0.fecha) || new Date().toLocaleDateString('es-SV')], ['Equipos', String(equiposLote.length)], ['Registrado por', e(registrado)]],
+    cuerpo,
+  }), 'documento.html');
 }
 
-export function generateMemoPDF(eq, movimiento) {
-  const esTipo = movimiento.tipo === 'prestamo' ? 'PRÉSTAMO' : 'DEVOLUCIÓN';
-  const de = movimiento.de || '';
-  const a = movimiento.a || '';
-  const fecha = fmtDate(movimiento.fecha);
-  const nota = movimiento.nota || '';
-  const vineta = eq.vineta || '';
+export function generateMemoPDF(eq, mov) {
+  const esTipo = mov.tipo === 'prestamo' ? 'Préstamo' : 'Devolución';
+  const de = mov.de || '';
+  const a = mov.a || '';
+  const usuario = USUARIOS.find(x => x.nombre === mov.registradoPor);
+  const firmaDe = usuario && usuario.area === de ? e(mov.registradoPor) : '';
+  const firmaA = usuario && usuario.area === a ? e(mov.registradoPor) : '';
 
-  const html = `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Arial', sans-serif; color: #0a1628; background: #fff; padding: 40px; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; border-bottom: 3px solid #0057b8; padding-bottom: 20px; }
-  .logo-area { display: flex; align-items: center; gap: 14px; }
-  .logo-box { width: 56px; height: 56px; background: linear-gradient(135deg, #003d8f, #0077cc); border-radius: 12px; display: flex; align-items: center; justify-content: center; }
-  .logo-box svg { width: 32px; height: 32px; }
-  .company-name { font-size: 22px; font-weight: 800; color: #0057b8; letter-spacing: -.5px; }
-  .company-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
-  .memo-title { text-align: right; }
-  .memo-label { font-size: 11px; font-weight: 700; color: #94a3b8; letter-spacing: 2px; text-transform: uppercase; }
-  .memo-type { font-size: 24px; font-weight: 800; color: #0057b8; margin-top: 4px; }
-  .memo-date { font-size: 12px; color: #64748b; margin-top: 4px; }
-  .section { margin-bottom: 28px; }
-  .section-title { font-size: 10px; font-weight: 700; color: #0057b8; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid #e8f0fb; }
-  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .info-item { background: #f8fafc; border-radius: 8px; padding: 12px 16px; }
-  .info-label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
-  .info-value { font-size: 15px; font-weight: 700; color: #0a1628; font-family: 'Courier New', monospace; }
-  .info-value.normal { font-family: Arial, sans-serif; font-size: 14px; }
-  .transfer-row { display: flex; align-items: center; gap: 16px; margin: 20px 0; }
-  .transfer-box { flex: 1; background: #e8f0fb; border: 2px solid #0057b8; border-radius: 10px; padding: 14px 18px; text-align: center; }
-  .transfer-box.dest { background: #ecfdf5; border-color: #059669; }
-  .transfer-label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
-  .transfer-name { font-size: 16px; font-weight: 800; color: #0a1628; }
-  .arrow { font-size: 28px; color: #0057b8; font-weight: 700; }
-  .nota-box { background: #f8fafc; border-left: 3px solid #0057b8; border-radius: 6px; padding: 12px 16px; font-size: 13px; color: #4a5568; font-style: italic; min-height: 40px; }
-  .firma-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 8px; }
-  .firma-box { text-align: center; }
-  .firma-line { border-top: 1.5px solid #0a1628; margin-top: 60px; padding-top: 8px; }
-  .firma-label { font-size: 11px; color: #64748b; }
-  .firma-name { font-size: 13px; font-weight: 700; color: #0a1628; margin-top: 2px; }
-  .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 10px; color: #94a3b8; }
-<\/style>
-  <\/head>
-<body>
-  <div class="header">
-    <div class="logo-area">
-      <div class="logo-box">
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="3" y="2" width="18" height="20" rx="2" stroke="white" stroke-width="1.8" fill="none"/>
-          <path d="M8 7h8M8 10h5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
-          <path d="M12 14l-2 4h4l-2 4" stroke="#7dd3fc" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
-      <div>
-        <div class="company-name">CPT INNOVA</div>
-        <div class="company-sub">Analizadores de Red · Calidad de Energía</div>
-      </div>
+  const cuerpo =
+    seccion('Datos del equipo', datos([
+      dato('Número de serie', e(eq.serie), true),
+      dato('Modelo / Marca', e(eq.modelo)),
+      dato('Viñeta', e(eq.vineta), true),
+    ]))
+    + seccion('Movimiento', bloqueMovimiento({ eti: 'Área que entrega', val: e(de) }, { eti: 'Área que recibe', val: e(a) }))
+    + (mov.nota ? seccion('Observaciones', texto(e(mov.nota))) : '')
+    + seccion('Firmas de conformidad', firmas([
+      { eti: 'Entrega', nom: e(de), sub: firmaDe },
+      { eti: 'Recibe', nom: e(a), sub: firmaA },
+    ]));
 
-    </div>
-    <div class="memo-title">
-      <div class="memo-label">Memorándum de</div>
-      <div class="memo-type">${esTipo}</div>
-      <div class="memo-date">${fecha}</div>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Datos del equipo</div>
-    <div class="info-grid">
-      <div class="info-item">
-        <div class="info-label">Número de serie</div>
-        <div class="info-value">${eq.serie}</div>
-      </div>
-      <div class="info-item">
-        <div class="info-label">Modelo / Marca</div>
-        <div class="info-value normal">${eq.modelo||'—'}</div>
-      </div>
-      ${vineta ? `<div class="info-item">
-        <div class="info-label">Viñeta</div>
-        <div class="info-value">${vineta}</div>
-      </div>` : ''}
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Movimiento</div>
-    <div class="transfer-row">
-      <div class="transfer-box">
-        <div class="transfer-label">Área que entrega</div>
-        <div class="transfer-name">${de}</div>
-      </div>
-      <div class="arrow">→</div>
-      <div class="transfer-box dest">
-        <div class="transfer-label">Área que recibe</div>
-        <div class="transfer-name">${a}</div>
-      </div>
-    </div>
-  </div>
-
-  ${nota ? `<div class="section">
-    <div class="section-title">Observaciones</div>
-    <div class="nota-box">${nota}</div>
-  </div>` : ''}
-
-  <div class="section">
-    <div class="section-title">Firmas de conformidad</div>
-    <div class="firma-grid">
-      <div class="firma-box">
-        <div class="firma-line">
-          <div class="firma-label">Entrega</div>
-          <div class="firma-name">${de}</div>
-          ${(() => { const u = USUARIOS.find(x => x.nombre === movimiento.registradoPor); return (u && u.area === de) ? '<div style="font-size:11px;color:#64748b;margin-top:3px">'+movimiento.registradoPor+'</div>' : ''; })()}
-        </div>
-      </div>
-      <div class="firma-box">
-        <div class="firma-line">
-          <div class="firma-label">Recibe</div>
-          <div class="firma-name">${a}</div>
-          ${(() => { const u = USUARIOS.find(x => x.nombre === movimiento.registradoPor); return (u && u.area === a) ? '<div style="font-size:11px;color:#64748b;margin-top:3px">'+movimiento.registradoPor+'</div>' : ''; })()}
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="footer">
-    Documento generado por CPT INNOVA · Sistema de Gestión de Analizadores de Red · ${new Date().toLocaleDateString('es-SV')}
-  </div>
-<\/body>
-<\/html>`;
-
-  abrirDoc(html, 'documento.html');
-
+  abrirDoc(docMemo({
+    titulo: `${esTipo} · ${e(eq.serie)}`,
+    tipo: esTipo,
+    meta: [['Fecha', fmtDate(mov.fecha)], ['Equipo', e(eq.serie)], ['Registrado por', e(mov.registradoPor)]],
+    cuerpo,
+  }), 'documento.html');
 }
 
 export function buildMemoCargaMasiva(filas) {
-  const esMT = state.cargaAreaOrigen === 'CPT MT' || state.cargaAreaOrigen === 'CPT DELSUR';
+  const origen = state.cargaAreaOrigen;
+  const esMT = origen === 'CPT MT' || origen === 'CPT DELSUR';
   const fecha = new Date().toLocaleDateString('es-SV');
-  const td = (v, mono) => '<td style="padding:4px 6px;font-size:9px;border-bottom:1px solid #e2e8f0;'+(mono?'font-family:\'Courier New\',monospace;font-weight:700':'')+'">'+(v||'—')+'</td>';
-  const rows = filas.map(r => '<tr>'
-    +td(r.caso, true)
-    +td(r.serie, true)
-    +td(r.vineta||'—', true)
-    +td(r.idUsuario||'—', false)
-    +td(r.lugar, false)
-    +td(r.direccion||'—', false)
-    +(esMT ? td(r.multiplicador||'—',false)+td(r.corrientes||'—',false)+td(r.conexion||'—',false) : td(r.notas||'—',false)+td(r.medidor||'—',true))
-    +'<td style="padding:4px 6px;font-size:9px;border-bottom:1px solid #e2e8f0;text-align:center">'+(r.fechaInst||'—')+'</td>'
-    +(esMT ? '' : '<td style="padding:4px 6px;font-size:9px;border-bottom:1px solid #e2e8f0;text-align:center">'+(r.fechaRetiro||'—')+'</td>')
-    +td(r.accesorios||'—', false)
-    +'</tr>').join('');
+  const td = (v, mono, c) => `<td class="${[mono && 'mono', c && 'c'].filter(Boolean).join(' ')}">${v || '—'}</td>`;
+  const rows = filas.map((r, i) => '<tr>'
+    + `<td class="num">${i + 1}</td>`
+    + td(r.caso, true)
+    + td(r.serie, true)
+    + td(r.vineta, true)
+    + td(r.idUsuario)
+    + td(r.lugar)
+    + td(r.direccion)
+    + (esMT ? td(r.multiplicador) + td(r.corrientes) + td(r.conexion) : td(r.notas) + td(r.medidor, true))
+    + td(r.fechaInst, false, true)
+    + (esMT ? '' : td(r.fechaRetiro, false, true))
+    + td(r.accesorios)
+    + '</tr>').join('');
 
-  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:Arial,sans-serif;color:#0a1628;padding:16px;font-size:10px}
-    .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;border-bottom:2px solid #0057b8;padding-bottom:8px}
-    .logo-box{width:36px;height:36px;background:linear-gradient(135deg,#003d8f,#0077cc);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-    .company-name{font-size:14px;font-weight:800;color:#0057b8}
-    .company-sub{font-size:10px;color:#94a3b8;margin-top:2px}
-    .memo-type{font-size:14px;font-weight:800;color:#0057b8;text-align:right}
-    .memo-label{font-size:10px;color:#94a3b8;letter-spacing:2px;text-transform:uppercase;text-align:right}
-    .section-title{font-size:9px;font-weight:700;color:#0057b8;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #e8f0fb}
-    table{width:100%;border-collapse:collapse;margin-bottom:12px}
-    thead{background:#0057b8}
-    thead th{padding:5px 6px;text-align:left;font-size:8px;font-weight:700;color:#fff;letter-spacing:.5px;text-transform:uppercase}
-    .badge{display:inline-block;background:#e8f0fb;color:#0057b8;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700}
-    .firma-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;margin-top:8px}
-    .firma-line{border-top:1.5px solid #0a1628;margin-top:28px;padding-top:6px;text-align:center}
-    .firma-label{font-size:10px;color:#64748b}
-    .firma-name{font-size:13px;font-weight:700;margin-top:2px}
-    .footer{margin-top:10px;padding-top:6px;border-top:1px solid #e2e8f0;text-align:center;font-size:8px;color:#94a3b8}
-  @media print{body{padding:8px}@page{margin:8mm 6mm}}<\/style><\/head><body>
-  <div class="header">
-    <div style="display:flex;align-items:center;gap:12px">
-      <div class="logo-box">
-        <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
-          <rect x="3" y="2" width="18" height="20" rx="2" stroke="white" stroke-width="1.8" fill="none"/>
-          <path d="M8 7h8M8 10h5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
-          <path d="M12 14l-2 4h4l-2 4" stroke="#7dd3fc" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
-      <div>
-        <div class="company-name">CPT INNOVA</div>
-        <div class="company-sub">Calidad del Producto Técnico · Analizadores de Red</div>
-      </div>
-    </div>
-    <div>
-      <div class="memo-label">Memorándum de</div>
-      <div class="memo-type">ASIGNACIÓN DE EQUIPOS</div>
-      <div style="font-size:11px;color:#64748b;text-align:right;margin-top:4px">Para: Campos y Servicios · ${fecha}</div>
-    </div>
-  </div>
-  <div style="margin-bottom:20px">
-    <div class="section-title">Equipos asignados <span class="badge">${filas.length} equipos</span></div>
-    <table>
+  const cuerpo =
+    `<p class="intro">Mediante la presente se notifica la asignación de <b>${filas.length} analizadores de red ECAMEC</b> a <b>Campos y Servicios</b>, los cuales serán usados para las siguientes mediciones.</p>`
+    + seccion('Equipos asignados', `<div class="tabla-wrap"><table class="tabla">
       <thead><tr>
-        <th>N° SIGET</th>
-        <th>Equipo</th>
-        <th>Viñeta</th>
-        <th>ID Usuario</th>
-        <th>Nombre del Usuario</th>
-        <th>Dirección</th>
+        <th>#</th><th>N° SIGET</th><th>Equipo</th><th>Viñeta</th><th>ID usuario</th><th>Nombre del usuario</th><th>Dirección</th>
         ${esMT ? '<th>Multiplicador</th><th>Corrientes</th><th>Conexión</th>' : '<th>Transformador</th><th>Medidor</th>'}
-        <th style="text-align:center">F. Instalación</th>
-        ${!esMT ? '<th style="text-align:center">F. Retiro</th>' : ''}
-        <th>Accesorios</th>
+        <th class="c">F. instalación</th>${esMT ? '' : '<th class="c">F. retiro</th>'}<th>Accesorios</th>
       </tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-  </div>
-  <div style="margin-bottom:24px">
-    <div class="section-title">Firmas de conformidad</div>
-    <div class="firma-grid">
-      <div class="firma-line">
-        <div class="firma-label">Entrega</div>
-        <div class="firma-name">${state.cargaAreaOrigen} · ${areaToSede(state.cargaAreaOrigen)}</div>
-        <div style="font-size:11px;color:#64748b;margin-top:3px">${state.sesionUsuario?.nombre||''}</div>
-      </div>
-      <div class="firma-line"><div class="firma-label">Recibe</div><div class="firma-name">Campos y Servicios</div></div>
-    </div>
-  </div>
-  <div class="footer">Documento generado por CPT INNOVA · Sistema de Gestión de Analizadores de Red · ${fecha}</div>
-  <\/body><\/html>`;
+      <tbody>${rows}</tbody></table></div>`, cuenta(filas.length))
+    + seccion('Firmas de conformidad', firmas([
+      { eti: 'Entrega', nom: `${origen} · ${areaToSede(origen)}`, sub: state.sesionUsuario?.nombre || '' },
+      { eti: 'Recibe', nom: 'Campos y Servicios' },
+    ]));
 
-  return html;
+  return docMemo({
+    titulo: `Asignación de equipos · ${fecha}`,
+    tipo: 'Asignación de equipos',
+    meta: [['Fecha', fecha], ['Para', 'Campos y Servicios'], ['Entrega', `${origen} · ${areaToSede(origen)}`], ['Equipos', String(filas.length)]],
+    cuerpo,
+    compacta: true,
+    apaisada: true,
+  });
 }
 
 // Memo de envío de un equipo a revisión en la Subestación Cucumacayán
 export function generateMemoRevision(eq, envio) {
-  const e = escapeHtml;
   const cond = CONDICIONES.find(c => c.key === envio.condicionAnterior);
   const area = USUARIOS.find(u => u.nombre === envio.entregadoPor)?.area || '';
   const antecedentes = envio.antecedentes || [];
 
-  const html = `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>Envío a revisión · ${e(eq.serie)}</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Arial', sans-serif; color: #0a1628; background: #fff; padding: 40px; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; border-bottom: 3px solid #0057b8; padding-bottom: 20px; }
-  .logo-area { display: flex; align-items: center; gap: 14px; }
-  .logo-box { width: 56px; height: 56px; background: linear-gradient(135deg, #003d8f, #0077cc); border-radius: 12px; display: flex; align-items: center; justify-content: center; }
-  .logo-box svg { width: 32px; height: 32px; }
-  .company-name { font-size: 22px; font-weight: 800; color: #0057b8; letter-spacing: -.5px; }
-  .company-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
-  .memo-title { text-align: right; }
-  .memo-label { font-size: 11px; font-weight: 700; color: #94a3b8; letter-spacing: 2px; text-transform: uppercase; }
-  .memo-type { font-size: 22px; font-weight: 800; color: #0057b8; margin-top: 4px; }
-  .memo-date { font-size: 12px; color: #64748b; margin-top: 4px; }
-  .section { margin-bottom: 24px; }
-  .section-title { font-size: 10px; font-weight: 700; color: #0057b8; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #e8f0fb; }
-  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .info-item { background: #f8fafc; border-radius: 8px; padding: 10px 14px; }
-  .info-label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
-  .info-value { font-size: 15px; font-weight: 700; color: #0a1628; font-family: 'Courier New', monospace; }
-  .info-value.normal { font-family: Arial, sans-serif; font-size: 14px; }
-  .transfer-row { display: flex; align-items: center; gap: 16px; }
-  .transfer-box { flex: 1; background: #e8f0fb; border: 2px solid #0057b8; border-radius: 10px; padding: 12px 16px; text-align: center; }
-  .transfer-box.dest { background: #f3f0ff; border-color: #7c3aed; }
-  .transfer-label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
-  .transfer-name { font-size: 15px; font-weight: 800; color: #0a1628; }
-  .arrow { font-size: 28px; color: #0057b8; font-weight: 700; }
-  .texto-box { background: #f8fafc; border-left: 3px solid #0057b8; border-radius: 6px; padding: 12px 16px; font-size: 13px; color: #1e293b; line-height: 1.5; white-space: pre-wrap; }
-  .texto-box.falla { border-left-color: #dc2626; background: #fef2f2; }
-  table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  th { text-align: left; font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; padding: 6px 8px; border-bottom: 1px solid #e2e8f0; }
-  td { padding: 7px 8px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
-  .firma-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
-  .firma-box { text-align: center; }
-  .firma-line { border-top: 1.5px solid #0a1628; margin-top: 60px; padding-top: 8px; }
-  .firma-label { font-size: 11px; color: #64748b; }
-  .firma-name { font-size: 13px; font-weight: 700; color: #0a1628; margin-top: 2px; }
-  .firma-sub { font-size: 11px; color: #64748b; margin-top: 3px; }
-  .footer { margin-top: 36px; padding-top: 14px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 10px; color: #94a3b8; }
-  @media print { body { padding: 20px; } @page { margin: 12mm; } }
-</style>
-</head>
-<body>
-  <div class="header">
-    <div class="logo-area">
-      <div class="logo-box">
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="3" y="2" width="18" height="20" rx="2" stroke="white" stroke-width="1.8" fill="none"/>
-          <path d="M8 7h8M8 10h5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
-          <path d="M12 14l-2 4h4l-2 4" stroke="#7dd3fc" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
-      <div>
-        <div class="company-name">CPT INNOVA</div>
-        <div class="company-sub">Analizadores de Red · Calidad de Energía</div>
-      </div>
-    </div>
-    <div class="memo-title">
-      <div class="memo-label">Memorándum de</div>
-      <div class="memo-type">ENVÍO A REVISIÓN</div>
-      <div class="memo-date">${fmtDate(envio.fecha)}${envio.hora ? ' · ' + e(envio.hora) : ''}</div>
-    </div>
-  </div>
+  const cuerpo =
+    seccion('Datos del equipo', datos([
+      dato('Número de serie', e(eq.serie), true),
+      dato('Modelo / Marca', e(eq.modelo)),
+      dato('Viñeta', e(eq.vineta), true),
+      dato('Condición al entregar', cond ? cond.label : ''),
+      dato('Fecha del incidente', fmtDate(envio.fechaIncidente)),
+      dato('Fecha de entrega', fmtDate(envio.fecha)),
+    ]))
+    + seccion('Entrega', bloqueMovimiento(
+      { eti: 'Entrega', val: e(envio.sedeOrigen), sub: area ? e(area) : '' },
+      { eti: 'Recibe para revisión', val: 'Subestación Cucumacayán' }, 'morado'))
+    + seccion('Motivo de la entrega', texto(e(envio.motivo)))
+    + seccion('¿Qué le pasó al equipo?', texto(e(envio.descripcion), true))
+    + (antecedentes.length ? seccion('Antecedentes registrados', `<table class="tabla">
+        <thead><tr><th style="width:96px">Fecha</th><th>Detalle</th><th style="width:34%">Origen</th></tr></thead>
+        <tbody>${antecedentes.map(x => `<tr><td>${fmtDate(x.fecha)}</td><td>${e(x.texto)}</td><td>${e(x.origen)}</td></tr>`).join('')}</tbody>
+      </table>`) : '')
+    + seccion('Firmas de conformidad', firmas([
+      { eti: 'Entrega', nom: e(envio.entregadoPor), sub: area ? e(area) : '' },
+      { eti: 'Recibe', nom: '', sub: 'Subestación Cucumacayán' },
+    ]));
 
-  <div class="section">
-    <div class="section-title">Datos del equipo</div>
-    <div class="info-grid">
-      <div class="info-item"><div class="info-label">Número de serie</div><div class="info-value">${e(eq.serie)}</div></div>
-      <div class="info-item"><div class="info-label">Modelo / Marca</div><div class="info-value normal">${e(eq.modelo || '—')}</div></div>
-      ${eq.vineta ? `<div class="info-item"><div class="info-label">Viñeta</div><div class="info-value">${e(eq.vineta)}</div></div>` : ''}
-      <div class="info-item"><div class="info-label">Condición al entregar</div><div class="info-value normal">${cond ? cond.label : '—'}</div></div>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Entrega</div>
-    <div class="transfer-row">
-      <div class="transfer-box">
-        <div class="transfer-label">Entrega</div>
-        <div class="transfer-name">${e(envio.sedeOrigen)}${area ? ' · ' + e(area) : ''}</div>
-      </div>
-      <div class="arrow">→</div>
-      <div class="transfer-box dest">
-        <div class="transfer-label">Recibe para revisión</div>
-        <div class="transfer-name">Subestación Cucumacayán</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Motivo de la entrega</div>
-    <div class="texto-box">${e(envio.motivo)}</div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">¿Qué le pasó al equipo?</div>
-    <div class="texto-box falla">${e(envio.descripcion)}</div>
-  </div>
-
-  <div class="section">
-    <div class="info-grid">
-      <div class="info-item"><div class="info-label">Fecha del incidente</div><div class="info-value normal">${fmtDate(envio.fechaIncidente)}</div></div>
-      <div class="info-item"><div class="info-label">Fecha de entrega</div><div class="info-value normal">${fmtDate(envio.fecha)}</div></div>
-    </div>
-  </div>
-
-  ${antecedentes.length ? `<div class="section">
-    <div class="section-title">Antecedentes registrados</div>
-    <table>
-      <thead><tr><th style="width:90px">Fecha</th><th>Detalle</th><th style="width:34%">Origen</th></tr></thead>
-      <tbody>${antecedentes.map(a => `<tr><td>${fmtDate(a.fecha)}</td><td>${e(a.texto)}</td><td>${e(a.origen)}</td></tr>`).join('')}</tbody>
-    </table>
-  </div>` : ''}
-
-  <div class="section">
-    <div class="section-title">Firmas de conformidad</div>
-    <div class="firma-grid">
-      <div class="firma-box"><div class="firma-line">
-        <div class="firma-label">Entrega</div>
-        <div class="firma-name">${e(envio.entregadoPor)}</div>
-        ${area ? `<div class="firma-sub">${e(area)}</div>` : ''}
-      </div></div>
-      <div class="firma-box"><div class="firma-line">
-        <div class="firma-label">Recibe</div>
-        <div class="firma-name">&nbsp;</div>
-        <div class="firma-sub">Subestación Cucumacayán</div>
-      </div></div>
-    </div>
-  </div>
-
-  <div class="footer">
-    Documento generado por CPT INNOVA · Sistema de Gestión de Analizadores de Red · ${new Date().toLocaleDateString('es-SV')}${envio.editadoPor ? ' · Última edición: ' + fmtDate(envio.fechaEdicion) + ' por ' + e(envio.editadoPor) : ''}
-  </div>
-</body>
-</html>`;
-
-  abrirDoc(html, 'envio-revision-' + String(eq.serie || 'equipo').replace(/[^\w-]+/g, '_') + '.html');
+  abrirDoc(docMemo({
+    titulo: `Envío a revisión · ${e(eq.serie)}`,
+    tipo: 'Envío a revisión',
+    meta: [['Fecha', fmtDate(envio.fecha) + (envio.hora ? ' · ' + e(envio.hora) : '')], ['Equipo', e(eq.serie)], ['Entregado por', e(envio.entregadoPor)]],
+    cuerpo,
+    pie: envio.editadoPor ? ` · Última edición: ${fmtDate(envio.fechaEdicion)} por ${e(envio.editadoPor)}` : '',
+  }), nombreArchivo('envio-revision', eq.serie));
 }
 
 // Memo de equipo dañado en campo por Campos y Servicios (tres firmas)
 export function generateMemoDanio(m) {
-  const e = escapeHtml;
   const cond = CONDICIONES.find(c => c.key === m.condicion);
-  const dato = (label, valor, mono) => `<div class="info-item"><div class="info-label">${label}</div><div class="info-value${mono ? '' : ' normal'}">${valor || '—'}</div></div>`;
 
-  const html = `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>Equipo dañado · ${e(m.serie)}</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Arial', sans-serif; color: #0a1628; background: #fff; padding: 40px; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 26px; border-bottom: 3px solid #0057b8; padding-bottom: 20px; }
-  .logo-area { display: flex; align-items: center; gap: 14px; }
-  .logo-box { width: 56px; height: 56px; background: linear-gradient(135deg, #003d8f, #0077cc); border-radius: 12px; display: flex; align-items: center; justify-content: center; }
-  .logo-box svg { width: 32px; height: 32px; }
-  .company-name { font-size: 22px; font-weight: 800; color: #0057b8; letter-spacing: -.5px; }
-  .company-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
-  .memo-title { text-align: right; }
-  .memo-label { font-size: 11px; font-weight: 700; color: #94a3b8; letter-spacing: 2px; text-transform: uppercase; }
-  .memo-type { font-size: 22px; font-weight: 800; color: #dc2626; margin-top: 4px; }
-  .memo-date { font-size: 12px; color: #64748b; margin-top: 4px; }
-  .section { margin-bottom: 22px; }
-  .section-title { font-size: 10px; font-weight: 700; color: #0057b8; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #e8f0fb; }
-  .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-  .info-item { background: #f8fafc; border-radius: 8px; padding: 10px 14px; }
-  .info-label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
-  .info-value { font-size: 14px; font-weight: 700; color: #0a1628; font-family: 'Courier New', monospace; }
-  .info-value.normal { font-family: Arial, sans-serif; font-size: 13px; }
-  .texto-box { background: #fef2f2; border-left: 3px solid #dc2626; border-radius: 6px; padding: 12px 16px; font-size: 13px; color: #1e293b; line-height: 1.5; white-space: pre-wrap; }
-  .intro { font-size: 13px; color: #334155; line-height: 1.6; }
-  .firma-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 28px; }
-  .firma-box { text-align: center; }
-  .firma-line { border-top: 1.5px solid #0a1628; margin-top: 64px; padding-top: 8px; }
-  .firma-label { font-size: 12px; font-weight: 700; color: #0a1628; }
-  .firma-name { font-size: 12px; color: #334155; margin-top: 3px; min-height: 15px; }
-  .firma-sub { font-size: 10px; color: #94a3b8; margin-top: 2px; }
-  .footer { margin-top: 34px; padding-top: 14px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 10px; color: #94a3b8; }
-  @media print { body { padding: 20px; } @page { margin: 12mm; } }
-</style>
-</head>
-<body>
-  <div class="header">
-    <div class="logo-area">
-      <div class="logo-box">
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="3" y="2" width="18" height="20" rx="2" stroke="white" stroke-width="1.8" fill="none"/>
-          <path d="M8 7h8M8 10h5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
-          <path d="M12 14l-2 4h4l-2 4" stroke="#7dd3fc" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
-      <div>
-        <div class="company-name">CPT INNOVA</div>
-        <div class="company-sub">Analizadores de Red · Calidad de Energía</div>
-      </div>
-    </div>
-    <div class="memo-title">
-      <div class="memo-label">Memorándum de</div>
-      <div class="memo-type">EQUIPO DAÑADO EN CAMPO</div>
-      <div class="memo-date">${fmtDate(m.fecha)}${m.hora ? ' · ' + e(m.hora) : ''}</div>
-    </div>
-  </div>
-
-  <div class="section">
-    <p class="intro">Por medio del presente se hace constar que el analizador de red detallado a continuación, despachado a
+  const cuerpo =
+    `<p class="intro">Por medio del presente se hace constar que el analizador de red detallado a continuación, despachado a
     <b>Campos y Servicios</b> para su instalación en campo, resultó dañado. El equipo se entrega en la
-    <b>Subestación Cucumacayán</b> en la condición indicada.</p>
-  </div>
+    <b>Subestación Cucumacayán</b> en la condición indicada.</p>`
+    + seccion('Datos del equipo', datos([
+      dato('Número de serie', e(m.serie), true),
+      dato('Modelo / Marca', e(m.modelo)),
+      dato('Viñeta', e(m.vineta), true),
+    ]))
+    + seccion('Datos de la instalación', datos([
+      dato('Caso', m.caso ? '#' + e(m.caso) : '', true),
+      dato('Lugar', e(m.lugar)),
+      dato('Área beneficiaria', e(m.areaBeneficiaria)),
+      dato('Fecha de instalación', fmtDate(m.fechaInstalacion)),
+      dato('Retiro programado', fmtDate(m.fechaRetiro)),
+      dato('Fecha del daño', fmtDate(m.fechaDanio)),
+    ]))
+    + seccion('¿Qué le pasó al equipo?', texto(e(m.descripcion), true))
+    + seccion('Recepción', datos([
+      dato('Condición en que se recibe', cond ? cond.label : e(m.condicion)),
+      dato('Se entrega en', 'Subestación Cucumacayán'),
+      dato('Técnico de Campos y Servicios', e(m.tecnicoCampos)),
+    ]))
+    + seccion('Firmas de conformidad', firmas([
+      { eti: e(m.areaGenera || 'CPT MT'), nom: e(m.generadoPor), sub: 'CPT INNOVA' },
+      { eti: 'Subestación Cucumacayán', nom: '', sub: 'Recibe el equipo' },
+      { eti: 'Campos y Servicios', nom: '', sub: 'Contratista' },
+    ]));
 
-  <div class="section">
-    <div class="section-title">Datos del equipo</div>
-    <div class="info-grid">
-      ${dato('Número de serie', e(m.serie), true)}
-      ${dato('Modelo / Marca', e(m.modelo))}
-      ${dato('Viñeta', e(m.vineta), true)}
-    </div>
-  </div>
+  abrirDoc(docMemo({
+    titulo: `Equipo dañado · ${e(m.serie)}`,
+    tipo: 'Equipo dañado en campo',
+    meta: [['Fecha', fmtDate(m.fecha) + (m.hora ? ' · ' + e(m.hora) : '')], ['Equipo', e(m.serie)], ['Generado por', e(m.generadoPor)]],
+    cuerpo,
+    rojo: true,
+    pie: m.editadoPor ? ` · Última edición: ${fmtDate(m.fechaEdicion)} por ${e(m.editadoPor)}` : '',
+  }), nombreArchivo('equipo-danado', m.serie));
+}
 
-  <div class="section">
-    <div class="section-title">Datos de la instalación</div>
-    <div class="info-grid">
-      ${dato('Caso', m.caso ? '#' + e(m.caso) : '', true)}
-      ${dato('Lugar', e(m.lugar))}
-      ${dato('Área beneficiaria', e(m.areaBeneficiaria))}
-      ${dato('Fecha de instalación', fmtDate(m.fechaInstalacion))}
-      ${dato('Retiro programado', fmtDate(m.fechaRetiro))}
-      ${dato('Fecha del daño', fmtDate(m.fechaDanio))}
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">¿Qué le pasó al equipo?</div>
-    <div class="texto-box">${e(m.descripcion)}</div>
-  </div>
-
-  <div class="section">
-    <div class="info-grid">
-      ${dato('Condición en que se recibe', cond ? cond.label : e(m.condicion))}
-      ${dato('Se entrega en', 'Subestación Cucumacayán')}
-      ${dato('Técnico de Campos y Servicios', e(m.tecnicoCampos))}
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Firmas de conformidad</div>
-    <div class="firma-grid">
-      <div class="firma-box"><div class="firma-line">
-        <div class="firma-label">${e(m.areaGenera || 'CPT MT')}</div>
-        <div class="firma-name">${e(m.generadoPor)}</div>
-        <div class="firma-sub">CPT INNOVA</div>
-      </div></div>
-      <div class="firma-box"><div class="firma-line">
-        <div class="firma-label">Subestación Cucumacayán</div>
-        <div class="firma-name"></div>
-        <div class="firma-sub">Recibe el equipo</div>
-      </div></div>
-      <div class="firma-box"><div class="firma-line">
-        <div class="firma-label">Campos y Servicios</div>
-        <div class="firma-name"></div>
-        <div class="firma-sub">Contratista</div>
-      </div></div>
-    </div>
-  </div>
-
-  <div class="footer">
-    Documento generado por CPT INNOVA · Sistema de Gestión de Analizadores de Red · ${new Date().toLocaleDateString('es-SV')}${m.editadoPor ? ' · Última edición: ' + fmtDate(m.fechaEdicion) + ' por ' + e(m.editadoPor) : ''}
-  </div>
-</body>
-</html>`;
-
-  abrirDoc(html, 'equipo-danado-' + String(m.serie || 'equipo').replace(/[^\w-]+/g, '_') + '.html');
+// Memo de entrega de accesorios (candados, cadenas, sellos). items: [{ label, qty, detalle }]
+// fechaGuardada (AAAA-MM-DD) se usa al reimprimir un memo del historial
+export function buildMemoAccesorios(f, items, fechaGuardada) {
+  const fecha = fechaGuardada ? fmtDate(fechaGuardada) : new Date().toLocaleDateString('es-SV', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const cuerpo =
+    seccion('Movimiento', bloqueMovimiento({ eti: 'Entrega', val: e(f.de) }, { eti: 'Recibe', val: e(f.para) }))
+    + seccion('Accesorios entregados', `<table class="tabla">
+        <thead><tr><th>Accesorio</th><th class="c" style="width:100px">Cantidad</th><th>Detalle</th></tr></thead>
+        <tbody>${items.map(x => `<tr><td><b>${e(x.label)}</b></td><td class="c mono" style="font-size:15px;font-weight:800;color:#0e7490">${x.qty}</td><td>${e(x.detalle || '—')}</td></tr>`).join('')}</tbody>
+      </table>`)
+    + seccion('Firmas de conformidad', firmas([
+      { eti: 'Entrega', nom: e(f.de) },
+      { eti: 'Recibe', nom: e(f.para) },
+    ]));
+  return docMemo({
+    titulo: `Entrega de accesorios · ${fecha}`,
+    tipo: 'Entrega de accesorios',
+    meta: [['Fecha', fechaGuardada ? fecha : fecha + ' · ' + hora()], ['De', e(f.de)], ['Para', e(f.para)]],
+    cuerpo,
+  });
 }

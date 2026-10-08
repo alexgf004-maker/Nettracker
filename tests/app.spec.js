@@ -364,7 +364,16 @@ test.describe('Inventario', () => {
     await expect(app$(page)).toContainText('Memo devolución · 1 equipo');
     await page.getByRole('button', { name: 'Registrar y generar memo' }).click();
     await expect(page.locator('.modal-overlay')).toContainText('Registrar devolución de 1 equipo');
+    await page.evaluate(() => {
+      window.__docs = [];
+      const crear = URL.createObjectURL.bind(URL);
+      URL.createObjectURL = b => { b.text().then(t => window.__docs.push(t)); return crear(b); };
+    });
     await page.getByRole('button', { name: /Confirmar devolución y generar memo/ }).click();
+    // Un solo memo con la hoja de la app (encabezado petróleo → turquesa) y el equipo en la tabla
+    await expect.poll(() => page.evaluate(() => window.__docs.length)).toBe(1);
+    const memo = (await page.evaluate(() => window.__docs))[0];
+    for (const texto of ['Devolución de lote', 'SN-103', '#0b2e3b', 'Firmas de conformidad', 'Imprimir o guardar PDF']) expect(memo).toContain(texto);
     const esc = (await app.escrituras()).filter(([op, ruta]) => op === 'update' && ruta.startsWith('equipos/'));
     expect(esc.map(e => e[1])).toEqual(['equipos/e4']);
     expect(esc[0][2]).toMatchObject({ prestado: false, prestadoFecha: null });
@@ -494,7 +503,7 @@ test.describe('Envío a revisión (Cucumacayán)', () => {
     // Memo
     await expect.poll(async () => (await docs()).length).toBe(1);
     const memo = (await docs())[0];
-    expect(memo).toContain('ENVÍO A REVISIÓN');
+    expect(memo).toContain('Envío a revisión');
     expect(memo).toContain('SN-103');
     expect(memo).toContain('Diagnóstico de batería');
     expect(memo).toContain('No enciende &lt;sin batería&gt;'); // el texto del usuario se escapa
@@ -601,15 +610,15 @@ test.describe('Campos y Servicios', () => {
 
     await expect.poll(async () => (await docs()).length).toBe(1);
     const memo = (await docs())[0];
-    for (const texto of ['EQUIPO DAÑADO EN CAMPO', 'SN-106', '#C-006', 'Zaragoza', 'Carcasa quebrada', 'Fuera de servicio', 'Juan Pérez', 'David García']) {
+    for (const texto of ['Equipo dañado en campo', 'SN-106', '#C-006', 'Zaragoza', 'Carcasa quebrada', 'Fuera de servicio', 'Juan Pérez', 'David García']) {
       expect(memo, texto).toContain(texto);
     }
     // Retiro programado (10/09) y fecha del daño (retiro real, 12/09)
-    expect(memo).toMatch(/Retiro programado<\/div><div class="info-value normal">10\/09\/2026/);
-    expect(memo).toMatch(/Fecha del daño<\/div><div class="info-value normal">12\/09\/2026/);
-    expect(memo.match(/class="firma-label"/g)).toHaveLength(3);
-    expect(memo).toContain('<div class="firma-label">Subestación Cucumacayán</div>');
-    expect(memo).toContain('<div class="firma-label">Campos y Servicios</div>');
+    expect(memo).toMatch(/Retiro programado<\/div><div class="dato-val">10\/09\/2026/);
+    expect(memo).toMatch(/Fecha del daño<\/div><div class="dato-val">12\/09\/2026/);
+    expect(memo.match(/class="firma-eti"/g)).toHaveLength(3);
+    expect(memo).toContain('<div class="firma-eti">Subestación Cucumacayán</div>');
+    expect(memo).toContain('<div class="firma-eti">Campos y Servicios</div>');
 
     const escrituras = await app.escrituras();
     const inst = escrituras.find(([, ruta]) => ruta === 'analizadores/r6');
@@ -773,7 +782,7 @@ test.describe('Firma de quien genera el memo', () => {
     await app.ejecutar(() => editarDanio('r6'));
     await page.getByText('Guardar cambios').click();
     await expect.poll(async () => (await docs()).length).toBe(1);
-    expect((await docs())[0]).toMatch(/firma-label">CPT MT<\/div>\s*<div class="firma-name">Bryan Francia/);
+    expect((await docs())[0]).toMatch(/firma-eti">CPT MT<\/div>\s*<div class="firma-nom">Bryan Francia/);
     const memo = (await app.escrituras()).find(([, ruta]) => ruta === 'analizadores/r6')[2].memoDanio;
     expect(memo).toMatchObject({ generadoPor: 'Bryan Francia', areaGenera: 'CPT MT', creadoPor: 'David García', fecha: '2026-09-15' });
   });
@@ -785,7 +794,7 @@ test.describe('Firma de quien genera el memo', () => {
     await app.ejecutar(() => editarRevision('e6', 0));
     await page.getByText('Guardar cambios').click();
     await expect.poll(async () => (await docs()).length).toBe(1);
-    expect((await docs())[0]).toMatch(/firma-name">Francisco Chulo<\/div>\s*<div class="firma-sub">CPT BT/);
+    expect((await docs())[0]).toMatch(/firma-nom">Francisco Chulo<\/div>\s*<div class="firma-sub">CPT BT/);
     const envio = (await app.escrituras()).at(-1)[2].historialMantenimiento[0].envioRevision;
     expect(envio).toMatchObject({ entregadoPor: 'Francisco Chulo', creadoPor: 'David García' });
   });
