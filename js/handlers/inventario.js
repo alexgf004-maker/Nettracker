@@ -50,7 +50,7 @@ window.exportHojaVida = eqId => {
   .badge-blue { background: #e8f0fb; color: #0057b8; }
   .stat-row { display: flex; gap: 12px; margin-bottom: 12px; }
   .stat-box { flex:1; text-align:center; padding: 10px 8px; border-radius: 8px; }
-  .stat-num { font-size: 20px; font-weight: 800; font-family: 'Courier New', monospace; }
+  .stat-num { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
   .stat-lbl { font-size: 8px; font-weight: 600; margin-top: 2px; }
   table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 9px; }
   thead { background: #0057b8; }
@@ -88,7 +88,7 @@ window.exportHojaVida = eqId => {
 
 <h2>Datos generales</h2>
 <div class="grid">
-  <div class="field"><div class="field-label">Serie</div><div class="field-value" style="font-family:'Courier New',monospace;font-size:13px">${eq.serie}</div></div>
+  <div class="field"><div class="field-label">Serie</div><div class="field-value" style="font-size:13px;font-weight:700">${eq.serie}</div></div>
   <div class="field"><div class="field-label">Modelo / Marca</div><div class="field-value">${eq.modelo||'—'}</div></div>
   <div class="field"><div class="field-label">Viñeta</div><div class="field-value">${eq.vineta||'—'}</div></div>
   <div class="field"><div class="field-label">Sede</div><div class="field-value">${eq.sede||'Plantel Central'}</div></div>
@@ -146,7 +146,7 @@ ${historial.length > 0 ? `
     const fallasFis = r.fallas && r.fallas.length > 0 ? r.fallas.join(', ') : '';
     const fallasMed = r.descargas ? r.descargas.filter(d=>d.medicionOk===false).flatMap(d=>d.fallasMedicion||[]).join(', ') : '';
     return `<tr>
-      <td><span style="font-family:'Courier New',monospace;font-weight:700">${r.serie}</span><br><span style="color:#94a3b8">#${r.caso||'—'}</span></td>
+      <td><span style="font-weight:700">${r.serie}</span><br><span style="color:#94a3b8">#${r.caso||'—'}</span></td>
       <td>${r.lugar||'—'}</td>
       <td>${r.areaInstalacion||'CPT MT'}</td>
       <td style="white-space:nowrap">${fmtDate(r.fechaInstalacion)}</td>

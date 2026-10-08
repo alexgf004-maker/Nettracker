@@ -10,7 +10,7 @@ const ESTILO = `
   * { margin: 0; padding: 0; box-sizing: border-box; }
   :root { --petroleo: #0b2e3b; --turq: #0e7490; --turq2: #06b6d4; --turq-claro: #ecfeff; --texto: #0f172a; --texto2: #475569; --texto3: #64748b; --borde: #d7e3e8; --fondo: #f4f8fa; }
   html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { font-family: 'Plus Jakarta Sans', 'Segoe UI', Arial, sans-serif; color: var(--texto); background: #e6edf0; font-size: 13px; line-height: 1.45; }
+  body { font-family: 'Plus Jakarta Sans', 'Segoe UI', Arial, sans-serif; color: var(--texto); background: #e6edf0; font-size: 13px; line-height: 1.45; font-variant-numeric: tabular-nums; }
   .hoja { width: 210mm; min-height: 297mm; margin: 24px auto; background: #fff; box-shadow: 0 10px 30px -12px rgba(11,46,59,.35); display: flex; flex-direction: column; }
   .hoja.apaisada { width: 297mm; min-height: 210mm; }
   .barra { position: sticky; top: 0; z-index: 2; display: flex; justify-content: center; gap: 10px; padding: 10px; background: rgba(230,237,240,.92); }
@@ -44,7 +44,7 @@ const ESTILO = `
   .dato { padding: 11px 16px; border-right: 1px solid var(--borde); border-bottom: 1px solid var(--borde); margin: 0 -1px -1px 0; }
   .dato-eti { font-size: 9.5px; font-weight: 700; color: var(--texto3); letter-spacing: 1px; text-transform: uppercase; }
   .dato-val { font-size: 15px; font-weight: 700; color: var(--texto); margin-top: 3px; word-break: break-word; }
-  .mono { font-family: 'Consolas', 'Courier New', monospace; letter-spacing: .3px; }
+  .mono { font-weight: 700; }
 
   .mov { display: flex; align-items: stretch; gap: 0; }
   .mov-caja { flex: 1; border: 1px solid var(--borde); border-radius: 12px; padding: 14px 18px; background: #fff; }

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
@@ -35,10 +35,10 @@
   --radius: 16px;
   --radius-sm: 10px;
   --font: 'Plus Jakarta Sans', sans-serif;
-  --mono: 'JetBrains Mono', monospace;
+  --mono: 'Plus Jakarta Sans', sans-serif; /* números con la fuente de la app; las cifras van tabulares (alineadas) */
 }
 
-body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; max-width: 480px; margin: 0 auto; }
+body { background: var(--bg); color: var(--text); font-family: var(--font); font-variant-numeric: tabular-nums; min-height: 100vh; max-width: 480px; margin: 0 auto; }
 
 /* HEADER */
 header {
