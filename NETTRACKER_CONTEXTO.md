@@ -453,6 +453,8 @@ Gestión de despachos de equipos hacia campo y devoluciones.
 
 Permite:
 - Registrar despacho por Excel (carga masiva)
+  - `filasDespacho()` en `actions/carga.js` lee el formato de MT y el de BT: busca la fila del encabezado (la que tiene SIGET y Equipo) en cualquier parte, lee las fechas de Excel como fecha real (el "9/4/26" de BT es 04/09/2026), toma lat/lng de "Ubicación" ("lat lng") si no hay Latitud/Longitud, lee Medidor e ignora las filas sin equipo ni SIGET (firmas al pie). La serie se busca igual sin importar mayúsculas
+  - El formato de BT no trae fecha de retiro: la vista previa pide una fecha y se pone a todos los que no la tienen (`aplicarRetiroCarga`)
 - Generar memo de despacho de accesorios (`generarMemoAccesorios`)
 - Ver historial de cargas anteriores
 

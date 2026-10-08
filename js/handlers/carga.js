@@ -1,5 +1,5 @@
 // Handlers (onclick) de despachos y accesorios
-import { confirmarCargaMasiva, generarMemoCargaMasiva, procesarExcel } from '../actions/carga.js';
+import { aplicarRetiroCarga, confirmarCargaMasiva, generarMemoCargaMasiva, procesarExcel } from '../actions/carga.js';
 import { SEDE_CUCUMACAYAN, isAdmin } from '../config.js';
 import { db, get, ref, remove, update } from '../firebase.js';
 import { state } from '../state.js';
@@ -23,6 +23,7 @@ window.eliminarMemoAcc = el => {
 
 window.handleFileUpload = e => { const f = e.target.files[0]; if (f) procesarExcel(f); };
 window.confirmarCarga = confirmarCargaMasiva;
+window.aplicarRetiroCarga = aplicarRetiroCarga;
 window.cancelarCarga = () => { state.cargaData = []; state.cargaView = 'upload'; render(); };
 
 window.verMemo = id => {
