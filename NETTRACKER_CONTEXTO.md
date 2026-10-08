@@ -479,5 +479,6 @@ sesionUsuario = { nombre }  // null = pantalla de perfiles
 5. **`render()` debe llamarse** al final de cualquier handler que cambie estado visible
 6. **Correr `npm test`** antes de publicar; si agregas una función importante, agrega su prueba en `tests/app.spec.js`
 7. Probar en local con `npm run serve` (o `python3 -m http.server`)
-8. **Sin emojis** en la interfaz: usar íconos `<i class="ic ic-nombre"></i>` (o `<i class=ic-nombre></i>` dentro de textos JS). Para uno nuevo, agregarlo a `tools/gen-icons.js` y correr `npm run icons`. En avisos (`showToast`, `confirm`) y documentos generados (memos, Excel), solo texto
-9. **Reglas del trabajo** (plazos, tipos de caso) van en `js/domain/` como funciones puras, con su prueba en "Reglas del trabajo"
+8. **Una sola fuente** (Plus Jakarta Sans), también para números, series y códigos: `--mono` apunta a ella y las cifras van tabulares (`font-variant-numeric: tabular-nums`) para que las columnas queden alineadas. No usar fuentes monoespaciadas (JetBrains Mono, Courier, Consolas).
+9. **Sin emojis** en la interfaz: usar íconos `<i class="ic ic-nombre"></i>` (o `<i class=ic-nombre></i>` dentro de textos JS). Para uno nuevo, agregarlo a `tools/gen-icons.js` y correr `npm run icons`. En avisos (`showToast`, `confirm`) y documentos generados (memos, Excel), solo texto
+10. **Reglas del trabajo** (plazos, tipos de caso) van en `js/domain/` como funciones puras, con su prueba en "Reglas del trabajo"

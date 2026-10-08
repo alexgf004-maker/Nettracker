@@ -54,7 +54,7 @@ const ESTILO_CARTA = `
   .referencias { display: flex; gap: 10px; justify-content: flex-end; margin-bottom: 22px; }
   .ref { border: 1px solid #d6e2f0; background: #f4f8fc; border-radius: 8px; padding: 6px 12px; text-align: right; }
   .ref small { display: block; font-size: 7.5pt; letter-spacing: 1px; text-transform: uppercase; color: #6b7a90; }
-  .ref b { font-size: 11pt; font-family: Consolas, 'Courier New', monospace; color: #14213d; }
+  .ref b { font-size: 11pt; font-variant-numeric: tabular-nums; color: #14213d; }
   .saludo { margin-bottom: 2px; }
   .cliente { font-weight: 800; font-size: 12.5pt; margin-bottom: 18px; }
   p { text-align: justify; margin-bottom: 12px; }
@@ -107,7 +107,7 @@ const ESTILO_HOJA = `
   .dato b { font-size: 9pt; }
   .dato.ancho { grid-column: span 2; }
   .dato.completo { grid-column: 1 / -1; }
-  .mono { font-family: Consolas, 'Courier New', monospace; }
+  .mono { font-variant-numeric: tabular-nums; }
   .columnas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex: 1; }
   .col { display: flex; flex-direction: column; gap: 8px; }
   .bloque { border: 1px solid #c9d6e6; border-radius: 7px; overflow: hidden; }
