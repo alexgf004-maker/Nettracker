@@ -11,10 +11,10 @@ import { abrirMultiplicador, cerrarImportMultiplicadores, cerrarMultiplicador, e
 import { asignarEquipo, asignarFecha, cerrarProgramacion, enviarFechaADespachos, exportarFecha, guardarProgramacion, importarProgramacion, procesarProgramacion, setDatoFecha } from '../actions/fechas.js';
 import { abrirResultado, analizarArchivos, analizarTXT, cerrarAnalisis, cerrarGraficas, cerrarResultado, exportarAnalisis, exportarCuadroResumen, exportarSeries, guardarAnalisis, guardarResultado, recalcularTXT, verGraficas } from '../actions/resultados.js';
 import { moverCursorGrafica, salirCursorGrafica } from '../views/graficas.js';
-import { limpiarGraficar } from '../actions/analisis-reclamo.js';
+import { agregarComboReclamo, limpiarComboReclamo, limpiarGraficar, quitarComboReclamo, restablecerZoomReclamo, setZoomReclamo, toggleEscalaReclamo, toggleSerieComboReclamo } from '../actions/analisis-reclamo.js';
 import { abrirAnalisisReclamo, cargarTXTReclamo, cerrarAnalisisReclamo, guardarAnalisisReclamo, setParamReclamo, setVistaReclamo, subirTXTReclamo } from '../actions/analisis-reclamo.js';
 import { exportarArmonicosReclamo, exportarTensionReclamo } from '../actions/excel-reclamo.js';
-import { cursorReclamo, salirCursorReclamo } from '../views/analisis-reclamo.js';
+import { cursorReclamo, salirCursorReclamo, zoomFin, zoomInicio } from '../views/analisis-reclamo.js';
 import { abrirPuntoReclamo, cerrarPuntoReclamo, desvincularPuntoReclamo, registrarPuntoReclamo, setNombrePunto, vincularPuntoReclamo } from '../actions/expedientes.js';
 import { abrirExpediente, abrirNuevoReclamo, cerrarExpediente, cerrarNuevoReclamo, completarCoordenadasReclamo, eliminarExpediente, guardarDatoExpediente, guardarNuevoReclamo, leerCorreoNuevoReclamo, registrarInstalacionReclamo, setCampoNuevoReclamo, setExpedienteVista } from '../actions/expedientes.js';
 import { abrirFT, agregarNotaFT, cerrarFT, marcarAvisoFT, quitarAvisoFT, setCompensacionFT, setRemedicionFT, setRutaFT } from '../actions/ft.js';
@@ -69,9 +69,9 @@ window.setFTNota = v => { state.ftNota = v; };
 Object.assign(window, { verGraficas, cerrarGraficas, exportarSeries, moverCursorGrafica, salirCursorGrafica });
 
 // Análisis de reclamos (macros Graficar y Armónicos)
-Object.assign(window, { abrirAnalisisReclamo, cerrarAnalisisReclamo, subirTXTReclamo, cargarTXTReclamo, setParamReclamo, setVistaReclamo, guardarAnalisisReclamo, exportarTensionReclamo, exportarArmonicosReclamo, cursorReclamo, salirCursorReclamo });
+Object.assign(window, { abrirAnalisisReclamo, cerrarAnalisisReclamo, subirTXTReclamo, cargarTXTReclamo, setParamReclamo, setVistaReclamo, guardarAnalisisReclamo, exportarTensionReclamo, exportarArmonicosReclamo, cursorReclamo, salirCursorReclamo, zoomInicio, zoomFin });
 
 // Expedientes de reclamo
 Object.assign(window, { abrirNuevoReclamo, cerrarNuevoReclamo, leerCorreoNuevoReclamo, setCampoNuevoReclamo, guardarNuevoReclamo, abrirExpediente, cerrarExpediente, setExpedienteVista, guardarDatoExpediente, completarCoordenadasReclamo, registrarInstalacionReclamo, eliminarExpediente });
 Object.assign(window, { abrirPuntoReclamo, cerrarPuntoReclamo, setNombrePunto, registrarPuntoReclamo, vincularPuntoReclamo, desvincularPuntoReclamo });
-Object.assign(window, { limpiarGraficar });
+Object.assign(window, { limpiarGraficar, setZoomReclamo, restablecerZoomReclamo, toggleEscalaReclamo, toggleSerieComboReclamo, agregarComboReclamo, quitarComboReclamo, limpiarComboReclamo });

@@ -1,7 +1,7 @@
 // Análisis de un reclamo: gráficas y tablas de las macros Graficar y Armónicos a partir de los dos TXT.
 // SVG propio, sin librerías. Cada gráfica tiene una sola escala; los límites van como líneas punteadas.
 import {
-  analizarArmonicos, analizarTension, ARMONICAS, CARGA_ALERTA, DATI_LIM, LIMITE_PST, NIVELES, PERC_MAX,
+  analizarArmonicos, analizarTension, ARMONICAS, catalogoSeries, LIMITE_INVALIDO, tituloCombo, CARGA_ALERTA, DATI_LIM, LIMITE_PST, NIVELES, PERC_MAX,
   leerTension, TIPOS_RED, VDAT_LIM,
 } from '../domain/reclamo.js';
 import { state } from '../state.js';
@@ -52,49 +52,72 @@ function ticks(min, max, cuantos = 4) {
 
 const decimales = (yMax, yMin) => { const r = yMax - yMin; return r < 2 ? 2 : r < 20 ? 1 : 0; };
 
-// series: [{ nombre, color, v }]; lineas: [{ valor, nombre, tipo: limite|trafo|alerta }]; banda: { inf, sup, nominal, tol }
-export function graficaLinea({ id, titulo, unidad, t, fechas, series, lineas = [], banda = null, desdeCero = false }) {
-  const n = t.length; const tMax = t[n - 1] || 1;
-  const valores = series.flatMap(s => s.v).filter(x => x !== null && x !== undefined);
-  if (!valores.length) return '';
-  let yMin = Math.min(...valores); let yMax = Math.max(...valores);
-  lineas.forEach(l => { yMin = Math.min(yMin, l.valor); yMax = Math.max(yMax, l.valor); });
-  if (banda) { yMin = Math.min(yMin, banda.inf); yMax = Math.max(yMax, banda.sup); }
-  if (desdeCero) yMin = Math.min(0, yMin);
-  const margen = (yMax - yMin) * 0.08 || 1;
-  if (!desdeCero) yMin -= margen;
-  yMax += margen;
-  const ys = ticks(yMin, yMax); yMin = Math.min(yMin, ys[0]); yMax = Math.max(yMax, ys[ys.length - 1]);
-  const X = x => (x / tMax) * W; const Y = v => H - ((v - yMin) / (yMax - yMin)) * H;
-  const camino = arr => { let s = ''; let abierto = false; arr.forEach((v, i) => { if (v === null || v === undefined) { abierto = false; return; } s += `${abierto ? 'L' : 'M'}${X(t[i]).toFixed(1)},${Y(v).toFixed(1)}`; abierto = true; }); return s; };
-  let svg = `<svg class="graf-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(titulo)}">`;
-  ys.forEach(v => { svg += `<line class="graf-grid" x1="0" x2="${W}" y1="${Y(v)}" y2="${Y(v)}"/>`; });
+// series: [{ nombre, color, v, unidad?, eje?: 'der' }]; lineas: [{ valor, nombre, tipo: limite|trafo|alerta }]
+// banda: { inf, sup, nominal, tol }; ventana: { desde, hasta } en minutos (zoom, igual en todas las gráficas)
+// piso: los valores por debajo no cuentan para la escala (p. ej. registros en cero) y se recortan
+export function graficaLinea({ id, titulo, unidad, t, fechas, series, lineas = [], banda = null, desdeCero = false, ventana = null, piso = null }) {
+  const n = t.length; if (!n) return '';
+  const t0 = ventana ? ventana.desde : t[0]; const t1 = ventana ? ventana.hasta : (t[n - 1] || 1);
+  const dentro = i => t[i] >= t0 && t[i] <= t1;
+  const izq = series.filter(s => s.eje !== 'der'); const der = series.filter(s => s.eje === 'der');
+  // Escala de un eje con los valores visibles (sin los que quedan bajo el piso)
+  const escala = (lista, conLimites) => {
+    const vals = [];
+    lista.forEach(s => s.v.forEach((v, i) => { if (v !== null && v !== undefined && dentro(i) && (piso === null || s.eje === 'der' || v >= piso)) vals.push(v); }));
+    if (!vals.length) return null;
+    let lo = Math.min(...vals); let hi = Math.max(...vals);
+    if (conLimites) {
+      lineas.forEach(l => { lo = Math.min(lo, l.valor); hi = Math.max(hi, l.valor); });
+      if (banda) { lo = Math.min(lo, banda.inf); hi = Math.max(hi, banda.sup); }
+    }
+    const cero = conLimites ? desdeCero : lista.every(s => s.desdeCero);
+    if (cero) lo = Math.min(0, lo);
+    const margen = (hi - lo) * 0.08 || 1;
+    if (!cero) lo -= margen;
+    hi += margen;
+    const ys = ticks(lo, hi); lo = Math.min(lo, ys[0]); hi = Math.max(hi, ys[ys.length - 1]);
+    return { lo, hi, ys, Y: v => H - ((v - lo) / (hi - lo)) * H, pct: v => (1 - (v - lo) / (hi - lo)) * 100, dec: decimales(hi, lo) };
+  };
+  const eI = escala(izq, true); const eD = der.length ? escala(der, false) : null;
+  if (!eI) return '';
+  const X = x => ((x - t0) / ((t1 - t0) || 1)) * W;
+  const camino = (arr, Y) => { let s = ''; let abierto = false; arr.forEach((v, i) => { if (v === null || v === undefined || !dentro(i)) { abierto = false; return; } s += `${abierto ? 'L' : 'M'}${X(t[i]).toFixed(1)},${Y(v).toFixed(1)}`; abierto = true; }); return s; };
+  let svg = `<svg class="graf-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(titulo)}"><defs><clipPath id="clip-${id}"><rect x="0" y="0" width="${W}" height="${H}"/></clipPath></defs>`;
+  eI.ys.forEach(v => { svg += `<line class="graf-grid" x1="0" x2="${W}" y1="${eI.Y(v)}" y2="${eI.Y(v)}"/>`; });
+  // Marcas de tiempo: días; si el zoom es corto, cada 6 horas
   const [, hora] = String(fechas[0] || '').split(' ');
   const [hh, mm] = (hora || '0:0').split(':').map(Number);
-  const dias = [];
-  for (let m = 1440 - (hh * 60 + mm); m < tMax; m += 1440) if (m > 0) dias.push(m);
-  dias.forEach(m => { svg += `<line class="graf-dia" x1="${X(m)}" x2="${X(m)}" y1="0" y2="${H}"/>`; });
+  const offset = hh * 60 + mm; const paso = (t1 - t0) <= 2 * 1440 ? 360 : 1440;
+  const marcas = [];
+  for (let m = Math.ceil((t0 + offset) / paso) * paso - offset; m < t1; m += paso) if (m > t0) marcas.push(m);
+  marcas.forEach(m => { svg += `<line class="graf-dia" x1="${X(m)}" x2="${X(m)}" y1="0" y2="${H}"/>`; });
+  const Y = eI.Y;
   if (banda) {
     svg += `<rect class="graf-banda" x="0" width="${W}" y="${Y(banda.sup)}" height="${Y(banda.inf) - Y(banda.sup)}"/>`;
     svg += `<line class="graf-limite" x1="0" x2="${W}" y1="${Y(banda.sup)}" y2="${Y(banda.sup)}"/><line class="graf-limite" x1="0" x2="${W}" y1="${Y(banda.inf)}" y2="${Y(banda.inf)}"/>`;
     svg += `<line class="graf-nominal" x1="0" x2="${W}" y1="${Y(banda.nominal)}" y2="${Y(banda.nominal)}"/>`;
   }
   lineas.forEach(l => { svg += `<line class="graf-limite" style="stroke:${COLOR_LIMITE[l.tipo || 'limite']}" x1="0" x2="${W}" y1="${Y(l.valor)}" y2="${Y(l.valor)}"/>`; });
-  svg += series.map(s => `<path class="graf-linea" d="${camino(s.v)}" stroke="${s.color}"/>`).join('');
+  svg += `<g clip-path="url(#clip-${id})">` + series.map(s => `<path class="graf-linea ${s.eje === 'der' ? 'der' : ''}" d="${camino(s.v, s.eje === 'der' ? eD.Y : Y)}" stroke="${s.color}"/>`).join('') + '</g>';
   svg += `<line class="graf-cursor" x1="0" x2="0" y1="0" y2="${H}" visibility="hidden"/></svg>`;
-  const pct = v => (1 - (v - yMin) / (yMax - yMin)) * 100;
-  const dec = decimales(yMax, yMin);
-  let ejes = ys.map(v => `<span class="graf-y" style="top:${pct(v)}%">${fmt(v, dec)}</span>`).join('');
+  const pct = eI.pct; const dec = eI.dec;
+  let ejes = eI.ys.map(v => `<span class="graf-y" style="top:${pct(v)}%">${fmt(v, dec)}</span>`).join('');
+  if (eD) ejes += eD.ys.map(v => `<span class="graf-y der" style="top:${eD.pct(v)}%">${fmt(v, eD.dec)}</span>`).join('');
   if (banda) ejes += `<span class="graf-banda-l" style="top:${pct(banda.sup)}%">+${Math.round(banda.tol * 100)} %</span><span class="graf-banda-l" style="top:${pct(banda.inf)}%">−${Math.round(banda.tol * 100)} %</span>`;
   lineas.forEach(l => { ejes += `<span class="graf-banda-l" style="top:${pct(l.valor)}%;color:${COLOR_LIMITE[l.tipo || 'limite']}">${esc(l.nombre)}</span>`; });
-  const etiquetasX = dias.map(m => `<span class="graf-x" style="left:${(m / tMax) * 100}%">${esc(String(fechas[t.indexOf(m)] || fechaDeMinuto(fechas[0], m)).slice(0, 5))}</span>`).join('');
-  GRAFICAS.set(id, { t, fechas, series, unidad, dec: Math.max(dec, unidad === 'p.u.' ? 3 : dec) });
-  const leyenda = series.map(s => `<span><i style="background:${s.color}"></i>${esc(s.nombre)}</span>`).join('')
+  const etiqueta = m => { const f = String(fechas[t.indexOf(m)] || ''); return paso < 1440 ? (f ? f.slice(0, 5) + ' ' + f.slice(11, 16) : fechaDeMinuto(fechas[0], m) + ' ' + horaDeMinuto(offset + m)) : (f.slice(0, 5) || fechaDeMinuto(fechas[0], m)); };
+  const etiquetasX = marcas.map(m => `<span class="graf-x" style="left:${(X(m) / W) * 100}%">${esc(etiqueta(m))}</span>`).join('');
+  GRAFICAS.set(id, { t, fechas, series, unidad, t0, t1, dec: Math.max(dec, unidad === 'p.u.' ? 3 : dec), decDer: eD?.dec ?? 2 });
+  const unidadDer = der[0]?.unidad || '';
+  const leyenda = series.map(s => `<span><i style="background:${s.color}"></i>${esc(s.nombre)}${s.eje === 'der' ? ' (eje der.)' : ''}</span>`).join('')
     + (banda ? '<span><i class="graf-leyenda-banda"></i>Tolerancia</span>' : '')
     + lineas.map(l => `<span><i class="graf-leyenda-lim" style="border-color:${COLOR_LIMITE[l.tipo || 'limite']}"></i>${esc(l.nombre)}</span>`).join('');
-  return `<div class="graf-bloque"><div class="graf-titulo"><b>${esc(titulo)}</b><span>${esc(unidad)}</span><span class="graf-leyenda">${leyenda}</span></div>
-    <div class="graf-area" data-graf="${id}" onpointermove="cursorReclamo(event)" onpointerleave="salirCursorReclamo(event)">${svg}<div class="graf-ejes">${ejes}</div><div class="graf-xs">${etiquetasX}</div></div></div>`;
+  return `<div class="graf-bloque"><div class="graf-titulo"><b>${esc(titulo)}</b><span>${esc(unidad)}${unidadDer ? ' · ' + esc(unidadDer) + ' (der.)' : ''}</span><span class="graf-leyenda">${leyenda}</span></div>
+    <div class="graf-area ${eD ? 'con-der' : ''}" data-graf="${id}" onpointerdown="zoomInicio(event)" onpointermove="cursorReclamo(event)" onpointerup="zoomFin(event)" onpointerleave="salirCursorReclamo(event)">${svg}<div class="graf-ejes">${ejes}</div><div class="graf-xs">${etiquetasX}</div><div class="graf-seleccion" hidden></div></div></div>`;
 }
+
+const minutoDelDia = f => { const [, h] = String(f || '').split(' '); const [hh, mm] = (h || '0:0').split(':').map(Number); return hh * 60 + mm; };
+const horaDeMinuto = m => { const x = ((m % 1440) + 1440) % 1440; return `${String(Math.floor(x / 60)).padStart(2, '0')}:${String(x % 60).padStart(2, '0')}`; };
 
 // "dd/mm/aaaa hh:mm" + minutos → "dd/mm"
 function fechaDeMinuto(inicio, minutos) {
@@ -135,15 +158,38 @@ export function graficaBarras({ titulo, unidad, categorias, series, limite }) {
     <div class="graf-area graf-area-barras">${svg}<div class="graf-ejes">${ejes}</div><div class="graf-xs">${xs}</div></div></div>`;
 }
 
+// Zoom: arrastrar sobre una gráfica acerca ese tramo en todas
+let arrastre = null;
+export function zoomInicio(ev) {
+  const area = ev.currentTarget; if (!GRAFICAS.get(area.dataset.graf)) return;
+  arrastre = { area, x0: ev.clientX };
+  try { area.setPointerCapture(ev.pointerId); } catch { /* sin captura */ }
+}
+export function zoomFin(ev) {
+  const a = arrastre; arrastre = null; if (!a) return;
+  const sel = a.area.querySelector('.graf-seleccion'); if (sel) sel.hidden = true;
+  const rect = a.area.getBoundingClientRect();
+  if (Math.abs(ev.clientX - a.x0) < rect.width * 0.03) return; // fue un toque, no un arrastre
+  const g = GRAFICAS.get(a.area.dataset.graf);
+  const fr = x => Math.min(1, Math.max(0, (x - rect.left) / rect.width));
+  const [f0, f1] = [fr(a.x0), fr(ev.clientX)].sort((p, q) => p - q);
+  window.setZoomReclamo(g.t0 + f0 * (g.t1 - g.t0), g.t0 + f1 * (g.t1 - g.t0));
+}
+
 // Cursor de las gráficas de línea: valores de esa gráfica en el punto más cercano
 export function cursorReclamo(ev) {
   const area = ev.currentTarget; const g = GRAFICAS.get(area.dataset.graf); if (!g) return;
   const rect = area.getBoundingClientRect();
+  if (arrastre?.area === area) {
+    const sel = area.querySelector('.graf-seleccion');
+    const x0 = Math.min(arrastre.x0, ev.clientX) - rect.left; const x1 = Math.max(arrastre.x0, ev.clientX) - rect.left;
+    sel.hidden = false; sel.style.left = `${Math.max(0, x0)}px`; sel.style.width = `${Math.min(rect.width, x1) - Math.max(0, x0)}px`;
+  }
   const frac = Math.min(1, Math.max(0, (ev.clientX - rect.left) / rect.width));
-  const tMax = g.t[g.t.length - 1] || 1; const objetivo = frac * tMax;
+  const objetivo = g.t0 + frac * (g.t1 - g.t0);
   let i = 0; let mejor = Infinity;
   g.t.forEach((t, k) => { const dist = Math.abs(t - objetivo); if (dist < mejor) { mejor = dist; i = k; } });
-  const x = (g.t[i] / tMax) * W;
+  const x = ((g.t[i] - g.t0) / ((g.t1 - g.t0) || 1)) * W;
   const linea = area.querySelector('.graf-cursor'); linea.setAttribute('x1', x); linea.setAttribute('x2', x); linea.setAttribute('visibility', 'visible');
   const tip = document.getElementById('graf-tooltip'); if (!tip) return;
   tip.replaceChildren();
@@ -151,7 +197,7 @@ export function cursorReclamo(ev) {
   tip.append(cab, ...g.series.map(s => {
     const div = document.createElement('div');
     const sw = document.createElement('i'); sw.style.background = s.color;
-    const b = document.createElement('b'); b.textContent = `${fmt(s.v[i], g.dec)} ${g.unidad}`;
+    const b = document.createElement('b'); b.textContent = `${fmt(s.v[i], s.eje === 'der' ? g.decDer : g.dec)} ${s.unidad || g.unidad}`;
     div.append(sw, b, document.createTextNode(` ${s.nombre}`));
     return div;
   }));
@@ -161,6 +207,7 @@ export function cursorReclamo(ev) {
   tip.style.top = `${rect.top - mr.top + modal.scrollTop + 8}px`;
 }
 export function salirCursorReclamo(ev) {
+  if (arrastre?.area === ev.currentTarget) return; // sigue arrastrando (con captura)
   const linea = ev.currentTarget.querySelector('.graf-cursor'); if (linea) linea.setAttribute('visibility', 'hidden');
   const tip = document.getElementById('graf-tooltip'); if (tip) tip.hidden = true;
 }
@@ -239,7 +286,13 @@ function seccionTension(a, c) {
       <table class="tabla-est"><thead><tr><th>Fase</th><th>Registros fuera de la banda</th><th>FebNoPer</th></tr></thead><tbody>
       ${Object.entries(r.porFase).map(([p, x]) => `<tr><td><span class="graf-fase"><i style="background:${COLOR_FASE[p]}"></i>U${p}</span></td><td>${fmt(x.ft)} de ${fmt(r.validos)}</td><td class="${x.febNoPer > 0.05 ? 'mal' : ''}">${fmt(x.febNoPer * 100, 2)} %</td></tr>`).join('')}</tbody></table></div>`;
   }
-  const g = (id, titulo, unidad, series, extra = {}) => graficaLinea({ id, titulo, unidad, t: d.t, fechas: d.fechas, series, ...extra });
+  // Zoom (igual en todas) y escala de tensión sin los registros bajo el 70 % del nominal (ceros)
+  const ventana = a.zoom || null;
+  const piso = !a.escalaCompleta && nominal > 0 ? nominal * LIMITE_INVALIDO : null;
+  html += `<div class="graf-herramientas"><i class="ic ic-buscar"></i><span>${ventana ? `Viendo del ${esc(fechaDeMinuto(d.fechas[0], ventana.desde))} ${horaDeMinuto(minutoDelDia(d.fechas[0]) + ventana.desde)} al ${esc(fechaDeMinuto(d.fechas[0], ventana.hasta))} ${horaDeMinuto(minutoDelDia(d.fechas[0]) + ventana.hasta)}` : 'Arrastra sobre una gráfica para acercar ese tramo'}</span>
+    ${ventana ? '<button class="b b-g" onclick="restablecerZoomReclamo()">Restablecer zoom</button>' : ''}
+    ${nominal > 0 ? `<button class="b b-l" onclick="toggleEscalaReclamo()">${a.escalaCompleta ? 'Ocultar registros en cero' : 'Ver escala completa (con ceros)'}</button>` : ''}</div>`;
+  const g = (id, titulo, unidad, series, extra = {}) => graficaLinea({ id, titulo, unidad, t: d.t, fechas: d.fechas, series, ventana, ...(unidad === 'V' ? { piso } : {}), ...extra });
   const bloqueGraf = (contenido, tabla) => `<div class="bloque graf-con-tabla">${contenido}${tabla}</div>`;
   html += bloqueGraf(g('u', 'Tensión promedio', 'V', fasesSeries(fases, x => d.U[x]?.v, 'U'), { banda }), tablaEstadisticas('Tensión (V)', t.U.v, fases, 1));
   if (fases.some(x => d.U[x]?.max)) html += bloqueGraf(g('umax', 'Tensión máxima', 'V', fasesSeries(fases, x => d.U[x]?.max, 'U'), { banda }), tablaEstadisticas('Máximos (V)', t.U.max, fases, 1));
@@ -264,7 +317,32 @@ function seccionTension(a, c) {
     }), `<table class="tabla-est"><thead><tr><th>STOTAL (kVA)</th><th>Valor</th><th>% de la capacidad</th></tr></thead><tbody>${[['Máx', 'max'], ['Prom', 'prom'], ['Mín', 'min']].map(([l, k]) => { const pc = t.carga[k] === null ? null : (t.carga[k] / kva) * 100; return `<tr><td>${l}</td><td>${fmt(t.carga[k], 2)}</td><td class="${pc > 100 ? 'mal' : ''}">${fmt(pc, 1)} %</td></tr>`; }).join('')}</tbody></table>
       <div class="page-sub">STOTAL tomado de la ${esc(d.stotal.origen === 'nombre' ? 'columna ' + d.stotal.encabezado : d.stotal.origen + (d.stotal.encabezado ? ` (${d.stotal.encabezado})` : ''))}.</div>`);
   }
+  html += bloqueCombinadas(a, d, fases, ventana, piso);
   return html;
+}
+
+// Gráficas combinadas: el usuario elige series de distintas variables (máximo dos unidades: la segunda va a la derecha)
+export const COLORES_COMBO = ['#2a78d6', '#eb6834', '#1baf7a', '#8b5cf6', '#d6457a', '#c9a227', '#475569', '#0891b2'];
+export function seriesCombo(claves, catalogo) {
+  const elegidas = claves.map(k => catalogo.find(c => c.clave === k)).filter(Boolean);
+  const unidadIzq = elegidas[0]?.unidad;
+  return elegidas.map((c, i) => ({ ...c, color: COLORES_COMBO[i % COLORES_COMBO.length], eje: c.unidad === unidadIzq ? undefined : 'der', desdeCero: c.unidad !== 'V' }));
+}
+function bloqueCombinadas(a, d, fases, ventana, piso) {
+  const catalogo = catalogoSeries(d, fases);
+  const combos = a.params.combinadas || [];
+  let html = `<div class="bloque combo-bloque"><div class="bloque-head"><div class="bloque-titulo">Gráficas combinadas</div><span class="page-sub">Elige series para comparar, por ejemplo tensión mínima vs corriente máxima</span></div>`;
+  combos.forEach((claves, i) => {
+    const series = seriesCombo(claves, catalogo); if (!series.length) return;
+    const unidadIzq = series[0].unidad;
+    html += `<div class="combo-graf"><button class="combo-quitar" onclick="quitarComboReclamo(${i})" title="Quitar gráfica">✕</button>${graficaLinea({ id: 'combo' + i, titulo: tituloCombo(series), unidad: unidadIzq, t: d.t, fechas: d.fechas, series, ventana, piso: unidadIzq === 'V' ? piso : null, desdeCero: unidadIzq !== 'V' })}</div>`;
+  });
+  const sel = a.comboSel || [];
+  const grupos = [...new Set(catalogo.map(c => c.grupo))];
+  html += '<div class="combo-elegir">' + grupos.map(gr => `<div class="combo-grupo"><small>${esc(gr)}</small><div>${catalogo.filter(c => c.grupo === gr).map(c => `<button class="pildora ${sel.includes(c.clave) ? 'active' : ''}" onclick="toggleSerieComboReclamo('${c.clave}')">${esc(c.nombre)}</button>`).join('')}</div></div>`).join('') + '</div>';
+  html += `<div class="barra-acciones"><button class="b b-p" onclick="agregarComboReclamo()" ${sel.length ? '' : 'disabled'}><i class="ic ic-plus"></i> Agregar gráfica combinada${sel.length ? ` (${sel.length} ${sel.length === 1 ? 'serie' : 'series'})` : ''}</button>
+    ${sel.length ? '<button class="b b-l" onclick="limpiarComboReclamo()">Limpiar selección</button>' : ''}<span class="page-sub">Las combinadas también salen en el Excel de tensión.</span></div>`;
+  return html + '</div>';
 }
 
 function seccionArmonicos(a, c) {
@@ -280,8 +358,8 @@ function seccionArmonicos(a, c) {
   const cats = ARMONICAS.map(n => 'H' + n);
   html += `<div class="bloque">${graficaBarras({ titulo: 'Espectro de tensión · TDI percentil 95 vs. Tabla 4', unidad: '%', categorias: cats, limite: arm.espectro.map(e => e.limTDI), series: fases.map(p => ({ nombre: `F${p}`, color: COLOR_FASE[p], v: arm.espectro.map(e => e.tdi[p]) })) })}</div>`;
   html += `<div class="bloque">${graficaBarras({ titulo: 'Espectro de corriente · DAII percentil 95 vs. Tabla 5', unidad: '%', categorias: cats, limite: arm.espectro.map(e => e.limDAII), series: fases.map(p => ({ nombre: `F${p}`, color: COLOR_FASE[p], v: arm.espectro.map(e => e.daii[p]) })) })}</div>`;
-  html += `<div class="bloque">${graficaLinea({ id: 'vdat', titulo: 'VDAT en el tiempo', unidad: '%', t: arm.t, fechas: arm.fechas, desdeCero: true, series: fases.map(p => ({ nombre: `VDAT F${p}`, color: COLOR_FASE[p], v: arm.VDAT[p] })), lineas: [{ valor: VDAT_LIM, nombre: 'Límite SIGET 8 %' }] })}</div>`;
-  html += `<div class="bloque">${graficaLinea({ id: 'dati', titulo: 'DATI en el tiempo', unidad: '%', t: arm.t, fechas: arm.fechas, desdeCero: true, series: fases.map(p => ({ nombre: `DATI F${p}`, color: COLOR_FASE[p], v: arm.DATI[p] })), lineas: [{ valor: DATI_LIM, nombre: 'Límite SIGET 20 %' }] })}</div>`;
+  html += `<div class="bloque">${graficaLinea({ id: 'vdat', ventana: a.zoom || null, titulo: 'VDAT en el tiempo', unidad: '%', t: arm.t, fechas: arm.fechas, desdeCero: true, series: fases.map(p => ({ nombre: `VDAT F${p}`, color: COLOR_FASE[p], v: arm.VDAT[p] })), lineas: [{ valor: VDAT_LIM, nombre: 'Límite SIGET 8 %' }] })}</div>`;
+  html += `<div class="bloque">${graficaLinea({ id: 'dati', ventana: a.zoom || null, titulo: 'DATI en el tiempo', unidad: '%', t: arm.t, fechas: arm.fechas, desdeCero: true, series: fases.map(p => ({ nombre: `DATI F${p}`, color: COLOR_FASE[p], v: arm.DATI[p] })), lineas: [{ valor: DATI_LIM, nombre: 'Límite SIGET 20 %' }] })}</div>`;
   html += `<div class="bloque"><div class="bloque-head"><div class="bloque-titulo">Armónicos de tensión · Tabla 4 (Art. 45)</div></div>${tablaArmonicos(arm.tension, fases, arm.nf)}
     <div class="page-sub">Percentil 95 (IEC 61000-4-7) y % del tiempo fuera del límite. TDI = Un/U1 × 100.</div></div>`;
   html += `<div class="bloque"><div class="bloque-head"><div class="bloque-titulo">Armónicos de corriente · Tabla 5 (Arts. 49-51)</div></div>${tablaArmonicos(arm.corriente, fases, arm.nf)}
