@@ -3,9 +3,9 @@
 // - Armónicos (Armonicos_SIGET10): Detalle_V, Detalle_I, Resumen_Armonicos, Resumen_Compacto y Graficos.
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
-import { ARMONICAS, CARGA_ALERTA, DATI_LIM, LIMITE_PST, PERC_MAX, TIPOS_RED, VDAT_LIM } from '../domain/reclamo.js';
+import { ARMONICAS, catalogoSeries, estadisticas, tituloCombo, CARGA_ALERTA, DATI_LIM, LIMITE_PST, PERC_MAX, TIPOS_RED, VDAT_LIM } from '../domain/reclamo.js';
 import { descargarXlsx, escribirConGraficas, rango } from '../excel-graficas.js';
-import { analisisActivo, calculoReclamo } from '../views/analisis-reclamo.js';
+import { analisisActivo, calculoReclamo, seriesCombo } from '../views/analisis-reclamo.js';
 
 // Colores de fase de los informes CPT (los de las macros)
 const COLOR_FASE = { 1: 'FFC000', 2: '0070C0', 3: 'FF0000' };
@@ -53,6 +53,17 @@ function tablaEstadistica(ws, c0, r0, titulos, est) {
   });
 }
 
+// Ubicación en cada hoja: la gráfica arriba a la derecha de los datos (H2:U23) y las tablas debajo (desde H25)
+const ANCLA_GRAFICA = [[7, 1], [21, 23]];
+const FILA_TABLAS = 24;
+
+// Escala del eje de tensión: la banda ±tolerancia con 3 % de margen, redondeada a un paso acorde al nivel
+// (la macro redondeaba a centenas: en 120 V el eje quedaba de 100 a 200 y la curva se veía aplastada)
+export function escalaTension(nominal, tol) {
+  const paso = 10 ** Math.max(0, Math.floor(Math.log10(nominal)) - 2);
+  return { min: Math.floor((nominal * (1 - tol) * 0.97) / paso) * paso, max: Math.ceil((nominal * (1 + tol) * 1.03) / paso) * paso };
+}
+
 // Hoja de una gráfica de la macro de tensión
 function hojaPerfil({ fechas, t, series, limites = [], titulo, usuario, escalaY = null, tablas }) {
   const ws = {};
@@ -67,8 +78,14 @@ function hojaPerfil({ fechas, t, series, limites = [], titulo, usuario, escalaY 
     series.forEach((s, k) => { const v = s.v[i]; if (v !== null && v !== undefined) celda(ws, 1 + k, i + 1, v, num); });
     limites.forEach((l, k) => celda(ws, 1 + series.length + k, i + 1, Math.round(l.valor * 1000) / 1000, num));
   }
-  let ultFila = n + 1;
-  ultFila = Math.max(ultFila, tablas(ws) + 1);
+  // Las tablas (resumen y estadísticas) van debajo de la gráfica, que queda arriba a la vista
+  const tmp = {}; const ultTabla = tablas(tmp);
+  for (const [ref, cel] of Object.entries(tmp)) {
+    if (ref[0] === '!') continue;
+    const { c, r } = XLSX.utils.decode_cell(ref);
+    ws[XLSX.utils.encode_cell({ c, r: r - 1 + FILA_TABLAS })] = cel;
+  }
+  const ultFila = Math.max(n + 1, ultTabla - 1 + FILA_TABLAS + 1);
   cerrarHoja(ws, 14, ultFila);
   ws['!cols'] = [{ wch: 16 }, ...Array(5).fill({ wch: 13 }), { wch: 3 }, { wch: 18 }, ...Array(5).fill({ wch: 14 })];
   ws['!freeze'] = { xSplit: 1, ySplit: 1 };
@@ -76,7 +93,7 @@ function hojaPerfil({ fechas, t, series, limites = [], titulo, usuario, escalaY 
     titulo: `${titulo}${usuario ? ' - ' + usuario.toUpperCase() : ''}`,
     categorias: rango(hoja, 1, 2, n + 1),
     series: [
-      ...series.map((s, k) => ({ nombre: s.nombre, ref: rango(hoja, 2 + k, 2, n + 1), color: s.color, ancho: 1.5 })),
+      ...series.map((s, k) => ({ nombre: s.nombre, ref: rango(hoja, 2 + k, 2, n + 1), color: s.color, ancho: 1.5, eje: s.eje })),
       ...limites.map((l, k) => ({ nombre: l.nombre, ref: rango(hoja, 2 + series.length + k, 2, n + 1), color: l.color, guion: l.guion !== false, ancho: 2 })),
     ],
     y: escalaY || undefined, saltoEtiquetas: saltoEtiquetas(t), rotarEtiquetas: true,
@@ -100,12 +117,10 @@ export function exportarTensionReclamo() {
     { nombre: `SUB-${pct}%`, valor: nominal * (1 - tol), color: '404040' },
   ] : [];
   const serieFases = (grupo, campo, sufijo, unidad) => fases.filter(x => grupo[x]?.[campo]).map(x => ({ nombre: `${sufijo}${x}${campo === 'v' ? '' : campo === 'max' ? 'Max' : 'Min'} [${unidad}]`, v: grupo[x][campo], color: COLOR_FASE[x], clave: x }));
-  const ANCLA_ABAJO = [[7, 15], [21, 39]];
-  const ANCLA = [[7, 7], [21, 31]];
 
   // Tensión promedio: resumen de la medición (FebNoPer) y tabla estadística
   const sProm = serieFases(d.U, 'v', 'U', 'V');
-  const escala = nominal > 0 ? { min: Math.floor((nominal * (1 - tol) * 0.97) / 100) * 100, max: Math.ceil((nominal * (1 + tol) * 1.03) / 100) * 100 } : null;
+  const escala = nominal > 0 ? escalaTension(nominal, tol) : null;
   agregar('Tensión promedio', hojaPerfil({
     fechas: d.fechas, t: d.t, series: sProm, limites: limTension, titulo: 'PERFIL DE TENSIÓN PROMEDIO', usuario, escalaY: escala,
     tablas: ws => {
@@ -132,14 +147,15 @@ export function exportarTensionReclamo() {
       }
       return 13;
     },
-  }), ANCLA_ABAJO);
+  }), ANCLA_GRAFICA);
 
   const perfil = (nombre, titulo, series, est, limites = [], extra = {}) => {
     if (!series.length) return;
-    agregar(nombre, hojaPerfil({ fechas: d.fechas, t: d.t, series, limites, titulo, usuario, tablas: ws => { tablaEstadistica(ws, 7, 1, series, est); return 5; }, ...extra }), ANCLA);
+    agregar(nombre, hojaPerfil({ fechas: d.fechas, t: d.t, series, limites, titulo, usuario, tablas: ws => { tablaEstadistica(ws, 7, 1, series, est); return 5; }, ...extra }), ANCLA_GRAFICA);
   };
-  perfil('Tensión máxima', 'PERFIL DE TENSIÓN MÁXIMOS', serieFases(d.U, 'max', 'U', 'V'), t.U.max, limTension);
-  perfil('Tensión mínima', 'PERFIL DE TENSIÓN MÍNIMOS', serieFases(d.U, 'min', 'U', 'V'), t.U.min, limTension);
+  // Máximos y mínimos con la misma escala de la banda: los registros en cero quedan fuera y la curva se ve
+  perfil('Tensión máxima', 'PERFIL DE TENSIÓN MÁXIMOS', serieFases(d.U, 'max', 'U', 'V'), t.U.max, limTension, { escalaY: escala });
+  perfil('Tensión mínima', 'PERFIL DE TENSIÓN MÍNIMOS', serieFases(d.U, 'min', 'U', 'V'), t.U.min, limTension, { escalaY: escala });
   perfil('Corriente promedio', 'PERFIL DE CORRIENTES PROMEDIO', serieFases(d.I, 'v', 'I', 'A'), t.I.v);
   perfil('Corriente máxima', 'PERFIL DE CORRIENTES MÁXIMAS', serieFases(d.I, 'max', 'I', 'A'), t.I.max,
     t.iMaxTrafo ? [{ nombre: `I Max Trafo (${Math.round(t.iMaxTrafo * 100) / 100} A)`, valor: t.iMaxTrafo, color: 'FF0000' }] : []);
@@ -156,7 +172,7 @@ export function exportarTensionReclamo() {
         sPST.forEach((s, i) => celda(ws, 8 + i, 2, Math.round(t.pstP95[s.clave] * 10000) / 10000, st(null, { color: t.pstP95[s.clave] > LIMITE_PST ? '9C0006' : '000000', fmt: '0.0000' })));
         return 3;
       },
-    }), ANCLA);
+    }), ANCLA_GRAFICA);
   }
 
   // Cargabilidad: STOTAL (kVA) contra la capacidad del trafo y su 85 %
@@ -173,8 +189,22 @@ export function exportarTensionReclamo() {
         ['max', 'prom', 'min'].forEach((k, j) => celda(ws, 9, 2 + j, t.carga[k] === null ? '' : t.carga[k] / kva, st(null, { color: t.carga[k] / kva > 1 ? '9C0006' : '000000', negrita: false, fmt: '0.0%' })));
         return 5;
       },
-    }), ANCLA);
+    }), ANCLA_GRAFICA);
   }
+
+  // Gráficas combinadas (vs): una hoja por combinación, con eje derecho si hay dos unidades
+  const catalogo = catalogoSeries(d, fases);
+  (p.combinadas || []).forEach((claves, i) => {
+    const series = seriesCombo(claves, catalogo); if (!series.length) return;
+    const nombre = `Combinada ${i + 1}`;
+    const h = hojaPerfil({
+      fechas: d.fechas, t: d.t, titulo: tituloCombo(series).toUpperCase(), usuario,
+      series: series.map(x => ({ nombre: `${x.nombre} [${x.unidad}]`, v: x.v, color: x.color.replace('#', '').toUpperCase(), eje: x.eje })),
+      escalaY: series[0].unidad === 'V' && escala ? escala : null,
+      tablas: ws => { tablaEstadistica(ws, 7, 1, series.map((x, k) => ({ nombre: `${x.nombre} [${x.unidad}]`, clave: k })), Object.fromEntries(series.map((x, k) => [k, estadisticas(x.v)]))); return 5; },
+    });
+    agregar(nombre, h, ANCLA_GRAFICA);
+  });
 
   descargarXlsx(escribirConGraficas(libro, graficas), `${a.tension.nombre}_Graficas.xlsx`);
   showToast('Excel de tensión descargado');

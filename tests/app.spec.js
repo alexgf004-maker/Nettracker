@@ -1601,6 +1601,21 @@ test.describe('Análisis de reclamos', () => {
     await expect(page.getByRole('button', { name: 'Guardar en el reclamo' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Excel de tensión' })).toBeVisible();
     expect((await app.escrituras()).length).toBe(0);
+    // Zoom: arrastrar sobre una gráfica acerca ese tramo; Restablecer vuelve a verlo todo
+    const area = page.locator('[data-graf="u"]'); await area.scrollIntoViewIfNeeded(); const caja = await area.boundingBox();
+    await page.mouse.move(caja.x + caja.width * 0.1, caja.y + caja.height / 2); await page.mouse.down();
+    await page.mouse.move(caja.x + caja.width * 0.4, caja.y + caja.height / 2, { steps: 5 }); await page.mouse.up();
+    await expect(page.locator('.graf-herramientas')).toContainText('Viendo del');
+    await page.getByRole('button', { name: 'Restablecer zoom' }).click();
+    await expect(page.locator('.graf-herramientas')).toContainText('Arrastra sobre una gráfica');
+    // Combinada con dos unidades: la segunda va al eje derecho; una tercera unidad no se permite
+    await page.locator('.combo-grupo', { hasText: 'Tensión mínima' }).getByRole('button', { name: 'U1 mín' }).click();
+    await page.locator('.combo-grupo', { hasText: 'Corriente máxima' }).getByRole('button', { name: 'I1 máx' }).click();
+    await page.locator('.combo-grupo', { hasText: 'Flicker PST' }).getByRole('button', { name: 'PST1' }).click();
+    await expect(page.locator('.toast')).toContainText('dos unidades');
+    await page.getByRole('button', { name: /Agregar gráfica combinada/ }).click();
+    await expect(page.locator('.combo-graf')).toContainText('Tensión mínima vs Corriente máxima');
+    await expect(page.locator('.combo-graf')).toContainText('(eje der.)');
     await page.getByRole('button', { name: 'Empezar de nuevo' }).click();
     await expect(page.locator('.arch-slot.lleno')).toHaveCount(0);
   });
@@ -1613,17 +1628,20 @@ test.describe('Análisis de reclamos', () => {
       abrirAnalisisReclamo('r9');
       cargarTXTReclamo([{ nombre: 'RE192026456.txt', texto: tt }, { nombre: 'RE1920264560.txt', texto: ta }]);
       setParamReclamo('usuario', 'Empresa');
+      toggleSerieComboReclamo('U.min.1'); toggleSerieComboReclamo('I.max.1'); agregarComboReclamo();
     }, [txtTension(), txtArmonicos()]);
     const bajar = async boton => { const d = page.waitForEvent('download'); await page.getByRole('button', { name: boton }).click(); return d; };
     const dt = await bajar('Excel de tensión');
     expect(dt.suggestedFilename()).toBe('RE192026456_Graficas.xlsx');
     const bt = require('fs').readFileSync(await dt.path());
     const wt = XLSX.read(bt);
-    expect(wt.SheetNames).toEqual(['Tensión promedio', 'Tensión máxima', 'Tensión mínima', 'Corriente promedio', 'Corriente máxima', 'PST']);
+    expect(wt.SheetNames).toEqual(['Tensión promedio', 'Tensión máxima', 'Tensión mínima', 'Corriente promedio', 'Corriente máxima', 'PST', 'Combinada 1']);
     const prom = XLSX.utils.sheet_to_json(wt.Sheets['Tensión promedio'], { header: 1 });
     expect(prom[0].slice(0, 6)).toEqual(['Fecha/Hora', 'U1 [V]', 'U2 [V]', 'U3 [V]', 'SOBRE+6%', 'SUB-6%']);
     expect(prom[1][0]).toBe('1/9/2026 00:00');
-    expect(prom[3].slice(7, 13)).toEqual([144, 0, 144, 10, 10 / 144, 'FUERA DE TOLERANCIA']);
+    // La gráfica va arriba (H2) y las tablas debajo: el resumen queda en las filas 25 a 27
+    expect(prom[25].slice(7, 13)).toEqual(['Registros Totales', 'Registros Inválidos', 'Registros Válidos', 'Registros FT', 'FebNoPer', 'Estado']);
+    expect(prom[26].slice(7, 13)).toEqual([144, 0, 144, 10, 10 / 144, 'FUERA DE TOLERANCIA']);
     // Cada hoja lleva su gráfica nativa de Excel, con las series apuntando a sus columnas
     const zt = XLSX.CFB.read(bt, { type: 'buffer' });
     const chart1 = Buffer.from(XLSX.CFB.find(zt, '/xl/charts/chart1.xml').content).toString();
@@ -1631,6 +1649,14 @@ test.describe('Análisis de reclamos', () => {
     expect(chart1).toContain('PERFIL DE TENSIÓN PROMEDIO - EMPRESA');
     expect(XLSX.CFB.find(zt, '/xl/charts/chart6.xml')).toBeTruthy();
     expect(Buffer.from(XLSX.CFB.find(zt, '/xl/worksheets/sheet1.xml').content).toString()).toContain('<drawing r:id="rIdDibujo1"/>');
+    // Escala de tensión ajustada al nivel (13.2 kV ±6 %: 12 000 a 14 500), también en mínimos
+    expect(chart1).toContain('<c:max val="14500"/><c:min val="12000"/>');
+    expect(Buffer.from(XLSX.CFB.find(zt, '/xl/charts/chart3.xml').content).toString()).toContain('<c:min val="12000"/>');
+    // Combinada: tensión mínima vs corriente máxima, la corriente en el eje derecho
+    const combo = Buffer.from(XLSX.CFB.find(zt, '/xl/charts/chart7.xml').content).toString();
+    expect(combo).toContain('TENSIÓN MÍNIMA VS CORRIENTE MÁXIMA');
+    expect(combo).toContain('<c:axPos val="r"/>');
+    expect(combo).toContain("'Combinada 1'!$C$2:$C$145");
 
     const da = await bajar('Excel de armónicos');
     expect(da.suggestedFilename()).toBe('RE1920264560_Armonicos.xlsx');

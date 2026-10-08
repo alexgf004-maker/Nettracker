@@ -42,11 +42,14 @@ function serie(s, i, cat, tipo) {
 //         y: { min, max }, saltoEtiquetas, rotarEtiquetas, tituloX, tituloY, colorTitulo }
 export function xmlGrafica(spec) {
   const barras = spec.series.map((s, i) => ({ s, i })).filter(x => x.s.tipo === 'barra');
-  const lineas = spec.series.map((s, i) => ({ s, i })).filter(x => x.s.tipo !== 'barra');
+  const lineas = spec.series.map((s, i) => ({ s, i })).filter(x => x.s.tipo !== 'barra' && x.s.eje !== 'der');
+  const lineasDer = spec.series.map((s, i) => ({ s, i })).filter(x => x.s.tipo !== 'barra' && x.s.eje === 'der');
   const ejes = '<c:axId val="50010"/><c:axId val="50020"/>';
   let plot = '';
   if (barras.length) plot += `<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>${barras.map(x => serie(x.s, x.i, spec.categorias, 'barra')).join('')}<c:gapWidth val="80"/>${ejes}</c:barChart>`;
   if (lineas.length) plot += `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${lineas.map(x => serie(x.s, x.i, spec.categorias, 'linea')).join('')}<c:marker val="1"/>${ejes}</c:lineChart>`;
+  // Segunda unidad en el eje derecho (gráficas combinadas)
+  if (lineasDer.length) plot += `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${lineasDer.map(x => serie(x.s, x.i, spec.categorias, 'linea')).join('')}<c:marker val="1"/><c:axId val="50030"/><c:axId val="50040"/></c:lineChart>`;
   const tituloEje = t => (t ? `<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="900" b="0"><a:latin typeface="${FUENTE}"/></a:defRPr></a:pPr><a:r><a:rPr lang="es-SV" sz="900" b="0"><a:latin typeface="${FUENTE}"/></a:rPr><a:t>${xml(t)}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>` : '');
   const y = spec.y || {};
   const escala = `<c:scaling><c:orientation val="minMax"/>${y.max !== undefined ? `<c:max val="${y.max}"/>` : ''}${y.min !== undefined ? `<c:min val="${y.min}"/>` : ''}</c:scaling>`;
@@ -57,6 +60,8 @@ export function xmlGrafica(spec) {
 <c:autoTitleDeleted val="0"/><c:plotArea><c:layout/>${plot}
 <c:catAx><c:axId val="50010"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/>${tituloEje(spec.tituloX)}<c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="low"/>${texto(800, { rot: spec.rotarEtiquetas ? -5400000 : null })}<c:crossAx val="50020"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/>${salto}<c:noMultiLvlLbl val="0"/></c:catAx>
 <c:valAx><c:axId val="50020"/>${escala}<c:delete val="0"/><c:axPos val="l"/><c:majorGridlines><c:spPr><a:ln w="6350"><a:solidFill><a:srgbClr val="D2D2D2"/></a:solidFill></a:ln></c:spPr></c:majorGridlines>${tituloEje(spec.tituloY)}<c:numFmt formatCode="General" sourceLinked="0"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/>${texto(800)}<c:crossAx val="50010"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx>
+${lineasDer.length ? `<c:catAx><c:axId val="50030"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="1"/><c:axPos val="b"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="50040"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx>
+<c:valAx><c:axId val="50040"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="r"/>${tituloEje(spec.tituloY2)}<c:numFmt formatCode="General" sourceLinked="0"/><c:majorTickMark val="out"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/>${texto(800)}<c:crossAx val="50030"/><c:crosses val="max"/><c:crossBetween val="between"/></c:valAx>` : ''}
 <c:spPr><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></c:spPr></c:plotArea>
 <c:legend><c:legendPos val="b"/><c:overlay val="0"/>${texto(800)}</c:legend><c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart>
 <c:spPr><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:ln w="6350"><a:solidFill><a:srgbClr val="B4B4B4"/></a:solidFill></a:ln></c:spPr>${texto(900)}</c:chartSpace>`;

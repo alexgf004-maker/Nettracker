@@ -4,7 +4,7 @@
 import { db, get, ref, update } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
-import { fasesConTension, leerTension, resumenGuardado, sugerirNominal, tipoDeTXT } from '../domain/reclamo.js';
+import { catalogoSeries, fasesConTension, fasesDe, leerTension, MAX_UNIDADES_COMBO, resumenGuardado, sugerirNominal, tipoDeTXT } from '../domain/reclamo.js';
 import { hoyLocal, normalizarCodigo } from '../domain/trabajo.js';
 import { analisisActivo, calculoReclamo } from '../views/analisis-reclamo.js';
 import { userArea } from '../config.js';
@@ -119,3 +119,38 @@ export async function guardarAnalisisReclamo() {
 // ── Graficar (pestaña rápida, sin reclamo y sin guardar) ──
 export const nuevoGraficar = () => ({ id: null, params: paramsIniciales({ areaInstalacion: userArea() }), tension: null, armonicos: null });
 export function limpiarGraficar() { state.graficar = nuevoGraficar(); render(); }
+
+// ── Zoom, escala y gráficas combinadas ──
+export function setZoomReclamo(desde, hasta) {
+  const a = analisisActivo(); if (!a || hasta - desde < 20) return; // menos de 20 minutos no se acerca más
+  a.zoom = { desde: Math.round(desde), hasta: Math.round(hasta) }; render();
+}
+export function restablecerZoomReclamo() { const a = analisisActivo(); if (a) { a.zoom = null; render(); } }
+export function toggleEscalaReclamo() { const a = analisisActivo(); if (a) { a.escalaCompleta = !a.escalaCompleta; render(); } }
+
+export function toggleSerieComboReclamo(clave) {
+  const a = analisisActivo(); if (!a) return;
+  const sel = a.comboSel || [];
+  if (sel.includes(clave)) a.comboSel = sel.filter(k => k !== clave);
+  else {
+    // Máximo dos unidades por gráfica (la segunda va en el eje derecho)
+    const cat = catalogoSeries(calculoReclamo(a).d, fasesDe(a.params.fases || 3));
+    const unidad = k => cat.find(c => c.clave === k)?.unidad;
+    const unidades = new Set([...sel, clave].map(unidad));
+    if (unidades.size > MAX_UNIDADES_COMBO) return showToast('Una gráfica combinada admite dos unidades como máximo (una por eje)');
+    a.comboSel = [...sel, clave];
+  }
+  render();
+}
+export function limpiarComboReclamo() { const a = analisisActivo(); if (a) { a.comboSel = []; render(); } }
+export function agregarComboReclamo() {
+  const a = analisisActivo(); if (!a?.comboSel?.length) return;
+  a.params.combinadas = [...(a.params.combinadas || []), [...a.comboSel]];
+  a.comboSel = []; a.cambios = true;
+  render();
+}
+export function quitarComboReclamo(i) {
+  const a = analisisActivo(); if (!a) return;
+  a.params.combinadas = (a.params.combinadas || []).filter((_, k) => k !== i); a.cambios = true;
+  render();
+}

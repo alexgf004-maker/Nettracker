@@ -273,6 +273,9 @@ En el detalle de la campaña:
 
 - Pestaña para revisar rápido una medición en campo: se sube el TXT (de tensión, de armónicos o de campaña), se ponen nominal y red, y se ven el veredicto DT/FT con el FebNoPer, los valores y todas las gráficas del análisis de reclamos, con los dos Excel. No se guarda nada (`state.graficar`, `renderGraficar`; mismo cuerpo que el análisis del reclamo con `analisisActivo()`).
 - También muestra (y exporta) el **FebNoPer por fase** como dato de análisis (mismos registros válidos; en cada fase, los que quedan fuera de la banda; el DT/FT lo define el FebNoPer general) y la **cargabilidad en % de la capacidad** del trafo (máx, prom y mín de STOTAL ÷ kVA).
+- Zoom: arrastrar sobre una gráfica acerca ese tramo en todas (`a.zoom = { desde, hasta }` en minutos); "Restablecer zoom" vuelve a todo. La escala de tensión no toma en cuenta los registros bajo el 70 % del nominal (ceros) salvo con "Ver escala completa".
+- Gráficas combinadas (vs): se eligen series del TXT de tensión (U prom/máx/mín, I prom/máx, PST, STOTAL por fase) y se agregan como gráfica; máximo dos unidades, la segunda en el eje derecho (punteada). Se guardan en `params.combinadas` (con el análisis del reclamo) y salen en el Excel de tensión como hojas "Combinada N" con eje secundario.
+- Excel de tensión: la gráfica va arriba (H2:U23) y las tablas debajo (desde H25). Escala del eje de tensión: banda ±tolerancia con 3 % de margen redondeada a un paso según el nivel (10^(dígitos−3)); la macro redondeaba a centenas y en 120 V quedaba de 100 a 200. Máximos y mínimos usan la misma escala.
 
 ## Análisis de reclamos (macros Graficar y Armónicos)
 

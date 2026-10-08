@@ -279,3 +279,23 @@ export function resumenGuardado(tension, arm) {
   }
   return out;
 }
+
+// ── Gráficas combinadas (vs) ──
+// Series del TXT de tensión que se pueden combinar en una misma gráfica. clave: 'U.min.1', 'I.max.2', 'PST.1', 'S'…
+const VARIABLES = [
+  ['U', 'v', 'Tensión promedio', 'U', 'V'], ['U', 'max', 'Tensión máxima', 'U', 'V'], ['U', 'min', 'Tensión mínima', 'U', 'V'],
+  ['I', 'v', 'Corriente promedio', 'I', 'A'], ['I', 'max', 'Corriente máxima', 'I', 'A'],
+];
+export function catalogoSeries(d, fases) {
+  if (!d) return [];
+  const out = [];
+  for (const [g, campo, grupo, letra, unidad] of VARIABLES) {
+    fases.forEach(p => { const v = d[g][p]?.[campo]; if (v) out.push({ clave: `${g}.${campo}.${p}`, grupo, nombre: `${letra}${p} ${campo === 'v' ? 'prom' : campo === 'max' ? 'máx' : 'mín'}`, unidad, v }); });
+  }
+  fases.forEach(p => { if (d.PST[p]) out.push({ clave: `PST.${p}`, grupo: 'Flicker PST', nombre: `PST${p}`, unidad: 'p.u.', v: d.PST[p] }); });
+  if (d.S) out.push({ clave: 'S', grupo: 'Cargabilidad', nombre: 'STOTAL', unidad: 'kVA', v: cargabilidadKVA(d.S) });
+  return out;
+}
+export const MAX_UNIDADES_COMBO = 2;
+// Título de una gráfica combinada: "Tensión mínima vs Corriente máxima"
+export const tituloCombo = series => [...new Set(series.map(s => s.grupo))].join(' vs ');
