@@ -115,18 +115,24 @@ export function resumenTension(U, nFases, nominal, tol) {
   const limSup = nominal * (1 + tol); const limInf = nominal * (1 - tol); const inv = nominal * LIMITE_INVALIDO;
   const fases = fasesDe(nFases);
   let total = 0; let invalidos = 0; let ft = 0;
+  const ftFase = Object.fromEntries(fases.map(p => [p, 0]));
   const n = U['1'].v.length;
   for (let i = 0; i < n; i++) {
     if (U['1'].v[i] === null) continue; // la macro salta la fila si U1 está vacía
     total++;
     const vs = fases.map(p => U[p]?.v[i] ?? 0);
     if (vs.some(v => v < inv)) { invalidos++; continue; }
-    if (vs.some(v => v < limInf || v > limSup)) ft++;
+    const fuera = vs.map(v => v < limInf || v > limSup);
+    if (fuera.some(Boolean)) ft++;
+    fases.forEach((p, k) => { if (fuera[k]) ftFase[p]++; });
   }
   const validos = total - invalidos;
   const febNoPer = validos > 0 ? ft / validos : 0;
   const estado = validos === 0 ? 'ERROR - NIVEL DE TENSIÓN INCORRECTO' : febNoPer > UMBRAL_FT ? 'FUERA DE TOLERANCIA' : 'DENTRO DE TOLERANCIA';
-  return { total, invalidos, validos, ft, febNoPer, estado, limSup, limInf };
+  // FebNoPer por fase: solo como dato de análisis (el veredicto DT/FT sale del FebNoPer general).
+  // Mismos registros válidos; en cada fase cuenta los que quedan fuera de la banda.
+  const porFase = Object.fromEntries(fases.map(p => [p, { ft: ftFase[p], febNoPer: validos > 0 ? ftFase[p] / validos : 0 }]));
+  return { total, invalidos, validos, ft, febNoPer, estado, limSup, limInf, porFase };
 }
 
 // Corriente máxima del trafo para la línea de la gráfica. Trifásico: kVA × 1000 / (√3 × V L-L)

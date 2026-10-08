@@ -272,6 +272,7 @@ En el detalle de la campaña:
 ## Graficar (Herramientas)
 
 - Pestaña para revisar rápido una medición en campo: se sube el TXT (de tensión, de armónicos o de campaña), se ponen nominal y red, y se ven el veredicto DT/FT con el FebNoPer, los valores y todas las gráficas del análisis de reclamos, con los dos Excel. No se guarda nada (`state.graficar`, `renderGraficar`; mismo cuerpo que el análisis del reclamo con `analisisActivo()`).
+- También muestra (y exporta) el **FebNoPer por fase** como dato de análisis (mismos registros válidos; en cada fase, los que quedan fuera de la banda; el DT/FT lo define el FebNoPer general) y la **cargabilidad en % de la capacidad** del trafo (máx, prom y mín de STOTAL ÷ kVA).
 
 ## Análisis de reclamos (macros Graficar y Armónicos)
 

@@ -234,6 +234,11 @@ function seccionTension(a, c) {
       <div class="tile ${ft || err ? 't-rojo' : 't-verde'}"><span class="v">${fmt(r.febNoPer * 100, 2)} %</span><span class="l">FebNoPer · ${esc(err ? 'Revisar nivel de tensión' : ft ? 'Fuera de tolerancia' : 'Dentro de tolerancia')}</span></div>
     </div>`;
   }
+  if (r && r.validos > 0 && Object.keys(r.porFase || {}).length > 1) {
+    html += `<div class="bloque"><div class="bloque-head"><div class="bloque-titulo">FebNoPer por fase</div><span class="page-sub">Dato de análisis: el DT o FT lo define el FebNoPer general</span></div>
+      <table class="tabla-est"><thead><tr><th>Fase</th><th>Registros fuera de la banda</th><th>FebNoPer</th></tr></thead><tbody>
+      ${Object.entries(r.porFase).map(([p, x]) => `<tr><td><span class="graf-fase"><i style="background:${COLOR_FASE[p]}"></i>U${p}</span></td><td>${fmt(x.ft)} de ${fmt(r.validos)}</td><td class="${x.febNoPer > 0.05 ? 'mal' : ''}">${fmt(x.febNoPer * 100, 2)} %</td></tr>`).join('')}</tbody></table></div>`;
+  }
   const g = (id, titulo, unidad, series, extra = {}) => graficaLinea({ id, titulo, unidad, t: d.t, fechas: d.fechas, series, ...extra });
   const bloqueGraf = (contenido, tabla) => `<div class="bloque graf-con-tabla">${contenido}${tabla}</div>`;
   html += bloqueGraf(g('u', 'Tensión promedio', 'V', fasesSeries(fases, x => d.U[x]?.v, 'U'), { banda }), tablaEstadisticas('Tensión (V)', t.U.v, fases, 1));
@@ -256,7 +261,7 @@ function seccionTension(a, c) {
   else {
     html += bloqueGraf(g('carga', 'Cargabilidad', 'kVA', [{ nombre: 'STOTAL', color: COLOR_FASE[1], v: t.S }], {
       desdeCero: true, lineas: [{ valor: kva, nombre: `Capacidad ${fmt(kva)} kVA`, tipo: 'trafo' }, { valor: kva * CARGA_ALERTA, nombre: `85 % · ${fmt(kva * CARGA_ALERTA, 1)} kVA`, tipo: 'alerta' }],
-    }), `<table class="tabla-est"><thead><tr><th>STOTAL (kVA)</th><th>Valor</th></tr></thead><tbody>${[['Máx', 'max'], ['Prom', 'prom'], ['Mín', 'min']].map(([l, k]) => `<tr><td>${l}</td><td>${fmt(t.carga[k], 2)}</td></tr>`).join('')}</tbody></table>
+    }), `<table class="tabla-est"><thead><tr><th>STOTAL (kVA)</th><th>Valor</th><th>% de la capacidad</th></tr></thead><tbody>${[['Máx', 'max'], ['Prom', 'prom'], ['Mín', 'min']].map(([l, k]) => { const pc = t.carga[k] === null ? null : (t.carga[k] / kva) * 100; return `<tr><td>${l}</td><td>${fmt(t.carga[k], 2)}</td><td class="${pc > 100 ? 'mal' : ''}">${fmt(pc, 1)} %</td></tr>`; }).join('')}</tbody></table>
       <div class="page-sub">STOTAL tomado de la ${esc(d.stotal.origen === 'nombre' ? 'columna ' + d.stotal.encabezado : d.stotal.origen + (d.stotal.encabezado ? ` (${d.stotal.encabezado})` : ''))}.</div>`);
   }
   return html;

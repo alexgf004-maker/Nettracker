@@ -1520,6 +1520,7 @@ test.describe('Análisis de reclamos', () => {
     expect(r.carga.max).toBe(400); // STOTAL en VA → kVA
     expect(r.resumen).toMatchObject({ total: 144, invalidos: 0, validos: 144, ft: 10, estado: 'FUERA DE TOLERANCIA' });
     expect(r.resumen.febNoPer).toBeCloseTo(10 / 144, 6);
+    expect(r.resumen.porFase['1']).toEqual({ ft: 10, febNoPer: 10 / 144 }); // dato de análisis por fase
     expect(r.iTrafo).toBeCloseTo(100 * 1000 / (Math.sqrt(3) * 240), 6); // trifásico: kVA × 1000 / (√3 × V L-L)
     expect(r.pst['1']).toBeCloseTo(0.5, 6);
     expect(r.n).toBe(144);
@@ -1587,8 +1588,12 @@ test.describe('Análisis de reclamos', () => {
     app = await abrirApp(page);
     await cerrarAlerta(page);
     await nav(page, 'Graficar');
-    await page.locator('.graf-pagina input[type=file]').setInputFiles({ name: 'CR192026100.txt', mimeType: 'text/plain', buffer: Buffer.from(txtTension()) });
+    await page.locator('.graf-pagina input[type=file]').setInputFiles({ name: 'CR192026100.txt', mimeType: 'text/plain', buffer: Buffer.from(txtTension({ stotal: true })) });
     await expect(page.locator('#ar-nominal')).toHaveValue('13200');
+    // FebNoPer por fase como dato y cargabilidad en % de la capacidad (STOTAL 400 kVA de 500 kVA)
+    await expect(page.locator('.bloque', { hasText: 'FebNoPer por fase' })).toContainText('10 de 144');
+    await page.locator('#ar-kva').fill('500'); await page.locator('#ar-kva').press('Enter');
+    await expect(page.locator('.tabla-est', { hasText: '% de la capacidad' })).toContainText('80.0 %');
     await expect(page.locator('.veredicto-dtft')).toContainText('FT');
     await expect(page.locator('.veredicto-dtft')).toContainText('FebNoPer 6.94 %');
     await page.locator('#ar-red').selectOption('rural_bt');

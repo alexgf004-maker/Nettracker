@@ -121,6 +121,15 @@ export function exportarTensionReclamo() {
       [['Usuario', usuario], ['Nivel de tensión (V)', nominal || ''], ['Urbanidad / red', `${TIPOS_RED[p.red]?.label || ''} (±${pct}%)`], ['Tipo de instalación', ['', 'Monofásico', 'Bifásico', 'Trifásico'][p.fases]]]
         .forEach(([l, v], i) => { celda(ws, 7, 5 + i, l, st('D9E1F2', { color: '000000' })); celda(ws, 8, 5 + i, v, st(null, { color: '000000', negrita: false, centro: false })); });
       tablaEstadistica(ws, 7, 9, sProm, t.U.v);
+      // FebNoPer por fase: dato de análisis (el estado sale del FebNoPer general)
+      if (r?.porFase && Object.keys(r.porFase).length > 1) {
+        ['FebNoPer por fase', 'Registros FT', 'FebNoPer'].forEach((h, i) => celda(ws, 10 + i, 4, h, st(AZUL_TABLA)));
+        Object.entries(r.porFase).forEach(([p, x], j) => {
+          celda(ws, 10, 5 + j, `U${p}`, st('D9E1F2', { color: '000000' }));
+          celda(ws, 11, 5 + j, x.ft, st(null, { color: '000000', negrita: false }));
+          celda(ws, 12, 5 + j, x.febNoPer, st(null, { color: '000000', negrita: false, fmt: '0.00%' }));
+        });
+      }
       return 13;
     },
   }), ANCLA_ABAJO);
@@ -157,7 +166,13 @@ export function exportarTensionReclamo() {
     agregar('Cargabilidad', hojaPerfil({
       fechas: d.fechas, t: d.t, series: sS, titulo: 'PERFIL DE CARGABILIDAD', usuario,
       limites: [{ nombre: `Capacidad (${kva} KVA)`, valor: kva, color: 'FF0000', guion: false }, { nombre: `85% Capacidad (${Math.round(kva * CARGA_ALERTA * 100) / 100} KVA)`, valor: kva * CARGA_ALERTA, color: 'FFC000' }],
-      tablas: ws => { tablaEstadistica(ws, 7, 1, sS, { s: t.carga }); return 5; },
+      tablas: ws => {
+        tablaEstadistica(ws, 7, 1, sS, { s: t.carga });
+        // Cargabilidad en % de la capacidad del trafo
+        celda(ws, 9, 1, '% Capacidad', st(AZUL_TABLA));
+        ['max', 'prom', 'min'].forEach((k, j) => celda(ws, 9, 2 + j, t.carga[k] === null ? '' : t.carga[k] / kva, st(null, { color: t.carga[k] / kva > 1 ? '9C0006' : '000000', negrita: false, fmt: '0.0%' })));
+        return 5;
+      },
     }), ANCLA);
   }
 
