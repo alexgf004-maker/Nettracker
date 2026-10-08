@@ -1,5 +1,5 @@
 // Handlers globales (onclick): navegación, búsqueda, tema, calendario, reportes, login
-import { cerrarSesion, entrarComo } from '../actions/auth.js';
+import { borrarPin, cerrarSesion, entrarComo, teclaPin, toggleMenuPerfil, volverAPerfiles } from '../actions/auth.js';
 import { desmarcarCampanaEntregada, desmarcarInformeEntregado, desmarcarRequerimientoEntregado, marcarCampanaEntregada, marcarInformeEntregado, marcarRequerimientoEntregado, setEntregaLimite } from '../actions/trabajo.js';
 import { userArea, userInstTab } from '../config.js';
 import { mantenimientoRef, seguimientoDesdeRef, set } from '../firebase.js';
@@ -133,3 +133,4 @@ window.setAreaFiltro = f => { state.areaFiltro = f; render(); };
 window.abrirCampanaTrabajo = clave => { state.campanaVista = 'precampana'; state.multFiltro = 'todos'; state.resultadosFiltro = 'todos'; state.casosFiltro = 'todos'; state.casosBusqueda = ''; state.tab = 'campanas'; state.view = 'lista'; state.campanaClave = clave; state.showMas = false; render(); };
 Object.assign(window, { marcarCampanaEntregada, desmarcarCampanaEntregada, marcarInformeEntregado, desmarcarInformeEntregado, setEntregaLimite, marcarRequerimientoEntregado, desmarcarRequerimientoEntregado });
 window.cerrarSesion = cerrarSesion;
+Object.assign(window, { teclaPin, volverAPerfiles, toggleMenuPerfil, borrarPin });

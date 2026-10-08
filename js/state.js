@@ -26,6 +26,8 @@ export const state = {
   valTipo: 'monofasico',
   // ── SESSION ──
   sesionUsuario: null, // { nombre }
+  login: null, // { nombre, paso: crear|confirmar|pin, pin, pin2, error } mientras se pone el PIN
+  menuPerfil: false, // menú del perfil en el encabezado
   tab: 'dashboard',
   showMas: false, // hoja "Más" del menú en celular
   areaFiltro: 'mia', // mia | todas (Inicio y pestañas de Trabajo)

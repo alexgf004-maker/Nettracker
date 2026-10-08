@@ -1118,3 +1118,21 @@ header { background-image: var(--onda), var(--degradado); background-repeat: rep
 .combo-elegir { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin: 8px 0 12px; }
 .combo-grupo small { display: block; font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: var(--text3); margin-bottom: 4px; }
 .combo-grupo > div { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* Entrada con PIN */
+.perfil-avatar.grande { width: 64px; height: 64px; font-size: 22px; margin: 0 auto 12px; }
+.pin-tarjeta { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.pin-puntos { display: flex; gap: 14px; margin: 6px 0 2px; }
+.pin-puntos i { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--primary); }
+.pin-puntos i.lleno { background: var(--primary); }
+.pin-error { min-height: 18px; font-size: 13px; font-weight: 700; color: var(--red); text-align: center; }
+.pin-teclado { display: grid; grid-template-columns: repeat(3, 72px); gap: 10px; }
+.pin-tecla { height: 58px; border-radius: 16px; border: 1px solid var(--border); background: var(--white); font: 700 22px var(--font); color: var(--text); cursor: pointer; }
+.pin-tecla:active { background: var(--primary-light); }
+.pin-tecla:disabled { opacity: .4; }
+.perfil-menu-wrap { position: relative; }
+.perfil-menu { position: absolute; right: 0; top: calc(100% + 8px); z-index: 120; min-width: 230px; background: var(--white); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-md); padding: 6px; display: flex; flex-direction: column; }
+.perfil-menu button { border: none; background: none; text-align: left; padding: 10px 12px; border-radius: 8px; font: 600 13px var(--font); color: var(--text); cursor: pointer; display: flex; align-items: center; gap: 8px; }
+.perfil-menu button:hover { background: var(--primary-light); }
+.perfil-menu-t { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: var(--text3); padding: 8px 12px 4px; border-top: 1px solid var(--border2); margin-top: 4px; }
+.perfil-menu-fondo { position: fixed; inset: 0; z-index: 110; }

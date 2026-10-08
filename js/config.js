@@ -2,7 +2,7 @@
 import { state } from './state.js';
 
 export const SEDES = ['Plantel Central', 'Subestación Cucumacayán'];
-export const TECNICOS = ['David García', 'Bryan Francia', 'Francisco Chulo', 'Vicente Ramos'];
+export const TECNICOS = ['David García', 'Bryan Francia', 'Francisco Chulo', 'Samuel Villalobos'];
 export const AREAS = ['CPT DELSUR', 'CPT MT', 'CPT BT', 'Campos y Servicios'];
 export const ADMIN = 'David García';
 export const isAdmin = () => state.sesionUsuario?.nombre === ADMIN;
@@ -11,7 +11,7 @@ export const USUARIOS = [
   { nombre: 'David García', area: 'CPT MT' },
   { nombre: 'Bryan Francia', area: 'CPT MT' },
   { nombre: 'Francisco Chulo', area: 'CPT BT' },
-  { nombre: 'Vicente Ramos', area: 'CPT BT' },
+  { nombre: 'Samuel Villalobos', area: 'CPT BT' },
 ];
 
 export const userArea = () => { const u = USUARIOS.find(x => x.nombre === state.sesionUsuario?.nombre); return u?.area || 'CPT MT'; };
