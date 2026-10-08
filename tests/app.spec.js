@@ -446,6 +446,39 @@ test.describe('Despachos y mapa', () => {
     await expect(app$(page)).toContainText('Subir archivo');
   });
 
+  test('acepta el formato de despacho de BT: encabezado más abajo, fechas de Excel, ubicación y retiro elegido al cargar', async ({ page }) => {
+    const XLSX = require('xlsx');
+    const serial = (Date.UTC(2026, 8, 4) - Date.UTC(1899, 11, 30)) / 864e5; // 04/09/2026 (el Excel lo muestra 9/4/26)
+    const filas = [
+      ['De: Calidad de producto BT'], ['Para: Campos y servicios.'], ['Asunto: Asignación de equipos'], ['Fecha: 04 DE SEPTIEMBRE'], [],
+      ['Mediante la presente se notifica asignación de 2 equipos'], [],
+      ['Número SIGET', 'Equipo', 'Id del Usuario', 'Nombre del Usuario', 'DIRECCION', 'Fecha instalación', 'Transformador', 'Medidor', 'Accesorio', 'Ubicación'],
+      ['CR192026901', 'SN-105', 100001, 'Usuario de prueba A', 'Colonia Ejemplo 1', serial, 'T-1', 'M-1', 'Cables', '13.5 -88.8'],
+      ['CR192026902', 'sn-106', 100002, 'Usuario de prueba B', 'Colonia Ejemplo 2', serial, 'T-2', 'M-2', 'Cables', '13.6 -88.9'],
+      [], [], ['', '', '', 'Firma de quien entrega'], ['', '', '', 'Unidad de Calidad', '', '', '', 'Campos & Servicios'],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(filas);
+    for (const c of ['F9', 'F10']) ws[c].z = 'm/d/yy';
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Hoja1');
+    app = await abrirApp(page, { excel: true });
+    await cerrarAlerta(page);
+    await nav(page, 'Despachos');
+    await app.ejecutar(() => setCargaSubView('subir'));
+    await page.locator('input[type=file][accept=".xlsx,.xls"]').setInputFiles({ name: 'Despacho_BT.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) });
+    // Dos filas (las firmas del pie no cuentan), con la fecha bien leída y sin retiro
+    await expect(app$(page)).toContainText('2 equipos sin fecha de retiro');
+    await expect(app$(page)).toContainText('Inst: 04/09/2026');
+    await expect(app$(page)).not.toContainText('Sin serie');
+    await page.locator('#carga-retiro').fill('2026-09-11');
+    await page.getByRole('button', { name: 'Poner fecha' }).click();
+    await expect(app$(page)).toContainText('Retiro: 11/09/2026');
+    await page.getByRole('button', { name: /Confirmar e importar \(2 equipos\)/ }).click();
+    const inst = (await app.escrituras()).filter(([op, ruta]) => op === 'push' && ruta === 'analizadores').map(e => e[2]);
+    expect(inst).toHaveLength(2);
+    expect(inst[0]).toMatchObject({ serie: 'SN-105', caso: 'CR192026901', fechaInstalacion: '2026-09-04', fechaRetiro: '2026-09-11', lat: '13.5', lng: '-88.8', areaBeneficiaria: 'CPT BT' });
+    expect(inst[1]).toMatchObject({ caso: 'CR192026902', lat: '13.6', lng: '-88.9' });
+  });
+
   test('mapa con filtros por área', async ({ page }) => {
     app = await abrirApp(page);
     await cerrarAlerta(page);

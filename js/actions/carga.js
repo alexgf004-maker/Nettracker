@@ -6,63 +6,71 @@ import { abrirMemo, showToast } from '../ui.js';
 import { eqEnCampo, today } from '../utils.js';
 import { render } from '../views/render.js';
 
+// Normaliza un encabezado: sin tildes, minúsculas y sin espacios de más
+const norm = v => String(v ?? '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ');
+
+// Fecha de una celda: número de serie de Excel, Date o texto (el texto se deja como viene, DD/MM/AAAA)
+function fechaCelda(v) {
+  if (v === '' || v == null) return '';
+  const dd = (d, m, y) => String(d).padStart(2, '0') + '/' + String(m).padStart(2, '0') + '/' + y;
+  if (v instanceof Date) return dd(v.getDate(), v.getMonth() + 1, v.getFullYear());
+  if (typeof v === 'number') { const p = XLSX.SSF.parse_date_code(v); return p ? dd(p.d, p.m, p.y) : ''; }
+  return String(v).trim();
+}
+
+// Filas del Excel de despacho (arreglo de arreglos) → filas de la carga. Acepta el formato de MT y el de BT:
+// el encabezado puede estar más abajo (el de BT trae De/Para/Asunto/Fecha arriba), sin fecha de retiro
+// y con "Ubicación" = "lat lng". Las filas sin equipo ni SIGET (firmas al pie) se ignoran.
+export function filasDespacho(aoa) {
+  const fila = aoa.findIndex(r => r.some(c => norm(c).includes('siget')) && r.some(c => norm(c) === 'equipo'));
+  if (fila < 0) return null;
+  const enc = aoa[fila].map(norm);
+  const col = (...nombres) => { const k = enc.findIndex(h => nombres.map(norm).includes(h)); return k; };
+  const c = {
+    caso: col('Numero SIGET', 'No SIGET', 'N° SIGET', 'SIGET'),
+    serie: col('Equipo'),
+    lugar: col('Nombre del Usuario', 'Nombre de Usuario', 'Nombre Usuario', 'Usuario'),
+    fechaInst: col('Fecha instalacion', 'FechaInstalacion', 'F. instalacion'),
+    fechaRetiro: col('Fecha retiro', 'FechaRetiro', 'F. retiro'),
+    notas: col('Transformador', 'Transf'),
+    medidor: col('Medidor'),
+    lat: col('Latitud', 'Lat'),
+    lng: col('Longitud', 'Lng', 'Long'),
+    ubicacion: col('Ubicacion', 'Coordenadas'),
+    idUsuario: col('Id del Usuario', 'ID Usuario', 'IdCliente', 'id_usuario'),
+    direccion: col('Direccion', 'Direccion 4'),
+    accesorios: col('Accesorios', 'Accesorio'),
+    multiplicador: col('Multiplicador', 'Mult'),
+    corrientes: col('Corrientes', 'Corriente'),
+    conexion: col('Conexion', 'Tipo conexion'),
+  };
+  const filas = [];
+  for (const r of aoa.slice(fila + 1)) {
+    const v = k => c[k] < 0 ? '' : String(r[c[k]] ?? '').trim();
+    if (!v('serie') && !v('caso')) continue;
+    let lat = v('lat'), lng = v('lng');
+    if (!lat && !lng && v('ubicacion')) [lat = '', lng = ''] = v('ubicacion').split(/[\s,;]+/).filter(Boolean);
+    filas.push({
+      serie: v('serie'), caso: v('caso'), lugar: v('lugar'),
+      fechaInst: c.fechaInst < 0 ? '' : fechaCelda(r[c.fechaInst]),
+      fechaRetiro: c.fechaRetiro < 0 ? '' : fechaCelda(r[c.fechaRetiro]),
+      notas: v('notas'), medidor: v('medidor'), lat, lng, idUsuario: v('idUsuario'), direccion: v('direccion'),
+      accesorios: v('accesorios'), multiplicador: v('multiplicador'), corrientes: v('corrientes'), conexion: v('conexion'),
+    });
+  }
+  return filas;
+}
+
 export function procesarExcel(file) {
   const reader = new FileReader();
   reader.onload = e => {
     try {
-      const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      // Find header row - look for row containing 'Número SIGET' or 'Numero SIGET'
-      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-      let headerRow = 0;
-      for (let r = range.s.r; r <= Math.min(range.s.r + 5, range.e.r); r++) {
-        const cell = ws[XLSX.utils.encode_cell({r, c: 0})];
-        if (cell && cell.v && cell.v.toString().toLowerCase().includes('siget')) { headerRow = r; break; }
-        const cell2 = ws[XLSX.utils.encode_cell({r, c: 1})];
-        if (cell2 && cell2.v && cell2.v.toString().toLowerCase().includes('equipo')) { headerRow = r; break; }
-      }
-      const rows = XLSX.utils.sheet_to_json(ws, { raw: false, range: headerRow });
-      if (rows.length === 0) return showToast('El archivo está vacío');
-
-      state.cargaData = rows.map(row => {
-        // Flexible column finder - handles accents, case, spaces
-        const findCol = (keys) => {
-          const rowKeys = Object.keys(row);
-          for (const k of keys) {
-            const found = rowKeys.find(rk => rk.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'') === k.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''));
-            if (found && row[found] !== undefined && row[found] !== '') return row[found];
-          }
-          return '';
-        };
-        const fmtDate = v => {
-          if (!v) return '';
-          if (typeof v === 'object' && v instanceof Date) return v.toLocaleDateString('es-SV');
-          const s = v.toString().trim();
-          // Handle Excel serial number dates
-          if (/^\d{5}$/.test(s)) {
-            const d = new Date(Math.round((parseInt(s) - 25569) * 86400 * 1000));
-            return d.toLocaleDateString('es-SV');
-          }
-          return s;
-        };
-        const serie = findCol(['Equipo']).toString().trim();
-        const caso = findCol(['Numero SIGET', 'Número SIGET', 'No SIGET', 'SIGET']).toString().trim();
-        const lugar = findCol(['Nombre del Usuario', 'Nombre de Usuario', 'Nombre Usuario', 'Usuario']).toString().trim();
-        const fechaInst = fmtDate(findCol(['Fecha instalacion', 'Fecha instalación', 'Fecha Instalacion', 'Fecha Instalación', 'FechaInstalacion']));
-        const fechaRetiro = fmtDate(findCol(['Fecha retiro', 'Fecha Retiro', 'FechaRetiro']));
-        const notas = findCol(['Transformador', 'Transf']).toString().trim();
-        const lat = findCol(['Latitud', 'Lat']).toString().trim();
-        const lng = findCol(['Longitud', 'Lng', 'Long']).toString().trim();
-        const idUsuario = findCol(['Id del Usuario','ID del Usuario','ID Usuario','IdCliente','id_usuario']).toString().trim();
-        const direccion = findCol(['Direccion','Dirección','DIRECCION','Direccion 4','Dirección 4']).toString().trim();
-        const accesorios = findCol(['Accesorios','ACCESORIOS','Accesorio']).toString().trim();
-        const multiplicador = findCol(['Multiplicador','MULTIPLICADOR','Mult']).toString().trim();
-        const corrientes = findCol(['Corrientes','CORRIENTES','Corriente']).toString().trim();
-        const conexion = findCol(['Conexion','Conexión','CONEXION','Tipo conexion','Tipo conexión']).toString().trim();
-
-        return validarFilaCarga({ serie, caso, lugar, fechaInst, fechaRetiro, notas, lat, lng, idUsuario, direccion, accesorios, multiplicador, corrientes, conexion });
-      });
-
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' });
+      const filas = filasDespacho(aoa);
+      if (!filas) return showToast('No encontré el encabezado (Número SIGET, Equipo…) en el archivo');
+      if (filas.length === 0) return showToast('El archivo está vacío');
+      state.cargaData = filas.map(validarFilaCarga);
       state.cargaView = 'preview';
       render();
     } catch(err) {
@@ -72,10 +80,18 @@ export function procesarExcel(file) {
   reader.readAsArrayBuffer(file);
 }
 
+// El formato de BT no trae fecha de retiro: se elige una al cargar y se pone a las filas que no la tienen
+export function aplicarRetiroCarga(iso) {
+  if (!iso) return showToast('Elige la fecha de retiro');
+  const [y, m, d] = iso.split('-');
+  state.cargaData = state.cargaData.map(r => r.fechaRetiro ? r : validarFilaCarga({ ...r, fechaRetiro: d + '/' + m + '/' + y }));
+  render();
+}
+
 // Revisa una fila del despacho (venga del Excel o de las Fechas de una campaña) y le agrega el equipo
 export function validarFilaCarga(fila) {
   const { serie, caso, fechaRetiro } = fila;
-  const eq = state.equipos.find(e => e.serie === serie);
+  const eq = state.equipos.find(e => e.serie === serie) || state.equipos.find(e => norm(e.serie) === norm(serie));
   let status = 'ok';
   let problema = '';
   if (!serie) { status = 'error'; problema = 'Sin número de serie'; }

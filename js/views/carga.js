@@ -197,10 +197,11 @@ export function renderCarga() {
       {name:'Equipo', desc:'Serie del analizador'},
       {name:'Nombre del Usuario', desc:'Lugar de instalación'},
       {name:'Fecha instalación', desc:'DD/MM/YYYY'},
-      {name:'Fecha retiro', desc:'DD/MM/YYYY'},
+      {name:'Fecha retiro', desc:'Si no viene, se elige al cargar'},
       {name:'Transformador', desc:'Va a notas'},
       {name:'Latitud', desc:'Opcional, para mapa'},
       {name:'Longitud', desc:'Opcional, para mapa'},
+      {name:'Ubicación', desc:'Opcional, "lat lng" en una columna'},
     ];
     cols.forEach(c => {
       html += '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border2)">';
@@ -221,6 +222,13 @@ export function renderCarga() {
     html += '<div style="flex:1;background:var(--yellow-light);border:1px solid var(--yellow);border-radius:10px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--yellow)">' + warn + '</div><div style="font-size:10px;color:var(--yellow);font-weight:600">ADVERTENCIA</div></div>';
     html += '<div style="flex:1;background:var(--red-light);border:1px solid var(--red);border-radius:10px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:800;color:var(--red)">' + err + '</div><div style="font-size:10px;color:var(--red);font-weight:600">BLOQUEADOS</div></div>';
     html += '</div>';
+
+    const sinRetiro = state.cargaData.filter(r => !r.fechaRetiro).length;
+    if (sinRetiro > 0) {
+      html += '<div class="carga-retiro"><div class="carga-retiro-t"><i class=ic-calendario></i> ' + sinRetiro + ' equipo' + (sinRetiro > 1 ? 's' : '') + ' sin fecha de retiro</div>';
+      html += '<div class="carga-retiro-s">Este formato no la trae. Elige la fecha de retiro y se pone a todos los que no la tienen.</div>';
+      html += '<div class="carga-retiro-f"><input type="date" id="carga-retiro"><button class="b b-p" onclick="aplicarRetiroCarga(document.getElementById(\'carga-retiro\').value)">Poner fecha</button></div></div>';
+    }
 
     if (err > 0) {
       html += '<div style="background:var(--red-light);border:1px solid #fecaca;border-radius:10px;padding:12px;margin-bottom:12px;font-size:12px;color:var(--red);font-weight:600"><i class=ic-alerta></i> Hay ' + err + ' equipo' + (err>1?'s':'') + ' bloqueado' + (err>1?'s':'') + '. Se registrarán solo los válidos y con advertencia.</div>';
