@@ -16,13 +16,14 @@ export const GRUPOS_ESTADO = [
 ];
 export const grupoDeEstado = estado => GRUPOS_ESTADO.find(([, , es]) => es.includes(estado || ''))?.[0] || 'por_resolver';
 
-// Puntos que hay que ir a validar en campo: los de "Por resolver" (Pendiente de validar, Revisar, Acceso denegado o sin estado)
-export const casosPorValidar = casos => casos.filter(c => grupoDeEstado(c.mult?.estado) === 'por_resolver');
+// Puntos que hay que ir a validar en campo: solo Pendiente de validar y Acceso denegado (los sin estado no)
+export const ESTADOS_POR_VALIDAR = ['Pendiente de validar', 'Acceso denegado'];
+export const casosPorValidar = casos => casos.filter(c => ESTADOS_POR_VALIDAR.includes(c.mult?.estado));
 // Listado de esos puntos: las columnas del listado de la campaña más el estado del multiplicador y su nota
 export function filasPorValidar(casos) {
   const [enc, ...filas] = filasListado(casos);
   const porCodigo = new Map(casos.map(c => [c.codigo, c]));
-  return [[...enc, 'ESTADO', 'NOTAS'], ...filas.map(f => { const c = porCodigo.get(f[1]) || {}; return [...f, c.mult?.estado || 'Sin estado', c.mult?.notas || '']; })];
+  return [[...enc, 'ESTADO', 'NOTAS'], ...filas.map(f => { const c = porCodigo.get(f[1]) || {}; return [...f, c.mult?.estado || '', c.mult?.notas || '']; })];
 }
 
 export const CONFIGURACIONES = ['Monofásico', 'Bifásico', 'Estrella', 'Delta', 'Estrella 2 hilos'];

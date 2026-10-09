@@ -2,7 +2,7 @@
 import { ordenarCasos } from '../domain/listados.js';
 import {
   calcularMultiplicador, CONFIGURACIONES, CR_OBLIGATORIOS_MT, estadosDe, GRUPOS_ESTADO, grupoDeEstado, historicoDe, POSICIONES_TAP,
-  redondear, resumenMultiplicadores, TENSIONES_BT,
+  casosPorValidar, redondear, resumenMultiplicadores, TENSIONES_BT,
 } from '../domain/multiplicadores.js';
 import { MESES, nombreCampana } from '../domain/trabajo.js';
 import { state } from '../state.js';
@@ -16,6 +16,7 @@ const tgEstado = e => (e ? `<span class="tg ${TG_GRUPO[grupoDeEstado(e)]}">${esc
 export function renderMultiplicadores(c) {
   const casos = ordenarCasos(c.casos);
   const r = resumenMultiplicadores(casos);
+  const nValidar = casosPorValidar(casos).length;
   const filtro = state.multFiltro || 'todos';
   const visibles = casos.filter(x => filtro === 'todos' || grupoDeEstado(x.mult?.estado) === filtro);
 
@@ -35,8 +36,8 @@ export function renderMultiplicadores(c) {
     <button class="b b-p" onclick="exportarMultiplicadores('${c.clave}')"><i class="ic ic-descargar"></i> Exportar multiplicadores</button>
     <label class="b b-g"><i class="ic ic-subir"></i> Importar desde Excel<input type="file" accept=".xlsx,.xlsm,.xls" hidden onchange="importarMultiplicadores(this.files)"></label>
     <span class="sep"></span>
-    <button class="b b-g" onclick="exportarPorValidar('${c.clave}', 'listado')" ${r.porGrupo.por_resolver ? '' : 'disabled'} title="Excel con los puntos que faltan por validar en campo"><i class="ic ic-excel"></i> Listado por validar (${r.porGrupo.por_resolver})</button>
-    <button class="b b-g" onclick="exportarPorValidar('${c.clave}', 'mapa')" ${r.porGrupo.por_resolver ? '' : 'disabled'} title="Archivo KML para importar en Google My Maps"><i class="ic ic-map-pin"></i> Mapa por validar</button>
+    <button class="b b-g" onclick="exportarPorValidar('${c.clave}', 'listado')" ${nValidar ? '' : 'disabled'} title="Excel con los Pendiente de validar y Acceso denegado"><i class="ic ic-excel"></i> Listado por validar (${nValidar})</button>
+    <button class="b b-g" onclick="exportarPorValidar('${c.clave}', 'mapa')" ${nValidar ? '' : 'disabled'} title="Archivo KML para importar en Google My Maps"><i class="ic ic-map-pin"></i> Mapa por validar</button>
   </div>`;
   html += '<details class="ayuda"><summary><i class="ic ic-ayuda"></i> ¿Cómo se calculan?</summary><p>Toca un caso para anotar lo que se vio en campo: configuración, posición del TAP, tensión según la placa del transformador, tensión de baja y X del medidor. El multiplicador ECAMEC, el DRANETZ y el TI se calculan con las mismas fórmulas del Excel. Si el usuario ya se midió antes, se puede usar su histórico. "Importar desde Excel" carga una hoja de multiplicadores ya hecha, con sus fechas y equipos.</p></details>';
   html += '</div>';
