@@ -1030,6 +1030,33 @@ test.describe('Precampaña', () => {
     await expect(page.locator('.toast')).toContainText('Sin coordenadas: CR1O2026202');
   });
 
+  test('multiplicadores: listado y mapa de los puntos por validar', async ({ page }) => {
+    const XLSX = require('xlsx');
+    const datos = conCampana();
+    const casos = datos.campanas['2026-10_CPT-MT'].casos;
+    Object.assign(casos.CR1O2026201, { lat: 13.67, lng: -89.28, mult: { estado: 'Realizado' } });
+    Object.assign(casos.CR1O2026202, { lat: 13.68, lng: -89.27, mult: { estado: 'Pendiente de validar', notas: 'Llamar antes' } });
+    app = await abrirApp(page, { datos, excel: true });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('multiplicadores'); });
+    // Por validar: el pendiente y el que no tiene estado (el Realizado no)
+    let descarga = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Listado por validar (2)' }).click();
+    let archivo = await descarga;
+    expect(archivo.suggestedFilename()).toBe('Por_validar_Octubre_2026_CPT_MT.xlsx');
+    const filas = XLSX.utils.sheet_to_json(XLSX.readFile(await archivo.path()).Sheets['Por validar'], { header: 1 });
+    expect(filas[0].slice(-2)).toEqual(['ESTADO', 'NOTAS']);
+    expect(filas.slice(1).map(f => [f[1], f[11], f[12]])).toEqual([['CR1O2026202', 'Pendiente de validar', 'Llamar antes'], ['DA1O2026011O00', 'Sin estado', '']]);
+    descarga = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Mapa por validar' }).click();
+    archivo = await descarga;
+    const kml = require('fs').readFileSync(await archivo.path(), 'utf8');
+    expect(kml.match(/<Placemark>/g)).toHaveLength(1);
+    expect(kml).toContain('<name>CR1O2026202</name>');
+    expect(kml).toContain('<Data name="ESTADO"><value>Pendiente de validar</value></Data>');
+    await expect(page.locator('.toast')).toContainText('Sin coordenadas: DA1O2026011O00');
+  });
+
   test('cartas: piden los datos del firmante la primera vez y se generan con el texto del equipo', async ({ page }) => {
     app = await abrirApp(page, { datos: conCampana() });
     await cerrarAlerta(page);

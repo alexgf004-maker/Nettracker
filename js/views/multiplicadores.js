@@ -34,6 +34,9 @@ export function renderMultiplicadores(c) {
   html += `<div class="barra-acciones">
     <button class="b b-p" onclick="exportarMultiplicadores('${c.clave}')"><i class="ic ic-descargar"></i> Exportar multiplicadores</button>
     <label class="b b-g"><i class="ic ic-subir"></i> Importar desde Excel<input type="file" accept=".xlsx,.xlsm,.xls" hidden onchange="importarMultiplicadores(this.files)"></label>
+    <span class="sep"></span>
+    <button class="b b-g" onclick="exportarPorValidar('${c.clave}', 'listado')" ${r.porGrupo.por_resolver ? '' : 'disabled'} title="Excel con los puntos que faltan por validar en campo"><i class="ic ic-excel"></i> Listado por validar (${r.porGrupo.por_resolver})</button>
+    <button class="b b-g" onclick="exportarPorValidar('${c.clave}', 'mapa')" ${r.porGrupo.por_resolver ? '' : 'disabled'} title="Archivo KML para importar en Google My Maps"><i class="ic ic-map-pin"></i> Mapa por validar</button>
   </div>`;
   html += '<details class="ayuda"><summary><i class="ic ic-ayuda"></i> ¿Cómo se calculan?</summary><p>Toca un caso para anotar lo que se vio en campo: configuración, posición del TAP, tensión según la placa del transformador, tensión de baja y X del medidor. El multiplicador ECAMEC, el DRANETZ y el TI se calculan con las mismas fórmulas del Excel. Si el usuario ya se midió antes, se puede usar su histórico. "Importar desde Excel" carga una hoja de multiplicadores ya hecha, con sus fechas y equipos.</p></details>';
   html += '</div>';
