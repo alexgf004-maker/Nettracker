@@ -2,8 +2,8 @@
 import { db, ref, set, update } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
-import { ordenarCasos } from '../domain/listados.js';
-import { filasMultiplicadores, historicoDe, leerMultiplicadoresExcel, planificarMultiplicadores } from '../domain/multiplicadores.js';
+import { kmlMapa, ordenarCasos } from '../domain/listados.js';
+import { casosPorValidar, filasMultiplicadores, filasPorValidar, historicoDe, leerMultiplicadoresExcel, planificarMultiplicadores } from '../domain/multiplicadores.js';
 import { leerArchivo } from './campanas.js';
 import { hoyLocal, MESES } from '../domain/trabajo.js';
 import { render } from '../views/render.js';
@@ -63,6 +63,28 @@ export function exportarMultiplicadores(clave) {
   XLSX.utils.book_append_sheet(wb, ws, 'Multiplicadores');
   XLSX.writeFile(wb, `Multiplicadores_${MESES[g.mes - 1]}_${g.anio}_${g.area.replace(/\s+/g, '_')}.xlsx`);
   showToast('Multiplicadores exportados');
+}
+
+// Listado (Excel) o mapa (KML para My Maps) de los puntos que hay que ir a validar en campo
+export function exportarPorValidar(clave, formato) {
+  const g = state.campanas?.[clave];
+  const casos = casosPorValidar(Object.values(g?.casos || {}));
+  if (!casos.length) return showToast('No hay puntos por validar');
+  const base = `Por_validar_${MESES[g.mes - 1]}_${g.anio}_${g.area.replace(/\s+/g, '_')}`;
+  if (formato === 'mapa') {
+    const { kml, conPunto, sinCoordenadas } = kmlMapa(`Por validar ${MESES[g.mes - 1]} ${g.anio} ${g.area}`, casos, filasPorValidar);
+    if (!conPunto) return showToast('Ninguno de los puntos por validar tiene coordenadas. Complétalas en Casos.');
+    const url = URL.createObjectURL(new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' }));
+    const a = document.createElement('a'); a.href = url; a.download = base + '.kml';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    return showToast(sinCoordenadas.length ? `Mapa con ${conPunto} puntos. Sin coordenadas: ${sinCoordenadas.join(', ')}` : `Mapa con ${conPunto} puntos por validar`);
+  }
+  const ws = hojaConEstilo(filasPorValidar(casos), { anchos: [12, 18, 40, 60, 12, 12, 12, 12, 30, 14, 10, 20, 40] });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Por validar');
+  XLSX.writeFile(wb, base + '.xlsx');
+  showToast(`Listado con ${casos.length} puntos por validar`);
 }
 
 // ── IMPORTAR UN EXCEL DE MULTIPLICADORES YA HECHO (también trae las fechas y el equipo de cada caso) ──

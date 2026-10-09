@@ -1,6 +1,6 @@
 // Multiplicadores: cómo se programa el analizador en cada caso, según lo que se vio en campo.
 // Mismas opciones y fórmulas que la hoja "Multiplicadores" del Excel del equipo. Funciones puras.
-import { normalizar, normalizarNC } from './listados.js';
+import { filasListado, normalizar, normalizarNC } from './listados.js';
 import { buscarCasoImportado } from './trabajo.js';
 import { fechaExcel } from './fechas.js';
 
@@ -15,6 +15,15 @@ export const GRUPOS_ESTADO = [
   ['no_se_miden', 'No se medirán', ['Cliente de baja', 'Conexión no posible']],
 ];
 export const grupoDeEstado = estado => GRUPOS_ESTADO.find(([, , es]) => es.includes(estado || ''))?.[0] || 'por_resolver';
+
+// Puntos que hay que ir a validar en campo: los de "Por resolver" (Pendiente de validar, Revisar, Acceso denegado o sin estado)
+export const casosPorValidar = casos => casos.filter(c => grupoDeEstado(c.mult?.estado) === 'por_resolver');
+// Listado de esos puntos: las columnas del listado de la campaña más el estado del multiplicador y su nota
+export function filasPorValidar(casos) {
+  const [enc, ...filas] = filasListado(casos);
+  const porCodigo = new Map(casos.map(c => [c.codigo, c]));
+  return [[...enc, 'ESTADO', 'NOTAS'], ...filas.map(f => { const c = porCodigo.get(f[1]) || {}; return [...f, c.mult?.estado || 'Sin estado', c.mult?.notas || '']; })];
+}
 
 export const CONFIGURACIONES = ['Monofásico', 'Bifásico', 'Estrella', 'Delta', 'Estrella 2 hilos'];
 export const POSICIONES_TAP = ['1', '2', '3', '4', '5', 'MP', 'Tapón', 'Interno'];

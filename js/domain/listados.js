@@ -204,9 +204,10 @@ export function filasListado(casos) {
 // Mapa para el contratista (Google My Maps): KML con un punto por caso, todos del mismo color
 // (en la precampaña todavía no hay fechas de instalación). Cada punto lleva las columnas del listado,
 // que My Maps muestra como tabla. Devuelve { kml, conPunto, sinCoordenadas: [códigos] }.
-export function kmlMapa(nombre, casos) {
+// `armarFilas` permite otro listado con las mismas columnas base (p. ej. los puntos por validar, con su estado).
+export function kmlMapa(nombre, casos, armarFilas = filasListado) {
   const x = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  const [enc, ...filas] = filasListado(casos);
+  const [enc, ...filas] = armarFilas(casos);
   const iLat = enc.indexOf('LATITUD'); const iLng = enc.indexOf('LONGITUD'); const iCod = enc.indexOf('CÓDIGO SIGET');
   const num = v => (v === '' || v === null || v === undefined || Number.isNaN(Number(v)) ? null : Number(v));
   const conPunto = filas.filter(f => num(f[iLat]) !== null && num(f[iLng]) !== null);
