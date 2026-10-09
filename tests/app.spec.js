@@ -1030,23 +1030,26 @@ test.describe('Precampaña', () => {
     await expect(page.locator('.toast')).toContainText('Sin coordenadas: CR1O2026202');
   });
 
-  test('multiplicadores: listado y mapa de los puntos por validar', async ({ page }) => {
+  test('multiplicadores: listado y mapa de los puntos por validar (pendientes y acceso denegado)', async ({ page }) => {
     const XLSX = require('xlsx');
     const datos = conCampana();
     const casos = datos.campanas['2026-10_CPT-MT'].casos;
     Object.assign(casos.CR1O2026201, { lat: 13.67, lng: -89.28, mult: { estado: 'Realizado' } });
     Object.assign(casos.CR1O2026202, { lat: 13.68, lng: -89.27, mult: { estado: 'Pendiente de validar', notas: 'Llamar antes' } });
+    Object.assign(casos.DA1O2026011O00, { mult: { estado: 'Acceso denegado' } });
+    casos.CR1O2026203 = { ...casos.CR1O2026202, codigo: 'CR1O2026203', codigoEnte: 'CR1O2026203', nc: '333', mult: {} }; // sin estado: no va
+    casos.CR1O2026204 = { ...casos.CR1O2026202, codigo: 'CR1O2026204', codigoEnte: 'CR1O2026204', nc: '444', mult: { estado: 'Revisar' } }; // tampoco
     app = await abrirApp(page, { datos, excel: true });
     await cerrarAlerta(page);
     await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('multiplicadores'); });
-    // Por validar: el pendiente y el que no tiene estado (el Realizado no)
+    // Por validar: el pendiente y el de acceso denegado (no el realizado, el sin estado ni el de revisar)
     let descarga = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Listado por validar (2)' }).click();
     let archivo = await descarga;
     expect(archivo.suggestedFilename()).toBe('Por_validar_Octubre_2026_CPT_MT.xlsx');
     const filas = XLSX.utils.sheet_to_json(XLSX.readFile(await archivo.path()).Sheets['Por validar'], { header: 1 });
     expect(filas[0].slice(-2)).toEqual(['ESTADO', 'NOTAS']);
-    expect(filas.slice(1).map(f => [f[1], f[11], f[12]])).toEqual([['CR1O2026202', 'Pendiente de validar', 'Llamar antes'], ['DA1O2026011O00', 'Sin estado', '']]);
+    expect(filas.slice(1).map(f => [f[1], f[11], f[12]])).toEqual([['CR1O2026202', 'Pendiente de validar', 'Llamar antes'], ['DA1O2026011O00', 'Acceso denegado', '']]);
     descarga = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Mapa por validar' }).click();
     archivo = await descarga;
