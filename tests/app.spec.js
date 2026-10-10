@@ -271,7 +271,7 @@ test.describe('Instalaciones', () => {
 
   test('registrar una instalación nueva guarda en Firebase', async ({ page }) => {
     await page.getByRole('button', { name: 'Nuevo', exact: true }).click();
-    await expect(app$(page)).toContainText('Nuevo instalación');
+    await expect(app$(page)).toContainText('Nueva instalación');
     await app.ejecutar(() => {
       openSelector(); setSelectorSearch('105'); pickEquipo('e6');
       setField('caso', 'C-999'); setField('lugar', 'Lugar X'); setField('fechaRetiro', '2026-10-30');
