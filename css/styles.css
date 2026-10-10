@@ -1143,3 +1143,13 @@ header { background-image: var(--onda), var(--degradado); background-repeat: rep
 .carga-retiro-s { font-size: 12px; color: var(--text2); margin: 2px 0 10px; }
 .carga-retiro-f { display: flex; gap: 8px; }
 .carga-retiro-f input { flex: 1; min-width: 0; border: 1.5px solid var(--border); border-radius: 10px; padding: 9px 10px; font: 600 14px var(--font); background: #fff; color: var(--text); }
+
+/* Seguimiento FT: recordatorio de las fotos de los trabajos antes de la remedición (MEMOS) */
+.aviso-fotos { display: flex; gap: 12px; align-items: flex-start; background: #fff7ed; border: 2px solid #f59e0b; border-left-width: 6px; border-radius: 12px; padding: 12px 14px; margin: 8px 0 10px; color: #7c2d12; }
+.aviso-fotos > .ic { font-size: 22px; color: #d97706; flex-shrink: 0; margin-top: 1px; }
+.aviso-fotos b { display: block; font-size: 14px; font-weight: 800; color: #7c2d12; }
+.aviso-fotos span { display: block; font-size: 12.5px; margin-top: 3px; line-height: 1.45; }
+.aviso-fotos span b { display: inline; font-size: inherit; }
+.aviso-remedicion-tit { font-size: 11px; font-weight: 800; letter-spacing: .8px; text-transform: uppercase; color: var(--red); margin-top: 10px; }
+.ft-recordatorio { display: block; font-weight: 500; line-height: 1.45; }
+.ft-recordatorio b { font-weight: 800; }

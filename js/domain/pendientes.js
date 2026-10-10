@@ -72,6 +72,8 @@ export function calcularPendientes({ registros, campanasGuardadas = {}, reclamos
     if (x.cerrado || (area && x.area !== area)) continue;
     const ref = { clase: 'ft', tipo: x.tipo, clave: x.clave, id: x.id, caso: x.codigo };
     if (!x.ft.aviso) lista.push({ ...ref, urgencia: 'hoy', fecha: hoy, titulo: `Avisar a DELSUR del caso FT ${x.codigo}`, detalle: x.caso.nombre || '' });
+    if (!x.ft.sistema) lista.push({ ...ref, urgencia: 'hoy', fecha: hoy, titulo: `Subir al sistema el caso FT ${x.codigo}`, detalle: x.caso.nombre || '' });
+    if (!x.ft.resumen) lista.push({ ...ref, urgencia: 'hoy', fecha: hoy, titulo: `Enviar por correo el Resumen punto medido de ${x.codigo}`, detalle: x.caso.nombre || '' });
     if (x.limite && cuenta(x.limite)) {
       const u = urgencia(x.limite, hoy);
       if (u !== 'ok') lista.push({ ...ref, urgencia: u, fecha: x.limite, titulo: `Plazo de 90 días del caso FT ${x.codigo}`, detalle: x.caso.nombre || '' });

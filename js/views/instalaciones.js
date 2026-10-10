@@ -4,6 +4,7 @@ import { state } from '../state.js';
 import { badgeSt } from '../ui.js';
 import { calcSt, daysUntil, fmtDate, today } from '../utils.js';
 import { heroSeccion } from './componentes.js';
+import { avisoRemedicionHTML } from './ft.js';
 
 export function renderInstalaciones() {
   let html = '';
@@ -119,7 +120,7 @@ export function renderInstalaciones() {
   else if (state.view === 'form') {
     const selEq = state.form.equipoId ? state.equipos.find(e => e.id === state.form.equipoId) : null;
     html += `<div class="content">
-        <div class="page-title">${state.editId ? 'Editar instalación' : 'Nuevo instalación'}</div>
+        <div class="page-title">${state.editId ? 'Editar instalación' : 'Nueva instalación'}</div>
         <div class="form-section">
           <div class="form-section-title">Equipo</div>
           <div class="field"><label>Seleccionar equipo *</label>
@@ -134,6 +135,7 @@ export function renderInstalaciones() {
           <div class="field"><label>Código de caso / campaña *</label>
             <input placeholder="Ej: CR1D2025201" value="${state.form.caso}" oninput="setField('caso',this.value)">
           </div>
+          <div id="aviso-remedicion">${avisoRemedicionHTML(state.form.caso)}</div>
         </div>
         <div class="form-section">
           <div class="form-section-title">Ubicación</div>

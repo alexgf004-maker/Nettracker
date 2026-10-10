@@ -5,6 +5,7 @@ import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { emptyForm, eqSt } from '../utils.js';
 import { render } from '../views/render.js';
+import { avisoRemedicionHTML } from '../views/ft.js';
 import { closeDanioModal, confirmDanio, editarDanio, openDanioModal, reimprimirMemoDanio } from '../actions/danio.js';
 
 window.setFilter = f => { state.filterStatus = f; render(); };
@@ -22,7 +23,12 @@ window.setSearch = v => {
   }
 };
 
-window.setField = (k, v) => { state.form[k] = v; if (k === 'energiaTipoInst' || k === 'areaInstalacion' || k === 'locMode') render(); };
+window.setField = (k, v) => {
+  state.form[k] = v;
+  if (k === 'energiaTipoInst' || k === 'areaInstalacion' || k === 'locMode') render();
+  // Remedición de un caso FT: el recordatorio de las fotos aparece mientras se escribe el código (sin redibujar el formulario)
+  if (k === 'caso') { const el = document.getElementById('aviso-remedicion'); if (el) el.innerHTML = avisoRemedicionHTML(v); }
+};
 window.setLocMode = m => { state.locMode = m; render(); };
 window.triggerGPS = getGPS;
 window.setRetiroDesc = v => { state.retiroForm.descripcion = v; };
