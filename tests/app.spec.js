@@ -1371,6 +1371,48 @@ test.describe('Precampaña', () => {
     await expect(page.locator('.section-title', { hasText: 'Cerrados (1)' })).toBeVisible();
   });
 
+  test('seguimiento FT: subir al sistema, Resumen punto medido y fotos de los trabajos para la remedición', async ({ page }) => {
+    const datos = conCampana();
+    datos.analizadores = { ...datos.analizadores, r20: { serie: 'SN-300', caso: 'CR1O2026201', fechaInstalacion: '2026-09-01', fechaRetiro: '2026-09-09', areaInstalacion: 'CPT MT', retirado: true, fechaRetiroReal: '2026-09-09', fechaRegistro: '2026-09-01' } };
+    datos.campanas['2026-10_CPT-MT'].casos.CR1O2026201.resultado = { medicion: 'valida', tolerancia: 'fuera' };
+    datos.campanas['2026-10_CPT-MT'].casos.CR1O2026201.ft = { aviso: { fecha: '2026-09-20', por: 'David García' } };
+    app = await abrirApp(page, { datos });
+    await cerrarAlerta(page);
+    // En Inicio, hasta marcarlos
+    const hoy = page.locator('.grupo', { has: page.locator('.grupo-titulo', { hasText: 'Hoy' }) });
+    await expect(hoy).toContainText('Subir al sistema el caso FT CR1O2026201');
+    await expect(hoy).toContainText('Enviar por correo el Resumen punto medido de CR1O2026201');
+    await nav(page, 'Seguimiento FT');
+    const card = page.locator('.card', { hasText: 'CR1O2026201' });
+    await expect(card).toContainText('Falta subir al sistema');
+    await expect(card).toContainText('Falta enviar Resumen punto medido');
+    await card.click();
+    const modal = page.locator('.modal');
+    await expect(modal).toContainText('la gráfica que genera el sistema');
+    await expect(modal.locator('.aviso-fotos')).toContainText('toma fotografías de los trabajos realizados');
+    await expect(modal.locator('.aviso-fotos')).toContainText('MEMOS');
+    await modal.getByRole('button', { name: 'Marcar caso subido al sistema' }).click();
+    expect((await app.escrituras()).at(-1)).toEqual(['set', 'campanas/2026-10_CPT-MT/casos/CR1O2026201/ft/sistema', { fecha: '2026-09-23', por: 'David García' }]);
+    await modal.getByRole('button', { name: 'Marcar Resumen punto medido enviado' }).click();
+    expect((await app.escrituras()).at(-1)[1]).toBe('campanas/2026-10_CPT-MT/casos/CR1O2026201/ft/resumen');
+    await expect(modal).toContainText('Enviado el 23/09/2026 por David García');
+    await app.ejecutar(() => cerrarFT());
+    await expect(card).not.toContainText('Falta subir al sistema');
+    // Al registrar la remedición (CR2…), el recordatorio de las fotos aparece mientras se escribe el código
+    await app.ejecutar(() => newInstallFromDash());
+    const codigo = page.getByPlaceholder('Ej: CR1D2025201');
+    await codigo.fill('CR1O2026202');
+    await expect(page.locator('#aviso-remedicion')).toBeEmpty();
+    await codigo.fill('CR2O2026201');
+    await expect(page.locator('#aviso-remedicion')).toContainText('Remedición del caso FT CR1O2026201');
+    await expect(page.locator('#aviso-remedicion .aviso-fotos')).toContainText('MEMOS');
+    // Marcadas las fotos en el seguimiento, ya no insiste
+    await app.ejecutar(() => { abrirFT('2026-10_CPT-MT', 'CR1O2026201'); });
+    await page.locator('.modal').getByRole('button', { name: 'Marcar fotos subidas a MEMOS' }).click();
+    await expect(page.locator('.modal .aviso-fotos')).toHaveCount(0);
+    await expect(page.locator('.modal')).toContainText('Fotos subidas a MEMOS el 23/09/2026');
+  });
+
   test('seguimiento FT: pasados los 90 días queda vencido', async ({ page }) => {
     const datos = conCampana();
     datos.analizadores = { ...datos.analizadores, r20: { serie: 'SN-300', caso: 'CR1O2026201', fechaInstalacion: '2026-06-01', fechaRetiro: '2026-06-09', areaInstalacion: 'CPT MT', retirado: true, fechaRetiroReal: '2026-06-09', fechaRegistro: '2026-06-01' } };

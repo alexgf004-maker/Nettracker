@@ -20,6 +20,15 @@ export function quitarAvisoFT(clave, id) {
   if (!confirm('¿Quitar el registro del aviso?')) return;
   remove(ref(db, ruta(clave, id) + '/aviso'));
 }
+// Pasos que se marcan con fecha y quién: sistema, resumen (Resumen punto medido) y fotos (fotos de los trabajos en MEMOS)
+export function marcarPasoFT(clave, id, paso) {
+  const msg = { sistema: 'Caso subido al sistema', resumen: 'Resumen punto medido enviado', fotos: 'Fotos subidas a MEMOS' }[paso] || 'Paso registrado';
+  set(ref(db, ruta(clave, id) + '/' + paso), firma()).then(() => showToast(msg));
+}
+export function quitarPasoFT(clave, id, paso) {
+  if (!confirm('¿Quitar este paso como hecho?')) return;
+  remove(ref(db, ruta(clave, id) + '/' + paso));
+}
 export function setRutaFT(clave, id, valor) { update(ref(db, ruta(clave, id)), { ruta: valor || null }); }
 export function setCompensacionFT(clave, id, valor) {
   const v = String(valor || '').trim().replace(',', '.');

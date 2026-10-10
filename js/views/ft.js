@@ -1,5 +1,5 @@
 // Pestaña Seguimiento FT: casos fuera de tolerancia de todas las campañas, con su plazo de 90 días
-import { DIAS_SOLUCION_FT, RUTAS_FT } from '../domain/ft.js';
+import { DIAS_SOLUCION_FT, ftDeRemedicion, RUTAS_FT } from '../domain/ft.js';
 import { todosFT } from '../domain/expedientes.js';
 import { hoyLocal, nombreCampana } from '../domain/trabajo.js';
 import { state } from '../state.js';
@@ -41,6 +41,7 @@ export function renderFT() {
           <div class="barra-leyenda" style="margin:4px 0 0"><span>Día ${x.dias} de ${DIAS_SOLUCION_FT}</span><span>Instalación ${fmtDate(x.inicio)} · plazo ${fmtDate(x.limite)}</span></div>` : ''}
         <div class="tags">
           ${x.ft.aviso ? `<span class="tg verde"><i class="ic ic-correo"></i> Aviso enviado ${fmtDate(x.ft.aviso.fecha)}</span>` : '<span class="tg rojo"><i class="ic ic-correo"></i> Falta avisar a DELSUR</span>'}
+          ${x.cerrado ? '' : `${x.ft.sistema ? '' : '<span class="tg rojo"><i class="ic ic-subir"></i> Falta subir al sistema</span>'}${x.ft.resumen ? '' : '<span class="tg rojo"><i class="ic ic-correo"></i> Falta enviar Resumen punto medido</span>'}`}
           ${x.ft.ruta ? `<span class="tg azul">${esc(x.ft.ruta)}</span>` : ''}
           ${x.remedicionInstalada ? `<span class="tg gris">Remedición ${esc(x.remedicionInstalada.codigo)} ${x.remedicionInstalada.retirado ? 'retirada' : 'en campo'}</span>` : ''}
           ${x.vencido ? '<span class="tg rojo">Más de 90 días: se penalizan los 90 días y la compensación sigue</span>' : ''}
@@ -69,7 +70,17 @@ export function renderFTModal() {
     ? `<div class="aviso aviso-verde"><i class="ic ic-check"></i> Enviado el ${fmtDate(ft.aviso.fecha)} por ${esc(ft.aviso.por)} <button class="btn-link" onclick="quitarAvisoFT('${clave}', '${id}')">Deshacer</button></div>`
     : `<button class="btn btn-primary" onclick="marcarAvisoFT('${clave}', '${id}')"><i class="ic ic-correo"></i> Marcar aviso enviado por correo</button>`;
 
-  html += '<div class="section-title" style="margin-top:12px">2. Ruta de solución</div>';
+  // Pasos que se marcan con fecha y quién (salen en Inicio hasta marcarlos)
+  const paso = (k, hecho, boton, icono) => ft[k]
+    ? `<div class="aviso aviso-verde"><i class="ic ic-check"></i> ${hecho} el ${fmtDate(ft[k].fecha)} por ${esc(ft[k].por)} <button class="btn-link" onclick="quitarPasoFT('${clave}', '${id}', '${k}')">Deshacer</button></div>`
+    : `<button class="btn btn-primary" onclick="marcarPasoFT('${clave}', '${id}', '${k}')"><i class="ic ic-${icono}"></i> ${boton}</button>`;
+  html += '<div class="section-title" style="margin-top:12px">2. Subir el caso al sistema</div>';
+  html += paso('sistema', 'Subido', 'Marcar caso subido al sistema', 'subir');
+  html += '<div class="section-title" style="margin-top:12px">3. Resumen punto medido</div>';
+  if (!ft.resumen) html += '<div class="aviso aviso-amarillo ft-recordatorio"><i class="ic ic-correo"></i> Envía por correo el <b>Resumen punto medido</b>: la gráfica que genera el sistema al subir el caso.</div>';
+  html += paso('resumen', 'Enviado', 'Marcar Resumen punto medido enviado', 'correo');
+
+  html += '<div class="section-title" style="margin-top:12px">4. Ruta de solución</div>';
   html += `<div class="field"><select onchange="setRutaFT('${clave}', '${id}', this.value)"><option value="">Sin definir</option>${RUTAS_FT.map(r => `<option ${ft.ruta === r ? 'selected' : ''}>${r}</option>`).join('')}</select></div>`;
   html += `<div class="field"><label>Compensación diaria informada (el cálculo de montos está pendiente de definir)</label><input inputmode="decimal" value="${esc(ft.compensacionDiaria ?? '')}" onchange="setCompensacionFT('${clave}', '${id}', this.value)"></div>`;
 
@@ -77,7 +88,9 @@ export function renderFTModal() {
   (ft.notas || []).forEach(n => { html += `<div class="fila"><div class="fila-main"><div class="fila-sub">${fmtDate(n.fecha)} · ${esc(n.por)}</div><div>${esc(n.texto)}</div></div></div>`; });
   html += `</div><div class="row"><input id="ft-nota" value="${esc(state.ftNota)}" oninput="setFTNota(this.value)" placeholder="Ej.: mediciones aledañas, memo de soluciones, presupuesto enviado…"><button class="btn-accion" onclick="agregarNotaFT('${clave}', '${id}')">Agregar</button></div>`;
 
-  html += '<div class="section-title" style="margin-top:12px">3. Remedición (cierra el caso)</div>';
+  html += '<div class="section-title" style="margin-top:12px">5. Remedición (cierra el caso)</div>';
+  html += avisoFotos(ft.fotos);
+  html += paso('fotos', 'Fotos subidas a MEMOS', 'Marcar fotos subidas a MEMOS', 'subir');
   if (x.remedicionInstalada) html += `<div class="aviso aviso-azul"><i class="ic ic-info"></i> Instalación encontrada: ${esc(x.remedicionInstalada.codigo)} desde el ${fmtDate(x.remedicionInstalada.fecha)}${x.remedicionInstalada.retirado ? ' (retirada)' : ''}</div>`;
   html += `<div class="row"><div class="field"><label>Código</label><input value="${esc(rem.codigo || x.remedicionInstalada?.codigo || '')}" onchange="setRemedicionFT('${clave}', '${id}', 'codigo', this.value)"></div>
     <div class="field"><label>Fecha</label><input type="date" value="${esc(rem.fecha || '')}" onchange="setRemedicionFT('${clave}', '${id}', 'fecha', this.value)"></div></div>`;
@@ -87,4 +100,18 @@ export function renderFTModal() {
   html += x.cerrado ? '<div class="aviso aviso-verde"><i class="ic ic-check"></i> Caso cerrado por remedición normalizada</div>' : '';
   html += '<button class="btn btn-secondary" style="margin-top:8px" onclick="cerrarFT()">Cerrar</button>';
   return html + '</div></div>';
+}
+
+// Recordatorio de las fotos de los trabajos antes de la remedición (en Seguimiento FT y al registrar la remedición)
+export function avisoFotos(hecho) {
+  if (hecho) return '';
+  return `<div class="aviso-fotos"><i class="ic ic-alerta"></i><div><b>Antes de remedir: toma fotografías de los trabajos realizados</b>
+    <span>Todo lo que se hizo para mejorar el voltaje (cambio de trafo, transferencia, conexiones, etc.). Después súbelas a la carpeta compartida <b>MEMOS</b>.</span></div></div>`;
+}
+
+// En el formulario de instalación: si el código es la remedición de un caso FT abierto, recuerda las fotos
+export function avisoRemedicionHTML(codigo) {
+  const x = ftDeRemedicion(codigo, todosFT(state.campanas, state.reclamos, state.records, hoyLocal()));
+  if (!x) return '';
+  return `<div class="aviso-remedicion-tit">Remedición del caso FT ${esc(x.codigo)}</div>` + (avisoFotos(x.ft.fotos) || '<div class="aviso aviso-verde"><i class="ic ic-check"></i> Fotos de los trabajos ya subidas a MEMOS</div>');
 }

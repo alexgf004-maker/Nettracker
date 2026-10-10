@@ -16,6 +16,18 @@ export function codigoRemedicion(codigo) {
   return m ? `${m[1]}${Number(m[2]) + 1}${m[3]}` : '';
 }
 
+// ¿Este código es la remedición de un caso FT abierto? Mismo caso con un número de medición mayor
+// (CR1… → CR2…, RE1… → RE2…). Devuelve el caso FT o null.
+export function ftDeRemedicion(codigo, listaFT) {
+  const partes = c => /^(CR|DA|DF|RE)(\d)(.+)$/.exec(String(c || '').trim().replace(/^[[#]+|\]+$/g, '').replace(/\s+/g, '').toUpperCase());
+  const r = partes(codigo);
+  if (!r) return null;
+  return listaFT.find(x => {
+    const f = partes(x.codigo);
+    return !x.cerrado && f && f[1] === r[1] && f[3] === r[3] && Number(r[2]) > Number(f[2]);
+  }) || null;
+}
+
 // Todos los casos FT de las campañas guardadas
 export function casosFT(campanas, registros, hoy) {
   const lista = [];

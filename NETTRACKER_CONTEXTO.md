@@ -294,6 +294,8 @@ En el detalle de la campaña:
 Pestaña Trabajo → Seguimiento FT (`js/domain/ft.js`, `casos/{id}/ft`). Los casos FT salen de Resultados (válida + fuera de tolerancia):
 - Plazo: 90 días calendario desde la instalación de la medición inicial (no desde el retiro ni la descarga).
 - Paso 1: aviso a DELSUR por correo, lo antes posible (aparece en Inicio como pendiente de hoy hasta marcarlo).
+- Paso 2: subir el caso al sistema (`ft/sistema`). Paso 3: enviar por correo el **Resumen punto medido**, la gráfica que genera ese sistema (`ft/resumen`). Los dos se marcan con fecha y quién (`marcarPasoFT`) y, como el aviso, salen en Inicio como pendientes de hoy hasta marcarlos; la tarjeta muestra lo que falta.
+- Antes de la remedición: recuadro destacado para tomar fotografías de los trabajos realizados y subirlas a la carpeta compartida MEMOS, con "Marcar fotos subidas a MEMOS" (`ft/fotos`). El mismo recordatorio aparece en el formulario de instalación al escribir el código de la remedición de un caso FT abierto (CR1… → CR2…, RE1… → RE2…; `ftDeRemedicion` en `domain/ft.js`, `avisoRemedicionHTML` en `views/ft.js`).
 - Ruta: Estudio y propuesta de obras, Transferencia de alimentador o CPT DELSUR y Planificación. Bitácora libre para los pasos (mediciones aledañas, memo, presupuesto…).
 - Compensación diaria informada: solo se anota; el cálculo de montos está pendiente de definir.
 - Remedición: el mismo código con el número de medición siguiente (CR1… → CR2…); si existe la instalación se muestra. Solo "Sí, se normalizó" cierra el caso.
