@@ -50,7 +50,7 @@ export function documentoXML(bloques) {
       case 'p': return parrafo(corridas(b.texto), { alineado: 'both' });
       case 'vineta': return parrafo(corridas('▪ ') + corridas(b.texto), { alineado: 'both', sangria: 360 });
       case 'formula': return parrafo(corridas(b.texto, { negrita: true, sz: 22 }), { alineado: 'center', antes: 60, despues: 180 });
-      case 'grafica': return parrafo(corridas(`[Gráfica: ${b.texto}]`, { italica: true, color: '0E7490' }), { alineado: 'center', antes: 60, despues: 180 });
+      case 'grafica': return parrafo(corridas(`[${b.foto ? 'Foto' : 'Gráfica'}: ${b.texto}]`, { italica: true, color: '0E7490' }), { alineado: 'center', antes: 60, despues: 180 });
       case 'tabla': return tablaXML(b);
       default: return '';
     }

@@ -2042,6 +2042,86 @@ test.describe('Análisis de reclamos', () => {
     expect(XLSX.CFB.find(zip, '/[Content_Types].xml')).toBeTruthy();
   });
 
+  test('inspección: reglas de puesta a tierra y del rango de placa del equipo', async ({ page }) => {
+    app = await abrirApp(page);
+    const r = await page.evaluate(async tt => {
+      const m = await import('/js/domain/reclamo.js');
+      const i = await import('/js/domain/inspeccion.js');
+      const d = m.leerTension(tt);
+      return {
+        tierra: [i.veredictoTierra('22.3'), i.veredictoTierra(25), i.veredictoTierra('320'), i.veredictoTierra('')],
+        kva: i.kvaTotal({ cantidad: '3', kva: '100' }),
+        // 13200 V entre 12 000 y 13 500: los 10 registros al 8 % (14 256 V) quedan arriba → 6.9 % del tiempo
+        eq: i.tensionVsEquipo(d.U, ['1', '2', '3'], { vmin: '12000', vmax: '13500' }),
+        // Secundario equivalente (÷ 55) contra 200–240 V: 13200/55 = 240 dentro; 14256/55 = 259 arriba
+        sec: i.tensionVsEquipo(d.U, ['1'], { vmin: 200, vmax: 240 }, 55),
+        sinRango: i.tensionVsEquipo(d.U, ['1'], { vmin: '', vmax: 240 }),
+      };
+    }, txtTension());
+    expect(r.tierra).toEqual(['CUMPLE', 'CUMPLE', 'NO CUMPLE', null]);
+    expect(r.kva).toBe(300);
+    expect(r.eq.porFase['1']).toMatchObject({ n: 144, arriba: 10, abajo: 0 });
+    expect(r.eq.peor).toBeCloseTo(10 / 144, 6);
+    expect(r.eq.cumple).toBe(false); // más del 5 % del tiempo
+    expect(r.sec.porFase['1'].arriba).toBe(10);
+    expect(r.sinRango).toBeNull();
+  });
+
+  test('inspección: se llena en el expediente y sale en el borrador de informe', async ({ page }) => {
+    app = await abrirApp(page, { excel: true });
+    await cerrarAlerta(page);
+    await nav(page, 'Reclamos');
+    await page.locator('.exp-card', { hasText: 'RE192026456' }).click();
+    await page.getByRole('tab', { name: /Inspección/ }).click();
+    await expect(page.getByRole('tab', { name: /Inspección/ })).toContainText('Sin llenar');
+    await page.locator('#insp-fecha').fill('2026-09-01'); await page.locator('#insp-fecha').dispatchEvent('change');
+    await page.locator('#insp-circuito').fill('AL999-23KV'); await page.locator('#insp-circuito').press('Tab');
+    await page.locator('#insp-subestacion-tipo').selectOption('Banco de transformadores');
+    await page.locator('#insp-subestacion-cantidad').fill('3'); await page.locator('#insp-subestacion-cantidad').press('Tab');
+    await page.locator('#insp-subestacion-kva').fill('100'); await page.locator('#insp-subestacion-kva').press('Tab');
+    await expect(page.locator('.bloque', { hasText: 'Subestación del usuario' })).toContainText('300 kVA en total');
+    await page.locator('#insp-subestacion-conexionPri').selectOption('Estrella');
+    await page.locator('#insp-subestacion-conexionSec').selectOption('Delta');
+    await page.locator('#insp-medidor-rtc').fill('600/5'); await page.locator('#insp-medidor-rtc').press('Tab');
+    await page.getByRole('button', { name: 'Agregar tablero' }).click();
+    const tb = page.locator('.insp-item').first();
+    await tb.locator('input[id$="-nombre"]').fill('Sub-tablero del VFD'); await tb.locator('input[id$="-nombre"]').press('Tab');
+    await tb.locator('input[id$="-tierra"]').fill('abc'); await tb.locator('input[id$="-tierra"]').press('Tab');
+    await expect(page.locator('.toast')).toContainText('solo el número');
+    await tb.locator('input[id$="-tierra"]').fill('320'); await tb.locator('input[id$="-tierra"]').press('Tab');
+    await expect(page.locator('.insp-item').first()).toContainText('320 Ω · no cumple');
+    await page.getByRole('button', { name: 'Agregar equipo dañado' }).click();
+    const eq = page.locator('.insp-item').nth(1);
+    await eq.locator('input[id$="-equipo"]').fill('Variador de frecuencia'); await eq.locator('input[id$="-equipo"]').press('Tab');
+    await eq.locator('input[id$="-vmin"]').fill('12000'); await eq.locator('input[id$="-vmin"]').press('Tab');
+    await eq.locator('input[id$="-vmax"]').fill('13500'); await eq.locator('input[id$="-vmax"]').press('Tab');
+    await eq.locator('input[id$="-monto"]').fill('$1500'); await eq.locator('input[id$="-monto"]').press('Tab');
+    await eq.locator('select[id$="-disponible"]').selectOption('no');
+    await expect(page.getByRole('tab', { name: /Inspección/ })).toContainText('Visita 01/09/2026');
+    // Borrador desde el análisis con relación TC distinta a la del medidor (aviso para verificar)
+    await page.evaluate(([tt, ta]) => {
+      abrirAnalisisReclamo('r9');
+      cargarTXTReclamo([{ nombre: 'RE192026456.txt', texto: tt }, { nombre: 'RE1920264560.txt', texto: ta }]);
+      setParamReclamo('relI', '800/5');
+    }, [txtTension(), txtArmonicos()]);
+    const descarga = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Borrador de informe (Word)' }).click();
+    const XLSX = require('xlsx-js-style');
+    const zip = XLSX.CFB.read(require('fs').readFileSync(await (await descarga).path()), { type: 'buffer' });
+    const doc = Buffer.from(XLSX.CFB.find(zip, '/word/document.xml').content).toString().replace(/<[^>]+>/g, '');
+    expect(doc).toContain('AL999-23KV / [completar]');
+    expect(doc).toContain('La subestación en análisis está conformada por un banco de transformadores con una capacidad nominal total de 300 kVA, integrado por 3 transformadores de 100 kVA. El banco presenta una configuración estrella en el lado primario y delta en el lado secundario.');
+    expect(doc).toContain('[verificar] La RTC del medidor (600/5) no coincide con la relación de corriente usada en la medición (800/5).');
+    expect(doc).toContain('obteniéndose un valor de 320 Ω');
+    expect(doc).toContain('por encima del límite máximo aceptable (25 Ω)');
+    expect(doc).toContain('ya no se encontraba disponible en sitio');
+    expect(doc).toContain('$1500');
+    expect(doc).toContain('[Foto: Subestación del usuario]');
+    expect(doc).toContain('Tensión frente al rango de operación del variador de frecuencia');
+    expect(doc).toContain('Resistencia a tierra — Sub-tablero del VFD25 Ω (NEC 2008)320 ΩNO CUMPLE');
+    expect(doc).toContain('6.9% del tiempo fuera de rangoNO CUMPLE');
+  });
+
   test('descarga los Excel de tensión y armónicos con sus gráficas', async ({ page }) => {
     const XLSX = require('xlsx-js-style');
     app = await abrirApp(page, { excel: true });

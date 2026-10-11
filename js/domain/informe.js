@@ -2,6 +2,7 @@
 // análisis de los TXT. Funciones puras: devuelven bloques (títulos, párrafos, tablas y marcas de gráfica) que
 // js/docx.js convierte en un Word para terminarlo a mano. Lo que la app no sabe queda como [completar].
 // Redacción y artículos citados como en los informes CPT (SIGET, Acuerdo 38-E-2015).
+import { kvaTotal, LIMITE_TIERRA, lista, tensionVsEquipo, veredictoTierra } from './inspeccion.js';
 import { DATI_LIM, estadisticas, LIMITE_PST, P_UMBRAL, percentil, TIPOS_RED, UMBRAL_FT, VDAT_LIM } from './reclamo.js';
 
 export const COMPLETAR = '[completar]';
@@ -132,6 +133,11 @@ export function borradorInforme({ exp = {}, inst = {}, params = {}, d = null, t 
   const periodo = d ? periodoTexto(d.inicio, d.fin) : arm?.n ? periodoTexto(arm.inicio, arm.fin) : COMPLETAR;
   const punto = inst.reclamo?.punto || '';
   const conclusiones = []; const bullets = [];
+  const insp = exp.inspeccion || {};
+  const sub = insp.subestacion || {}; const med = insp.medidor || {};
+  const tableros = lista(insp.tableros); const equipos = lista(insp.equipos);
+  const minus = x => String(x || '').toLowerCase();
+  const foto = texto => B.push({ t: 'grafica', texto: texto, foto: true });
 
   B.push({ t: 'titulo', texto: `INFORME DE RECLAMO ${exp.codigo || inst.caso || ''}`.trim(), sub: `${usuario}${exp.ct ? ' · ' + exp.ct : ''}` });
   B.push({ t: 'nota', texto: `Borrador generado por NetTracker${hoy ? ' el ' + fechaISO(hoy) : ''} con los datos del expediente y el análisis de los TXT${punto ? ` del punto ${punto}` : ''}. Revisar y completar lo marcado ${COMPLETAR} antes de entregar.` });
@@ -143,7 +149,7 @@ export function borradorInforme({ exp = {}, inst = {}, params = {}, d = null, t 
     ['NC (ID de usuario)', exp.nc || COMPLETAR],
     ['Dirección', exp.direccion || COMPLETAR],
     ['Referencia eléctrica (CT)', exp.ct || COMPLETAR],
-    ['Circuito / Subestación', COMPLETAR],
+    ['Circuito / Subestación', insp.circuito || insp.subestacionDist ? [insp.circuito || COMPLETAR, insp.subestacionDist || COMPLETAR].join(' / ') : COMPLETAR],
     ['Tensión nominal', nominal ? `${nominal} V` : COMPLETAR],
     ['Urbanidad y red', `${red.label} (${tolTxt})`],
     ['Código de reclamo / WO', [exp.codigo || inst.caso, exp.wo].filter(Boolean).join(' / ') || COMPLETAR],
@@ -165,13 +171,57 @@ export function borradorInforme({ exp = {}, inst = {}, params = {}, d = null, t 
     ['Total de registros', [d && `${d.n} registros (tensión)`, arm?.n && `${arm.n} registros (armónicos)`].filter(Boolean).join(' · ') || COMPLETAR],
   ], { anchos: [35, 65] });
 
-  // 3. Inspección: no está en la app todavía
+  // 3. Inspección (checklist del expediente)
   h('3. INSPECCIÓN DE INSTALACIONES DEL USUARIO');
-  p(`${COMPLETAR} Subestación, medidor de facturación, tablero, puesta a tierra y equipo dañado.`);
+  let sub3 = 0; const h3 = texto => h(`3.${++sub3}. ${texto}`, 2);
+  if (insp.fecha) p(`La inspección se realizó el ${fechaISO(insp.fecha)}${insp.atendio ? `, atendida por ${insp.atendio} por parte del usuario` : ''}.`);
+  h3('Subestación del usuario');
+  if (Object.values(sub).some(Boolean)) {
+    const total = kvaTotal(sub); const cant = Number(sub.cantidad) || 0;
+    let tx = `La subestación en análisis está conformada por ${sub.tipo && sub.tipo !== 'Otro' ? (/^Banco/.test(sub.tipo) ? 'un banco de transformadores' : 'un ' + minus(sub.tipo)) : `equipo de transformación ${COMPLETAR}`}${total ? ` con una capacidad nominal total de ${n(total, 0)} kVA` : ''}${cant > 1 && sub.kva ? `, integrado por ${cant} transformadores de ${sub.kva} kVA` : ''}.`;
+    if (sub.conexionPri || sub.conexionSec) tx += ` ${cant > 1 ? 'El banco presenta' : 'Presenta'} una configuración ${minus(sub.conexionPri) || COMPLETAR} en el lado primario y ${minus(sub.conexionSec) || COMPLETAR} en el lado secundario${sub.vSec ? `, con tensión secundaria de ${sub.vSec} V` : ''}.`;
+    if (sub.tap) tx += ` Actualmente, ${cant > 1 ? 'los transformadores se encuentran' : 'el transformador se encuentra'} operando con el TAP en ${sub.tap}.`;
+    if (sub.notas) tx += ` ${sub.notas}`;
+    p(tx);
+  } else p(COMPLETAR);
+  foto('Subestación del usuario');
+  h3('Punto de entrega – medidor de facturación');
+  if (Object.values(med).some(Boolean)) {
+    let tx = `El medidor de facturación${med.modelo ? ` ${med.modelo}` : ''} opera a través de transformadores de potencial y de corriente${med.rtc ? `, con una relación de transformación de ${med.rtc} en corriente` : ''}${med.rtp ? ` y ${med.rtp} en voltaje` : ''}.${med.serie ? ` El número de serie del equipo de medición corresponde al ${med.serie}.` : ''}`;
+    const rtc = leerRelacion(med.rtc);
+    if (rtc && relI && Math.abs(rtc.factor - relI.factor) > 1e-9) tx += ` [verificar] La RTC del medidor (${rtc.texto}) no coincide con la relación de corriente usada en la medición (${relI.texto}).`;
+    if (med.notas) tx += ` ${med.notas}`;
+    p(tx);
+  } else p(COMPLETAR);
+  foto('Medidor de facturación');
+  tableros.forEach(tb => {
+    h3(`Tablero ${tb.nombre || COMPLETAR}`);
+    if (tb.observaciones) p(tb.observaciones);
+    if (tb.protecciones) p(`Protecciones: ${tb.protecciones}`);
+    const ver = veredictoTierra(tb.tierra);
+    if (ver) {
+      p(`Se realizó medición de resistencia a tierra en este punto, obteniéndose un valor de ${tb.tierra} Ω, valor que, conforme al Código Eléctrico Nacional (NEC 2008), adoptado por referencia por la SIGET para la verificación de redes de puesta a tierra, se encuentra ${ver === 'CUMPLE' ? `dentro del límite máximo aceptable (${LIMITE_TIERRA} Ω)` : `por encima del límite máximo aceptable (${LIMITE_TIERRA} Ω)`}.`);
+    }
+    foto(`Tablero ${tb.nombre || ''}`.trim());
+  });
+  if (!tableros.length) { h3('Tablero eléctrico'); p(COMPLETAR); }
+  h3('Equipo dañado');
+  if (equipos.length) {
+    equipos.forEach(eq => {
+      const nombre = [eq.equipo, eq.marca && `marca ${eq.marca}`, eq.modelo && `modelo ${eq.modelo}`].filter(Boolean).join(', ') || COMPLETAR;
+      let tx = `Equipo reportado como dañado: ${nombre}.`;
+      if (eq.descripcion) tx += ` ${eq.descripcion}`;
+      if (eq.vmin && eq.vmax) tx += ` Rango de voltaje de operación según placa: ${eq.vmin} – ${eq.vmax} V.`;
+      if (eq.disponible === 'no') tx += ` Al momento de la inspección${insp.fecha ? ` (${fechaISO(insp.fecha)})` : ''}, el equipo reportado como dañado ya no se encontraba disponible en sitio para su verificación física, por lo que no fue posible constatar de forma directa el tipo o alcance del daño interno.`;
+      p(tx);
+      foto(`Placa de ${eq.equipo || 'equipo dañado'}`);
+    });
+    if (equipos.some(eq => eq.monto)) tabla(['Equipo', 'Marca / modelo', 'Monto reclamado'], equipos.map(eq => [eq.equipo || COMPLETAR, [eq.marca, eq.modelo].filter(Boolean).join(' / ') || '—', eq.monto ? `$${eq.monto}` : COMPLETAR]), { anchos: [40, 35, 25] });
+  } else p(COMPLETAR);
 
   // 4. Mediciones
   h(`4. MEDICIONES – ${usuario}`);
-  p(`El usuario ${usuario}${exp.direccion ? `, ubicado en ${exp.direccion},` : ''} está asociado a la referencia eléctrica ${exp.ct || COMPLETAR}, alimentado desde el circuito ${COMPLETAR}.`);
+  p(`El usuario ${usuario}${exp.direccion ? `, ubicado en ${exp.direccion},` : ''} está asociado a la referencia eléctrica ${exp.ct || COMPLETAR}, alimentado desde el circuito ${insp.circuito || COMPLETAR}${insp.subestacionDist ? ` proveniente de ${insp.subestacionDist}` : ''}.`);
 
   let sub4 = 0; const h4 = texto => h(`4.${++sub4}. ${texto}`, 2);
   if (d && t?.resumen) {
@@ -209,6 +259,21 @@ export function borradorInforme({ exp = {}, inst = {}, params = {}, d = null, t 
       tabla(['Parámetro', ...fases.map(f => `U${f} [V]`)], [['Máx', 'max'], ['Prom', 'prom'], ['Mín', 'min']].map(([l, k]) => [l, ...fases.map(f => n(sec[f][k], 2))]), { anchos: [25, ...fases.map(() => 75 / fases.length)] });
       p(`Respecto a ${relV.secundario} V ${tolTxt} (${n(inf, 1)} V a ${n(sup, 1)} V), ${fuera.every(x => x === 0) ? 'ningún registro del secundario equivalente queda fuera de la banda' : `quedan fuera de la banda ${enumerar(fases.map((f, i) => `${fuera[i]} registros en ${ORDINAL_FASE[f]}`))}`}.`);
     }
+
+    // Tensión frente al rango de placa de los equipos dañados
+    const factorEq = enMT && relV ? relV.factor : 1;
+    equipos.forEach(eq => {
+      const r2 = tensionVsEquipo(d.U, fases, eq, factorEq);
+      if (!r2) return;
+      const nom = eq.equipo || 'equipo dañado';
+      h4(`Tensión frente al rango de operación del ${minus(nom)}`);
+      const fs = Object.keys(r2.porFase);
+      const base = `${factorEq !== 1 ? 'la tensión secundaria equivalente' : 'la tensión medida'}${eq.base === 'ff' ? ' llevada a fase-fase (×√3)' : ''}`;
+      grafica(`Perfil de tensión con la banda del ${minus(nom)} (${r2.vmin}–${r2.vmax} V)`);
+      tabla(['Fase', 'Prom [V]', 'Máx [V]', 'Mín [V]', `Sobre ${r2.vmax} V`, `Bajo ${r2.vmin} V`], fs.map(f => { const x = r2.porFase[f]; return [`U${f}`, n(x.prom, 1), n(x.max, 1), n(x.min, 1), pct(x.pArriba * 100, 1), pct(x.pAbajo * 100, 1)]; }), { anchos: [16, 16, 16, 16, 18, 18] });
+      p(`Se comparó ${base} con el rango de tensión de entrada admisible del ${minus(nom)} según su placa (${r2.vmin} – ${r2.vmax} V). ${r2.cumple ? `La tensión se mantuvo dentro de ese rango, con a lo sumo ${pct(r2.peor * 100, 1)} del tiempo fuera de él.` : `La tensión estuvo fuera de ese rango hasta el ${pct(r2.peor * 100, 1)} del tiempo, por encima del 5% admitido.`} ${COMPLETAR} Interpretar la responsabilidad (especificación del equipo o calidad del suministro).`);
+      conclusiones.push([`Tensión vs. tolerancia del ${minus(nom)} (${r2.vmin}-${r2.vmax} V, dato de fabricante)`, `${r2.vmin}–${r2.vmax} V (fabricante)`, `${pct(r2.peor * 100, 1)} del tiempo fuera de rango`, r2.cumple ? 'CUMPLE' : 'NO CUMPLE']);
+    });
 
     // Corrientes
     const ic = analizarCorrientes(d, fases);
@@ -300,6 +365,10 @@ export function borradorInforme({ exp = {}, inst = {}, params = {}, d = null, t 
   // 8. Conclusiones
   h('8. CONCLUSIONES');
   conclusiones.push(['Continuidad (SAIFI/SAIDI)', '8 / 16 h', COMPLETAR, COMPLETAR]);
+  tableros.forEach(tb => {
+    const ver = veredictoTierra(tb.tierra);
+    if (ver) conclusiones.push([`Resistencia a tierra — ${tb.nombre || 'tablero'}`, `${LIMITE_TIERRA} Ω (NEC 2008)`, `${tb.tierra} Ω`, ver]);
+  });
   tabla(['Parámetro', 'Límite SIGET', 'Resultado', 'Veredicto'], conclusiones, { veredicto: true, anchos: [30, 24, 26, 20] });
   bullets.forEach(vineta);
 
