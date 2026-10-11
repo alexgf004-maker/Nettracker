@@ -1974,6 +1974,74 @@ test.describe('Análisis de reclamos', () => {
     await expect(page.locator('.arch-slot.lleno')).toHaveCount(0);
   });
 
+  test('borrador de informe: redacta las secciones con los datos del expediente y del análisis', async ({ page }) => {
+    app = await abrirApp(page);
+    const b = await page.evaluate(async ([tt, ta]) => {
+      const m = await import('/js/domain/reclamo.js');
+      const inf = await import('/js/domain/informe.js');
+      const d = m.leerTension(tt);
+      const params = { fases: 3, nominal: '13200', red: 'urbano_mt', relV: '13200/120', relI: '800/5' };
+      const t = m.analizarTension(d, { fases: 3, nominal: 13200, tol: 0.06 });
+      const arm = m.analizarArmonicos(ta, 3);
+      const exp = { codigo: 'RE192026456', wo: 'WO-100200', ct: 'CT10001', motivo: 'Se requiere el estudio de voltaje', nc: '900100', nombre: 'USUARIO DE PRUEBA', direccion: 'CALLE PRUEBA 1' };
+      const inst = { serie: 'SN-202', modelo: 'PQ-2', caso: 'RE192026456', fechaInstalacion: '2026-09-01', fechaRetiroReal: '2026-09-02' };
+      return { bloques: inf.borradorInforme({ exp, inst, params, d, t, arm, hoy: '2026-10-11' }), periodo: inf.periodoTexto('28/07/2026 10:00', '03/08/2026 09:50'), rel: inf.leerRelacion('22290 / 240') };
+    }, [txtTension(), txtArmonicos()]);
+    const texto = b.bloques.map(x => x.texto || '').join('\n');
+    expect(b.periodo).toBe('28 de julio al 3 de agosto del 2026');
+    expect(b.rel.factor).toBeCloseTo(92.875, 6);
+    // Generalidades y equipo de medición
+    const [gen, equipo] = b.bloques.filter(x => x.t === 'tabla' && x.encabezado[0] === 'Característica');
+    expect(gen.filas).toContainEqual(['Referencia eléctrica (CT)', 'CT10001']);
+    expect(gen.filas).toContainEqual(['Circuito / Subestación', '[completar]']);
+    expect(equipo.filas).toContainEqual(['Analizador de redes', 'PQ-2: SN-202']);
+    expect(equipo.filas).toContainEqual(['Factor multiplicador', 'Voltaje= 13200/120   Corriente= 800/5']);
+    expect(equipo.filas).toContainEqual(['Intervalo de regulación de tensión', '10 minutos']);
+    expect(equipo.filas).toContainEqual(['Total de registros', '144 registros (tensión) · 144 registros (armónicos)']);
+    // Regulación: FEBNoPer con su fórmula y el periodo
+    expect(texto).toContain('4.1. Resultados de calidad de energía en media tensión – 1 de septiembre del 2026');
+    expect(texto).toContain('se obtuvo un total de 144 registros, de los cuales se obtuvieron 0 registros inválidos y 10 registros fuera de tolerancia');
+    expect(texto).toContain('FEBNoPer = NtrgNoPer / NrgTOT = 10 / (144 − 0) × 100% = 6.94%');
+    expect(texto).toContain('4.2. Perfil de tensión secundario');
+    expect(texto).toContain('4.3. Perfil de corriente medido');
+    expect(texto).toContain('4.4. Perfil de distorsión por efecto parpadeo flicker');
+    // Flicker: P95 cumple aunque haya un pico
+    expect(texto).toContain('resultó en 0.5000, 0.5000 y 0.5000 para las fases U1, U2 y U3 respectivamente, dentro del límite unitario');
+    expect(texto).toContain('Se observa 1 registro puntual que supera el límite de referencia (1 en U1)');
+    expect(texto).not.toContain('mayor magnitud'); // con corrientes iguales no se inventa una fase mayor
+    // Armónicos: el VDAT cumple pero el H5 de la fase 1 no (como el hallazgo del informe)
+    expect(texto).toContain('No obstante, el armónico individual H5 incumple su límite propio (6.00%) en la Fase 1');
+    // Conclusiones con su veredicto
+    const concl = b.bloques.find(x => x.t === 'tabla' && x.encabezado[0] === 'Parámetro' && x.encabezado[1] === 'Límite SIGET');
+    expect(concl.filas[0]).toEqual(['Regulación de tensión (MT)', '±6% (Art. 22-23)', 'FEBNoPer 6.9%', 'NO CUMPLE']);
+    expect(concl.filas.map(f => f[0])).toEqual(['Regulación de tensión (MT)', 'Flicker Pst', 'Armónicos de tensión (VDAT)', 'Armónicos individuales de tensión', 'Armónicos de corriente (DATI)', 'Continuidad (SAIFI/SAIDI)']);
+    expect(concl.filas[3][3]).toBe('NO CUMPLE');
+    expect(b.bloques.filter(x => x.t === 'vineta').length).toBe(4);
+  });
+
+  test('descarga el borrador de informe en Word desde el análisis del reclamo', async ({ page }) => {
+    app = await abrirApp(page, { excel: true });
+    await cerrarAlerta(page);
+    await page.evaluate(([tt, ta]) => {
+      abrirAnalisisReclamo('r9');
+      cargarTXTReclamo([{ nombre: 'RE192026456.txt', texto: tt }, { nombre: 'RE1920264560.txt', texto: ta }]);
+    }, [txtTension(), txtArmonicos()]);
+    await page.locator('#ar-reli').fill('800/5'); await page.locator('#ar-reli').press('Tab');
+    const descarga = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Borrador de informe (Word)' }).click();
+    const d = await descarga;
+    expect(d.suggestedFilename()).toBe('RE192026456_Borrador_informe.docx');
+    const XLSX = require('xlsx-js-style');
+    const zip = XLSX.CFB.read(require('fs').readFileSync(await d.path()), { type: 'buffer' });
+    const doc = Buffer.from(XLSX.CFB.find(zip, '/word/document.xml').content).toString();
+    expect(doc).toContain('INFORME DE RECLAMO RE192026456');
+    expect(doc).toContain('USUARIO DE PRUEBA');
+    expect(doc).toContain('Corriente= 800/5');
+    expect(doc).toContain('w:highlight w:val="yellow"'); // lo que falta va resaltado
+    expect(XLSX.CFB.find(zip, '/word/styles.xml')).toBeTruthy();
+    expect(XLSX.CFB.find(zip, '/[Content_Types].xml')).toBeTruthy();
+  });
+
   test('descarga los Excel de tensión y armónicos con sus gráficas', async ({ page }) => {
     const XLSX = require('xlsx-js-style');
     app = await abrirApp(page, { excel: true });

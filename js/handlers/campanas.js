@@ -14,6 +14,7 @@ import { moverCursorGrafica, salirCursorGrafica } from '../views/graficas.js';
 import { agregarComboReclamo, limpiarComboReclamo, limpiarGraficar, quitarComboReclamo, restablecerZoomReclamo, setZoomReclamo, toggleEscalaReclamo, toggleSerieComboReclamo } from '../actions/analisis-reclamo.js';
 import { abrirAnalisisReclamo, cargarTXTReclamo, cerrarAnalisisReclamo, guardarAnalisisReclamo, setParamReclamo, setVistaReclamo, subirTXTReclamo } from '../actions/analisis-reclamo.js';
 import { exportarArmonicosReclamo, exportarTensionReclamo } from '../actions/excel-reclamo.js';
+import { exportarBorradorInforme } from '../actions/informe.js';
 import { cursorReclamo, salirCursorReclamo, zoomFin, zoomInicio } from '../views/analisis-reclamo.js';
 import { abrirPuntoReclamo, cerrarPuntoReclamo, desvincularPuntoReclamo, registrarPuntoReclamo, setNombrePunto, vincularPuntoReclamo } from '../actions/expedientes.js';
 import { abrirExpediente, abrirNuevoReclamo, cerrarExpediente, cerrarNuevoReclamo, completarCoordenadasReclamo, eliminarExpediente, guardarDatoExpediente, guardarNuevoReclamo, leerCorreoNuevoReclamo, registrarInstalacionReclamo, setCampoNuevoReclamo, setExpedienteVista } from '../actions/expedientes.js';
@@ -69,7 +70,7 @@ window.setFTNota = v => { state.ftNota = v; };
 Object.assign(window, { verGraficas, cerrarGraficas, exportarSeries, moverCursorGrafica, salirCursorGrafica });
 
 // Análisis de reclamos (macros Graficar y Armónicos)
-Object.assign(window, { abrirAnalisisReclamo, cerrarAnalisisReclamo, subirTXTReclamo, cargarTXTReclamo, setParamReclamo, setVistaReclamo, guardarAnalisisReclamo, exportarTensionReclamo, exportarArmonicosReclamo, cursorReclamo, salirCursorReclamo, zoomInicio, zoomFin });
+Object.assign(window, { abrirAnalisisReclamo, cerrarAnalisisReclamo, subirTXTReclamo, cargarTXTReclamo, setParamReclamo, setVistaReclamo, guardarAnalisisReclamo, exportarTensionReclamo, exportarArmonicosReclamo, exportarBorradorInforme, cursorReclamo, salirCursorReclamo, zoomInicio, zoomFin });
 
 // Expedientes de reclamo
 Object.assign(window, { abrirNuevoReclamo, cerrarNuevoReclamo, leerCorreoNuevoReclamo, setCampoNuevoReclamo, guardarNuevoReclamo, abrirExpediente, cerrarExpediente, setExpedienteVista, guardarDatoExpediente, completarCoordenadasReclamo, registrarInstalacionReclamo, eliminarExpediente });
