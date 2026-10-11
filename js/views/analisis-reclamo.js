@@ -4,6 +4,9 @@ import {
   analizarArmonicos, analizarTension, ARMONICAS, catalogoSeries, LIMITE_INVALIDO, tituloCombo, CARGA_ALERTA, DATI_LIM, LIMITE_PST, NIVELES, PERC_MAX,
   leerTension, TIPOS_RED, VDAT_LIM,
 } from '../domain/reclamo.js';
+import { diagnosticarArmonicos } from '../domain/diagnostico.js';
+import { claveExpediente } from '../domain/expedientes.js';
+import { normalizarInspeccion } from '../domain/inspeccion.js';
 import { state } from '../state.js';
 import { escapeHtml, fmtDate } from '../utils.js';
 import { COLOR_FASE } from './graficas.js';
@@ -347,6 +350,27 @@ function bloqueCombinadas(a, d, fases, ventana, piso) {
   return html + '</div>';
 }
 
+// Datos del reclamo que usa el diagnóstico: si es MT y la subestación y cargas de la inspección
+export function contextoDiagnostico(a) {
+  const rec = a?.id ? state.records.find(x => x.id === a.id) : null;
+  const exp = rec ? state.reclamos?.[rec.reclamo?.id || claveExpediente(rec.caso)] : null;
+  const insp = normalizarInspeccion(exp?.inspeccion);
+  return { enMT: /_mt$/.test(a?.params?.red || 'urbano_mt'), subestacion: insp.subestacion || {}, cargas: insp.cargas || {} };
+}
+
+// Diagnóstico: contexto en amperios, tipo de carga, origen (como indicio), horario y severidad
+function bloqueDiagnostico(arm, ctx) {
+  const dg = diagnosticarArmonicos(arm, ctx);
+  if (!dg) return '';
+  const filas = [...dg.severidad.tension.map(x => ({ ...x, tipo: 'Tensión' })), ...dg.severidad.corriente.map(x => ({ ...x, tipo: 'Corriente' }))];
+  const tabla = filas.length ? `<div class="tabla-wrap"><table class="tabla-est"><thead><tr><th>Orden</th><th>Tipo</th><th>Límite</th><th>P95 (fase)</th><th>Veces el límite</th><th>% del tiempo fuera</th></tr></thead><tbody>
+    ${filas.map(x => `<tr><td>H${x.n}</td><td>${x.tipo}</td><td>${fmt(x.limite, 2)} %</td><td>${fmt(x.p95, 2)} % (F${x.fase})</td><td><b>${fmt(x.veces, 2)}×</b></td><td>${fmt(x.pctTiempo, 1)} %</td></tr>`).join('')}</tbody></table></div>` : '';
+  const sinInsp = !ctx.subestacion?.tipo ? '<div class="page-sub">Con la conexión del transformador de la inspección del reclamo, el diagnóstico también revisa los armónicos triplen.</div>' : '';
+  return `<div class="bloque diagnostico"><div class="bloque-head"><div class="bloque-titulo">Diagnóstico</div><span class="tg gris">Indicios para el informe</span></div>
+    ${dg.parrafos.map(t => `<p class="diag-p">${esc(t)}</p>`).join('') || '<div class="page-sub">Sin hallazgos que comentar.</div>'}
+    ${tabla ? `<div class="insp-sub" style="margin-top:8px">Severidad de lo que no cumple</div>${tabla}` : ''}${sinInsp}</div>`;
+}
+
 function seccionArmonicos(a, c) {
   const arm = c.arm;
   if (!a.armonicos) return aviso('Sube el TXT de armónicos (el de 10 minutos, 197 columnas) para evaluar los armónicos según SIGET 38-E-2015.', 'azul');
@@ -357,6 +381,7 @@ function seccionArmonicos(a, c) {
   html += '<div class="veredictos">' + fases.map(p => `<div class="veredicto"><span class="graf-fase"><i style="background:${COLOR_FASE[p]}"></i>Fase ${p}</span>
     <div><span class="tg ${arm.cumpleTension[p] ? 'verde' : 'rojo'}">Tensión: ${arm.cumpleTension[p] ? 'CUMPLE' : 'NO CUMPLE'}</span>
     <span class="tg ${arm.cumpleCorriente[p] ? 'verde' : 'rojo'}">Corriente: ${arm.cumpleCorriente[p] ? 'CUMPLE' : 'NO CUMPLE'}</span></div></div>`).join('') + '</div>';
+  html += bloqueDiagnostico(arm, contextoDiagnostico(a));
   const cats = ARMONICAS.map(n => 'H' + n);
   html += `<div class="bloque">${graficaBarras({ titulo: 'Espectro de tensión · TDI percentil 95 vs. Tabla 4', unidad: '%', categorias: cats, limite: arm.espectro.map(e => e.limTDI), series: fases.map(p => ({ nombre: `F${p}`, color: COLOR_FASE[p], v: arm.espectro.map(e => e.tdi[p]) })) })}</div>`;
   html += `<div class="bloque">${graficaBarras({ titulo: 'Espectro de corriente · DAII percentil 95 vs. Tabla 5', unidad: '%', categorias: cats, limite: arm.espectro.map(e => e.limDAII), series: fases.map(p => ({ nombre: `F${p}`, color: COLOR_FASE[p], v: arm.espectro.map(e => e.daii[p]) })) })}</div>`;

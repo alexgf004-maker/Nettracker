@@ -191,6 +191,7 @@ export function analizarArmonicos(texto, nf) {
   const r = {
     n: completas.length, incompletas: datos.length - completas.length, nf, fases,
     fechas: [], P: vacio(), VDAT: vacio(), DATI: vacio(), TDI: porArm(), DAII: porArm(),
+    I1: vacio(), IhA: vacio(), IA: porArm(), // corrientes en amperios: fundamental, armónica total y por orden
     vdatOver: {}, datiOver: {}, tdiOver: {}, daiiOver: {}, cargados: {},
   };
   fases.forEach(p => { r.vdatOver[p] = 0; r.datiOver[p] = 0; r.cargados[p] = 0; });
@@ -217,8 +218,11 @@ export function analizarArmonicos(texto, nf) {
         if (tdi > limTDI(n)) r.tdiOver[n][p]++;
       });
       // Corriente: DATI y DAII (DATI solo se penaliza con P >= 3.5 kW, Art. 49a)
-      const dati = i1 > 0 ? (Math.sqrt(ARMONICAS.reduce((s, n) => s + I(n) ** 2, 0)) / i1) * 100 : 0;
+      const ih = Math.sqrt(ARMONICAS.reduce((s, n) => s + I(n) ** 2, 0));
+      const dati = i1 > 0 ? (ih / i1) * 100 : 0;
       r.DATI[p].push(dati);
+      r.I1[p].push(i1); r.IhA[p].push(ih);
+      ARMONICAS.forEach(n => r.IA[n][p].push(I(n)));
       const cargado = P >= P_UMBRAL;
       if (cargado) r.cargados[p]++;
       if (cargado && dati > DATI_LIM) r.datiOver[p]++;
