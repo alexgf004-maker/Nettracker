@@ -100,6 +100,7 @@ export const state = {
   memosEquipos: [], // memosEquipos/{id}: memos generados, para reimprimir
   invVista: 'equipos', // pestaña de Equipos: 'equipos' | 'memos'
   invArea: '', // filtro por área dueña ('' = todas)
+  ordenar: null, // pantalla Ordenar equipos: { mt: [ids de CPT MT], busqueda }
   cargaData: [], // preview rows from excel
   cargaView: 'upload', // upload | preview
   cargaSubView: 'subir', // subir | historial | accesorios

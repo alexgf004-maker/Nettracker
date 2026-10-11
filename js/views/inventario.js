@@ -4,14 +4,14 @@ import { state } from '../state.js';
 import { badgeSt } from '../ui.js';
 import { calcSt, eqEnCampo, fmtDate } from '../utils.js';
 import { AREAS_DUENAS, estadoEquipo, tenedor } from '../domain/inventario.js';
-import { renderAsignarAreas, renderListaEquipos, renderMemoNuevo } from './equipos.js';
+import { renderListaEquipos, renderMemoNuevo, renderOrdenar } from './equipos.js';
 
 export function renderInventario() {
   let html = '';
 
   if (state.view === 'lista') html += renderListaEquipos();
   else if (state.view === 'memo_nuevo' && state.memoNuevo) html += renderMemoNuevo();
-  else if (state.view === 'asignar_areas') html += renderAsignarAreas();
+  else if (state.view === 'ordenar' && state.ordenar) html += renderOrdenar();
 
   else if (state.view === 'equipo_form') {
     html += `<div class="content">

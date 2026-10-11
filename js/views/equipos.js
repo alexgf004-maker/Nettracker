@@ -1,6 +1,6 @@
 // Equipos: lista por estado, memos de préstamo/devolución (nuevo y guardados) y asignación del área dueña
 import { isAdmin } from '../config.js';
-import { AREAS_DUENAS, AREAS_MOVIMIENTO, CAMPOS, coincideBusqueda, estadoEquipo, motivoNoMovimiento, pendientesDevolverCampos, sugerirArea } from '../domain/inventario.js';
+import { AREAS_DUENAS, AREAS_MOVIMIENTO, CAMPOS, coincideBusqueda, estadoEquipo, motivoNoMovimiento, pendientesDevolverCampos, planOrdenar } from '../domain/inventario.js';
 import { state } from '../state.js';
 import { escapeHtml, fmtDate } from '../utils.js';
 import { heroSeccion } from './componentes.js';
@@ -42,7 +42,7 @@ export function renderListaEquipos() {
     <button class="b b-p" onclick="abrirMemoNuevo({ tipo: 'devolucion' })"><i class="ic ic-check"></i> Nueva devolución</button>
   </div>`;
   if (sinArea.length) html += `<div class="aviso aviso-amarillo inv-aviso"><i class="ic ic-alerta"></i><span>${sinArea.length} ${sinArea.length === 1 ? 'equipo no tiene' : 'equipos no tienen'} área dueña (CPT MT o CPT BT). Sin área no se pueden prestar ni devolver.</span>
-    ${isAdmin() ? '<button class="b b-g" onclick="abrirAsignarAreas()">Asignar área</button>' : '<span>Pídele al administrador que la asigne.</span>'}</div>`;
+    ${isAdmin() ? '<button class="b b-g" onclick="abrirOrdenar()">Ordenar equipos</button>' : '<span>Pídele al administrador que ordene los equipos.</span>'}</div>`;
   if (pendCampos.length) html += `<div class="aviso aviso-azul inv-aviso"><i class="ic ic-info"></i><span>${pendCampos.length} ${pendCampos.length === 1 ? 'equipo ya no está instalado pero sigue como prestado' : 'equipos ya no están instalados pero siguen como prestados'} a Campos y Servicios: ${pendCampos.map(e => esc(e.serie)).join(', ')}.</span>
     <button class="b b-g" onclick="regularizarDevolucionesCampos()">Registrar devolución</button></div>`;
 
@@ -83,7 +83,7 @@ export function renderListaEquipos() {
     html += `<div class="eq-grupo ${color}"><div class="eq-grupo-t">${titulo} <span>(${items.length})</span></div><div class="eq-lista">${items.map(x => tarjetaEquipo(x.eq, x.est)).join('')}</div></div>`;
   });
   html += `<div class="inv-pie"><label class="b b-g"><i class="ic ic-bandeja"></i> Importar equipos desde Excel<input type="file" accept=".xlsx,.xls" onchange="handleImportEquipos(event)" hidden></label>
-    ${isAdmin() && !sinArea.length ? '<button class="b b-l" onclick="abrirAsignarAreas()">Áreas de los equipos</button>' : ''}</div>`;
+    ${isAdmin() ? '<button class="b b-g" onclick="abrirOrdenar()"><i class="ic ic-ajustes"></i> Ordenar equipos (MT / Cucumacayán)</button>' : ''}</div>`;
   return html + '</div>';
 }
 
@@ -143,18 +143,27 @@ export function renderMemoNuevo() {
   return html;
 }
 
-// Asignar el área dueña a los equipos que no la tienen (sugerida por su primer préstamo o su sede)
-export function renderAsignarAreas() {
-  const lista = state.equipos.filter(eq => !eq.area);
-  let html = `<div class="content"><div class="memo-nuevo-head"><button class="btn-link" onclick="volverEquipos()"><i class="ic ic-chevron-left"></i> Equipos</button><h2>Área de los equipos</h2></div>`;
-  if (!lista.length) return html + '<div class="empty"><div class="empty-text">Todos los equipos ya tienen área. Para cambiar la de uno, usa Editar en su ficha.</div></div></div>';
-  html += `<div class="bloque"><p class="memo-ayuda">Cada equipo es de un área: el préstamo sale de ella y la devolución regresa a ella. Viene sugerida por su primer préstamo o, si no tiene, por su sede (Plantel Central → CPT MT, Cucumacayán → CPT BT). Revisa y guarda.</p>
-    <div class="area-filas">${lista.map(eq => {
-      const sug = sugerirArea(eq);
-      return `<div class="area-fila"><div><b>${esc(eq.serie)}</b><small>${esc(eq.modelo || '')} · ${esc(eq.sede || 'Plantel Central')}${eq.vineta ? ' · ' + esc(eq.vineta) : ''}</small></div>
-        <select data-area-eq="${eq.id}">${AREAS_DUENAS.map(a => `<option ${a === sug ? 'selected' : ''}>${a}</option>`).join('')}</select></div>`;
-    }).join('')}</div>
-    <button class="b b-p" onclick="guardarAreas()"><i class="ic ic-check"></i> Guardar áreas (${lista.length})</button></div></div>`;
+// Ordenar el inventario: se marcan los equipos de CPT MT (Plantel Central); todos los demás son de CPT BT y van a la Cucumacayán
+export function renderOrdenar() {
+  const o = state.ordenar;
+  const plan = planOrdenar(state.equipos, state.records, o.mt);
+  const mover = plan.filter(x => x.cambios.sede);
+  const lista = [...state.equipos].sort((a, b) => Number(b.area === 'CPT MT') - Number(a.area === 'CPT MT') || (a.serie || '').localeCompare(b.serie || '')) // no se reordena al marcar
+    .filter(eq => coincideBusqueda(eq, o.busqueda));
+  let html = `<div class="content memo-nuevo"><div class="memo-nuevo-head"><button class="btn-link" onclick="volverEquipos()"><i class="ic ic-chevron-left"></i> Equipos</button><h2>Ordenar equipos</h2></div>
+    <div class="bloque"><p class="memo-ayuda">Marca solo los equipos que son de <b>CPT MT</b> (los que tienen en Plantel Central). Todos los demás quedan como <b>CPT BT</b> y guardados en la <b>Cucumacayán</b>, la bodega. Los que están en campo o prestados no se mueven: solo se les corrige el área.</p>
+      <div class="ordenar-resumen"><div><b>${o.mt.length}</b><span>CPT MT</span></div><div><b>${state.equipos.length - o.mt.length}</b><span>CPT BT</span></div><div class="${mover.length ? 'mueve' : ''}"><b>${mover.length}</b><span>Pasan a la Cucumacayán</span></div></div>
+      <input id="ordenar-buscar" class="search-input" placeholder="Buscar serie, viñeta o modelo" value="${esc(o.busqueda)}" oninput="setOrdenarBusqueda(this.value)">
+      <div class="memo-eqs">${lista.map(eq => {
+        const mt = o.mt.includes(eq.id);
+        const est = estadoEquipo(eq, state.records);
+        const p = plan.find(x => x.eq.id === eq.id);
+        const nota = p?.cambios.sede ? `<span class="tg ambar">${esc(eq.sede || 'Plantel Central')} → Cucumacayán</span>` : '';
+        return `<button class="memo-eq ${mt ? 'sel' : ''}" onclick="toggleOrdenarMT('${eq.id}')"><span class="memo-check">${mt ? '<i class="ic ic-check"></i>' : ''}</span>
+          <span class="memo-eq-main"><b>${esc(eq.serie)}</b>${eq.vineta ? ` · ${esc(eq.vineta)}` : ''}<small>${mt ? 'CPT MT' : 'CPT BT'} · ${esc(est.clave === 'disponible' ? eq.sede || 'Plantel Central' : est.label)}</small></span>${nota}</button>`;
+      }).join('')}</div></div>
+    <div class="memo-pie"><div><b>${o.mt.length} de CPT MT · ${state.equipos.length - o.mt.length} de CPT BT</b><small>${plan.length ? `${plan.length} ${plan.length === 1 ? 'cambio' : 'cambios'}${mover.length ? ` · ${mover.length} a la Cucumacayán` : ''}` : 'Sin cambios'}</small></div>
+      <button class="b b-p" onclick="guardarOrdenar()" ${plan.length ? '' : 'disabled'}><i class="ic ic-check"></i> Guardar</button></div>
+  </div>`;
   return html;
 }
-

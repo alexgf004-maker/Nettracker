@@ -467,20 +467,28 @@ test.describe('Memos de préstamo y devolución', () => {
     expect(doc).not.toContain('de lote');
   });
 
-  test('sin área no se puede prestar; el administrador la asigna con una sugerencia', async ({ page }) => {
+  test('ordenar equipos: se marcan los de CPT MT y todos los demás pasan a CPT BT en la Cucumacayán', async ({ page }) => {
     app = await abrirApp(page);
     await cerrarAlerta(page);
     await nav(page, 'Equipos');
     await expect(page.locator('.inv-aviso').first()).toContainText('no tienen área dueña');
-    await page.getByRole('button', { name: 'Asignar área' }).click();
-    // Sugerida por su primer préstamo o por la sede (Cucumacayán → CPT BT)
-    await expect(page.locator('[data-area-eq="e3"]')).toHaveValue('CPT BT');
-    await expect(page.locator('[data-area-eq="e2"]')).toHaveValue('CPT MT');
-    await page.locator('[data-area-eq="e2"]').selectOption('CPT BT');
-    await page.getByRole('button', { name: /Guardar áreas/ }).click();
-    const esc = (await app.escrituras()).filter(([op, ruta]) => op === 'update' && ruta.startsWith('equipos/'));
-    expect(esc).toContainEqual(['update', 'equipos/e2', { area: 'CPT BT' }]);
-    expect(esc).toContainEqual(['update', 'equipos/e3', { area: 'CPT BT' }]);
+    await page.getByRole('button', { name: 'Ordenar equipos' }).first().click();
+    await expect(page.locator('.memo-nuevo h2')).toHaveText('Ordenar equipos');
+    // Se marcan los dos de CPT MT (SN-105 está guardado en Plantel; SN-100 está en campo)
+    await page.locator('.memo-eq', { hasText: 'SN-105' }).click();
+    await page.locator('.memo-eq', { hasText: 'SN-100' }).click();
+    await expect(page.locator('.ordenar-resumen')).toContainText('2CPT MT');
+    // SN-101 está en campo y SN-103 prestado: no se mueven; SN-106 (guardado en Plantel) pasa a la Cucumacayán
+    await expect(page.locator('.memo-eq', { hasText: 'SN-106' })).toContainText('Plantel Central → Cucumacayán');
+    await expect(page.locator('.memo-eq', { hasText: 'SN-101' })).not.toContainText('→ Cucumacayán');
+    await page.locator('.memo-pie').getByRole('button', { name: 'Guardar' }).click();
+    const esc = Object.fromEntries((await app.escrituras()).filter(([op, ruta]) => op === 'update' && ruta.startsWith('equipos/')).map(([, r, d]) => [r.split('/')[1], d]));
+    expect(esc.e6).toMatchObject({ area: 'CPT MT' }); expect(esc.e6.sede).toBeUndefined();
+    expect(esc.e1).toMatchObject({ area: 'CPT MT' });
+    expect(esc.e7).toMatchObject({ area: 'CPT BT', sede: 'Subestación Cucumacayán' });
+    expect(esc.e2).toMatchObject({ area: 'CPT BT' }); expect(esc.e2.sede).toBeUndefined(); // en campo
+    expect(esc.e4).toMatchObject({ area: 'CPT BT' }); expect(esc.e4.sede).toBeUndefined(); // prestado
+    expect(esc.e3).toMatchObject({ area: 'CPT BT' }); expect(esc.e3.sede).toBeUndefined(); // ya estaba en la Cucumacayán
   });
 
   test('al retirar un equipo de Campos y Servicios la devolución se registra sola', async ({ page }) => {

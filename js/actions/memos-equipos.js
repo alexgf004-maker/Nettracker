@@ -4,7 +4,7 @@
 // Con un equipo sale el memo individual; con varios, el memo de lote.
 import { isAdmin, userArea } from '../config.js';
 import { db, push, ref, update } from '../firebase.js';
-import { AREAS_DUENAS, aplicarMovimiento, CAMPOS, devolucionAlRetirar, motivoNoMovimiento, pendientesDevolverCampos } from '../domain/inventario.js';
+import { AREAS_DUENAS, aplicarMovimiento, CAMPOS, devolucionAlRetirar, motivoNoMovimiento, pendientesDevolverCampos, planOrdenar } from '../domain/inventario.js';
 import { generateLotePDF, generateMemoPDF } from '../pdf/memos.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
@@ -92,18 +92,33 @@ export function reimprimirMemoEquipos(id) {
   if (memo) imprimirMemo(memo);
 }
 
-// ── Área dueña de cada equipo (la asigna el administrador) ──
-export function abrirAsignarAreas() {
-  if (!isAdmin()) return showToast('Solo el administrador asigna el área de los equipos');
-  state.view = 'asignar_areas'; render();
+// ── Ordenar el inventario (administrador): se marcan los de CPT MT; los demás son de CPT BT y van a la Cucumacayán ──
+export function abrirOrdenar() {
+  if (!isAdmin()) return showToast('Solo el administrador ordena el inventario');
+  state.ordenar = { mt: state.equipos.filter(eq => eq.area === 'CPT MT').map(eq => eq.id), busqueda: '' };
+  state.view = 'ordenar'; render();
 }
-export function guardarAreas() {
-  if (!isAdmin()) return;
-  const cambios = [...document.querySelectorAll('[data-area-eq]')].map(el => [el.dataset.areaEq, el.value]).filter(([, v]) => AREAS_DUENAS.includes(v));
-  if (!cambios.length) return showToast('No hay cambios');
-  cambios.forEach(([id, area]) => update(ref(db, 'equipos/' + id), { area }));
-  showToast(`Área asignada a ${cambios.length} ${cambios.length === 1 ? 'equipo' : 'equipos'}`);
-  state.view = 'lista'; render();
+export function toggleOrdenarMT(id) {
+  const o = state.ordenar; if (!o) return;
+  o.mt = o.mt.includes(id) ? o.mt.filter(x => x !== id) : [...o.mt, id];
+  render();
+}
+export function setOrdenarBusqueda(v) {
+  if (!state.ordenar) return;
+  state.ordenar.busqueda = v; render();
+  const inp = document.getElementById('ordenar-buscar');
+  if (inp) { inp.focus(); inp.setSelectionRange(v.length, v.length); }
+}
+export function guardarOrdenar() {
+  const o = state.ordenar; if (!o || !isAdmin()) return;
+  const plan = planOrdenar(state.equipos, state.records, o.mt);
+  if (!plan.length) { showToast('No hay cambios'); state.ordenar = null; state.view = 'lista'; render(); return; }
+  const mover = plan.filter(x => x.cambios.sede).length;
+  if (!confirm(`¿Guardar? ${o.mt.length} quedan de CPT MT y el resto de CPT BT.${mover ? ` ${mover} ${mover === 1 ? 'equipo pasa' : 'equipos pasan'} a la Cucumacayán.` : ''}`)) return;
+  const usuario = state.sesionUsuario?.nombre || '';
+  plan.forEach(({ eq, cambios }) => update(ref(db, 'equipos/' + eq.id), { ...cambios, editadoPor: usuario, fechaEdicion: today() }));
+  showToast(`Inventario ordenado: ${plan.length} ${plan.length === 1 ? 'equipo actualizado' : 'equipos actualizados'}`);
+  state.ordenar = null; state.view = 'lista'; render();
 }
 
 // Equipos que ya regresaron de campo pero siguen como prestados a Campos y Servicios (de antes de la devolución automática)
