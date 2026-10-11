@@ -426,6 +426,12 @@ test.describe('Memos de préstamo y devolución', () => {
     await page.locator('.memo-chips').nth(1).getByRole('button', { name: 'Campos y Servicios' }).click();
     await page.locator('.memo-nota').fill('Campaña de octubre');
     await expect(page.locator('.memo-pie')).toContainText('Memo de lote con 2 equipos');
+    // Los elegidos quedan como chips arriba (se quitan con ×) y la lista se puede plegar
+    await expect(page.locator('.memo-sel-chip')).toHaveText(['SN-105×', 'SN-109×']);
+    await page.getByRole('button', { name: /Ocultar equipos disponibles/ }).click();
+    await expect(page.locator('.memo-eq')).toHaveCount(0);
+    await page.getByRole('button', { name: /Ver equipos disponibles \(3\)/ }).click(); // a Campos y Servicios también los de CPT BT
+    await expect(page.locator('.memo-eq')).toHaveCount(3);
     await capturar(page);
     await page.getByRole('button', { name: 'Registrar y generar memo' }).click();
     const esc = await app.escrituras();

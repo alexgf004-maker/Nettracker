@@ -364,7 +364,7 @@ Catálogo de equipos físicos del equipo.
 **Lista**: grupos por dónde está cada equipo (Disponibles por sede, Con Campos y Servicios, Prestados a otra área, En campo, En mantenimiento, Fuera de servicio), indicadores corregidos, filtro por estado y por área dueña, búsqueda por serie, viñeta o modelo.
 
 **Memos de préstamo y devolución** (`js/actions/memos-equipos.js`, `js/views/equipos.js`): un solo flujo para uno o varios equipos ("Nuevo préstamo" / "Nueva devolución", o desde la ficha con el equipo ya elegido):
-1. Tipo; 2. De → Para; 3. Equipos: solo se pueden elegir los que cumplen las reglas, con buscador y "Elegir todos"; los demás aparecen en "No se pueden elegir" con el motivo; 4. Nota.
+1. Tipo; 2. De → Para; 3. Equipos: solo se pueden elegir los que cumplen las reglas, con buscador y "Elegir todos"; los elegidos quedan arriba como chips (se quitan con ×) y la lista va en una caja desplegable con su propio scroll (no se pierde la posición al marcar); los demás aparecen en "No se pueden elegir" con el motivo; 4. Nota. "Ordenar equipos" usa la misma caja con scroll.
 - Al confirmar se guarda el memo en `memosEquipos/{id}` (`tipo, de, a, fecha, hora, nota, registradoPor, equipos[{id, serie, modelo, vineta, condicion}]`), se registra el movimiento en cada equipo con `memoId` y se abre el memo: individual con un equipo, de lote con varios (con la condición de cada uno y la nota).
 - Pestaña **Memos**: todos los memos guardados para reimprimir. En Movimientos de la ficha, "Memo PDF" abre el memo guardado (de lote si eran varios); los movimientos de antes sacan el memo individual como siempre.
 

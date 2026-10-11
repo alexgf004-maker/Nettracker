@@ -125,13 +125,20 @@ export function renderMemoNuevo() {
   if (esPrestamo && m.a === CAMPOS) html += '<div class="memo-ayuda">A Campos y Servicios se le pueden entregar equipos de cualquier área (los de la bodega de la Cucumacayán). Al retirarlos de campo regresan solos a su área.</div>';
   if (!elegibles.length) html += `<div class="memo-vacio">${esPrestamo ? `No hay equipos ${m.a === CAMPOS ? '' : 'de ' + esc(m.de) + ' '}disponibles para prestar.` : `${esc(m.de)} no tiene equipos prestados de ${esc(m.a)} para devolver.`}</div>`;
   else {
-    html += `<button class="btn-link memo-todos" onclick="seleccionarTodosMemo(${esc(JSON.stringify(elegibles.map(x => x.eq.id)))})">${todosSel ? 'Quitar todos' : `Elegir todos (${elegibles.length})`}</button><div class="memo-eqs">`;
-    html += elegibles.map(({ eq }) => {
+    // Elegidos siempre a la vista (se quitan con ×); la lista va en una caja desplegable con su propio scroll
+    const elegidos = m.sel.map(id => state.equipos.find(x => x.id === id)).filter(Boolean);
+    if (elegidos.length) html += `<div class="memo-sel-chips">${elegidos.map(eq => `<span class="memo-sel-chip">${esc(eq.serie)}<button onclick="toggleEquipoMemo('${eq.id}')" title="Quitar">×</button></span>`).join('')}</div>`;
+    const abierta = m.listaAbierta !== false || !!m.busqueda;
+    html += `<div class="memo-lista ${abierta ? 'abierta' : ''}">
+      <div class="memo-lista-head"><button class="memo-lista-toggle" onclick="toggleListaMemo()"><i class="ic ic-chevron-down"></i> ${abierta ? 'Ocultar' : 'Ver'} equipos disponibles (${elegibles.length})</button>
+        <button class="btn-link memo-todos" onclick="seleccionarTodosMemo(${esc(JSON.stringify(elegibles.map(x => x.eq.id)))})">${todosSel ? 'Quitar todos' : 'Elegir todos'}</button></div>`;
+    if (abierta) html += '<div class="memo-eqs">' + elegibles.map(({ eq }) => {
       const sel = m.sel.includes(eq.id);
       return `<button class="memo-eq ${sel ? 'sel' : ''}" onclick="toggleEquipoMemo('${eq.id}')"><span class="memo-check">${sel ? '<i class="ic ic-check"></i>' : ''}</span>
         <span class="memo-eq-main"><b>${esc(eq.serie)}</b>${eq.vineta ? ` · ${esc(eq.vineta)}` : ''}<small>${esc(eq.modelo || '')}${eq.area !== m.de && esPrestamo ? ` · de ${esc(eq.area)} (${esc(eq.sede || '')})` : ''}${!esPrestamo && eq.prestadoFecha ? ' · prestado desde ' + fmtDate(eq.prestadoFecha) : ''}</small></span>
         ${(eq.condicion || 'bueno') === 'detalles' ? '<span class="tg ambar">Con detalles</span>' : ''}</button>`;
     }).join('') + '</div>';
+    html += '</div>';
   }
   if (noElegibles.length) {
     html += `<details class="memo-no"><summary>No se pueden elegir (${noElegibles.length})</summary>${noElegibles.map(({ eq, motivo }) => `<div class="memo-no-fila"><b>${esc(eq.serie)}</b><span>${esc(motivo)}</span></div>`).join('')}</details>`;
@@ -155,14 +162,14 @@ export function renderOrdenar() {
     <div class="bloque"><p class="memo-ayuda">Marca solo los equipos que son de <b>CPT MT</b> (los que tienen en Plantel Central). Todos los demás quedan como <b>CPT BT</b> y guardados en la <b>Cucumacayán</b>, la bodega. Los que están en campo o prestados no se mueven: solo se les corrige el área.</p>
       <div class="ordenar-resumen"><div><b>${o.mt.length}</b><span>CPT MT</span></div><div><b>${state.equipos.length - o.mt.length}</b><span>CPT BT</span></div><div class="${mover.length ? 'mueve' : ''}"><b>${mover.length}</b><span>Pasan a la Cucumacayán</span></div></div>
       <input id="ordenar-buscar" class="search-input" placeholder="Buscar serie, viñeta o modelo" value="${esc(o.busqueda)}" oninput="setOrdenarBusqueda(this.value)">
-      <div class="memo-eqs">${lista.map(eq => {
+      <div class="memo-lista abierta"><div class="memo-eqs">${lista.map(eq => {
         const mt = o.mt.includes(eq.id);
         const est = estadoEquipo(eq, state.records);
         const p = plan.find(x => x.eq.id === eq.id);
         const nota = p?.cambios.sede ? `<span class="tg ambar">${esc(eq.sede || 'Plantel Central')} → Cucumacayán</span>` : '';
         return `<button class="memo-eq ${mt ? 'sel' : ''}" onclick="toggleOrdenarMT('${eq.id}')"><span class="memo-check">${mt ? '<i class="ic ic-check"></i>' : ''}</span>
           <span class="memo-eq-main"><b>${esc(eq.serie)}</b>${eq.vineta ? ` · ${esc(eq.vineta)}` : ''}<small>${mt ? 'CPT MT' : 'CPT BT'} · ${esc(est.clave === 'disponible' ? eq.sede || 'Plantel Central' : est.label)}</small></span>${nota}</button>`;
-      }).join('')}</div></div>
+      }).join('')}</div></div></div>
     <div class="memo-pie"><div><b>${o.mt.length} de CPT MT · ${state.equipos.length - o.mt.length} de CPT BT</b><small>${plan.length ? `${plan.length} ${plan.length === 1 ? 'cambio' : 'cambios'}${mover.length ? ` · ${mover.length} a la Cucumacayán` : ''}` : 'Sin cambios'}</small></div>
       <button class="b b-p" onclick="guardarOrdenar()" ${plan.length ? '' : 'disabled'}><i class="ic ic-check"></i> Guardar</button></div>
   </div>`;
