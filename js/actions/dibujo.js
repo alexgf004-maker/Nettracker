@@ -1,6 +1,6 @@
 // Herramienta Dibujar: subir una imagen y dibujar encima; se descarga como PNG (confirmado: no se guarda en la base).
 // El borrador queda solo en este navegador (localStorage). Mientras se arrastra se repinta solo el SVG, sin render().
-import { caja, COLORES, definiciones, GROSORES, medidaReducida, mover, nuevoId, redimensionar, svgElemento, svgExportable, tamano, TAM_TEXTO } from '../domain/dibujo.js';
+import { caja, COLORES, coloresTramos, leerFilasTabla, definiciones, GROSORES, medidaEtiqueta, medidaReducida, mover, nuevoId, redimensionar, siguienteEtiqueta, svgElemento, svgExportable, tamano, TAM_TEXTO } from '../domain/dibujo.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { render } from '../views/render.js';
@@ -9,7 +9,7 @@ const CLAVE = 'nettracker_dibujo';
 const HISTORIAL_MAX = 60;
 
 export function nuevoDibujo() {
-  return { fondo: null, elementos: [], sel: null, herramienta: 'seleccionar', simbolo: 'transformador', color: COLORES[0], grosor: 'medio', tamTexto: 'mediano', historial: [], rehacer: [] };
+  return { fondo: null, elementos: [], sel: null, herramienta: 'seleccionar', simbolo: 'transformador', color: COLORES[0], grosor: 'medio', tamTexto: 'mediano', prefijo: 'P', fondoEtiqueta: '#fde047', tramo: null, historial: [], rehacer: [] };
 }
 export function cargarBorrador() {
   const d = nuevoDibujo();
@@ -75,8 +75,43 @@ export function dibPointerDown(ev) {
     if (id) { memorizar(); arrastre = { modo: 'mover', ultimo: [x, y], cambio: false }; repintar(); } else render();
     return;
   }
+  // Tramo de red: cada toque agrega un vértice; doble toque, Enter o "Terminar tramo" lo cierran
+  if (h === 'tramo') {
+    const t = d.tramo && d.elementos.find(e => e.id === d.tramo);
+    const ahora = ev.timeStamp; // tiempo del toque (para el doble toque)
+    if (t) {
+      const [lx, ly] = t.puntos[t.puntos.length - 1];
+      if (ahora - (d.ultimoToque || 0) < 350 && Math.hypot(x - lx, y - ly) < 25 * escalaBase()) { d.ultimoToque = 0; return terminarTramoDib(); }
+      reemplazar({ ...t, puntos: [...t.puntos, [x, y]] });
+      d.ultimoToque = ahora; guardarBorrador(); repintar();
+      return;
+    }
+    memorizar();
+    const nuevo = { ...base, grosor: base.grosor * 1.6, tipo: 'polilinea', puntos: [[x, y]] };
+    d.elementos.push(nuevo); d.sel = nuevo.id; d.tramo = nuevo.id; d.ultimoToque = ahora;
+    repintar(); render();
+    return;
+  }
   memorizar();
   let el;
+  if (h === 'etiqueta') {
+    // Se toca el punto (poste) y se arrastra hasta donde va el cuadro; con un toque, el cuadro queda arriba a la derecha
+    const tam = Math.round(20 * escalaBase());
+    el = { id: base.id, tipo: 'etiqueta', texto: siguienteEtiqueta(d.elementos, d.prefijo), fondo: d.fondoEtiqueta, tam, tx: x, ty: y, x: x + tam * 1.5, y: y - tam * 4 };
+    d.elementos.push(el); d.sel = el.id;
+    arrastre = { modo: 'etiqueta', cambio: false };
+    repintar();
+    return;
+  }
+  if (h === 'leyenda' || h === 'tabla') {
+    const tam = Math.round(18 * escalaBase());
+    el = h === 'leyenda'
+      ? { id: base.id, tipo: 'leyenda', x, y, tam, fondo: '#fde2d3', entradas: (coloresTramos(d.elementos).length ? coloresTramos(d.elementos) : [d.color]).map(c => ({ color: c, texto: 'Descripción del tramo' })) }
+      : { id: base.id, tipo: 'tabla', x, y, tam, encabezado: ['REFERENCIA', 'DISTANCIA [m]'], filas: [['P1W1', '']] };
+    d.elementos.push(el); d.sel = el.id; d.herramienta = 'seleccionar';
+    guardarBorrador(); render();
+    return;
+  }
   if (h === 'linea' || h === 'flecha') el = { ...base, tipo: h, x1: x, y1: y, x2: x, y2: y };
   else if (h === 'rect' || h === 'elipse') el = { ...base, tipo: h, x, y, w: 0, h: 0 };
   else if (h === 'trazo') el = { ...base, tipo: 'trazo', puntos: [[x, y]] };
@@ -109,6 +144,7 @@ export function dibPointerMove(ev) {
     reemplazar(mover(el, x - arrastre.ultimo[0], y - arrastre.ultimo[1]));
     arrastre.ultimo = [x, y];
   } else if (arrastre.modo === 'trazo') reemplazar({ ...el, puntos: [...el.puntos, [x, y]] });
+  else if (arrastre.modo === 'etiqueta') { const m = medidaEtiqueta(el); reemplazar({ ...el, x: x - m.w / 2, y: y - m.h / 2 }); }
   else reemplazar(redimensionar(el, arrastre.tirador, x, y));
   if (!cuadro) cuadro = requestAnimationFrame(() => { cuadro = null; repintar(); });
 }
@@ -118,7 +154,7 @@ export function dibPointerUp() {
   const a = arrastre; arrastre = null;
   const el = seleccionado();
   // Un clic sin arrastrar con línea, figura o trazo no deja un elemento vacío
-  if (a.nuevo && el) {
+  if (a.modo === 'etiqueta') { /* la etiqueta queda aunque no se arrastre */ } else if (a.nuevo && el) {
     const b = caja(el);
     if (b.w < 4 && b.h < 4) { d.elementos = d.elementos.filter(e => e.id !== el.id); d.sel = null; d.historial.pop(); }
   } else if (!a.cambio && a.modo !== 'trazo') d.historial.pop();
@@ -127,7 +163,15 @@ export function dibPointerUp() {
 }
 
 // ── Barra de herramientas ──
-export function setHerramientaDib(h) { const d = dib(); if (!d) return; d.herramienta = h; if (h !== 'seleccionar') d.sel = null; render(); }
+export function setHerramientaDib(h) { const d = dib(); if (!d) return; cerrarTramo(); d.herramienta = h; if (h !== 'seleccionar') d.sel = null; render(); }
+// Cierra el tramo en curso; con un solo punto no queda
+function cerrarTramo() {
+  const d = dib(); if (!d?.tramo) return;
+  const t = d.elementos.find(e => e.id === d.tramo);
+  if (t && t.puntos.length < 2) { d.elementos = d.elementos.filter(e => e.id !== t.id); d.sel = null; d.historial.pop(); }
+  d.tramo = null; guardarBorrador();
+}
+export function terminarTramoDib() { cerrarTramo(); render(); }
 export function setSimboloDib(s) { const d = dib(); if (!d) return; d.simbolo = s; d.herramienta = 'simbolo'; d.sel = null; render(); }
 export function setColorDib(c) {
   const d = dib(); if (!d) return; d.color = c;
@@ -148,11 +192,41 @@ export function setTamTextoDib(t) {
 // Mientras se escribe solo se repinta el SVG (el campo no pierde el foco)
 let textoMemorizado = null;
 export function textoDib(v) {
-  const el = seleccionado(); if (el?.tipo !== 'texto') return;
+  const el = seleccionado(); if (el?.tipo !== 'texto' && el?.tipo !== 'etiqueta') return;
   if (textoMemorizado !== el.id) { memorizar(); textoMemorizado = el.id; }
   reemplazar({ ...el, texto: v }); repintar(); guardarBorrador();
 }
 export function finTextoDib() { textoMemorizado = null; render(); }
+
+// ── Etiquetas, leyenda y tabla ──
+export function setPrefijoDib(v) { const d = dib(); if (d) d.prefijo = String(v || '').trim().slice(0, 6) || 'P'; }
+export function setFondoEtiquetaDib(c) {
+  const d = dib(); if (!d) return; d.fondoEtiqueta = c;
+  const el = seleccionado(); if (el?.tipo === 'etiqueta') { memorizar(); reemplazar({ ...el, fondo: c }); guardarBorrador(); }
+  render();
+}
+// Cambios de texto mientras se escribe: un solo paso de deshacer por elemento y sin perder el foco
+function editar(cambio) {
+  const el = seleccionado(); if (!el) return;
+  if (textoMemorizado !== el.id) { memorizar(); textoMemorizado = el.id; }
+  reemplazar(cambio(el)); repintar(); guardarBorrador();
+}
+export function leyendaTextoDib(i, v) { editar(el => ({ ...el, entradas: el.entradas.map((e, k) => (k === i ? { ...e, texto: v } : e)) })); }
+export function leyendaColorDib(i) { const c = dib().color; editar(el => ({ ...el, entradas: el.entradas.map((e, k) => (k === i ? { ...e, color: c } : e)) })); textoMemorizado = null; render(); }
+export function agregarEntradaLeyendaDib() {
+  const d = dib(); const el = seleccionado(); if (el?.tipo !== 'leyenda') return;
+  memorizar();
+  const usados = el.entradas.map(e => e.color);
+  const nuevo = coloresTramos(d.elementos).find(c => !usados.includes(c)) || d.color;
+  reemplazar({ ...el, entradas: [...el.entradas, { color: nuevo, texto: 'Descripción del tramo' }] }); guardarBorrador(); render();
+}
+export function quitarEntradaLeyendaDib(i) {
+  const el = seleccionado(); if (el?.tipo !== 'leyenda' || el.entradas.length <= 1) return;
+  memorizar(); reemplazar({ ...el, entradas: el.entradas.filter((_, k) => k !== i) }); guardarBorrador(); render();
+}
+export function tablaEncabezadoDib(c, v) { editar(el => ({ ...el, encabezado: el.encabezado.map((x, k) => (k === c ? v : x)) })); }
+export function tablaFilasDib(texto) { editar(el => ({ ...el, filas: leerFilasTabla(texto) })); }
+export function finEdicionDib() { textoMemorizado = null; render(); }
 
 export function girarDib() { const el = seleccionado(); if (el?.tipo !== 'simbolo') return; memorizar(); reemplazar({ ...el, rot: ((el.rot || 0) + 90) % 360 }); guardarBorrador(); render(); }
 export function duplicarDib() {
@@ -258,5 +332,6 @@ document.addEventListener('keydown', ev => {
   if (state.tab !== 'dibujar' || !dib()) return;
   if (/^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName)) return;
   const k = ev.key.toLowerCase();
+  if (dib().tramo && (k === 'enter' || k === 'escape')) { ev.preventDefault(); return terminarTramoDib(); }
   if ((ev.ctrlKey || ev.metaKey) && k === 'z') { ev.preventDefault(); ev.shiftKey ? rehacerDib() : deshacerDib(); } else if ((ev.ctrlKey || ev.metaKey) && k === 'y') { ev.preventDefault(); rehacerDib(); } else if ((k === 'delete' || k === 'backspace') && dib().sel) { ev.preventDefault(); borrarDib(); } else if (k === 'escape') { dib().sel = null; render(); }
 });

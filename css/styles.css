@@ -1347,6 +1347,12 @@ button.aviso-inicio-fila { cursor: pointer; }
 .dib-sel-barra { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; min-height: 44px; }
 .dib-sel-barra textarea { flex: 1 1 220px; min-height: 40px; height: 40px; }
 .dib-borrar { color: var(--red); }
+.dib-prefijo { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+.dib-prefijo input { width: 64px; height: 36px; padding: 4px 8px; }
+.dib-editor { margin-top: 10px; }
+.dib-fila { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.dib-fila input { flex: 1; }
+.dib-destino { fill: #fde047; }
 .dib-ayuda { margin: 0 0 8px; }
 .dib-lienzo { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: repeating-conic-gradient(#e5e7eb 0% 25%, #f8fafc 0% 50%) 50% / 20px 20px; }
 .dib-svg { display: block; width: 100%; height: auto; max-height: 78vh; touch-action: none; user-select: none; -webkit-user-select: none; }

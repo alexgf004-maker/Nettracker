@@ -2538,4 +2538,73 @@ test.describe('Herramienta Dibujar', () => {
     await expect(page.locator('#dib-svg')).toHaveAttribute('viewBox', '0 0 1600 1000');
     expect(errores).toEqual([]);
   });
+
+  test('propuesta de red: tramos, etiquetas numeradas, ubicación, leyenda y tabla de distancias', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    await page.setViewportSize({ width: 1280, height: 1100 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await page.evaluate(() => localStorage.removeItem('nettracker_dibujo'));
+    await nav(page, 'Dibujar');
+    let caja;
+    const medir = async () => { caja = await page.locator('#dib-svg').boundingBox(); };
+    const en = (fx, fy) => [caja.x + caja.width * fx, caja.y + caja.height * fy];
+    const tocar = async (fx, fy) => { await medir(); await page.mouse.click(...en(fx, fy)); await page.waitForTimeout(400); };
+    // Tramo magenta por tres postes; se termina con el botón
+    await page.getByRole('button', { name: 'Color #c026d3' }).click();
+    await page.getByRole('button', { name: 'Tramo de red' }).click();
+    await tocar(0.1, 0.6); await tocar(0.3, 0.5); await tocar(0.5, 0.45);
+    await page.getByRole('button', { name: 'Terminar tramo' }).click();
+    const tramo = page.locator('#dib-capa g[data-id] path[stroke="#c026d3"]');
+    await expect(tramo).toHaveCount(1);
+    expect((await tramo.getAttribute('d')).split('L').length).toBe(3);
+    // Un tramo de un solo punto no queda
+    await tocar(0.8, 0.8); await page.keyboard.press('Enter');
+    await expect(page.locator('#dib-capa path[stroke="#c026d3"]')).toHaveCount(1);
+    // Segundo tramo azul (doble toque termina)
+    await page.getByRole('button', { name: 'Color #2563eb' }).click();
+    await tocar(0.5, 0.45); await tocar(0.8, 0.3);
+    await medir(); await page.mouse.dblclick(...en(0.8, 0.3));
+    await expect(page.getByRole('button', { name: 'Terminar tramo' })).toHaveCount(0);
+    await expect(page.locator('#dib-capa path[stroke="#2563eb"]')).toHaveCount(1);
+    // Etiquetas: P1, P2 numeradas solas; luego prefijo W en celeste
+    await page.getByRole('button', { name: 'Etiqueta de punto (P1, W1…)' }).click();
+    await medir(); await page.mouse.move(...en(0.1, 0.6)); await page.mouse.down(); await page.mouse.move(...en(0.15, 0.4), { steps: 5 }); await page.mouse.up();
+    await page.locator('#dib-texto').fill('P1: DS111267'); await page.locator('#dib-texto').press('Tab');
+    await page.getByRole('button', { name: 'Etiqueta de punto (P1, W1…)' }).click();
+    await tocar(0.3, 0.5);
+    await expect(page.locator('#dib-capa g[data-id] text', { hasText: 'P2' })).toHaveCount(1);
+    await page.getByRole('button', { name: 'Etiqueta de punto (P1, W1…)' }).click();
+    await page.locator('#dib-prefijo').fill('W');
+    await page.getByRole('button', { name: 'Fondo Celeste' }).click();
+    await tocar(0.5, 0.45);
+    const w1 = page.locator('#dib-capa g[data-id]', { has: page.locator('text', { hasText: /^W1$/ }) });
+    await expect(w1.locator('rect')).toHaveAttribute('fill', '#7dd3fc');
+    await expect(page.locator('#dib-capa marker#punta-etq')).toHaveCount(1);
+    await expect(page.locator('#dib-capa text', { hasText: 'P1: DS111267' })).toHaveCount(1);
+    // Ubicación del usuario (símbolo)
+    await page.getByRole('button', { name: 'Símbolos eléctricos' }).click();
+    await page.locator('.dib-simbolo', { hasText: 'Ubicación (usuario)' }).click();
+    await tocar(0.85, 0.25);
+    // Leyenda con los colores de los tramos
+    await page.getByRole('button', { name: 'Leyenda' }).click();
+    await tocar(0.05, 0.05);
+    await expect(page.locator('#dib-leyenda-0')).toHaveCount(1);
+    await expect(page.locator('#dib-leyenda-1')).toHaveCount(1);
+    await page.locator('#dib-leyenda-0').fill('Red BT alimentada por el DS111267.'); await page.locator('#dib-leyenda-0').press('Tab');
+    await page.locator('#dib-leyenda-1').fill('Red BT alimentada por el nuevo transformador'); await page.locator('#dib-leyenda-1').press('Tab');
+    await expect(page.locator('#dib-capa text', { hasText: 'Red BT alimentada por el nuevo transformador' })).toHaveCount(1);
+    // Tabla de distancias
+    await page.getByRole('button', { name: 'Tabla de distancias' }).click();
+    await tocar(0.6, 0.75);
+    await page.locator('#dib-filas').fill('P1W1 50\nW1W2, 50\nW2P5\t34'); await page.locator('#dib-filas').press('Tab');
+    for (const t of ['REFERENCIA', 'DISTANCIA [m]', 'P1W1', 'W1W2', 'W2P5', '34']) await expect(page.locator('#dib-capa text', { hasText: new RegExp(`^${t.replace(/[[\]]/g, '\\$&')}$`) })).toHaveCount(1);
+    // Deshacer quita la tabla completa
+    await page.getByRole('button', { name: 'Deshacer' }).click();
+    await page.getByRole('button', { name: 'Deshacer' }).click();
+    await expect(page.locator('#dib-capa text', { hasText: 'REFERENCIA' })).toHaveCount(0);
+    const filas = await page.evaluate(async () => (await import('/js/domain/dibujo.js')).leerFilasTabla('A 1\nB C, 2\n\nD'));
+    expect(filas).toEqual([['A', '1'], ['B C', '2'], ['D', '']]);
+    expect(errores).toEqual([]);
+  });
 });
