@@ -328,6 +328,14 @@ test.describe('Inventario', () => {
     await nav(page, 'Equipos');
   });
 
+  test('sin parpadeo: la animación de entrada no se repite al escribir en el buscador', async ({ page }) => {
+    const anim = () => page.evaluate(() => getComputedStyle(document.querySelector('#app .content')).animationName);
+    await page.locator('.inv-buscar .search-input').pressSequentially('SN-1');
+    expect(await anim()).toBe('none');
+    await nav(page, 'Inicio'); // al cambiar de pantalla sí entra con su animación
+    expect(await anim()).toBe('fadeSlide');
+  });
+
   test('lista, filtros y búsqueda', async ({ page }) => {
     await expect(app$(page)).toContainText('SN-105');
     await app.ejecutar(() => setInvFiltro('prestado'));
