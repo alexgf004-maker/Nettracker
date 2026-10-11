@@ -1,7 +1,16 @@
 // Sincronización en tiempo real con Firebase
 import { campanasRef, reclamosRef, configCartasRef, seguimientoDesdeRef, equiposRef, historialAccesoriosRef, historialCargasRef, installsRef, mantenimientoRef, onValue as onValueFb, validacionesRef, db, ref } from '../firebase.js';
 import { state } from '../state.js';
-import { render } from '../views/render.js';
+import { render as renderAhora } from '../views/render.js';
+
+// Los datos que llegan se dibujan en la siguiente vuelta (una sola vez aunque lleguen varios nodos juntos).
+// Así, si al salir de un campo se guarda y llega el dato, el foco ya pasó al campo siguiente y render() lo conserva.
+let pendiente = false;
+function render() {
+  if (pendiente) return;
+  pendiente = true;
+  setTimeout(() => { pendiente = false; renderAhora(); }, 0);
+}
 
 // Cada listener actualiza su arreglo en el estado y vuelve a renderizar.
 // Se inicia al entrar (las reglas de la base no dejan leer sin sesión) y se detiene al cerrar sesión.

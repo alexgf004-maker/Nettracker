@@ -98,7 +98,19 @@ export function render() {
   const pantalla = [state.tab, state.view, state.valView, state.campanaClave, state.campanaVista, state.editEqId, state.invVista].join('|');
   el.classList.toggle('quieto', pantalla === ultimaPantalla);
   ultimaPantalla = pantalla;
+  // Campo en el que se está escribiendo: se conserva lo escrito (aún sin guardar), el foco y el cursor
+  const activo = document.activeElement;
+  const enEdicion = activo && activo.id && el.contains(activo) && /^(INPUT|TEXTAREA|SELECT)$/.test(activo.tagName) && !activo.classList.contains('search-input')
+    ? { id: activo.id, valor: activo.value, sucio: 'defaultValue' in activo && activo.value !== activo.defaultValue, ini: activo.selectionStart, fin: activo.selectionEnd } : null;
   el.innerHTML = html;
+  if (enEdicion) {
+    const nuevo = document.getElementById(enEdicion.id);
+    if (nuevo && el.contains(nuevo)) {
+      if (enEdicion.sucio && nuevo.tagName !== 'SELECT') nuevo.value = enEdicion.valor;
+      nuevo.focus({ preventScroll: true });
+      try { if (enEdicion.ini !== null && enEdicion.ini !== undefined) nuevo.setSelectionRange(enEdicion.ini, enEdicion.fin); } catch { /* fecha, número… no tienen cursor */ }
+    }
+  }
   el.dataset.view = state.tab === 'validaciones' ? 'val-' + state.valView : state.view; // el CSS de PC ajusta el ancho según la vista
 
   // Restore focus to search input if one was active
