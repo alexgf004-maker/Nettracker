@@ -38,6 +38,7 @@ export const TAB_VIEWS = {
 
 // Redibuja toda la app a partir del estado. Cualquier handler que cambie
 // el estado debe llamar render() al final.
+let ultimaPantalla = null;
 export function render() {
   const el = document.getElementById('app');
   if (!el) return;
@@ -95,6 +96,11 @@ export function render() {
   if (state.showAlertaRetiros) html += renderAlertaRetiros();
   html += renderBottomNav();
 
+  // La animación de entrada solo al cambiar de pantalla: si se redibuja la misma (llegan datos, cada letra de un
+  // buscador, marcar algo) no se repite, para que no parpadee
+  const pantalla = [state.tab, state.view, state.valView, state.campanaClave, state.campanaVista, state.editEqId, state.invVista].join('|');
+  el.classList.toggle('quieto', pantalla === ultimaPantalla);
+  ultimaPantalla = pantalla;
   el.innerHTML = html;
   el.dataset.view = state.tab === 'validaciones' ? 'val-' + state.valView : state.view; // el CSS de PC ajusta el ancho según la vista
 

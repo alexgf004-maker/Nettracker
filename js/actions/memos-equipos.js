@@ -45,18 +45,31 @@ export function setMemoNuevo(campo, valor) {
   if (campo !== 'nota') render();
 }
 
+// Redibuja sin perder la posición del scroll de la caja de equipos (son muchos)
+function renderConScroll() {
+  const top = document.querySelector('.memo-eqs')?.scrollTop || 0;
+  render();
+  const caja = document.querySelector('.memo-eqs');
+  if (caja) caja.scrollTop = top;
+}
+
 export function toggleEquipoMemo(id) {
   const m = state.memoNuevo; if (!m) return;
   const eq = state.equipos.find(x => x.id === id);
   if (!eq || motivoNoMovimiento(eq, m, state.records)) return;
   m.sel = m.sel.includes(id) ? m.sel.filter(x => x !== id) : [...m.sel, id];
+  renderConScroll();
+}
+export function toggleListaMemo() {
+  const m = state.memoNuevo; if (!m) return;
+  m.listaAbierta = m.listaAbierta === false;
   render();
 }
 export function seleccionarTodosMemo(ids) {
   const m = state.memoNuevo; if (!m) return;
   const todos = ids.every(id => m.sel.includes(id));
   m.sel = todos ? m.sel.filter(id => !ids.includes(id)) : [...new Set([...m.sel, ...ids])];
-  render();
+  renderConScroll();
 }
 
 // Registra el movimiento en todos los equipos elegidos, guarda el memo y lo abre
@@ -101,7 +114,7 @@ export function abrirOrdenar() {
 export function toggleOrdenarMT(id) {
   const o = state.ordenar; if (!o) return;
   o.mt = o.mt.includes(id) ? o.mt.filter(x => x !== id) : [...o.mt, id];
-  render();
+  renderConScroll();
 }
 export function setOrdenarBusqueda(v) {
   if (!state.ordenar) return;

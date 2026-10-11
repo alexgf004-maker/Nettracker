@@ -328,6 +328,14 @@ test.describe('Inventario', () => {
     await nav(page, 'Equipos');
   });
 
+  test('sin parpadeo: la animación de entrada no se repite al escribir en el buscador', async ({ page }) => {
+    const anim = () => page.evaluate(() => getComputedStyle(document.querySelector('#app .content')).animationName);
+    await page.locator('.inv-buscar .search-input').pressSequentially('SN-1');
+    expect(await anim()).toBe('none');
+    await nav(page, 'Inicio'); // al cambiar de pantalla sí entra con su animación
+    expect(await anim()).toBe('fadeSlide');
+  });
+
   test('lista, filtros y búsqueda', async ({ page }) => {
     await expect(app$(page)).toContainText('SN-105');
     await app.ejecutar(() => setInvFiltro('prestado'));
@@ -426,6 +434,12 @@ test.describe('Memos de préstamo y devolución', () => {
     await page.locator('.memo-chips').nth(1).getByRole('button', { name: 'Campos y Servicios' }).click();
     await page.locator('.memo-nota').fill('Campaña de octubre');
     await expect(page.locator('.memo-pie')).toContainText('Memo de lote con 2 equipos');
+    // Los elegidos quedan como chips arriba (se quitan con ×) y la lista se puede plegar
+    await expect(page.locator('.memo-sel-chip')).toHaveText(['SN-105×', 'SN-109×']);
+    await page.getByRole('button', { name: /Ocultar equipos disponibles/ }).click();
+    await expect(page.locator('.memo-eq')).toHaveCount(0);
+    await page.getByRole('button', { name: /Ver equipos disponibles \(3\)/ }).click(); // a Campos y Servicios también los de CPT BT
+    await expect(page.locator('.memo-eq')).toHaveCount(3);
     await capturar(page);
     await page.getByRole('button', { name: 'Registrar y generar memo' }).click();
     const esc = await app.escrituras();
