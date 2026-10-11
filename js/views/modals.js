@@ -3,6 +3,9 @@ import { CONDICIONES, FALLAS_GRAVES, FALLAS_RETIRO, SEDES, TECNICOS, userArea } 
 import { state } from '../state.js';
 import { badgeSt } from '../ui.js';
 import { calcSt, daysUntil, eqSt, escapeHtml } from '../utils.js';
+import { todosFT } from '../domain/expedientes.js';
+import { siguientePasoFT } from '../domain/ft.js';
+import { hoyLocal } from '../domain/trabajo.js';
 
 export function renderRetiroModal() {
   let html = '';
@@ -282,36 +285,46 @@ export function renderGlobalSearch() {
   return html;
 }
 
+// Casos FT abiertos del área del usuario (van primero en el aviso al abrir la app)
+export function ftParaAviso() {
+  const ua = userArea();
+  return todosFT(state.campanas, state.reclamos, state.records, hoyLocal()).filter(x => !x.cerrado && x.area === ua);
+}
+export function retirosParaAviso() {
+  const ua = userArea();
+  return state.records.filter(r => !r.retirado && daysUntil(r.fechaRetiro) <= 3 && daysUntil(r.fechaRetiro) >= 0 && (r.areaInstalacion || 'CPT MT') === ua)
+    .sort((a, b) => daysUntil(a.fechaRetiro) - daysUntil(b.fechaRetiro));
+}
+
+// Aviso al abrir la app: primero los casos FT con su siguiente paso, después los retiros próximos
 export function renderAlertaRetiros() {
-  let html = '';
-  const ua = userArea(); const proximos = state.records.filter(r => !r.retirado && daysUntil(r.fechaRetiro) <= 3 && daysUntil(r.fechaRetiro) >= 0 && (r.areaInstalacion||'CPT MT') === ua)
-    .sort((a,b) => daysUntil(a.fechaRetiro) - daysUntil(b.fechaRetiro));
-  html += '<div class="modal-overlay" style="position:fixed;inset:0;background:#00000088;z-index:300;display:flex;align-items:center;justify-content:center;padding:24px">';
-  html += '<div style="background:#fff;border-radius:20px;width:100%;max-width:380px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">';
-  html += '<div style="background:linear-gradient(135deg,#ff6b35,#f7c948);padding:20px 20px 16px">';
-  html += '<div style="font-size:22px;margin-bottom:4px"><i class=ic-campana></i></div>';
-  html += '<div style="font-size:17px;font-weight:800;color:#fff">Retiros próximos</div>';
-  html += '<div style="font-size:12px;color:rgba(255,255,255,.8);margin-top:2px">' + proximos.length + ' instalacion' + (proximos.length>1?'es':'') + ' requieren atención</div>';
-  html += '</div>';
-  html += '<div style="padding:16px;max-height:280px;overflow-y:auto">';
-  proximos.forEach(r => {
-    const d = daysUntil(r.fechaRetiro);
-    const color = d === 0 ? 'var(--red)' : d === 1 ? 'var(--yellow)' : 'var(--text2)';
-    const label = d === 0 ? '<i class=ic-alerta></i> Hoy' : d === 1 ? '<i class=ic-alerta></i> Mañana' : 'en ' + d + 'd';
-    html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border2)">';
-    html += '<div>';
-    html += '<div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--text)">' + (r.serie||'—') + '</div>';
-    html += '<div style="font-size:11px;color:var(--text3)">' + (r.lugar||'Sin ubicación') + ' · ' + (r.areaInstalacion||'CPT MT') + '</div>';
-    html += '</div>';
-    html += '<span style="font-size:12px;font-weight:700;color:' + color + ';flex-shrink:0;margin-left:8px">' + label + '</span>';
-    html += '</div>';
-  });
-  html += '</div>';
-  html += '<div style="padding:16px;display:flex;gap:8px">';
-  html += '<button onclick="cerrarAlerta()" style="flex:1;padding:12px;border:1px solid var(--border);border-radius:10px;background:#fff;font-family:var(--font);font-size:14px;font-weight:600;color:var(--text2);cursor:pointer">Cerrar</button>';
-  html += '<button onclick="verRetiros()" style="flex:1;padding:12px;border:none;border-radius:10px;background:var(--primary);font-family:var(--font);font-size:14px;font-weight:700;color:#fff;cursor:pointer">Ver retiros</button>';
-  html += '</div></div></div>';
-  return html;
+  const ft = ftParaAviso();
+  const proximos = retirosParaAviso();
+  const e = escapeHtml;
+  let html = '<div class="modal-overlay aviso-inicio-fondo"><div class="aviso-inicio">';
+  html += `<div class="aviso-inicio-head ${ft.length ? 'rojo' : ''}"><i class="ic ic-campana"></i><div><b>${ft.length ? 'Antes de empezar' : 'Retiros próximos'}</b>
+    <span>${[ft.length ? `${ft.length} ${ft.length === 1 ? 'caso FT abierto' : 'casos FT abiertos'}` : '', proximos.length ? `${proximos.length} ${proximos.length === 1 ? 'retiro próximo' : 'retiros próximos'}` : ''].filter(Boolean).join(' · ')}</span></div></div>`;
+  html += '<div class="aviso-inicio-cuerpo">';
+  if (ft.length) {
+    html += '<div class="aviso-inicio-sec">Casos FT: lo primero</div>';
+    ft.forEach(x => {
+      const sig = siguientePasoFT(x);
+      html += `<button class="aviso-inicio-fila ft" onclick="cerrarAlerta(); switchTab('ft'); abrirFT('${x.clave}', '${x.id}')"><div><b>${e(x.codigo)}</b><small>${sig ? e(sig.texto) : 'Sin pasos pendientes'}</small></div>
+        ${x.limite ? `<span class="${x.vencido ? 'rojo' : ''}">${x.vencido ? 'Vencido' : `Día ${x.dias}`}</span>` : ''}</button>`;
+    });
+  }
+  if (proximos.length) {
+    html += '<div class="aviso-inicio-sec">Retiros</div>';
+    proximos.forEach(r => {
+      const d = daysUntil(r.fechaRetiro);
+      html += `<div class="aviso-inicio-fila"><div><b>${e(r.serie || '—')}</b><small>${e(r.lugar || 'Sin ubicación')} · ${e(r.areaInstalacion || 'CPT MT')}</small></div>
+        <span class="${d === 0 ? 'rojo' : d === 1 ? 'ambar' : ''}">${d === 0 ? 'Hoy' : d === 1 ? 'Mañana' : 'en ' + d + ' días'}</span></div>`;
+    });
+  }
+  html += '</div><div class="aviso-inicio-pie"><button class="b b-g" onclick="cerrarAlerta()">Cerrar</button>';
+  if (ft.length) html += `<button class="b b-p" onclick="cerrarAlerta(); switchTab('ft')">Ver casos FT</button>`;
+  else if (proximos.length) html += '<button class="b b-p" onclick="verRetiros()">Ver retiros</button>';
+  return html + '</div></div></div>';
 }
 
 export function renderRevisionModal() {

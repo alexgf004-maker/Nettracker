@@ -1,6 +1,7 @@
 // Lógica de instalaciones: guardar, retiro, descarga, calendario
 import { FALLAS_GRAVES, isAdmin, sedeRetorno } from '../config.js';
 import { devolucionAlRetirar } from '../domain/inventario.js';
+import { DIAS_INFORME_RECLAMO, sumarDias, tipoDeTrabajo } from '../domain/trabajo.js';
 import { db, installsRef, push, ref, remove, update } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
@@ -120,7 +121,11 @@ export function handleRetiro() {
       }
       update(ref(db, `equipos/${deployRec.equipoId}`), eqUpdates);
     }
-    showToast('Equipo marcado como retirado');
+    // Reclamos (FT o no): empieza el conteo de 8 días para entregar el informe
+    if (tipoDeTrabajo(deployRec?.caso) === 'reclamo' || deployRec?.reclamo?.id) {
+      const limite = sumarDias(today(), DIAS_INFORME_RECLAMO).split('-').reverse().join('/');
+      showToast(`Retirado. Empieza el conteo: ${DIAS_INFORME_RECLAMO} días para entregar el informe (vence el ${limite})`);
+    } else showToast('Equipo marcado como retirado');
   });
 }
 

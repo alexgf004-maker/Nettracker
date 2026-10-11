@@ -11,7 +11,7 @@
 // - Armónicos o flicker fuera de límite: solo se avisa; le compete al usuario corregirlo.
 import { instalacionDeCaso } from './resultados.js';
 import { casosFT, DIAS_SOLUCION_FT } from './ft.js';
-import { diasEntre, etapaInstalacion, fechaInformeReclamo, normalizarCodigo, sumarDias } from './trabajo.js';
+import { DIAS_INFORME_RECLAMO, diasEntre, etapaInstalacion, fechaInformeReclamo, normalizarCodigo, sumarDias } from './trabajo.js';
 
 export const MAX_MEDICIONES = 6;
 // Campos del reclamo (los del correo de DELSUR)
@@ -159,7 +159,7 @@ export function ftExpediente(exp, mediciones, hoy) {
     medicion: inicial, ft, inicio, limite, cerrado,
     dias: inicio ? diasEntre(inicio, (cerrado && ft.remedicion?.fecha) || hoy) : null,
     vencido: !!limite && !cerrado && hoy > limite,
-    remedicionInstalada: rem ? { codigo: rem.codigo, fecha: rem.inst.fechaInstalacion, retirado: !!rem.inst.retirado } : null,
+    remedicionInstalada: rem ? { codigo: rem.codigo, fecha: rem.inst.fechaInstalacion, retirado: !!rem.inst.retirado, fechaRetiro: rem.inst.fechaRetiroReal || null } : null,
   };
 }
 
@@ -189,4 +189,27 @@ export function ftReclamos(reclamos, registros, hoy) {
 export function todosFT(campanas, reclamos, registros, hoy) {
   return [...casosFT(campanas, registros, hoy).map(x => ({ tipo: 'campana', ...x })), ...ftReclamos(reclamos, registros, hoy)]
     .sort((a, b) => Number(a.cerrado) - Number(b.cerrado) || (a.limite || '9').localeCompare(b.limite || '9'));
+}
+
+// Informes de reclamo por entregar: 8 días calendario desde el retiro de cada medición (FT o no). Los casos FT de
+// campaña no llevan informe: solo su plazo de 90 días. Ordenados por fecha límite (lo más urgente primero).
+export function informesPorEntregar(reclamos, registros, hoy) {
+  const lista = [];
+  for (const e of listaExpedientes(reclamos, registros, hoy)) {
+    for (const m of e.resumen.informePendiente) {
+      if (!m.inst?.fechaRetiroReal) continue;
+      lista.push({ tipo: 'reclamo', id: e.id, codigo: m.codigo, nombre: e.nombre || '', area: e.area, ft: !!m.ft, retiro: m.inst.fechaRetiroReal, ...conteoInforme(m.inst.fechaRetiroReal, hoy) });
+    }
+  }
+  return lista.sort((a, b) => a.limite.localeCompare(b.limite));
+}
+
+// Conteo de los 8 días calendario para entregar el informe del reclamo desde el retiro
+export function conteoInforme(fechaRetiro, hoy) {
+  const limite = sumarDias(fechaRetiro, DIAS_INFORME_RECLAMO);
+  const quedan = diasEntre(hoy, limite);
+  const dia = Math.min(DIAS_INFORME_RECLAMO, Math.max(0, diasEntre(fechaRetiro, hoy)));
+  const f = limite.split('-').reverse().join('/');
+  const texto = quedan > 1 ? `Quedan ${quedan} días · vence el ${f}` : quedan === 1 ? `Vence mañana (${f})` : quedan === 0 ? `Vence hoy (${f})` : `Vencido hace ${-quedan} ${quedan === -1 ? 'día' : 'días'} (${f})`;
+  return { limite, quedan, dia, vencido: quedan < 0, texto };
 }

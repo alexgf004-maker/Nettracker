@@ -306,6 +306,10 @@ Mapa para el contratista: en Casos, "Mapa para My Maps" descarga un KML (`kmlMap
 Pendiente: verificar los cálculos con un Excel de multiplicadores ya lleno e importar el histórico de multiplicadores que tiene el equipo.
 
 ## Área: Inicio (dashboard)
+**Casos FT primero**: si hay casos FT abiertos, el Inicio abre con el bloque "Casos FT" (antes de Pendientes): cada caso con su **siguiente paso** en grande (`siguientePasoFT`/`pasosFT` en `domain/ft.js`: aviso a DELSUR → subir al sistema → Resumen punto medido → ruta → fotos de los trabajos a MEMOS (urgente si la remedición ya está instalada) → remedición normalizada; sin informe), el avance "n de 6" y el plazo de 90 días. Esos pasos ya no se repiten en Pendientes. El aviso al abrir la app (una vez por sesión) muestra primero los casos FT del área con su paso y después los retiros próximos.
+
+**Informes de reclamos por entregar (8 días calendario desde el retiro)**: bloque después de los casos FT (`informesPorEntregar` y `conteoInforme` en `domain/expedientes.js`). Solo reclamos: cada medición retirada sin informe (FT o no), con "Quedan N días · vence el dd/mm" (o vence hoy / vencido) y una barra de 8 días; respeta "Contar desde" y ya no se repite en Pendientes. Al registrar el retiro de un reclamo la app avisa que empieza el conteo y la fecha en que vence. Los casos FT no llevan informe: solo su plazo de 90 días.
+
 `calcularPendientes()` (`js/domain/pendientes.js`) arma la lista; avisa desde 3 días antes (`DIAS_AVISO`):
 - Retiros programados vencidos / de hoy / próximos
 - Descargas pendientes después del retiro ("Por hacer", sin fecha)
