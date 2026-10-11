@@ -304,6 +304,16 @@ En el detalle de la campaña:
   9. Recomendaciones: a completar.
 - `js/docx.js` escribe el WordprocessingML a mano (Century Gothic, encabezados de tabla azules) y lo empaqueta con `XLSX.CFB`, sin librerías nuevas. Acción en `js/actions/informe.js`.
 
+## Diagnóstico de armónicos
+
+- `js/domain/diagnostico.js` (`diagnosticarArmonicos`, funciones puras con prueba). Se muestra en la pestaña Armónicos del análisis (bloque "Diagnóstico") y en el borrador de informe como "5.3. Diagnóstico" con la tabla de severidad y un `[completar]` para la conclusión. Partes confirmadas:
+  - Contexto en amperios: fases que no cumplen el DATI con corriente fundamental baja (menos del 25 % de la fase más cargada o la mayor parte del tiempo bajo 3.5 kW); se dan la mediana de I1 y la corriente armónica total en A. Solo cita el Art. 49 (evaluación en amperios) si la fase estuvo la mayor parte del tiempo bajo 3.5 kW.
+  - Tipo de carga por los tres órdenes dominantes de corriente: H5/H7 seis pulsos (variadores, rectificadores, UPS); H11/H13 doce pulsos; H3/H9 monofásicas electrónicas; pares media onda, CD o saturación. Si la inspección marcó variadores o cómputo/LED, dice que concuerda.
+  - Origen (red o usuario) SIEMPRE como indicio con la evidencia (confirmado): correlación de Pearson entre VDAT y la corriente armónica total del usuario por fase (r ≥ 0.6 sugiere aporte del usuario, r ≤ 0.2 sugiere la red, en medio no concluyente) y por cada orden de tensión que no cumple. Si la medición es en MT y el banco trifásico tiene un devanado en delta (inspección), los triplen de tensión no pueden atribuirse a las cargas del usuario.
+  - Perfil horario: horas de mayor y menor VDAT y de mayor corriente armónica del usuario, y si coinciden (si la corriente es casi pareja todo el día, lo dice en vez de comparar).
+  - Severidad: por orden que no cumple, P95 de la peor fase, veces el límite y % del tiempo fuera.
+- `analizarArmonicos` guarda ahora también las corrientes en amperios (`I1`, `IhA` y `IA[n]` por fase).
+
 ## Formulario de inspección del reclamo
 
 - Pestaña "Inspección" del expediente (uno por reclamo, confirmado), en `reclamos/{id}/inspeccion`. Pensado para llenarse en sitio desde el celular; cada campo se guarda al salir de él (`js/actions/inspeccion.js`) y las listas usan claves de push. Vista en `js/views/inspeccion.js`.

@@ -2,6 +2,7 @@
 // análisis de los TXT. Funciones puras: devuelven bloques (títulos, párrafos, tablas y marcas de gráfica) que
 // js/docx.js convierte en un Word para terminarlo a mano. Lo que la app no sabe queda como [completar].
 // Redacción y artículos citados como en los informes CPT (SIGET, Acuerdo 38-E-2015).
+import { diagnosticarArmonicos } from './diagnostico.js';
 import { CARGAS, conexion, normalizarInspeccion, CONDICIONES_TABLERO, INSTALACION_GENERAL, kvasTrafos, kvaTotal, LIMITE_TIERRA, lista, marcados, PROTECCIONES, TIPOS_SUBESTACION, veredictoTierra, tensionVsEquipo } from './inspeccion.js';
 import { DATI_LIM, estadisticas, LIMITE_PST, P_UMBRAL, percentil, TIPOS_RED, UMBRAL_FT, VDAT_LIM } from './reclamo.js';
 
@@ -367,6 +368,16 @@ export function borradorInforme({ exp = {}, inst = {}, params = {}, d = null, t 
       [dati.nombre, dati.limTxt, ...af.map(f => pct(dati.fases[f].p95)), af.every(f => dati.fases[f].cumple) ? 'CUMPLE' : 'NO CUMPLE'],
       ...[...new Set(fueraI.map(o => o.nombre))].map(nom => { const f = arm.corriente.find(x => x.nombre.startsWith(nom + ' ')); return [f.nombre, f.limTxt, ...af.map(x => pct(f.fases[x].p95)), 'NO CUMPLE']; }),
     ], { veredicto: true });
+
+    // Diagnóstico (indicios con su evidencia)
+    const dg = diagnosticarArmonicos(arm, { enMT, subestacion: sub, cargas: insp.cargas || {} });
+    if (dg?.parrafos.length) {
+      h('5.3. Diagnóstico', 2);
+      dg.parrafos.forEach(t => p(t));
+      const filasSev = [...dg.severidad.tension.map(x => ['Tensión', x]), ...dg.severidad.corriente.map(x => ['Corriente', x])];
+      if (filasSev.length) tabla(['Orden', 'Tipo', 'Límite', 'P95 (fase)', 'Veces el límite', '% del tiempo fuera'], filasSev.map(([tp, x]) => [`H${x.n}`, tp, pct(x.limite), `${pct(x.p95)} (F${x.fase})`, `${n(x.veces, 2)}×`, pct(x.pctTiempo, 1)]), { anchos: [12, 14, 16, 22, 18, 18] });
+      p(`${COMPLETAR} Revisar los indicios del diagnóstico y redactar la conclusión sobre el origen de la distorsión.`);
+    }
 
     conclusiones.push(['Armónicos de tensión (VDAT)', `${VDAT_LIM}% (Art. 45/Tabla 4)`, af.map(f => pct(vdat.fases[f].p95)).join(' / '),
       vdatCumple.length === af.length ? 'CUMPLE (VDAT total)' : `NO CUMPLE (${fasesNo(af.filter(f => !vdat.fases[f].cumple))})`]);

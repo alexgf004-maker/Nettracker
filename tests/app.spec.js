@@ -1850,6 +1850,24 @@ function txtArmonicos() {
   return filas.join('\r\n');
 }
 
+// Armónicos a la medida: u(i, n, p) e iA(i, n, p) en V y A por orden (n = 1 fundamental), P(i, p) en kW
+function txtArmonicosCon({ u, iA, P, filas = 144 }) {
+  const enc = ['Fecha y Hora', 'U1 [V]', 'U2 [V]', 'U3 [V]', 'I1 [A]', 'I2 [A]', 'I3 [A]', 'I4 [A]', 'P1 [kW]', 'P2 [kW]', 'P3 [kW]', 'PTotal [kW]', 'FP1', 'FP2', 'FP3', 'EA1 [kWh]', 'EA2 [kWh]', 'EA3 [kWh]', 'EATot [kWh]'];
+  for (let n = 1; n <= 25; n++) for (let p = 1; p <= 3; p++) enc.push(`Uarm${n}-${p}`);
+  for (let n = 1; n <= 25; n++) for (let p = 1; p <= 4; p++) enc.push(`Iarm${n}-${p}`);
+  enc.push('PST1 [p.u]', 'PST2 [p.u]', 'PST3 [p.u]');
+  const out = [enc.join(',')];
+  for (let i = 0; i < filas; i++) {
+    const ps = [1, 2, 3].map(p => P(i, p));
+    const f = [fechaTXT(i), 13200, 13200, 13200, 50, 50, 50, 1, ...ps, ps.reduce((a, b) => a + b, 0), 1, 1, 1, 0, 0, 0, 0];
+    for (let n = 1; n <= 25; n++) for (let p = 1; p <= 3; p++) f.push(u(i, n, p));
+    for (let n = 1; n <= 25; n++) for (let p = 1; p <= 4; p++) f.push(p === 4 ? 0 : iA(i, n, p));
+    f.push(0.5, 0.5, 0.5);
+    out.push(f.join(','));
+  }
+  return out.join('\r\n');
+}
+
 test.describe('Análisis de reclamos', () => {
   test('calcula el FebNoPer y los armónicos como las macros', async ({ page }) => {
     app = await abrirApp(page);
@@ -1910,6 +1928,8 @@ test.describe('Análisis de reclamos', () => {
     await expect(modal.locator('.veredicto').first()).toContainText('Tensión: NO CUMPLE');
     await expect(modal.locator('.veredicto').nth(1)).toContainText('Tensión: CUMPLE');
     await expect(modal.locator('.tabla-arm td.mal')).toHaveCount(1); // H5 de la fase 1
+    await expect(modal.locator('.bloque.diagnostico')).toContainText('Severidad de lo que no cumple');
+    await expect(modal.locator('.bloque.diagnostico')).toContainText('H5');
     await modal.getByRole('button', { name: 'Guardar en el reclamo' }).click();
     await expect(page.locator('.toast')).toContainText('Análisis guardado');
     const esc = await app.escrituras();
@@ -1974,6 +1994,54 @@ test.describe('Análisis de reclamos', () => {
     await expect(page.locator('.arch-slot.lleno')).toHaveCount(0);
   });
 
+  test('diagnóstico de armónicos: amperios, tipo de carga, origen como indicio, horario y severidad', async ({ page }) => {
+    app = await abrirApp(page);
+    // Caso 1: variadores del usuario. De día (8 a 17 h) inyecta H5/H7 y la tensión H5 sube con ella; la fase 3 con muy poca corriente
+    const dia = i => { const h = Math.floor(i / 6) % 24; return h >= 8 && h < 17; };
+    const usuario = txtArmonicosCon({
+      u: (i, n, p) => (n === 1 ? 7620 : n === 5 ? 7620 * (dia(i) ? 0.065 : 0.02) : 0),
+      iA: (i, n, p) => { const i1 = p === 3 ? 1.5 : dia(i) ? 100 : 30; return n === 1 ? i1 : n === 5 ? i1 * (p === 3 ? 0.5 : dia(i) ? 0.3 : 0.05) : n === 7 ? i1 * (p === 3 ? 0.2 : dia(i) ? 0.12 : 0.02) : 0; },
+      P: (i, p) => (p === 3 ? 5 : dia(i) ? 60 : 20),
+    });
+    // Caso 2: red. H3 de tensión alto de noche, sin relación con la corriente del usuario (constante); banco Y-Δ en MT
+    const red = txtArmonicosCon({
+      u: (i, n, p) => (n === 1 ? 7620 : n === 3 ? 7620 * (dia(i) ? 0.02 : 0.06 + 0.002 * ((i * 7) % 5)) : 0),
+      iA: (i, n, p) => (n === 1 ? 80 : n === 5 ? 80 * (0.1 + 0.01 * ((i * 3) % 4)) : 0),
+      P: () => 40,
+    });
+    const r = await page.evaluate(async ([tu, tr]) => {
+      const m = await import('/js/domain/reclamo.js');
+      const d = await import('/js/domain/diagnostico.js');
+      const a1 = d.diagnosticarArmonicos(m.analizarArmonicos(tu, 3), { enMT: false, cargas: { vfd: true } });
+      const a2 = d.diagnosticarArmonicos(m.analizarArmonicos(tr, 3), { enMT: true, subestacion: { tipo: 'tri', conexionPri: 'Estrella', conexionSec: 'Delta' } });
+      return { a1: { infladas: a1.amperios.infladas, dom: a1.dominantes.map(x => x.n), tipos: a1.tipos.map(t => t.clave), indicio: a1.origen.indicio, sevI: a1.severidad.corriente.map(x => x.n), parrafos: a1.parrafos },
+        a2: { indicio: a2.origen.indicio, delta: a2.origen.delta, sevV: a2.severidad.tension.map(x => ({ n: x.n, veces: x.veces })), parrafos: a2.parrafos },
+        r: [d.correlacion([1, 2, 3, 4], [2, 4, 6, 8]), d.correlacion([1, 1, 1], [1, 2, 3])] };
+    }, [usuario, red]);
+    expect(r.r[0]).toBeCloseTo(1, 6); expect(r.r[1]).toBeNull();
+    // Usuario: F3 con DATI alto por poca carga; H5/H7 de variadores; la tensión sigue a su corriente
+    expect(r.a1.infladas).toEqual(['3']);
+    expect(r.a1.dom.slice(0, 2)).toEqual([5, 7]);
+    expect(r.a1.tipos).toContain('seisPulsos');
+    expect(r.a1.indicio).toBe('usuario');
+    expect(r.a1.parrafos.join(' ')).toContain('Esto concuerda con los variadores de frecuencia identificados en la inspección.');
+    expect(r.a1.parrafos.join(' ')).toContain('sugiere que las cargas del usuario contribuyen');
+    expect(r.a1.parrafos.join(' ')).toContain('conviene leerlo junto con su valor en amperios');
+    expect(r.a1.parrafos.join(' ')).not.toContain('Art. 49'); // la fase 3 sí tuvo carga (P ≥ 3.5 kW)
+    expect(r.a1.sevI).toContain(5);
+    // Red: la tensión no sigue al usuario; con delta, el H3 medido en MT no viene del usuario
+    expect(r.a2.indicio).toBe('red');
+    expect(r.a2.delta).toBe(true);
+    expect(r.a2.sevV[0].n).toBe(3);
+    expect(r.a2.sevV[0].veces).toBeGreaterThan(1);
+    const t2 = r.a2.parrafos.join(' ');
+    expect(t2).toContain('sugiere que proviene principalmente de la red');
+    expect(t2).toContain('el H3 de tensión medido en media tensión no puede atribuirse a las cargas del usuario');
+    expect(t2).toMatch(/La distorsión de tensión es mayor en promedio entre las (0\d|1[7-9]|2\d):00/); // de noche
+    expect(t2).toContain('La corriente armónica del usuario se mantiene prácticamente constante a lo largo del día');
+    expect(r.a1.parrafos.join(' ')).toContain('Ambos máximos coinciden en horario.');
+  });
+
   test('borrador de informe: redacta las secciones con los datos del expediente y del análisis', async ({ page }) => {
     app = await abrirApp(page);
     const b = await page.evaluate(async ([tt, ta]) => {
@@ -2017,6 +2085,7 @@ test.describe('Análisis de reclamos', () => {
     expect(concl.filas.map(f => f[0])).toEqual(['Regulación de tensión (MT)', 'Flicker Pst', 'Armónicos de tensión (VDAT)', 'Armónicos individuales de tensión', 'Armónicos de corriente (DATI)', 'Continuidad (SAIFI/SAIDI)']);
     expect(concl.filas[3][3]).toBe('NO CUMPLE');
     expect(b.bloques.filter(x => x.t === 'vineta').length).toBe(4);
+    expect(texto).toContain('5.3. Diagnóstico');
   });
 
   test('descarga el borrador de informe en Word desde el análisis del reclamo', async ({ page }) => {
