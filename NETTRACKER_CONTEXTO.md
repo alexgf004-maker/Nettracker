@@ -296,13 +296,20 @@ En el detalle de la campaña:
 - `js/domain/informe.js` (`borradorInforme`, funciones puras con prueba) arma bloques (título, párrafos, tablas, fórmula, viñetas):
   1. Generalidades: usuario, NC, dirección, CT, tensión nominal, urbanidad y red, código/WO y tipo de reclamo (circuito/subestación a completar).
   2. Equipo de medición: modelo y serie, punto, fechas de instalación y retiro, factor multiplicador (relación TP y TC, campos nuevos "Relación de voltaje (TP)" y "Relación de corriente (TC)" en los datos de la medición, `params.relV`/`params.relI`), intervalos y total de registros.
-  3. Inspección: a completar (todavía no se captura en la app).
+  3. Inspección: sale del checklist del expediente (ver "Inspección del reclamo").
   4. Mediciones: regulación (Art. 22-23, FEBNoPer con su fórmula, tabla Máx/Prom/Mín y extremos respecto al nominal); perfil secundario equivalente si es MT y hay relación TP (tensión ÷ relación, banda sobre el secundario); corrientes (tabla, hora de mayor y menor demanda promedio, fase mayor y menor, desbalance = mayor desviación respecto al promedio de las fases ÷ promedio, promedio y P95); flicker (P95 por fase, picos sobre 1 y veredicto).
   5. Armónicos: VDAT y DATI por P95 con veredicto, armónicos individuales que no cumplen agrupados por orden (aunque el total cumpla), intervalos con carga y los tres órdenes con más contenido de corriente; tabla de indicadores que no cumplen.
   6-7. Calidad del servicio y evento: a completar.
   8. Conclusiones: tabla parámetro / límite / resultado / veredicto (CUMPLE en verde, NO CUMPLE en rojo) y viñetas; continuidad a completar.
   9. Recomendaciones: a completar.
 - `js/docx.js` escribe el WordprocessingML a mano (Century Gothic, encabezados de tabla azules) y lo empaqueta con `XLSX.CFB`, sin librerías nuevas. Acción en `js/actions/informe.js`.
+
+## Inspección del reclamo (checklist)
+
+- Pestaña "Inspección" del expediente (una por reclamo, confirmado), en `reclamos/{id}/inspeccion`: fecha, quién atendió, circuito MT y subestación de distribución; subestación del usuario (tipo, cantidad y kVA por transformador con el total, conexión primario/secundario, tensión secundaria, TAP, observaciones); medidor de facturación (modelo, serie, RTC, RTP); tableros (lista: nombre, resistencia a tierra, observaciones, protecciones); equipos dañados (lista: equipo, marca, modelo, rango de voltaje de placa, base de comparación, monto, si estaba disponible, descripción). Se guarda campo por campo (`js/actions/inspeccion.js`); las listas usan claves de push.
+- Fotos: no se guardan en la app (confirmado); el borrador deja `[Foto: …]` en cada sección.
+- Reglas (`js/domain/inspeccion.js`, confirmadas): puesta a tierra hasta 25 Ω CUMPLE (NEC 2008); equipo dañado NO CUMPLE si la tensión estuvo fuera de su rango de placa más del 5 % del tiempo en alguna fase. Se compara con el secundario equivalente (tensión ÷ relación TP) si la medición es en MT con relación TP; si no, con la tensión medida; opción ×√3 si la placa es fase-fase y la medición fase-neutro.
+- En el borrador: sección 3 redactada (subestación, medidor con aviso `[verificar]` si su RTC no coincide con la relación de corriente de la medición, cada tablero con su tierra, equipos dañados con tabla de montos), circuito y subestación en Generalidades y en la introducción de Mediciones, subsección "Tensión frente al rango de operación" por equipo con rango, y filas en conclusiones (tensión vs. equipo después de la regulación; resistencia a tierra por tablero al final).
 
 ## Seguimiento FT
 Pestaña Trabajo → Seguimiento FT (`js/domain/ft.js`, `casos/{id}/ft`). Los casos FT salen de Resultados (válida + fuera de tolerancia):

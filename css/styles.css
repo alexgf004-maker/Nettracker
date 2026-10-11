@@ -1045,6 +1045,11 @@ header { background-image: var(--onda), var(--degradado); background-repeat: rep
 .arch-slot.lleno { border-style: solid; border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
 .form-analisis { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0 12px; }
 .form-analisis .field { margin-bottom: 10px; }
+.form-analisis .field-ancho { grid-column: 1 / -1; }
+.form-analisis textarea { min-height: 56px; }
+.insp-item { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px 2px; margin-bottom: 10px; }
+.insp-item-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.insp-item-head .b { margin-left: auto; }
 .graf-con-tabla { display: flex; flex-direction: column; gap: 4px; }
 .tabla-est { border-collapse: collapse; font-size: 12px; min-width: 260px; }
 .tabla-est th { text-align: left; font-size: 10px; font-weight: 800; color: var(--text3); text-transform: uppercase; letter-spacing: .6px; padding: 6px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
