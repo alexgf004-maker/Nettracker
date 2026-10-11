@@ -351,10 +351,10 @@ Cada mes Campos y Servicios saca equipos de la **Subestación Cucumacayán**, lo
 Catálogo de equipos físicos del equipo.
 
 **Estado**: `equipos[]` (nodo `equipos`), `memosEquipos[]` (nodo `memosEquipos`)
-**Vistas** (`state.view` en la pestaña Equipos): `lista` (pestañas Equipos | Memos, `invVista`), `memo_nuevo`, `asignar_areas`, `equipo_form`, `equipo_detalle`
+**Vistas** (`state.view` en la pestaña Equipos): `lista` (pestañas Equipos | Memos, `invVista`), `memo_nuevo`, `ordenar`, `equipo_form`, `equipo_detalle`
 
 **Reglas** (`js/domain/inventario.js`, funciones puras con prueba):
-- **Área dueña** (`eq.area`, CPT MT o CPT BT): el préstamo sale de esa área y la devolución regresa a ella. Sin área no se puede prestar ni devolver; el administrador la asigna en "Asignar área" (sugerida por el primer préstamo o, si no hay, por la sede: Plantel Central → CPT MT, Cucumacayán → CPT BT). Al crear un equipo es obligatoria.
+- **Área dueña** (`eq.area`, CPT MT o CPT BT): el préstamo sale de esa área y la devolución regresa a ella. Sin área no se puede prestar ni devolver. CPT MT tiene unos pocos equipos propios en Plantel Central; todos los demás son de CPT BT y se guardan en la Cucumacayán (la bodega), de donde se le prestan a CPT MT para las campañas. **Ordenar equipos** (administrador, `planOrdenar`): se marcan solo los de CPT MT y al guardar todos los demás quedan de CPT BT y, si están guardados (no en campo ni prestados), pasan a la Cucumacayán; a los de CPT MT solo se les pone el área. Al crear un equipo el área es obligatoria.
 - **Quién lo tiene** (`tenedor`): si está prestado, el área del último préstamo; si no, su área dueña.
 - **Estado único** (`estadoEquipo`): En campo (instalación activa) > Fuera de servicio > En mantenimiento > Prestado (a Campos y Servicios o a otra área) > Disponible. "Con detalles" se marca aparte y sí se presta (con aviso en la lista y en el memo).
 - **Préstamo** (`motivoNoPrestamo`): de su área dueña, disponible (no instalado, no prestado, ni en mantenimiento ni fuera). **Devolución** (`motivoNoDevolucion`): prestado, no instalado, que lo tenga el área que entrega y que regrese a su área dueña.

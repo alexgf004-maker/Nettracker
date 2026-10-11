@@ -76,11 +76,19 @@ export function devolucionAlRetirar(eq, { caso, fecha, por }) {
   return { prestado, prestadoFecha, movimientos };
 }
 
-// Sugerencia para asignar el área dueña (se confirma a mano): el área del primer préstamo; si no hay, según la sede
-export function sugerirArea(eq) {
-  const primero = (eq.movimientos || []).find(m => m.tipo === 'prestamo' && AREAS_DUENAS.includes(m.de));
-  if (primero) return primero.de;
-  return eq.sede === 'Subestación Cucumacayán' ? 'CPT BT' : 'CPT MT';
+// Ordenar el inventario: los equipos marcados son de CPT MT (se quedan en Plantel Central) y todos los demás son de
+// CPT BT y se guardan en la Cucumacayán (la bodega). Solo se mueven de sede los que están guardados: los que están en
+// campo o prestados conservan su ubicación y solo se les corrige el área. Devuelve [{ eq, cambios }] con lo que cambia.
+export const SEDE_BODEGA = 'Subestación Cucumacayán';
+export function planOrdenar(equipos, registros, idsMT) {
+  return equipos.map(eq => {
+    const area = idsMT.includes(eq.id) ? 'CPT MT' : 'CPT BT';
+    const cambios = {};
+    if (eq.area !== area) cambios.area = area;
+    const guardado = !eq.prestado && !instalacionActiva(eq, registros);
+    if (area === 'CPT BT' && guardado && eq.sede !== SEDE_BODEGA) cambios.sede = SEDE_BODEGA;
+    return { eq, cambios };
+  }).filter(x => Object.keys(x.cambios).length);
 }
 
 // Texto para buscar: serie, viñeta y modelo

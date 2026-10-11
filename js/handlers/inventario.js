@@ -1,6 +1,6 @@
 // Handlers (onclick) de inventario, préstamos, mantenimiento y memos
 import { confirmCondicion, confirmarImportInventario, eliminarMovimientoFn, handleDelEq, handleSaveEq, openCondicionModal, procesarExcelInventario } from '../actions/inventario.js';
-import { abrirAsignarAreas, abrirMemoNuevo, cerrarMemoNuevo, confirmarMemoNuevo, guardarAreas, regularizarDevolucionesCampos, reimprimirMemoEquipos, seleccionarTodosMemo, setMemoNuevo, toggleEquipoMemo } from '../actions/memos-equipos.js';
+import { abrirMemoNuevo, abrirOrdenar, cerrarMemoNuevo, confirmarMemoNuevo, guardarOrdenar, regularizarDevolucionesCampos, setOrdenarBusqueda, toggleOrdenarMT, reimprimirMemoEquipos, seleccionarTodosMemo, setMemoNuevo, toggleEquipoMemo } from '../actions/memos-equipos.js';
 import { tenedor } from '../domain/inventario.js';
 import { CONDICIONES, isAdmin } from '../config.js';
 import { db, ref, update } from '../firebase.js';
@@ -272,7 +272,7 @@ window.setCondicionNota = v => { state.condicionForm.nota = v; };
 window.doCondicion = confirmCondicion;
 window.openCondicionModal = openCondicionModal;
 // Memos de préstamo/devolución (uno o varios equipos en el mismo flujo)
-Object.assign(window, { abrirMemoNuevo, cerrarMemoNuevo, setMemoNuevo, toggleEquipoMemo, seleccionarTodosMemo, confirmarMemoNuevo, reimprimirMemoEquipos, abrirAsignarAreas, guardarAreas, regularizarDevolucionesCampos });
+Object.assign(window, { abrirMemoNuevo, cerrarMemoNuevo, setMemoNuevo, toggleEquipoMemo, seleccionarTodosMemo, confirmarMemoNuevo, reimprimirMemoEquipos, abrirOrdenar, toggleOrdenarMT, setOrdenarBusqueda, guardarOrdenar, regularizarDevolucionesCampos });
 window.setInvVista = v => { state.invVista = v; render(); };
 window.volverEquipos = () => { state.view = 'lista'; state.editEqId = null; render(); };
 window.setInvArea = a => { state.invArea = a; render(); };

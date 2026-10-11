@@ -1228,3 +1228,9 @@ header { background-image: var(--onda), var(--degradado); background-repeat: rep
   .eq-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px 12px; }
   .memo-eqs { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
 }
+.ordenar-resumen { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.ordenar-resumen > div { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 10px; text-align: center; }
+.ordenar-resumen b { display: block; font-size: 22px; font-weight: 800; color: var(--text); }
+.ordenar-resumen span { font-size: 11px; color: var(--text3); font-weight: 600; }
+.ordenar-resumen .mueve { background: #fffbeb; border-color: #fde68a; }
+.ordenar-resumen .mueve b { color: #b45309; }
