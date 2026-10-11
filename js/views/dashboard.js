@@ -47,7 +47,7 @@ export function renderDashboard() {
   const ft = todosFT(state.campanas, state.reclamos, state.records, hoy).filter(x => !x.cerrado && (!area || x.area === area));
   if (ft.length) html += `<div class="ini-ft">${renderCasosFT(hoy, ft)}</div>`;
   // Después, el conteo de los 8 días para entregar informes (reclamos y remediciones FT)
-  const informes = informesPorEntregar(state.campanas, state.reclamos, state.records, hoy).filter(x => (!area || x.area === area) && (!state.seguimientoDesde || x.retiro >= state.seguimientoDesde));
+  const informes = informesPorEntregar(state.reclamos, state.records, hoy).filter(x => (!area || x.area === area) && (!state.seguimientoDesde || x.retiro >= state.seguimientoDesde));
   if (informes.length) html += `<div class="ini-informes">${renderInformes(informes)}</div>`;
   html += `<div class="ini-pend">${renderPendientes(hoy, pend.filter(p => p.clase !== 'ft' && p.clase !== 'informe'))}</div>`;
   html += `<div class="ini-trabajo">${renderResumenTrabajo(hoy, area, ftAbiertos)}</div>`;
@@ -108,13 +108,13 @@ function renderCasosFT(hoy, lista) {
 
 // Informes por entregar: conteo de 8 días calendario desde el retiro de cada medición
 function renderInformes(lista) {
-  let html = `<div class="bloque inf-inicio"><div class="bloque-head"><div class="bloque-titulo"><i class="ic ic-reloj"></i> Informes por entregar <span class="cuenta">${lista.length}</span></div><span class="inf-nota">${DIAS_INFORME_RECLAMO} días desde el retiro</span></div>`;
+  let html = `<div class="bloque inf-inicio"><div class="bloque-head"><div class="bloque-titulo"><i class="ic ic-reloj"></i> Informes de reclamos por entregar <span class="cuenta">${lista.length}</span></div><span class="inf-nota">${DIAS_INFORME_RECLAMO} días desde el retiro</span></div>`;
   lista.forEach(x => {
     const clase = x.vencido || x.quedan === 0 ? 'rojo' : x.quedan <= 2 ? 'ambar' : 'verde';
-    const accion = x.tipo === 'ft' ? `switchTab('ft'); abrirFT('${x.clave}', '${x.id}')` : `switchTab('reclamos'); abrirExpediente('${x.id}')`;
+    const accion = `switchTab('reclamos'); abrirExpediente('${x.id}')`;
     html += `<button class="inf-caso ${clase}" onclick="${accion}">
       <span class="inf-num"><b>${x.vencido ? '!' : x.quedan}</b><small>${x.vencido ? 'vencido' : x.quedan === 1 ? 'día' : 'días'}</small></span>
-      <span class="inf-main"><span class="inf-top"><b>${esc(x.codigo)}</b><span class="tg ${x.tipo === 'ft' ? 'rojo' : 'azul'}">${x.tipo === 'ft' ? 'Remedición FT' : x.ft ? 'Reclamo FT' : 'Reclamo'}</span></span>
+      <span class="inf-main"><span class="inf-top"><b>${esc(x.codigo)}</b><span class="tg ${x.ft ? 'rojo' : 'azul'}">${x.ft ? 'Reclamo FT' : 'Reclamo'}</span></span>
         <small>${esc(x.nombre)}${x.nombre ? ' · ' : ''}retirado el ${fmtDate(x.retiro)}</small><span class="inf-texto">${esc(x.texto)}</span>
         <span class="inf-barra">${Array.from({ length: DIAS_INFORME_RECLAMO }, (_, i) => `<i class="${i < x.dia ? 'ok' : ''}"></i>`).join('')}</span></span>
     </button>`;

@@ -1533,7 +1533,7 @@ test.describe('Precampaña', () => {
     // En Inicio, el caso FT va primero con el paso que sigue (el aviso ya está: toca subirlo al sistema)
     const ftInicio = page.locator('.ini-ft .ft-caso', { hasText: 'CR1O2026201' });
     await expect(ftInicio.locator('.ft-sig')).toContainText('Subir el caso al sistema');
-    await expect(ftInicio.locator('.ft-pasos')).toContainText('1 de 7');
+    await expect(ftInicio.locator('.ft-pasos')).toContainText('1 de 6');
     const orden = await page.evaluate(() => [...document.querySelectorAll('.inicio-layout > div')].map(d => d.className));
     expect(orden.indexOf('ini-ft')).toBeLessThan(orden.indexOf('ini-pend'));
     await nav(page, 'Seguimiento FT');
@@ -1587,37 +1587,39 @@ test.describe('Precampaña', () => {
     await expect(caso).toHaveClass(/urgente/);
     await expect(caso.locator('.ft-sig')).toContainText('Tomar fotos de los trabajos y subirlas a MEMOS');
     await expect(caso.locator('.ft-sig')).toContainText('La remedición CR2O2026201 ya está en campo');
-    await expect(caso.locator('.ft-pasos')).toContainText('4 de 7');
+    await expect(caso.locator('.ft-pasos')).toContainText('4 de 6');
   });
 
-  test('informes: al retirar la remedición de un caso FT empieza el conteo de 8 días', async ({ page }) => {
+  test('informes: el conteo de 8 días es solo de reclamos; la remedición de un caso FT no lleva informe', async ({ page }) => {
     const datos = conCampana();
     datos.analizadores = { ...datos.analizadores,
       r20: { serie: 'SN-300', caso: 'CR1O2026201', fechaInstalacion: '2026-08-01', fechaRetiro: '2026-08-09', areaInstalacion: 'CPT MT', retirado: true, fechaRetiroReal: '2026-08-09', fechaRegistro: '2026-08-01' },
-      r21: { serie: 'SN-301', caso: 'CR2O2026201', lugar: 'X', fechaInstalacion: '2026-09-12', fechaRetiro: '2026-09-23', areaInstalacion: 'CPT MT', fechaRegistro: '2026-09-12' } };
+      r21: { serie: 'SN-301', caso: 'CR2O2026201', lugar: 'X', fechaInstalacion: '2026-09-12', fechaRetiro: '2026-09-23', areaInstalacion: 'CPT MT', fechaRegistro: '2026-09-12' },
+      r22: { serie: 'SN-302', caso: 'RE292026456', lugar: 'Y', fechaInstalacion: '2026-09-15', fechaRetiro: '2026-09-23', areaInstalacion: 'CPT MT', fechaRegistro: '2026-09-15' } };
     const f = { fecha: '2026-08-10', por: 'David García' };
     Object.assign(datos.campanas['2026-10_CPT-MT'].casos.CR1O2026201, { resultado: { medicion: 'valida', tolerancia: 'fuera' }, ft: { aviso: f, sistema: f, resumen: f, ruta: 'Transferencia de alimentador', fotos: f } });
     app = await abrirApp(page, { datos });
     await cerrarAlerta(page);
-    // Al retirar la remedición avisa que empieza el conteo
-    await app.ejecutar(() => { switchTab('instalaciones'); openRetiroModal('r21'); });
-    await page.locator(`div[onclick="toggleSinProblema()"]`).click();
-    await page.getByText('Sí, ya descargué').click();
-    await page.getByText('Confirmar retiro').click();
+    const retirar = async id => {
+      await app.ejecutar(id => { switchTab('instalaciones'); openRetiroModal(id); }, id);
+      await page.locator(`div[onclick="toggleSinProblema()"]`).click();
+      await page.getByText('Sí, ya descargué').click();
+      await page.getByText('Confirmar retiro').click();
+    };
+    // La remedición del caso FT: retiro normal, sin conteo de informe
+    await retirar('r21');
+    await expect(page.locator('.toast')).toHaveText('Equipo marcado como retirado');
+    // El reclamo: empieza el conteo de 8 días
+    await retirar('r22');
     await expect(page.locator('.toast')).toContainText('Empieza el conteo: 8 días para entregar el informe (vence el 01/10/2026)');
-    // En Inicio: el informe de la remedición con su conteo, y en el caso FT es el siguiente paso
     await nav(page, 'Inicio');
-    const inf = page.locator('.inf-caso', { hasText: 'CR2O2026201' });
-    await expect(inf).toContainText('Remedición FT');
-    await expect(inf).toContainText('Quedan 8 días · vence el 01/10/2026');
-    await expect(page.locator('.ft-caso', { hasText: 'CR1O2026201' }).locator('.ft-sig')).toContainText('Entregar el informe de la remedición');
-    await inf.click();
-    const modal = page.locator('.modal');
-    await expect(modal).toContainText('Quedan 8 días · vence el 01/10/2026');
-    await modal.getByRole('button', { name: 'Marcar informe de la remedición entregado' }).click();
-    expect((await app.escrituras()).at(-1)[1]).toBe('campanas/2026-10_CPT-MT/casos/CR1O2026201/ft/informeRem');
-    await app.ejecutar(() => { cerrarFT(); switchTab('dashboard'); });
+    await expect(page.locator('.inf-caso', { hasText: 'RE292026456' })).toContainText('Quedan 8 días · vence el 01/10/2026');
     await expect(page.locator('.inf-caso', { hasText: 'CR2O2026201' })).toHaveCount(0);
+    // En el caso FT solo cuenta el plazo de 90 días; con la remedición retirada sigue confirmar si se normalizó
+    const caso = page.locator('.ft-caso', { hasText: 'CR1O2026201' });
+    await expect(caso).toContainText('de 90');
+    await expect(caso.locator('.ft-sig')).toContainText('Revisar la remedición: ¿se normalizó?');
+    await expect(caso.locator('.ft-pasos')).toContainText('5 de 6');
   });
 
   test('seguimiento FT: pasados los 90 días queda vencido', async ({ page }) => {

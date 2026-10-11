@@ -1,5 +1,5 @@
 // Pestaña Seguimiento FT: casos fuera de tolerancia de todas las campañas, con su plazo de 90 días
-import { conteoInforme, DIAS_SOLUCION_FT, ftDeRemedicion, RUTAS_FT } from '../domain/ft.js';
+import { DIAS_SOLUCION_FT, ftDeRemedicion, RUTAS_FT } from '../domain/ft.js';
 import { todosFT } from '../domain/expedientes.js';
 import { hoyLocal, nombreCampana } from '../domain/trabajo.js';
 import { state } from '../state.js';
@@ -98,14 +98,6 @@ export function renderFTModal() {
     <button class="${rem.normalizado === true ? 'active' : ''}" onclick="setRemedicionFT('${clave}', '${id}', 'normalizado', true)">Sí, se normalizó</button>
     <button class="${rem.normalizado === false ? 'active' : ''}" onclick="setRemedicionFT('${clave}', '${id}', 'normalizado', false)">No</button></div></div>`;
   html += x.cerrado ? '<div class="aviso aviso-verde"><i class="ic ic-check"></i> Caso cerrado por remedición normalizada</div>' : '';
-  // Campañas: informe de la remedición, 8 días calendario desde que se retiró (en reclamos se entrega en el expediente)
-  const ri = x.remedicionInstalada;
-  if (x.tipo !== 'reclamo' && ri?.retirado && ri.fechaRetiro) {
-    const c = conteoInforme(ri.fechaRetiro, hoyLocal());
-    html += '<div class="section-title" style="margin-top:12px">Informe de la remedición</div>';
-    if (!ft.informeRem) html += `<div class="aviso ${c.vencido || c.quedan <= 2 ? 'aviso-amarillo' : 'aviso-azul'} ft-recordatorio"><i class="ic ic-reloj"></i> Retirada el ${fmtDate(ri.fechaRetiro)}. <b>${esc(c.texto)}</b> para entregar el informe.</div>`;
-    html += paso('informeRem', 'Informe entregado', 'Marcar informe de la remedición entregado', 'check');
-  }
   html += '<button class="btn btn-secondary" style="margin-top:8px" onclick="cerrarFT()">Cerrar</button>';
   return html + '</div></div>';
 }
