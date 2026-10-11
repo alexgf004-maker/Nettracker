@@ -3,7 +3,7 @@
 // que un formulario impreso. Sin firma en pantalla queda la línea para firmar a mano.
 import {
   CARGAS, conexion, CONDICIONES_TABLERO, CONEXIONES_PRI, CONEXIONES_SEC, CONSTRUCCION_TRI, INSTALACION_GENERAL,
-  kvasTrafos, kvaTotal, LECTURAS, LIMITE_TIERRA, lista, MONTAJES, OTRA, PROTECCIONES, ROLES_FIRMA, TIPOS_SUBESTACION, veredictoTierra,
+  kvasTrafos, kvaTotal, LECTURAS, normalizarInspeccion, LIMITE_TIERRA, lista, MONTAJES, OTRA, PROTECCIONES, ROLES_FIRMA, TIPOS_SUBESTACION, veredictoTierra,
 } from '../domain/inspeccion.js';
 import { escapeHtml } from '../utils.js';
 import { docMemo, seccion } from './memo-base.js';
@@ -23,7 +23,8 @@ const filas = pares => {
   return `<table class="ft">${html}</table>`;
 };
 
-export function buildFormularioInspeccion(exp = {}, insp = {}, { inspector = '', medicion = { lista: [] }, logo = '' } = {}) {
+export function buildFormularioInspeccion(exp = {}, inspGuardada = {}, { inspector = '', medicion = { lista: [] }, logo = '' } = {}) {
+  const insp = normalizarInspeccion(inspGuardada);
   const sub = insp.subestacion || {}; const med = insp.medidor || {};
   const tipo = sub.tipo;
   let n = 0; const sec = (titulo, html) => seccion(`${++n}. ${titulo}`, html);
@@ -43,10 +44,10 @@ export function buildFormularioInspeccion(exp = {}, insp = {}, { inspector = '',
 
   // Subestación: tipo, transformadores con sus kVA, montaje y conexiones del tipo elegido
   const kvas = kvasTrafos(sub); const total = kvaTotal(sub);
-  const tiposCon = tipo ? [tipo] : Object.keys(TIPOS_SUBESTACION);
+  const tiposCon = TIPOS_SUBESTACION[tipo] ? [tipo] : Object.keys(TIPOS_SUBESTACION);
   const opcionesCon = (lado, catalogo) => {
     const elegido = sub[lado];
-    const ops = [...new Set(tiposCon.flatMap(t => catalogo[t]))];
+    const ops = [...new Set(tiposCon.flatMap(t => catalogo[t] || []))];
     const pares = ops.map(o => [elegido === o || (lado === 'conexionSec' && tipo === 'mono'), o]);
     pares.push([elegido === OTRA, `Otra${elegido === OTRA && conexion(sub, lado) ? ': ' + conexion(sub, lado) : ''}`]);
     return cbs(pares);

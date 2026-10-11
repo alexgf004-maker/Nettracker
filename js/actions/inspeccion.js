@@ -6,13 +6,18 @@ import { state } from '../state.js';
 import { abrirDoc, showToast } from '../ui.js';
 import { buildFormularioInspeccion } from '../pdf/inspeccion.js';
 import { medicionesExpediente } from '../domain/expedientes.js';
-import { equiposMedicion } from '../domain/inspeccion.js';
+import { equiposMedicion, migracionInspeccion } from '../domain/inspeccion.js';
 import { hoyLocal } from '../domain/trabajo.js';
 import { configCartas } from './documentos.js';
 import { render } from '../views/render.js';
 
 const NUMERICOS = /(^|\/)(kvas\/\d|kva|tierra|vmin|vmax|monto|lect\/\w+)$/;
 const rutaBase = id => `reclamos/${id}/inspeccion`;
+// Antes de escribir, deja en el formato nuevo lo que se llenó con la primera versión del formulario
+function migrar(id) {
+  const c = migracionInspeccion(state.reclamos?.[id]?.inspeccion);
+  if (c) update(ref(db, rutaBase(id)), c);
+}
 
 // ruta: 'fecha', 'subestacion/tap', 'tableros/{clave}/tierra'…
 export function guardarInspeccion(id, ruta, valor) {
@@ -21,6 +26,7 @@ export function guardarInspeccion(id, ruta, valor) {
     v = v.replace(',', '.').replace(/^\$/, '');
     if (Number.isNaN(Number(v))) return showToast('Escribe solo el número');
   }
+  migrar(id);
   const cambios = { [ruta]: v === '' ? null : v };
   // Al cambiar el tipo de subestación, las conexiones y la construcción del tipo anterior ya no aplican
   if (ruta === 'subestacion/tipo') ['construccion', 'conexionPri', 'conexionPriOtra', 'conexionSec', 'conexionSecOtra'].forEach(k => { cambios['subestacion/' + k] = null; });
@@ -28,10 +34,12 @@ export function guardarInspeccion(id, ruta, valor) {
 }
 
 export function marcarInspeccion(id, ruta, marcado) {
+  migrar(id);
   update(ref(db, rutaBase(id)), { [ruta]: marcado ? true : null });
 }
 
 export function agregarItemInspeccion(id, lista) {
+  migrar(id);
   push(ref(db, `${rutaBase(id)}/${lista}`), { orden: Date.now() });
 }
 

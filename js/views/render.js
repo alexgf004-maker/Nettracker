@@ -85,7 +85,12 @@ export function render() {
 
   const tabView = TAB_VIEWS[state.tab];
   if (tabView) {
-    const out = tabView();
+    let out;
+    try { out = tabView(); } catch (err) {
+      // Si una pantalla falla con datos inesperados, se avisa en vez de dejar la app sin responder
+      console.error(err);
+      out = `<div class="content"><div class="alert-banner alert-red">No se pudo mostrar esta pantalla (${String(err?.message || err).replace(/[<>&]/g, '')}). Vuelve atrás o recarga; si sigue pasando, avísale al administrador.</div></div>`;
+    }
     if (out === null) return render(); // la vista cambió el estado (p. ej. registro borrado)
     html += out;
   }
