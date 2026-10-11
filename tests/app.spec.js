@@ -2050,7 +2050,9 @@ test.describe('Análisis de reclamos', () => {
       const d = m.leerTension(tt);
       return {
         tierra: [i.veredictoTierra('22.3'), i.veredictoTierra(25), i.veredictoTierra('320'), i.veredictoTierra('')],
-        kva: i.kvaTotal({ cantidad: '3', kva: '100' }),
+        kva: [i.kvaTotal({ tipo: 'bi', kvas: { 1: '50', 2: '25', 3: '999' } }), i.kvaTotal({ tipo: 'tri', kvas: { 1: '100', 2: '100', 3: '100' } }), i.kvaTotal({ tipo: 'tri', construccion: 'unidad', kvas: { 1: '300', 2: '5' } }), i.kvaTotal({ tipo: 'mono', kvas: { 1: '37.5' } })],
+        cant: ['mono', 'bi', 'tri'].map(tipo => i.cantidadTrafos({ tipo })),
+        vacia: [i.inspeccionVacia({ firmas: { inspector1: { nombre: 'X' } } }), i.inspeccionVacia({ general: { planta: true } })],
         // 13200 V entre 12 000 y 13 500: los 10 registros al 8 % (14 256 V) quedan arriba → 6.9 % del tiempo
         eq: i.tensionVsEquipo(d.U, ['1', '2', '3'], { vmin: '12000', vmax: '13500' }),
         // Secundario equivalente (÷ 55) contra 200–240 V: 13200/55 = 240 dentro; 14256/55 = 259 arriba
@@ -2059,7 +2061,9 @@ test.describe('Análisis de reclamos', () => {
       };
     }, txtTension());
     expect(r.tierra).toEqual(['CUMPLE', 'CUMPLE', 'NO CUMPLE', null]);
-    expect(r.kva).toBe(300);
+    expect(r.kva).toEqual([75, 300, 300, 37.5]); // bifásica suma 2 trafos; trifásica de 1 unidad usa solo el primero
+    expect(r.cant).toEqual([1, 2, 3]);
+    expect(r.vacia).toEqual([true, false]);
     expect(r.eq.porFase['1']).toMatchObject({ n: 144, arriba: 10, abajo: 0 });
     expect(r.eq.peor).toBeCloseTo(10 / 144, 6);
     expect(r.eq.cumple).toBe(false); // más del 5 % del tiempo
@@ -2067,37 +2071,104 @@ test.describe('Análisis de reclamos', () => {
     expect(r.sinRango).toBeNull();
   });
 
-  test('inspección: se llena en el expediente y sale en el borrador de informe', async ({ page }) => {
+  test('inspección: formulario en el expediente, PDF con firmas y sección en el borrador', async ({ page }) => {
     app = await abrirApp(page, { excel: true });
     await cerrarAlerta(page);
     await nav(page, 'Reclamos');
     await page.locator('.exp-card', { hasText: 'RE192026456' }).click();
     await page.getByRole('tab', { name: /Inspección/ }).click();
     await expect(page.getByRole('tab', { name: /Inspección/ })).toContainText('Sin llenar');
+    // Encabezado con los datos del expediente
+    const cab = page.locator('.insp-cabecera');
+    await expect(cab).toContainText('900100'); await expect(cab).toContainText('USUARIO DE PRUEBA'); await expect(cab).toContainText('DS100001 / CT10001'); await expect(cab).toContainText('MED-1');
+    // Equipo de medición: de la instalación del reclamo
+    await expect(page.locator('.bloque', { hasText: 'Equipo de medición' })).toContainText('RE192026456');
+    await expect(page.locator('.insp-equipos')).toContainText('Punto principal');
+    await expect(page.locator('.insp-equipos')).toContainText('PQ-2 · SN-202');
+    const campo = async (sel, v) => { await page.locator(sel).fill(v); await page.locator(sel).press('Tab'); };
     await page.locator('#insp-fecha').fill('2026-09-01'); await page.locator('#insp-fecha').dispatchEvent('change');
-    await page.locator('#insp-circuito').fill('AL999-23KV'); await page.locator('#insp-circuito').press('Tab');
-    await page.locator('#insp-subestacion-tipo').selectOption('Banco de transformadores');
-    await page.locator('#insp-subestacion-cantidad').fill('3'); await page.locator('#insp-subestacion-cantidad').press('Tab');
-    await page.locator('#insp-subestacion-kva').fill('100'); await page.locator('#insp-subestacion-kva').press('Tab');
+    await campo('#insp-circuito', 'AL999-23KV');
+    // Bifásica: dos transformadores que se suman; secundario delta abierta o estrella de 2 hilos
+    await page.getByRole('button', { name: 'Bifásica' }).click();
+    await expect(page.locator('#insp-subestacion-kvas-3')).toHaveCount(0);
+    await campo('#insp-subestacion-kvas-1', '50'); await campo('#insp-subestacion-kvas-2', '25');
+    await expect(page.locator('.bloque', { hasText: 'Subestación del usuario' })).toContainText('75 kVA en total');
+    expect(await page.locator('#insp-subestacion-conexionSec option').allTextContents()).toEqual(['—', 'Delta abierta', 'Estrella de 2 hilos', 'Otra']);
+    // Monofásica: un solo transformador y secundario monofásico fijo
+    await page.getByRole('button', { name: 'Monofásica' }).click();
+    await expect(page.locator('#insp-subestacion-kvas-2')).toHaveCount(0);
+    await expect(page.locator('.field', { hasText: 'Conexión del secundario' }).locator('input')).toHaveValue('Monofásica');
+    // Trifásica en banco: tres transformadores; conexiones delta o estrella
+    await page.getByRole('button', { name: 'Trifásica' }).click();
+    await page.getByRole('button', { name: 'Banco de 3 transformadores' }).click();
+    for (const k of [1, 2, 3]) await campo(`#insp-subestacion-kvas-${k}`, '100');
     await expect(page.locator('.bloque', { hasText: 'Subestación del usuario' })).toContainText('300 kVA en total');
     await page.locator('#insp-subestacion-conexionPri').selectOption('Estrella');
     await page.locator('#insp-subestacion-conexionSec').selectOption('Delta');
-    await page.locator('#insp-medidor-rtc').fill('600/5'); await page.locator('#insp-medidor-rtc').press('Tab');
+    await page.locator('#insp-subestacion-montaje').selectOption('Poste');
+    await campo('#insp-medidor-rtc', '600/5');
+    await page.locator('#insp-general-trafosSecos').check();
+    await page.getByRole('button', { name: 'Agregar transformador seco' }).click();
+    await campo('.insp-item input[id$="-vSec"]', '240/120');
     await page.getByRole('button', { name: 'Agregar tablero' }).click();
-    const tb = page.locator('.insp-item').first();
-    await tb.locator('input[id$="-nombre"]').fill('Sub-tablero del VFD'); await tb.locator('input[id$="-nombre"]').press('Tab');
-    await tb.locator('input[id$="-tierra"]').fill('abc'); await tb.locator('input[id$="-tierra"]').press('Tab');
+    const tb = page.locator('.insp-item', { hasText: 'Tablero sin nombre' });
+    await campo('.insp-item input[id^="insp-tableros-"][id$="-nombre"]', 'Sub-tablero del VFD');
+    const tablero = page.locator('.insp-item', { hasText: 'Protecciones que tiene' });
+    await tablero.locator('input[id$="-tierra"]').fill('abc'); await tablero.locator('input[id$="-tierra"]').press('Tab');
     await expect(page.locator('.toast')).toContainText('solo el número');
-    await tb.locator('input[id$="-tierra"]').fill('320'); await tb.locator('input[id$="-tierra"]').press('Tab');
-    await expect(page.locator('.insp-item').first()).toContainText('320 Ω · no cumple');
+    await tablero.locator('input[id$="-tierra"]').fill('320'); await tablero.locator('input[id$="-tierra"]').press('Tab');
+    await expect(tablero).toContainText('320 Ω · no cumple');
+    await tablero.locator('label', { hasText: 'Supresor de transitorios' }).locator('input').check();
+    await tablero.locator('label', { hasText: 'Corrosión' }).locator('input').check();
+    await tablero.locator('input[id$="-lect-v12"]').fill('247'); await tablero.locator('input[id$="-lect-v12"]').press('Tab');
     await page.getByRole('button', { name: 'Agregar equipo dañado' }).click();
-    const eq = page.locator('.insp-item').nth(1);
+    const eq = page.locator('.insp-item', { hasText: 'Voltaje mínimo de placa' });
     await eq.locator('input[id$="-equipo"]').fill('Variador de frecuencia'); await eq.locator('input[id$="-equipo"]').press('Tab');
     await eq.locator('input[id$="-vmin"]').fill('12000'); await eq.locator('input[id$="-vmin"]').press('Tab');
     await eq.locator('input[id$="-vmax"]').fill('13500'); await eq.locator('input[id$="-vmax"]').press('Tab');
     await eq.locator('input[id$="-monto"]').fill('$1500'); await eq.locator('input[id$="-monto"]').press('Tab');
     await eq.locator('select[id$="-disponible"]').selectOption('no');
+    // Firmas: el inspector firma en pantalla; el acompañante queda en blanco para firmar a mano
+    await campo('#insp-firmas-acompanante-nombre', 'Persona de prueba'); await campo('#insp-firmas-acompanante-cargo', 'Mantenimiento');
+    await page.locator('.insp-firma').first().getByRole('button', { name: 'Firmar en pantalla' }).click();
+    await page.getByRole('button', { name: 'Guardar firma' }).click();
+    await expect(page.locator('.toast')).toContainText('Firma dentro del recuadro');
+    const lienzo = await page.locator('#firma-canvas').boundingBox();
+    await page.mouse.move(lienzo.x + 40, lienzo.y + 60); await page.mouse.down();
+    await page.mouse.move(lienzo.x + 200, lienzo.y + 90, { steps: 8 }); await page.mouse.move(lienzo.x + 300, lienzo.y + 40, { steps: 8 }); await page.mouse.up();
+    await page.getByRole('button', { name: 'Guardar firma' }).click();
+    await expect(page.locator('.insp-firma').first().locator('img.insp-firma-img')).toHaveCount(1);
+    await expect(page.locator('.insp-firma').nth(2)).toContainText('Sin firma en pantalla');
     await expect(page.getByRole('tab', { name: /Inspección/ })).toContainText('Visita 01/09/2026');
+    // PDF del formulario
+    const html = await page.evaluate(async () => {
+      const { buildFormularioInspeccion } = await import('/js/pdf/inspeccion.js');
+      const { state } = await import('/js/state.js');
+      const { medicionesExpediente } = await import('/js/domain/expedientes.js');
+      const { equiposMedicion } = await import('/js/domain/inspeccion.js');
+      const exp = { ...state.reclamos['RE-92026456'], id: 'RE-92026456' };
+      const medicion = equiposMedicion(medicionesExpediente(exp, state.records, '2026-09-23'), state.equipos);
+      return buildFormularioInspeccion(exp, exp.inspeccion, { inspector: 'David García', medicion });
+    });
+    expect(html).toContain('Formulario de');
+    expect(html).toContain('Calidad del Producto Técnico</div>');
+    expect(html).not.toContain('Documento generado');
+    expect(html).toContain('CPT INNOVA'); // sin logo configurado
+    const conLogo = await page.evaluate(async () => (await import('/js/pdf/inspeccion.js')).buildFormularioInspeccion({}, {}, { logo: 'data:image/png;base64,AAAA' }));
+    expect(conLogo).toContain('<div class="marca marca-img"><img src="data:image/png;base64,AAAA" alt=""><div class="marca-sub">Calidad del Producto Técnico</div>');
+    expect(conLogo).not.toContain('CPT INNOVA</div>');
+    expect(html).toContain('Equipo de medición · RE192026456');
+    expect(html).toMatch(/Punto principal<\/td><td class="val">PQ-2<\/td><td class="val">SN-202/);
+    expect(html).toContain('DS100001 / CT10001');
+    expect(html).toContain('<span class="cb on"><i></i>Trifásica</span>');
+    expect(html).toContain('<span class="cb"><i></i>Monofásica</span>');
+    expect(html).toContain('<b>Total: 300 kVA</b>');
+    expect(html).toContain('<span class="cb on"><i></i>Supresor de transitorios (DPS / TVSS)</span>');
+    expect(html).toContain('<span class="cb"><i></i>UPS</span>');
+    expect(html).toContain('320 Ω');
+    expect(html).toContain('data:image/png;base64,'); // firma del inspector
+    expect(html).toContain('Persona de prueba');
+    expect(html).toContain('David García');
     // Borrador desde el análisis con relación TC distinta a la del medidor (aviso para verificar)
     await page.evaluate(([tt, ta]) => {
       abrirAnalisisReclamo('r9');
@@ -2110,13 +2181,16 @@ test.describe('Análisis de reclamos', () => {
     const zip = XLSX.CFB.read(require('fs').readFileSync(await (await descarga).path()), { type: 'buffer' });
     const doc = Buffer.from(XLSX.CFB.find(zip, '/word/document.xml').content).toString().replace(/<[^>]+>/g, '');
     expect(doc).toContain('AL999-23KV / [completar]');
-    expect(doc).toContain('La subestación en análisis está conformada por un banco de transformadores con una capacidad nominal total de 300 kVA, integrado por 3 transformadores de 100 kVA. El banco presenta una configuración estrella en el lado primario y delta en el lado secundario.');
+    expect(doc).toContain('en compañía de Persona de prueba, Mantenimiento, por parte del usuario');
+    expect(doc).toContain('La subestación en análisis es trifásica, conformada por un banco de tres transformadores con una capacidad nominal total de 300 kVA (3 × 100 kVA), con montaje en poste. El banco presenta una configuración estrella en el lado primario y delta en el lado secundario.');
     expect(doc).toContain('[verificar] La RTC del medidor (600/5) no coincide con la relación de corriente usada en la medición (800/5).');
+    expect(doc).toContain('La instalación cuenta con transformadores secos.');
+    expect(doc).toContain('El tablero cuenta con los siguientes elementos de protección: supresor de transitorios (DPS / TVSS).');
+    expect(doc).toContain('Durante la inspección se observó: corrosión.');
+    expect(doc).toContain('247 V');
     expect(doc).toContain('obteniéndose un valor de 320 Ω');
-    expect(doc).toContain('por encima del límite máximo aceptable (25 Ω)');
     expect(doc).toContain('ya no se encontraba disponible en sitio');
     expect(doc).toContain('$1500');
-    expect(doc).toContain('[Foto: Subestación del usuario]');
     expect(doc).toContain('Tensión frente al rango de operación del variador de frecuencia');
     expect(doc).toContain('Resistencia a tierra — Sub-tablero del VFD25 Ω (NEC 2008)320 ΩNO CUMPLE');
     expect(doc).toContain('6.9% del tiempo fuera de rangoNO CUMPLE');

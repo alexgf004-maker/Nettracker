@@ -22,6 +22,8 @@ const ESTILO = `
   .marca-logo { width: 50px; height: 50px; border-radius: 14px; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.28); display: flex; align-items: center; justify-content: center; }
   .marca-logo svg { width: 28px; height: 28px; }
   .marca-nombre { font-size: 20px; font-weight: 800; letter-spacing: .3px; }
+  .marca-img { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .marca-img img { max-height: 58px; max-width: 240px; object-fit: contain; }
   .marca-sub { font-size: 11px; opacity: .78; margin-top: 1px; }
   .titulo { text-align: right; }
   .titulo-eti { font-size: 10px; font-weight: 700; letter-spacing: 2.4px; text-transform: uppercase; opacity: .75; }
@@ -80,6 +82,39 @@ const ESTILO = `
   .pie { margin: 0 34px; padding: 12px 0 18px; border-top: 2px solid; border-image: linear-gradient(90deg, #0b2e3b, #0e7490, #06b6d4) 1; display: flex; justify-content: space-between; gap: 16px; font-size: 10px; color: var(--texto3); }
   .pie b { color: var(--petroleo); }
 
+  /* Variante formal (formularios): encabezado blanco con filete, cuadros rectos y casillas */
+  .hoja.formal .enc { background: #fff; color: var(--petroleo); border-bottom: 3px double var(--petroleo); padding: 20px 34px 16px; }
+  .hoja.formal .marca-logo { background: var(--petroleo); border-color: var(--petroleo); border-radius: 10px; }
+  .hoja.formal .marca-sub { opacity: 1; color: var(--texto2); }
+  .hoja.formal .titulo-eti { opacity: 1; color: var(--texto3); }
+  .hoja.formal .titulo-tipo { font-size: 18px; text-transform: uppercase; letter-spacing: .6px; }
+  .hoja.formal .meta { background: #fff; }
+  .hoja.formal .cuerpo { padding: 18px 30px 8px; font-size: 11.5px; }
+  .hoja.formal .sec { margin-bottom: 14px; }
+  .hoja.formal .sec-tit { color: var(--petroleo); font-size: 10.5px; margin-bottom: 6px; }
+  .hoja.formal .sec-tit::before { background: var(--petroleo); }
+  .ft { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .ft td, .ft th { border: 1px solid #9fb3bd; padding: 4px 8px; vertical-align: top; font-size: 11px; }
+  .ft th { background: #eef3f5; color: var(--petroleo); font-size: 9px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; text-align: left; }
+  .ft .eti { background: #eef3f5; color: var(--texto2); font-size: 9px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; width: 24%; }
+  .ft .val { font-weight: 600; color: var(--texto); min-height: 16px; }
+  .ft .c { text-align: center; }
+  .ft td.val { height: 21px; }
+  .ft tr { break-inside: avoid; }
+  .cbs { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+  .cbs.col2 { display: grid; grid-template-columns: 1fr 1fr; }
+  .cb { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; }
+  .cb i { width: 11px; height: 11px; border: 1.3px solid var(--petroleo); display: inline-flex; align-items: center; justify-content: center; font-style: normal; font-size: 9px; font-weight: 800; line-height: 1; flex: none; }
+  .cb.on i::after { content: '✓'; }
+  .ok { color: #047857; font-weight: 800; } .mal { color: #b91c1c; font-weight: 800; }
+  .ffirmas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 6px; }
+  .ffirma { border: 1px solid #9fb3bd; padding: 8px 10px; text-align: center; break-inside: avoid; }
+  .ffirma-img { height: 56px; display: flex; align-items: flex-end; justify-content: center; border-bottom: 1.3px solid var(--petroleo); margin-bottom: 6px; }
+  .ffirma-img img { max-height: 60px; max-width: 100%; }
+  .ffirma-rol { font-size: 8.5px; font-weight: 700; color: var(--texto3); letter-spacing: 1px; text-transform: uppercase; }
+  .ffirma-nom { font-size: 12px; font-weight: 800; min-height: 16px; margin-top: 2px; }
+  .ffirma-cargo { font-size: 10.5px; color: var(--texto2); min-height: 14px; }
+
   @page { size: A4; margin: 0; }
   @page apaisada { size: A4 landscape; margin: 0; }
   @media print {
@@ -87,6 +122,8 @@ const ESTILO = `
     .barra { display: none; }
     .hoja { margin: 0; box-shadow: none; width: auto; min-height: 297mm; }
     .hoja.apaisada { page: apaisada; min-height: 210mm; }
+    .hoja.formal { min-height: 0; }
+    .hoja.formal .sec-tit { break-after: avoid; }
   }
   @media screen and (max-width: 820px) {
     .hoja, .hoja.apaisada { width: auto; min-height: 0; margin: 0; }
@@ -98,14 +135,15 @@ const ESTILO = `
     .mov { flex-direction: column; } .mov-flecha { width: auto; height: 40px; } .mov-flecha span { transform: rotate(90deg); }
     .firmas { grid-template-columns: 1fr; gap: 0; }
     .tabla-wrap { overflow-x: auto; }
+    .ffirmas, .cbs.col2 { grid-template-columns: 1fr; }
   }
 `;
 
 const hoy = () => new Date().toLocaleDateString('es-SV');
 
 // Documento completo. meta: [[etiqueta, valor], ...] bajo el encabezado.
-export function docMemo({ titulo, tipo, meta = [], cuerpo, pie = '', rojo = false, compacta = false, apaisada = false, subtitulo = 'Calidad del Producto Técnico · Analizadores de Red' }) {
-  const clases = ['hoja', compacta && 'compacta', apaisada && 'apaisada'].filter(Boolean).join(' ');
+export function docMemo({ titulo, tipo, meta = [], cuerpo, pie = '', rojo = false, compacta = false, apaisada = false, formal = false, logo = '', etiqueta = 'Memorándum de', subtitulo = 'Calidad del Producto Técnico · Analizadores de Red' }) {
+  const clases = ['hoja', compacta && 'compacta', apaisada && 'apaisada', formal && 'formal'].filter(Boolean).join(' ');
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -118,15 +156,15 @@ export function docMemo({ titulo, tipo, meta = [], cuerpo, pie = '', rojo = fals
 <div class="barra"><button onclick="window.print()">Imprimir o guardar PDF</button></div>
 <div class="${clases}">
   <div class="enc${rojo ? ' rojo' : ''}">
-    <div class="marca">
+    ${logo ? `<div class="marca marca-img"><img src="${logo}" alt=""><div class="marca-sub">${subtitulo}</div></div>` : `<div class="marca">
       <div class="marca-logo">${LOGO}</div>
       <div><div class="marca-nombre">CPT INNOVA</div><div class="marca-sub">${subtitulo}</div></div>
-    </div>
-    <div class="titulo"><div class="titulo-eti">Memorándum de</div><div class="titulo-tipo">${tipo}</div></div>
+    </div>`}
+    <div class="titulo"><div class="titulo-eti">${etiqueta}</div><div class="titulo-tipo">${tipo}</div></div>
   </div>
   ${meta.length ? `<div class="meta">${meta.map(([e, v]) => `<div><div class="meta-eti">${e}</div><div class="meta-val">${v || '—'}</div></div>`).join('')}</div>` : ''}
   <div class="cuerpo">${cuerpo}</div>
-  <div class="pie"><span>Documento generado por <b>NetTracker</b> · CPT INNOVA${pie}</span><span>${hoy()}</span></div>
+  <div class="pie"><span>${pie.replace(/^ · /, '')}</span><span>${hoy()}</span></div>
 </div>
 </body>
 </html>`;
