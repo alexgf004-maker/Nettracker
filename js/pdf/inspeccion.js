@@ -23,7 +23,7 @@ const filas = pares => {
   return `<table class="ft">${html}</table>`;
 };
 
-export function buildFormularioInspeccion(exp = {}, insp = {}, { inspector = '' } = {}) {
+export function buildFormularioInspeccion(exp = {}, insp = {}, { inspector = '', medicion = { lista: [] } } = {}) {
   const sub = insp.subestacion || {}; const med = insp.medidor || {};
   const tipo = sub.tipo;
   let n = 0; const sec = (titulo, html) => seccion(`${++n}. ${titulo}`, html);
@@ -35,6 +35,11 @@ export function buildFormularioInspeccion(exp = {}, insp = {}, { inspector = '' 
     ['Dirección', e(exp.direccion)], ['Código / WO', e([exp.codigo, exp.wo].filter(Boolean).join(' / '))],
     ['Motivo del reclamo', e(exp.motivo)], ['Circuito / Subestación', e([insp.circuito, insp.subestacionDist].filter(Boolean).join(' / '))],
   ]));
+
+  // Equipo de medición: de las instalaciones registradas para la medición inicial del reclamo
+  const eqs = medicion.lista.length ? medicion.lista : [{}, {}];
+  cuerpo += sec(`Equipo de medición${medicion.codigo ? ' · ' + e(medicion.codigo) : ''}`, `<table class="ft"><tr><th style="width:24%">Punto de medición</th><th>Analizador</th><th>Serie</th><th>Viñeta</th><th>Instalación</th><th>Retiro ${medicion.lista.some(x => x.retirado) ? '' : 'programado'}</th></tr>
+    ${eqs.map(x => `<tr><td class="val">${e(x.punto)}</td><td class="val">${e(x.modelo)}</td><td class="val">${e(x.serie)}</td><td class="val">${e(x.vineta)}</td><td class="val">${fecha(x.instalacion)}</td><td class="val">${fecha(x.retiro)}</td></tr>`).join('')}</table>`);
 
   // Subestación: tipo, transformadores con sus kVA, montaje y conexiones del tipo elegido
   const kvas = kvasTrafos(sub); const total = kvaTotal(sub);
@@ -98,7 +103,7 @@ export function buildFormularioInspeccion(exp = {}, insp = {}, { inspector = '' 
 
   const hora = [insp.horaInicio, insp.horaFin].filter(Boolean).join(' – ');
   return docMemo({
-    titulo: `Inspección ${exp.codigo || ''}`.trim(), tipo: 'Inspección de instalaciones', etiqueta: 'Formulario de', formal: true,
+    titulo: `Inspección ${exp.codigo || ''}`.trim(), tipo: 'Inspección de instalaciones', etiqueta: 'Formulario de', formal: true, subtitulo: 'Calidad del Producto Técnico',
     meta: [['Reclamo', e(exp.codigo)], ['Fecha de inspección', fecha(insp.fecha)], ['Hora', e(hora)], ['Área', e(exp.area)]],
     cuerpo, pie: ` · Formulario de inspección ${e(exp.codigo || '')}`,
   });

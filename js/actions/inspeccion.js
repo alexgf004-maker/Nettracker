@@ -5,6 +5,9 @@ import { db, push, ref, remove, update } from '../firebase.js';
 import { state } from '../state.js';
 import { abrirDoc, showToast } from '../ui.js';
 import { buildFormularioInspeccion } from '../pdf/inspeccion.js';
+import { medicionesExpediente } from '../domain/expedientes.js';
+import { equiposMedicion } from '../domain/inspeccion.js';
+import { hoyLocal } from '../domain/trabajo.js';
 import { render } from '../views/render.js';
 
 const NUMERICOS = /(^|\/)(kvas\/\d|kva|tierra|vmin|vmax|monto|lect\/\w+)$/;
@@ -89,5 +92,6 @@ export function borrarFirma(id, rol) {
 // Abre el formulario listo para imprimir o guardar como PDF
 export function generarFormularioInspeccion(id) {
   const exp = state.reclamos?.[id]; if (!exp) return;
-  abrirDoc(buildFormularioInspeccion({ ...exp, id }, exp.inspeccion || {}, { inspector: state.sesionUsuario?.nombre || '' }), `Inspeccion-${String(exp.codigo || id).replace(/[^\w-]+/g, '_')}.html`);
+  const medicion = equiposMedicion(medicionesExpediente({ ...exp, id }, state.records, hoyLocal()), state.equipos);
+  abrirDoc(buildFormularioInspeccion({ ...exp, id }, exp.inspeccion || {}, { inspector: state.sesionUsuario?.nombre || '', medicion }), `Inspeccion-${String(exp.codigo || id).replace(/[^\w-]+/g, '_')}.html`);
 }

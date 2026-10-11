@@ -2081,6 +2081,10 @@ test.describe('Análisis de reclamos', () => {
     // Encabezado con los datos del expediente
     const cab = page.locator('.insp-cabecera');
     await expect(cab).toContainText('900100'); await expect(cab).toContainText('USUARIO DE PRUEBA'); await expect(cab).toContainText('DS100001 / CT10001'); await expect(cab).toContainText('MED-1');
+    // Equipo de medición: de la instalación del reclamo
+    await expect(page.locator('.bloque', { hasText: 'Equipo de medición' })).toContainText('RE192026456');
+    await expect(page.locator('.insp-equipos')).toContainText('Punto principal');
+    await expect(page.locator('.insp-equipos')).toContainText('PQ-2 · SN-202');
     const campo = async (sel, v) => { await page.locator(sel).fill(v); await page.locator(sel).press('Tab'); };
     await page.locator('#insp-fecha').fill('2026-09-01'); await page.locator('#insp-fecha').dispatchEvent('change');
     await campo('#insp-circuito', 'AL999-23KV');
@@ -2140,10 +2144,17 @@ test.describe('Análisis de reclamos', () => {
     const html = await page.evaluate(async () => {
       const { buildFormularioInspeccion } = await import('/js/pdf/inspeccion.js');
       const { state } = await import('/js/state.js');
-      const exp = state.reclamos['RE-92026456'];
-      return buildFormularioInspeccion(exp, exp.inspeccion, { inspector: 'David García' });
+      const { medicionesExpediente } = await import('/js/domain/expedientes.js');
+      const { equiposMedicion } = await import('/js/domain/inspeccion.js');
+      const exp = { ...state.reclamos['RE-92026456'], id: 'RE-92026456' };
+      const medicion = equiposMedicion(medicionesExpediente(exp, state.records, '2026-09-23'), state.equipos);
+      return buildFormularioInspeccion(exp, exp.inspeccion, { inspector: 'David García', medicion });
     });
     expect(html).toContain('Formulario de');
+    expect(html).toContain('Calidad del Producto Técnico</div>');
+    expect(html).not.toContain('Documento generado');
+    expect(html).toContain('Equipo de medición · RE192026456');
+    expect(html).toMatch(/Punto principal<\/td><td class="val">PQ-2<\/td><td class="val">SN-202/);
     expect(html).toContain('DS100001 / CT10001');
     expect(html).toContain('<span class="cb on"><i></i>Trifásica</span>');
     expect(html).toContain('<span class="cb"><i></i>Monofásica</span>');

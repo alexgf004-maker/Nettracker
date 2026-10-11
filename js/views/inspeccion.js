@@ -4,6 +4,9 @@ import {
   BASES_EQUIPO, CARGAS, cantidadTrafos, CONDICIONES_TABLERO, CONEXIONES_PRI, CONEXIONES_SEC, CONSTRUCCION_TRI, INSTALACION_GENERAL,
   kvaTotal, LECTURAS, LIMITE_TIERRA, lista, MONTAJES, OTRA, PROTECCIONES, ROLES_FIRMA, TIPOS_SUBESTACION, veredictoTierra,
 } from '../domain/inspeccion.js';
+import { medicionesExpediente } from '../domain/expedientes.js';
+import { equiposMedicion } from '../domain/inspeccion.js';
+import { hoyLocal } from '../domain/trabajo.js';
 import { state } from '../state.js';
 import { escapeHtml } from '../utils.js';
 
@@ -33,6 +36,13 @@ export function vistaInspeccion(e) {
   const dato = (l, v) => `<div><small>${l}</small><b>${esc(v) || '—'}</b></div>`;
   html += bloque('Datos del reclamo', `<div class="insp-cabecera">${dato('Código', e.codigo)}${dato('NC', e.nc)}${dato('Nombre del usuario', e.nombre)}${dato('DS / CT', [e.corte, e.ct].filter(Boolean).join(' / '))}${dato('Medidor', e.medidor)}${dato('Dirección', e.direccion)}</div>
     <div class="page-sub" style="margin-top:6px">Vienen del expediente; si algo está mal, corrígelo en la pestaña Datos.</div>`);
+
+  // Equipo de medición: sale de las instalaciones registradas (no se escribe aquí)
+  const med = equiposMedicion(medicionesExpediente(e, state.records, hoyLocal()), state.equipos);
+  html += bloque(`Equipo de medición${med.codigo ? ' · ' + esc(med.codigo) : ''}`, med.lista.length
+    ? `<div class="insp-equipos">${med.lista.map(x => `<div><small>${esc(x.punto)}</small><b>${esc([x.modelo, x.serie].filter(Boolean).join(' · ')) || '—'}</b>${x.vineta ? `<span>Viñeta ${esc(x.vineta)}</span>` : ''}</div>`).join('')}</div>
+      <div class="page-sub" style="margin-top:6px">Sale de las instalaciones del reclamo (punto principal y puntos adicionales de la medición inicial).</div>`
+    : '<div class="page-sub">Todavía no hay una instalación registrada para este reclamo. Al registrarla en Mediciones, el equipo aparece aquí y en el PDF.</div>');
 
   html += bloque('Visita', `<div class="form-analisis">
     <div class="field"><label>Fecha de la inspección</label><input type="date" id="insp-fecha" value="${esc(insp.fecha || '')}" onchange="${guardar('fecha')}"></div>

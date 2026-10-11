@@ -132,3 +132,16 @@ export function tensionVsEquipo(U, fases, { vmin, vmax, base = 'directa' }, fact
   const peor = Math.max(0, ...Object.values(porFase).map(x => x.pArriba + x.pAbajo));
   return { vmin: lo, vmax: hi, porFase, peor, cumple: peor <= UMBRAL_EQUIPO };
 }
+
+// Equipos de la medición inicial del reclamo (punto principal y puntos adicionales), para el formulario.
+// mediciones: medicionesExpediente(); equipos: inventario (para la viñeta)
+export function equiposMedicion(mediciones = [], equipos = []) {
+  const m = mediciones.find(x => x.inst || x.puntos?.length);
+  if (!m) return { codigo: null, lista: [] };
+  const fila = (inst, punto) => {
+    const eq = equipos.find(x => x.id === inst.equipoId) || {};
+    return { punto, modelo: inst.modelo || eq.modelo || '', serie: inst.serie || eq.serie || '', vineta: eq.vineta || '',
+      instalacion: inst.fechaInstalacion || '', retiro: inst.fechaRetiroReal || inst.fechaRetiro || '', retirado: !!inst.retirado };
+  };
+  return { codigo: m.codigo, lista: [...(m.inst ? [fila(m.inst, 'Punto principal')] : []), ...(m.puntos || []).map(p => fila(p.inst, p.nombre))] };
+}
