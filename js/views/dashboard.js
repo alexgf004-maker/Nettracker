@@ -2,8 +2,9 @@
 import { isAdmin, userArea } from '../config.js';
 import { GRUPOS, calcularPendientes } from '../domain/pendientes.js';
 import { agruparCampanas, areaDeInstalacion, diasEntre, hoyLocal, registrosDeTipo } from '../domain/trabajo.js';
-import { listaExpedientes, todosFT } from '../domain/expedientes.js';
-import { DIAS_SOLUCION_FT, pasosFT, siguientePasoFT } from '../domain/ft.js';
+import { informesPorEntregar, listaExpedientes, todosFT } from '../domain/expedientes.js';
+import { DIAS_SOLUCION_FT, pasosFT } from '../domain/ft.js';
+import { DIAS_INFORME_RECLAMO } from '../domain/trabajo.js';
 import { state } from '../state.js';
 import { calcSt, escapeHtml, eqEnCampo, eqSt, fmtDate } from '../utils.js';
 import { areaVista, textoPlazo } from './trabajo.js';
@@ -45,7 +46,10 @@ export function renderDashboard() {
   // Primero los casos FT (se penalizan); los demás pendientes (retiros, descargas…) van después
   const ft = todosFT(state.campanas, state.reclamos, state.records, hoy).filter(x => !x.cerrado && (!area || x.area === area));
   if (ft.length) html += `<div class="ini-ft">${renderCasosFT(hoy, ft)}</div>`;
-  html += `<div class="ini-pend">${renderPendientes(hoy, pend.filter(p => p.clase !== 'ft'))}</div>`;
+  // Después, el conteo de los 8 días para entregar informes (reclamos y remediciones FT)
+  const informes = informesPorEntregar(state.campanas, state.reclamos, state.records, hoy).filter(x => (!area || x.area === area) && (!state.seguimientoDesde || x.retiro >= state.seguimientoDesde));
+  if (informes.length) html += `<div class="ini-informes">${renderInformes(informes)}</div>`;
+  html += `<div class="ini-pend">${renderPendientes(hoy, pend.filter(p => p.clase !== 'ft' && p.clase !== 'informe'))}</div>`;
   html += `<div class="ini-trabajo">${renderResumenTrabajo(hoy, area, ftAbiertos)}</div>`;
   html += `<div class="ini-equipos">${renderEquipos()}</div>`;
   html += `<div class="ini-acciones">${renderAcciones()}</div>`;
@@ -89,7 +93,7 @@ function renderPendientes(hoy, lista) {
 function renderCasosFT(hoy, lista) {
   let html = `<div class="bloque ft-inicio"><div class="bloque-head"><div class="bloque-titulo"><i class="ic ic-ft"></i> Casos FT <span class="cuenta">${lista.length}</span></div><button class="b b-l" onclick="switchTab('ft')">Seguimiento FT</button></div>`;
   lista.forEach(x => {
-    const pasos = pasosFT(x); const sig = siguientePasoFT(x);
+    const pasos = pasosFT(x, hoy); const sig = pasos.find(p => !p.hecho) || null;
     const hechos = pasos.filter(p => p.hecho).length;
     const urgente = !x.ft.aviso || sig?.urgente || x.vencido;
     html += `<button class="ft-caso ${urgente ? 'urgente' : ''}" onclick="switchTab('ft'); abrirFT('${x.clave}', '${x.id}')">
@@ -97,6 +101,22 @@ function renderCasosFT(hoy, lista) {
         ${x.limite ? `<span class="tg ${x.vencido ? 'rojo' : 'ambar'}">${x.vencido ? 'Plazo vencido' : `Día ${x.dias} de ${DIAS_SOLUCION_FT}`} · ${fmtDate(x.limite)}</span>` : ''}</div>
       ${sig ? `<div class="ft-sig"><span class="ft-sig-eti">Siguiente paso</span><b>${esc(sig.texto)}</b>${sig.detalle ? `<small>${esc(sig.detalle)}</small>` : ''}</div>` : ''}
       <div class="ft-pasos" title="${hechos} de ${pasos.length} pasos">${pasos.map(p => `<i class="${p.hecho ? 'ok' : p === sig ? 'act' : ''}" title="${esc(p.label)}"></i>`).join('')}<span>${hechos} de ${pasos.length}</span></div>
+    </button>`;
+  });
+  return html + '</div>';
+}
+
+// Informes por entregar: conteo de 8 días calendario desde el retiro de cada medición
+function renderInformes(lista) {
+  let html = `<div class="bloque inf-inicio"><div class="bloque-head"><div class="bloque-titulo"><i class="ic ic-reloj"></i> Informes por entregar <span class="cuenta">${lista.length}</span></div><span class="inf-nota">${DIAS_INFORME_RECLAMO} días desde el retiro</span></div>`;
+  lista.forEach(x => {
+    const clase = x.vencido || x.quedan === 0 ? 'rojo' : x.quedan <= 2 ? 'ambar' : 'verde';
+    const accion = x.tipo === 'ft' ? `switchTab('ft'); abrirFT('${x.clave}', '${x.id}')` : `switchTab('reclamos'); abrirExpediente('${x.id}')`;
+    html += `<button class="inf-caso ${clase}" onclick="${accion}">
+      <span class="inf-num"><b>${x.vencido ? '!' : x.quedan}</b><small>${x.vencido ? 'vencido' : x.quedan === 1 ? 'día' : 'días'}</small></span>
+      <span class="inf-main"><span class="inf-top"><b>${esc(x.codigo)}</b><span class="tg ${x.tipo === 'ft' ? 'rojo' : 'azul'}">${x.tipo === 'ft' ? 'Remedición FT' : x.ft ? 'Reclamo FT' : 'Reclamo'}</span></span>
+        <small>${esc(x.nombre)}${x.nombre ? ' · ' : ''}retirado el ${fmtDate(x.retiro)}</small><span class="inf-texto">${esc(x.texto)}</span>
+        <span class="inf-barra">${Array.from({ length: DIAS_INFORME_RECLAMO }, (_, i) => `<i class="${i < x.dia ? 'ok' : ''}"></i>`).join('')}</span></span>
     </button>`;
   });
   return html + '</div>';

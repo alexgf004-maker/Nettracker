@@ -1286,3 +1286,20 @@ button.aviso-inicio-fila { cursor: pointer; }
 .aviso-inicio-fila > span.rojo { color: var(--red); } .aviso-inicio-fila > span.ambar { color: var(--yellow); }
 .aviso-inicio-pie { display: flex; gap: 8px; padding: 12px 16px 16px; }
 .aviso-inicio-pie .b { flex: 1; justify-content: center; padding: 12px; }
+/* Inicio: informes por entregar con el conteo de 8 días */
+.inicio-layout { grid-template-areas: "ft" "informes" "pend" "trabajo" "acciones" "equipos" "actividad"; }
+.ini-informes { grid-area: informes; }
+.inf-nota { font-size: 11px; color: var(--text3); font-weight: 600; }
+.inf-caso { display: flex; gap: 12px; align-items: center; width: 100%; text-align: left; font-family: var(--font); background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin-top: 8px; cursor: pointer; color: var(--text); --c: #10b981; --cf: #ecfdf5; }
+.inf-caso.ambar { --c: #d97706; --cf: #fffbeb; } .inf-caso.rojo { --c: #dc2626; --cf: #fef2f2; }
+.inf-num { width: 54px; height: 54px; border-radius: 14px; background: var(--cf); color: var(--c); display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; }
+.inf-num b { font-size: 22px; font-weight: 800; line-height: 1; }
+.inf-num small { font-size: 10px; font-weight: 700; margin-top: 2px; }
+.inf-main { flex: 1; min-width: 0; display: block; }
+.inf-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.inf-top b { font-size: 14px; font-weight: 800; }
+.inf-main > small { display: block; font-size: 12px; color: var(--text3); margin-top: 2px; }
+.inf-texto { display: block; font-size: 12.5px; font-weight: 700; color: var(--c); margin-top: 2px; }
+.inf-barra { display: flex; gap: 3px; margin-top: 6px; }
+.inf-barra i { flex: 1; max-width: 26px; height: 5px; border-radius: 3px; background: var(--border); }
+.inf-barra i.ok { background: var(--c); }

@@ -22,7 +22,7 @@ export function quitarAvisoFT(clave, id) {
 }
 // Pasos que se marcan con fecha y quién: sistema, resumen (Resumen punto medido) y fotos (fotos de los trabajos en MEMOS)
 export function marcarPasoFT(clave, id, paso) {
-  const msg = { sistema: 'Caso subido al sistema', resumen: 'Resumen punto medido enviado', fotos: 'Fotos subidas a MEMOS' }[paso] || 'Paso registrado';
+  const msg = { sistema: 'Caso subido al sistema', resumen: 'Resumen punto medido enviado', fotos: 'Fotos subidas a MEMOS', informeRem: 'Informe de la remedición entregado' }[paso] || 'Paso registrado';
   set(ref(db, ruta(clave, id) + '/' + paso), firma()).then(() => showToast(msg));
 }
 export function quitarPasoFT(clave, id, paso) {

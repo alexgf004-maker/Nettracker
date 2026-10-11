@@ -1,6 +1,9 @@
 // Lógica de instalaciones: guardar, retiro, descarga, calendario
 import { FALLAS_GRAVES, isAdmin, sedeRetorno } from '../config.js';
 import { devolucionAlRetirar } from '../domain/inventario.js';
+import { todosFT } from '../domain/expedientes.js';
+import { ftDeRemedicion } from '../domain/ft.js';
+import { DIAS_INFORME_RECLAMO, hoyLocal, sumarDias, tipoDeTrabajo } from '../domain/trabajo.js';
 import { db, installsRef, push, ref, remove, update } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
@@ -120,7 +123,13 @@ export function handleRetiro() {
       }
       update(ref(db, `equipos/${deployRec.equipoId}`), eqUpdates);
     }
-    showToast('Equipo marcado como retirado');
+    // Reclamos y remediciones de casos FT: empieza el conteo de 8 días para entregar el informe
+    const esReclamo = tipoDeTrabajo(deployRec?.caso) === 'reclamo' || !!deployRec?.reclamo?.id;
+    const esRemedicionFT = !!ftDeRemedicion(deployRec?.caso, todosFT(state.campanas, state.reclamos, state.records, hoyLocal()));
+    if (esReclamo || esRemedicionFT) {
+      const limite = sumarDias(today(), DIAS_INFORME_RECLAMO).split('-').reverse().join('/');
+      showToast(`Retirado. Empieza el conteo: ${DIAS_INFORME_RECLAMO} días para entregar el informe (vence el ${limite})`);
+    } else showToast('Equipo marcado como retirado');
   });
 }
 

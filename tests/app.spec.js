@@ -110,7 +110,9 @@ test.describe('Inicio', () => {
     await cerrarAlerta(page);
     const grupo = titulo => page.locator('.grupo', { has: page.locator('.grupo-titulo', { hasText: titulo }) });
     await expect(grupo('Vencido')).toContainText('Cargar la campaña Agosto 2026 en el sistema CPT DELSUR');
-    await expect(grupo('Próximos días')).toContainText('Entregar informe del reclamo RE192026456');
+    // El informe del reclamo va en su propio bloque, con el conteo de 8 días desde el retiro
+    await expect(page.locator('.inf-caso', { hasText: 'RE192026456' })).toContainText('Reclamo');
+    await expect(page.locator('.pendiente', { hasText: 'Entregar informe' })).toHaveCount(0);
     await expect(grupo('Próximos días')).toContainText('Retirar SN-101');
     await expect(grupo('Por hacer')).toContainText('Descargar medición de SN-201');
     // SN-102 es de CPT BT: solo aparece al ver todas las áreas
@@ -131,17 +133,19 @@ test.describe('Inicio', () => {
   test('contar pendientes solo desde una fecha deja fuera lo viejo', async ({ page }) => {
     app = await abrirApp(page);
     await cerrarAlerta(page);
-    await expect(page.locator('.pendiente')).toHaveCount(4);
+    await expect(page.locator('.pendiente')).toHaveCount(3);
+    await expect(page.locator('.inf-caso')).toHaveCount(1);
     await page.getByRole('button', { name: 'Contar solo desde hoy' }).click();
     expect((await app.escrituras()).at(-1)).toEqual(['set', 'config/seguimientoDesde', '2026-09-23']);
     // Quedan solo los que vencen desde hoy: la campaña de agosto, la descarga y el informe eran de antes
     await expect(page.locator('.pendiente')).toHaveCount(1);
+    await expect(page.locator('.inf-caso')).toHaveCount(0);
     await expect(page.locator('.pendiente')).toContainText('Retirar SN-101');
     await expect(page.locator('.desde')).toContainText('Cuenta desde el 23/09/2026');
     await page.getByRole('button', { name: 'Cambiar' }).click();
     await page.getByRole('button', { name: 'Contar todo' }).click();
     expect((await app.escrituras()).at(-1)).toEqual(['set', 'config/seguimientoDesde', null]);
-    await expect(page.locator('.pendiente')).toHaveCount(4);
+    await expect(page.locator('.pendiente')).toHaveCount(3);
   });
 
   test('un pendiente lleva a lo que hay que hacer', async ({ page }) => {
@@ -1529,7 +1533,7 @@ test.describe('Precampaña', () => {
     // En Inicio, el caso FT va primero con el paso que sigue (el aviso ya está: toca subirlo al sistema)
     const ftInicio = page.locator('.ini-ft .ft-caso', { hasText: 'CR1O2026201' });
     await expect(ftInicio.locator('.ft-sig')).toContainText('Subir el caso al sistema');
-    await expect(ftInicio.locator('.ft-pasos')).toContainText('1 de 6');
+    await expect(ftInicio.locator('.ft-pasos')).toContainText('1 de 7');
     const orden = await page.evaluate(() => [...document.querySelectorAll('.inicio-layout > div')].map(d => d.className));
     expect(orden.indexOf('ini-ft')).toBeLessThan(orden.indexOf('ini-pend'));
     await nav(page, 'Seguimiento FT');
@@ -1583,7 +1587,37 @@ test.describe('Precampaña', () => {
     await expect(caso).toHaveClass(/urgente/);
     await expect(caso.locator('.ft-sig')).toContainText('Tomar fotos de los trabajos y subirlas a MEMOS');
     await expect(caso.locator('.ft-sig')).toContainText('La remedición CR2O2026201 ya está en campo');
-    await expect(caso.locator('.ft-pasos')).toContainText('4 de 6');
+    await expect(caso.locator('.ft-pasos')).toContainText('4 de 7');
+  });
+
+  test('informes: al retirar la remedición de un caso FT empieza el conteo de 8 días', async ({ page }) => {
+    const datos = conCampana();
+    datos.analizadores = { ...datos.analizadores,
+      r20: { serie: 'SN-300', caso: 'CR1O2026201', fechaInstalacion: '2026-08-01', fechaRetiro: '2026-08-09', areaInstalacion: 'CPT MT', retirado: true, fechaRetiroReal: '2026-08-09', fechaRegistro: '2026-08-01' },
+      r21: { serie: 'SN-301', caso: 'CR2O2026201', lugar: 'X', fechaInstalacion: '2026-09-12', fechaRetiro: '2026-09-23', areaInstalacion: 'CPT MT', fechaRegistro: '2026-09-12' } };
+    const f = { fecha: '2026-08-10', por: 'David García' };
+    Object.assign(datos.campanas['2026-10_CPT-MT'].casos.CR1O2026201, { resultado: { medicion: 'valida', tolerancia: 'fuera' }, ft: { aviso: f, sistema: f, resumen: f, ruta: 'Transferencia de alimentador', fotos: f } });
+    app = await abrirApp(page, { datos });
+    await cerrarAlerta(page);
+    // Al retirar la remedición avisa que empieza el conteo
+    await app.ejecutar(() => { switchTab('instalaciones'); openRetiroModal('r21'); });
+    await page.locator(`div[onclick="toggleSinProblema()"]`).click();
+    await page.getByText('Sí, ya descargué').click();
+    await page.getByText('Confirmar retiro').click();
+    await expect(page.locator('.toast')).toContainText('Empieza el conteo: 8 días para entregar el informe (vence el 01/10/2026)');
+    // En Inicio: el informe de la remedición con su conteo, y en el caso FT es el siguiente paso
+    await nav(page, 'Inicio');
+    const inf = page.locator('.inf-caso', { hasText: 'CR2O2026201' });
+    await expect(inf).toContainText('Remedición FT');
+    await expect(inf).toContainText('Quedan 8 días · vence el 01/10/2026');
+    await expect(page.locator('.ft-caso', { hasText: 'CR1O2026201' }).locator('.ft-sig')).toContainText('Entregar el informe de la remedición');
+    await inf.click();
+    const modal = page.locator('.modal');
+    await expect(modal).toContainText('Quedan 8 días · vence el 01/10/2026');
+    await modal.getByRole('button', { name: 'Marcar informe de la remedición entregado' }).click();
+    expect((await app.escrituras()).at(-1)[1]).toBe('campanas/2026-10_CPT-MT/casos/CR1O2026201/ft/informeRem');
+    await app.ejecutar(() => { cerrarFT(); switchTab('dashboard'); });
+    await expect(page.locator('.inf-caso', { hasText: 'CR2O2026201' })).toHaveCount(0);
   });
 
   test('seguimiento FT: pasados los 90 días queda vencido', async ({ page }) => {
