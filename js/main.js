@@ -6,10 +6,8 @@ import './handlers/validaciones.js';
 import './handlers/carga.js';
 import './handlers/campanas.js';
 import { initTheme, iniciarMonitorConexion } from './ui.js';
-import { restaurarSesion } from './actions/auth.js';
-import { iniciarSync } from './data/sync.js';
+import { iniciarAuth } from './actions/auth.js';
 
-restaurarSesion();
-iniciarSync();
+iniciarAuth(); // con sesión, arranca la sincronización con la base
 initTheme();
 iniciarMonitorConexion();

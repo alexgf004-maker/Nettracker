@@ -1,10 +1,16 @@
 // Sincronización en tiempo real con Firebase
-import { campanasRef, reclamosRef, configCartasRef, seguimientoDesdeRef, equiposRef, historialAccesoriosRef, historialCargasRef, installsRef, mantenimientoRef, onValue, validacionesRef } from '../firebase.js';
+import { campanasRef, reclamosRef, configCartasRef, seguimientoDesdeRef, equiposRef, historialAccesoriosRef, historialCargasRef, installsRef, mantenimientoRef, onValue as onValueFb, validacionesRef } from '../firebase.js';
 import { state } from '../state.js';
 import { render } from '../views/render.js';
 
-// Cada listener actualiza su arreglo en el estado y vuelve a renderizar
+// Cada listener actualiza su arreglo en el estado y vuelve a renderizar.
+// Se inicia al entrar (las reglas de la base no dejan leer sin sesión) y se detiene al cerrar sesión.
+let activos = null;
+export function detenerSync() { (activos || []).forEach(off => off()); activos = null; }
 export function iniciarSync() {
+  if (activos) return;
+  activos = [];
+  const onValue = (r, cb) => activos.push(onValueFb(r, cb));
   onValue(installsRef, snap => {
     state.records = [];
     snap.forEach(child => {

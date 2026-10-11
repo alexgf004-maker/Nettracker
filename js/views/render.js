@@ -42,6 +42,8 @@ export function render() {
   const el = document.getElementById('app');
   if (!el) return;
 
+  if (!state.authListo) return; // todavía no se sabe si hay sesión: queda el "Cargando…" inicial
+
   if (state.modoMantenimiento && state.sesionUsuario && state.sesionUsuario.nombre !== 'David García') {
     renderMantenimiento(el);
     return;

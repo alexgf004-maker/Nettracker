@@ -1,6 +1,6 @@
 // In-memory fake of the Realtime Database API used by the app.
 const T = window.__FIXTURE__ ? JSON.parse(JSON.stringify(window.__FIXTURE__)) : {};
-window.__DB__ = T; window.__WRITES__ = [];
+window.__DB__ = T; window.__WRITES__ = []; window.__LECTURAS__ = [];
 let seq = 0; const listeners = [];
 const parts = p => p.split('/').filter(Boolean);
 const getAt = p => parts(p).reduce((o, k) => (o == null ? undefined : o[k]), T);
@@ -12,9 +12,9 @@ export function getDatabase() { return {}; }
 export function ref(db, path) { return { path: path || '' }; }
 // __PENDIENTES__: lecturas iniciales que faltan por entregar (las pruebas esperan a que llegue a 0)
 window.__PENDIENTES__ = 0;
-export function onValue(r, cb) { listeners.push({ path: r.path, cb }); window.__PENDIENTES__++; setTimeout(() => { cb(snap(parts(r.path).at(-1), getAt(r.path))); window.__PENDIENTES__--; }, 0); return () => {}; }
+export function onValue(r, cb) { window.__LECTURAS__.push(r.path); listeners.push({ path: r.path, cb }); window.__PENDIENTES__++; setTimeout(() => { cb(snap(parts(r.path).at(-1), getAt(r.path))); window.__PENDIENTES__--; }, 0); return () => {}; }
 export function push(r, v) { const key = 'k' + String(++seq).padStart(4, '0'); window.__WRITES__.push(['push', r.path, v]); if (v !== undefined) { setAt(r.path + '/' + key, v); fire(); } return Object.assign(Promise.resolve({ key }), { key }); }
 export function set(r, v) { window.__WRITES__.push(['set', r.path, v]); setAt(r.path, v); fire(); return Promise.resolve(); }
 export function update(r, v) { window.__WRITES__.push(['update', r.path, v]); for (const [k, x] of Object.entries(v)) setAt(r.path + '/' + k, x); fire(); return Promise.resolve(); }
 export function remove(r) { window.__WRITES__.push(['remove', r.path]); setAt(r.path, null); fire(); return Promise.resolve(); }
-export function get(r) { return Promise.resolve(snap(parts(r.path).at(-1), getAt(r.path))); }
+export function get(r) { if (!r.path.startsWith('cuentas/')) window.__LECTURAS__.push(r.path); return Promise.resolve(snap(parts(r.path).at(-1), getAt(r.path))); }

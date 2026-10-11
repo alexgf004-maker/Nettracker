@@ -464,8 +464,16 @@ Permite:
 ---
 
 ## Perfiles
-Entrada con PIN de 4 dígitos (`js/actions/auth.js`): se elige el perfil y se pone su PIN. La primera vez cada quien crea el suyo (dos veces); el administrador puede borrar el PIN de alguien desde el menú del perfil (encabezado) y esa persona crea uno nuevo al entrar. En Firebase (`pines/{perfil}`) va `{ sal, hash }` con SHA-256 de "sal:pin", nunca el PIN. 5 intentos fallidos bloquean un minuto. La sesión queda guardada en el dispositivo (`localStorage` `cpt_session`) hasta "Cambiar de perfil".
-Ojo: sin Firebase Auth ni reglas en la base, el PIN evita que alguien entre a otro perfil desde la app, pero no protege los datos de alguien con conocimientos técnicos. Para eso faltan Firebase Auth y reglas (pendiente).
+Entrada con PIN de 6 dígitos (`js/actions/auth.js`) usando **Firebase Authentication**:
+- Cada perfil es una cuenta de correo y contraseña: `<perfil>@usuarios.nettracker.app` (correo interno, nadie lo usa) y el PIN como contraseña (Firebase pide 6 caracteres como mínimo).
+- La primera vez cada quien crea su PIN (dos veces) con `createUserWithEmailAndPassword`; en `cuentas/{perfil}` queda solo `{ creado }` para saber si pedir el PIN o crearlo. El PIN nunca se guarda en la base.
+- Firebase bloquea los intentos repetidos (`auth/too-many-requests`); además la app espera un minuto después de 5 PIN equivocados.
+- La sesión la recuerda Firebase en el dispositivo (`onAuthStateChanged` en `iniciarAuth`) hasta "Cambiar de perfil" (`signOut`). La sincronización (`iniciarSync`) arranca solo con sesión y se detiene al salir.
+- **Reglas de la base** (`database.rules.json`, se pegan en la consola): solo las cuentas `@usuarios.nettracker.app` pueden leer y escribir; lo único público es `cuentas` (qué perfiles ya tienen PIN).
+- **Borrar PIN** (administrador, menú del perfil): quita `cuentas/{perfil}`; además hay que borrar la cuenta en la consola (Authentication → Users) para que esa persona cree otra. Si la creación de cuentas está desactivada, hay que activarla un momento.
+- **Persona nueva**: agregarla en `USUARIOS` (config.js), activar un momento la creación de cuentas en la consola, que cree su PIN y volver a desactivarla.
+- Los PIN viejos de 4 dígitos (`pines/`) ya no se usan: la app borra el de cada quien al crear su cuenta y el nodo se puede borrar en la consola.
+- Pruebas: `tests/mock/firebase-auth.js` es un Auth falso en memoria; `abrirApp(page, { usuario, cuentas: { nombre: pin } })`.
 ```js
 sesionUsuario = { nombre }  // null = pantalla de perfiles
 ```

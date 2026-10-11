@@ -11,24 +11,35 @@ const HOY = new Date('2026-09-23T12:00:00');
  * Abre la app lista para probar.
  * - Firebase se reemplaza por tests/mock/firebase-*.js con los datos de tests/fixture.js
  * - Las librerías externas (Excel, PDF, mapas, fuentes) se bloquean
- * - usuario: nombre para entrar con sesión ya iniciada, o null para ver el login
+ * - usuario: nombre para entrar con sesión ya iniciada (Auth falso), o null para ver el login
  * - excel: true para usar la librería de Excel real (por defecto se bloquea)
  * Devuelve { errores, escrituras() } para verificar al final.
  */
-async function abrirApp(page, { usuario = 'David García', datos = fixture, excel = false } = {}) {
+// Correo interno de la cuenta de un perfil (igual que correoPerfil en js/actions/auth.js)
+const correoPerfil = nombre => String(nombre).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '@usuarios.nettracker.app';
+
+/**
+ * cuentas: { nombre: pin } perfiles que ya crearon su PIN (cuenta en el Auth falso y marca en cuentas/)
+ */
+async function abrirApp(page, { usuario = 'David García', datos = fixture, excel = false, cuentas = {} } = {}) {
   const errores = [];
   page.on('pageerror', e => errores.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errores.push('console: ' + m.text()); });
 
-  await page.addInitScript(({ datos, usuario }) => {
+  const auth = { cuentas: {}, actual: usuario ? correoPerfil(usuario) : null };
+  const clave = n => correoPerfil(n).split('@')[0];
+  for (const [nombre, pin] of Object.entries(cuentas)) auth.cuentas[correoPerfil(nombre)] = pin;
+  if (usuario && !(auth.actual in auth.cuentas)) auth.cuentas[auth.actual] = '000000';
+  if (Object.keys(cuentas).length) datos = { ...datos, cuentas: Object.fromEntries(Object.keys(cuentas).map(n => [clave(n), { creado: '2026-01-01' }])) };
+  await page.addInitScript(({ datos, auth }) => {
     if (window !== window.top) return; // el mapa corre en un iframe aparte
     window.__FIXTURE__ = datos;
+    window.__AUTH__ = auth;
     window.confirm = () => true;
     window.alert = () => {};
     window.open = () => null;
     localStorage.setItem('cpt_theme', 'light');
-    if (usuario) localStorage.setItem('cpt_session', JSON.stringify({ nombre: usuario }));
-  }, { datos, usuario });
+  }, { datos, auth });
   await page.route(/gstatic\.com\/firebasejs\/.*\/(firebase-[a-z]+\.js)$/, route =>
     route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(__dirname, 'mock', route.request().url().split('/').pop())) }));
   // Leaflet falso: cualquier llamada (L.map(...).setView(...), etc.) devuelve el mismo objeto

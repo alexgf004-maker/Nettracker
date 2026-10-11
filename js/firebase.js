@@ -1,6 +1,7 @@
 // Conexión a Firebase Realtime Database y referencias a los nodos
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, onValue, push, update, remove, get, set } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 export const firebaseConfig = {
   apiKey: "AIzaSyDmwLWle24Nldh-Y6YBmYLaaDA6ZTpuKuc",
@@ -14,6 +15,8 @@ export const firebaseConfig = {
 
 export const fbApp = initializeApp(firebaseConfig);
 export const db = getDatabase(fbApp);
+// Inicio de sesión: cada perfil es una cuenta de Firebase (correo interno + PIN). Las reglas de la base solo dejan entrar a esas cuentas.
+export const auth = getAuth(fbApp);
 export const installsRef = ref(db, 'analizadores');
 export const equiposRef = ref(db, 'equipos');
 export const historialCargasRef = ref(db, 'historialCargas');
@@ -26,4 +29,4 @@ export const seguimientoDesdeRef = ref(db, 'config/seguimientoDesde'); // fecha 
 // Base de coordenadas por NC: coordenadas/{NC} = [latitud, longitud] (se importa como JSON desde la consola de Firebase)
 export const coordenadasRef = ref(db, 'coordenadas');
 export const configCartasRef = ref(db, 'config/cartas'); // firmante, contacto y logo de las cartas al cliente // estado de cada campaña (entrega en el sistema CPT DELSUR)
-export { ref, onValue, push, update, remove, get, set };
+export { ref, onValue, push, update, remove, get, set, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut };

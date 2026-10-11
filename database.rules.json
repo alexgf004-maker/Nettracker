@@ -1,0 +1,9 @@
+{
+  "rules": {
+    ".read": "auth != null && auth.token.email.endsWith('@usuarios.nettracker.app')",
+    ".write": "auth != null && auth.token.email.endsWith('@usuarios.nettracker.app')",
+    "cuentas": {
+      ".read": true
+    }
+  }
+}

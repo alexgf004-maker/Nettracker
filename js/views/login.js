@@ -25,7 +25,7 @@ export function renderMantenimiento(el) {
 function renderPin(el) {
   const l = state.login;
   const titulo = l.cargando ? 'Un momento…' : l.paso === 'crear' ? 'Crea tu PIN' : l.paso === 'confirmar' ? 'Confirma tu PIN' : 'Pon tu PIN';
-  const sub = l.paso === 'crear' ? `Es la primera vez que entras. Elige ${LARGO_PIN} números que solo tú sepas.` : l.paso === 'confirmar' ? 'Escríbelo otra vez.' : '';
+  const sub = l.paso === 'crear' ? `Elige ${LARGO_PIN} números que solo tú sepas. Te los pedirá cada vez que entres en un dispositivo nuevo.` : l.paso === 'confirmar' ? 'Escríbelo otra vez.' : '';
   const valor = l.paso === 'confirmar' ? l.pin2 : l.pin;
   const bloqueado = l.bloqueadoHasta && Date.now() < l.bloqueadoHasta;
   const tecla = d => `<button class="pin-tecla" onclick="teclaPin('${d}')" ${l.cargando || bloqueado ? 'disabled' : ''}>${d === 'borrar' ? '<i class="ic ic-chevron-left"></i>' : d}</button>`;
