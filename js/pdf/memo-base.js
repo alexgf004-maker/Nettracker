@@ -162,7 +162,7 @@ export function docMemo({ titulo, tipo, meta = [], cuerpo, pie = '', rojo = fals
   </div>
   ${meta.length ? `<div class="meta">${meta.map(([e, v]) => `<div><div class="meta-eti">${e}</div><div class="meta-val">${v || '—'}</div></div>`).join('')}</div>` : ''}
   <div class="cuerpo">${cuerpo}</div>
-  <div class="pie"><span>Documento generado por <b>NetTracker</b> · CPT INNOVA${pie}</span><span>${hoy()}</span></div>
+  <div class="pie"><span>${pie.replace(/^ · /, '')}</span><span>${hoy()}</span></div>
 </div>
 </body>
 </html>`;
