@@ -23,8 +23,7 @@ export function renderHeader() {
   const nombre = state.sesionUsuario?.nombre || '';
   let acciones = '';
   if (state.view === 'lista' && state.tab === 'instalaciones') acciones += `<button class="btn-small" onclick="newInstall()"><i class="ic ic-plus"></i> Nuevo</button>`;
-  if (state.view === 'lista' && state.tab === 'inventario' && !state.modoSeleccionLote) acciones += `<button class="btn-small" onclick="newEquipo()"><i class="ic ic-plus"></i> Equipo</button>`;
-  if (state.view === 'lista' && state.tab === 'inventario' && state.modoSeleccionLote) acciones += `<button class="btn-small" onclick="cancelarLote()">Cancelar</button>`;
+  if (state.view === 'lista' && state.tab === 'inventario') acciones += `<button class="btn-small" onclick="newEquipo()"><i class="ic ic-plus"></i> Equipo</button>`;
 
   return `<header>
     <div class="header-left">

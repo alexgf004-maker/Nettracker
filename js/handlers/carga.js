@@ -6,6 +6,7 @@ import { state } from '../state.js';
 import { abrirDoc, abrirMemo, showToast } from '../ui.js';
 import { buildMemoAccesorios } from '../pdf/memos.js';
 import { today } from '../utils.js';
+import { devolucionAlRetirar } from '../domain/inventario.js';
 import { render } from '../views/render.js';
 
 window.reimprimirMemoAcc = el => {
@@ -147,7 +148,8 @@ window.retiroMasivo = id => {
     // Return equipo to sede
     if (r.equipoId) {
       const eq = state.equipos.find(x => x.id === r.equipoId);
-      if (eq) update(ref(db, 'equipos/' + r.equipoId), { sede: SEDE_CUCUMACAYAN }); // Campos y Servicios los regresa a la Cucumacayán
+      // Campos y Servicios los regresa a la Cucumacayán y la devolución a su área se registra sola
+      if (eq) update(ref(db, 'equipos/' + r.equipoId), { sede: SEDE_CUCUMACAYAN, ...devolucionAlRetirar(eq, { caso: r.caso, fecha: today(), por: usuario }) });
     }
   });
   showToast('' + instDespacho.length + ' equipos marcados como retirados · Descarga pendiente');

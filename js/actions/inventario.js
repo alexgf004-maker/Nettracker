@@ -3,93 +3,29 @@ import { isAdmin } from '../config.js';
 import { db, equiposRef, push, ref, remove, update } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
-import { emptyEF, sedeDestinoMovimiento, today } from '../utils.js';
+import { emptyEF, today } from '../utils.js';
 import { render } from '../views/render.js';
-import { generateLotePDF } from '../pdf/memos.js';
 
 // ── SAVE EQUIPO ──
 export function handleSaveEq() {
   if (!state.equipoForm.serie.trim()) return showToast('Ingresa el número de serie');
   if (!state.equipoForm.modelo.trim()) return showToast('Ingresa el modelo / marca');
+  if (!state.equipoForm.area) return showToast('Elige el área dueña (CPT MT o CPT BT)');
   // Check for duplicate serie
   const serieTrim = state.equipoForm.serie.trim().toUpperCase();
   const duplicate = state.equipos.find(e => e.serie.trim().toUpperCase() === serieTrim && e.id !== state.editEqId);
   if (duplicate) return showToast('Ya existe un equipo con ese número de serie');
   const usuario = state.sesionUsuario?.nombre || 'Desconocido';
-  const data = { ...state.equipoForm, serie: serieTrim, fechaRegistro: today(), creadoPor: usuario };
+  const data = { ...state.equipoForm, serie: serieTrim };
   if (state.editEqId) {
+    // Al editar se conservan la fecha de registro y quién lo creó
     const id = state.editEqId;
-    state.editEqId = null; state.equipoForm = emptyEF(); state.view = 'lista';
+    state.equipoForm = emptyEF(); state.view = 'equipo_detalle';
     update(ref(db, `equipos/${id}`), { ...data, editadoPor: usuario, fechaEdicion: today() }).then(() => showToast('Equipo actualizado'));
   } else {
     state.equipoForm = emptyEF(); state.view = 'lista';
-    push(equiposRef, data).then(() => showToast('Equipo agregado'));
+    push(equiposRef, { ...data, fechaRegistro: today(), creadoPor: usuario }).then(() => showToast('Equipo agregado'));
   }
-}
-
-// ── DELETE EQUIPO ──
-export function handlePrestamo(id) {
-  const eq = state.equipos.find(x => x.id === id);
-  if (!eq) return;
-  state.prestamoId = id;
-  state.prestamoForm = { de: 'CPT BT', a: 'CPT MT', nota: '', tipo: 'prestamo' };
-  state.showPrestamoModal = true;
-  render();
-}
-
-export function handleDevolucion(id) {
-  const eq = state.equipos.find(x => x.id === id);
-  if (!eq) return;
-  // Pre-fill De/Para based on last movement
-  const movs = eq.movimientos || [];
-  const lastMov = movs.length > 0 ? movs[movs.length - 1] : null;
-  const defaultDe = lastMov ? lastMov.a : 'Campos y Servicios';
-  const defaultA = lastMov ? lastMov.de : 'CPT BT';
-  state.prestamoId = id;
-  state.prestamoForm = { de: defaultDe, a: defaultA, nota: '', tipo: 'devolucion' };
-  state.showPrestamoModal = true;
-  render();
-}
-
-// Lote: registra el mismo movimiento en todos los equipos elegidos y genera un solo memo
-function confirmarMovimientoLote() {
-  const f = state.prestamoForm; const tipo = f.tipo;
-  const esPrestamo = tipo === 'prestamo';
-  const sedeDest = sedeDestinoMovimiento(f);
-  const movimiento = { tipo, de: f.de, a: f.a, fecha: today(), nota: f.nota, registradoPor: state.sesionUsuario?.nombre || 'Desconocido' };
-  const items = state.seleccionLote.map(id => state.equipos.find(x => x.id === id)).filter(Boolean).map(eq => {
-    const movimientos = [...(eq.movimientos || []), movimiento];
-    const datos = esPrestamo ? { prestado: true, prestadoFecha: today(), sede: sedeDest, movimientos } : { prestado: false, prestadoFecha: null, sede: sedeDest, movimientos };
-    update(ref(db, `equipos/${eq.id}`), datos);
-    return { eq: { ...eq, ...datos }, movimiento };
-  });
-  generateLotePDF(items, tipo);
-  showToast(`${esPrestamo ? 'Préstamo' : 'Devolución'} registrado para ${items.length} ${items.length === 1 ? 'equipo' : 'equipos'}`);
-  Object.assign(state, { showPrestamoModal: false, loteMovimiento: false, modoSeleccionLote: false, seleccionLote: [] });
-  render();
-}
-
-export function confirmMovimiento() {
-  if (state.loteMovimiento) return confirmarMovimientoLote();
-  const eq = state.equipos.find(x => x.id === state.prestamoId);
-  if (!eq) return;
-  // Prevent duplicate movimiento
-  const movs = eq.movimientos || [];
-  const last = movs[movs.length - 1];
-  if (last && last.tipo === state.prestamoForm.tipo && last.de === state.prestamoForm.de && last.a === state.prestamoForm.a && last.fecha === today()) {
-    return showToast('Ya se registró este movimiento hoy');
-  }
-  const esPrestamo = state.prestamoForm.tipo === 'prestamo';
-  const sedeDest = sedeDestinoMovimiento(state.prestamoForm);
-  const movimiento = { tipo: state.prestamoForm.tipo, de: state.prestamoForm.de, a: state.prestamoForm.a, fecha: today(), nota: state.prestamoForm.nota, registradoPor: state.sesionUsuario?.nombre || 'Desconocido' };
-  const movimientos = [...(eq.movimientos||[]), movimiento];
-  const updateData = esPrestamo
-    ? { prestado: true, prestadoFecha: today(), sede: sedeDest, movimientos }
-    : { prestado: false, prestadoFecha: null, sede: sedeDest, movimientos };
-  state.showPrestamoModal = false; state.prestamoId = null;
-  update(ref(db, `equipos/${eq.id}`), updateData).then(() =>
-    showToast(esPrestamo ? 'Préstamo registrado' : 'Devolución registrada')
-  );
 }
 
 export function openCondicionModal(id) {

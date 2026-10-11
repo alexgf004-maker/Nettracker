@@ -1,11 +1,13 @@
 // Handlers (onclick) de inventario, préstamos, mantenimiento y memos
-import { confirmCondicion, confirmMovimiento, confirmarImportInventario, eliminarMovimientoFn, handleDelEq, handleDevolucion, handlePrestamo, handleSaveEq, openCondicionModal, procesarExcelInventario } from '../actions/inventario.js';
+import { confirmCondicion, confirmarImportInventario, eliminarMovimientoFn, handleDelEq, handleSaveEq, openCondicionModal, procesarExcelInventario } from '../actions/inventario.js';
+import { abrirAsignarAreas, abrirMemoNuevo, cerrarMemoNuevo, confirmarMemoNuevo, guardarAreas, regularizarDevolucionesCampos, reimprimirMemoEquipos, seleccionarTodosMemo, setMemoNuevo, toggleEquipoMemo } from '../actions/memos-equipos.js';
+import { tenedor } from '../domain/inventario.js';
 import { CONDICIONES, isAdmin } from '../config.js';
 import { db, ref, update } from '../firebase.js';
-import { generateLotePDF, generateMemoPDF } from '../pdf/memos.js';
+import { generateMemoPDF } from '../pdf/memos.js';
 import { state } from '../state.js';
 import { abrirDoc, showToast } from '../ui.js';
-import { calcSt, elegibleLote, emptyEF, eqPrestado, fmtDate, today } from '../utils.js';
+import { calcSt, emptyEF, fmtDate, today } from '../utils.js';
 import { render } from '../views/render.js';
 import { closeRevisionModal, confirmRevision, editarRevision, openRevisionModal, reimprimirMemoRevision } from '../actions/revision.js';
 
@@ -202,9 +204,8 @@ ${mantHistorial.length > 0 ? `
 window.handleImportEquipos = e => { const f = e.target.files[0]; if (f) procesarExcelInventario(f); };
 window.confirmarImport = confirmarImportInventario;
 window.closeImportModal = () => { state.showImportModal = false; state.importData = []; render(); };
-window.setEF = (k, v) => { state.equipoForm[k] = v; if (k === 'condicion' || k === 'sede') render(); };
+window.setEF = (k, v) => { state.equipoForm[k] = v; if (k === 'condicion' || k === 'sede' || k === 'area') render(); };
 window.setInvFiltro = f => { state.inventarioFiltro = f; render(); };
-window.toggleVistaInv = () => { state.vistaInventario = state.vistaInventario === 'lista' ? 'grid' : 'lista'; render(); };
 
 window.setInvSearch = v => {
   state.inventarioSearch = v;
@@ -225,12 +226,11 @@ window.openEqDetalle = id => { state.editEqId = id; state.view = 'equipo_detalle
 window.editEquipo = id => {
   if (!isAdmin()) return showToast('Solo el administrador puede editar equipos');
   const eq = state.equipos.find(x => x.id === id); if (!eq) return;
-  state.equipoForm = { serie: eq.serie, modelo: eq.modelo||'', notas: eq.notas||'', sede: eq.sede||'Plantel Central', condicion: eq.condicion||'bueno', vineta: eq.vineta||'' };
+  state.equipoForm = { serie: eq.serie, modelo: eq.modelo||'', notas: eq.notas||'', sede: eq.sede||'Plantel Central', condicion: eq.condicion||'bueno', vineta: eq.vineta||'', area: eq.area||'' };
   state.editEqId = id; state.view = 'equipo_form'; render();
 };
 
 window.delEquipo = handleDelEq;
-window.registrarPrestamo = handlePrestamo;
 window.eliminarMovimiento = eliminarMovimientoFn;
 
 window.openMantModal = id => {
@@ -266,56 +266,32 @@ window.eliminarCondicion = (eqId, idx) => {
     .then(() => showToast('Registro eliminado'));
 };
 
-window.registrarDevolucion = handleDevolucion;
 window.closeCondicionModal = () => { state.showCondicionModal = false; state.condicionEqId = null; render(); };
 window.setCondicionField = (k, v) => { state.condicionForm[k] = v; render(); };
 window.setCondicionNota = v => { state.condicionForm.nota = v; };
 window.doCondicion = confirmCondicion;
 window.openCondicionModal = openCondicionModal;
-window.closePrestamoModal = () => { state.showPrestamoModal = false; state.prestamoId = null; state.loteMovimiento = false; render(); };
-window.setPrestamoField = (k, v) => { state.prestamoForm[k] = v; render(); };
-window.setPrestamoNota = v => { state.prestamoForm.nota = v; };
-window.doMovimiento = confirmMovimiento;
-
-window.activarModoLote = tipo => {
-  state.modoSeleccionLote = true;
-  state.seleccionLote = [];
-  state.tipoLote = tipo || 'prestamo';
-  render();
-};
-
-window.cancelarLote = () => { state.modoSeleccionLote = false; state.seleccionLote = []; render(); };
-
-window.toggleLote = id => {
-  const idx = state.seleccionLote.indexOf(id);
-  if (idx >= 0) state.seleccionLote.splice(idx, 1); else state.seleccionLote.push(id);
-  render();
-};
-
-window.toggleLoteCard = id => {
-  const eq = state.equipos.find(x => x.id === id);
-  if (!eq || !elegibleLote(eq, state.tipoLote)) return;
-  toggleLote(id);
-};
-
-// Pide una sola vez los datos del movimiento (de, para, nota); al confirmar se registra en todos y sale un memo
-window.generarLotePDF = () => {
-  if (state.seleccionLote.length === 0) return showToast('Selecciona al menos un equipo');
-  const primero = state.equipos.find(x => x.id === state.seleccionLote[0]);
-  const movs = primero?.movimientos || [];
-  const ultimo = movs[movs.length - 1];
-  state.prestamoForm = state.tipoLote === 'devolucion'
-    ? { de: ultimo ? ultimo.a : 'Campos y Servicios', a: ultimo ? ultimo.de : 'CPT BT', nota: '', tipo: 'devolucion' }
-    : { de: 'CPT BT', a: 'CPT MT', nota: '', tipo: 'prestamo' };
-  state.prestamoId = null; state.loteMovimiento = true; state.showPrestamoModal = true;
-  render();
+// Memos de préstamo/devolución (uno o varios equipos en el mismo flujo)
+Object.assign(window, { abrirMemoNuevo, cerrarMemoNuevo, setMemoNuevo, toggleEquipoMemo, seleccionarTodosMemo, confirmarMemoNuevo, reimprimirMemoEquipos, abrirAsignarAreas, guardarAreas, regularizarDevolucionesCampos });
+window.setInvVista = v => { state.invVista = v; render(); };
+window.volverEquipos = () => { state.view = 'lista'; state.editEqId = null; render(); };
+window.setInvArea = a => { state.invArea = a; render(); };
+// Desde la ficha: el mismo flujo con el equipo ya elegido
+window.registrarPrestamo = id => { const eq = state.equipos.find(x => x.id === id); if (eq) abrirMemoNuevo({ tipo: 'prestamo', de: eq.area || 'CPT MT', sel: [id] }); };
+window.registrarDevolucion = id => { const eq = state.equipos.find(x => x.id === id); if (eq) abrirMemoNuevo({ tipo: 'devolucion', de: tenedor(eq) || 'Campos y Servicios', a: eq.area || 'CPT MT', sel: [id] }); };
+window.setMemoBusqueda = v => {
+  setMemoNuevo('busqueda', v);
+  const inp = document.getElementById('memo-buscar');
+  if (inp) { inp.focus(); inp.setSelectionRange(v.length, v.length); }
 };
 
 window.generarMemo = (eqId, movIdx) => {
   const eq = state.equipos.find(x => x.id === eqId);
   if (!eq || !eq.movimientos) return;
   const mov = eq.movimientos[movIdx];
-  if (mov) generateMemoPDF(eq, mov);
+  if (!mov) return;
+  if (mov.memoId && state.memosEquipos.some(m => m.id === mov.memoId)) return reimprimirMemoEquipos(mov.memoId);
+  generateMemoPDF(eq, mov);
 };
 
 window.emailMemo = (eqId, movIdx) => {

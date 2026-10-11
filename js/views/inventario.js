@@ -2,165 +2,18 @@
 import { CONDICIONES, SEDES, isAdmin } from '../config.js';
 import { state } from '../state.js';
 import { badgeSt } from '../ui.js';
-import { calcSt, elegibleLote, eqEnCampo, eqPrestado, eqSt, fmtDate } from '../utils.js';
-import { heroSeccion } from './componentes.js';
+import { calcSt, eqEnCampo, fmtDate } from '../utils.js';
+import { AREAS_DUENAS, estadoEquipo, tenedor } from '../domain/inventario.js';
+import { renderAsignarAreas, renderListaEquipos, renderMemoNuevo } from './equipos.js';
 
 export function renderInventario() {
   let html = '';
 
-  if (state.view === 'lista') {
-    const disp = state.equipos.filter(e => eqSt(e) === 'disponible').length;
-    const desp = state.equipos.filter(e => eqSt(e) === 'instalado').length;
-    const enPlantel = state.equipos.filter(e => eqSt(e) === 'disponible' && (e.sede||'Plantel Central')==='Plantel Central').length;
-    const enCucu = state.equipos.filter(e => eqSt(e) === 'disponible' && e.sede==='Subestación Cucumacayán' && e.sede !== 'Con Campos y Servicios').length;
-    const prestados = state.equipos.filter(e => e.prestado).length;
-    const enCampo = state.equipos.filter(e => eqSt(e) === 'instalado').length;
-    const enMant = state.equipos.filter(e => e.condicion === 'mantenimiento').length;
-    const fuera = state.equipos.filter(e => e.condicion === 'fuera').length;
-    html += `<div class="content">${heroSeccion({
-      eyebrow: 'Recursos', titulo: 'Equipos',
-      sub: `${state.equipos.length} analizadores · ${enPlantel} disponibles en Plantel Central · ${enCucu} en Cucumacayán`,
-      kpis: [{ v: enPlantel + enCucu, l: 'Disponibles' }, { v: enCampo, l: 'En campo' }, { v: enMant, l: 'En mantenimiento' }, { v: fuera, l: 'Fuera de servicio', alerta: fuera > 0 }],
-    })}
-        <div class="stats-bar">
-          <div class="stat-chip ${state.inventarioFiltro==='TODOS'?'active':''}" onclick="setInvFiltro('TODOS')" style="flex-shrink:0;color:var(--primary)"><span class="stat-num">${state.equipos.length}</span><span class="stat-label">Total</span></div>
-          <div class="stat-chip ${state.inventarioFiltro==='disponible'?'active':''}" onclick="setInvFiltro('disponible')" style="flex-shrink:0;color:var(--green)"><span class="stat-num">${enPlantel+enCucu}</span><span class="stat-label">Disponibles</span></div>
-          <div class="stat-chip ${state.inventarioFiltro==='prestado'?'active':''}" onclick="setInvFiltro('prestado')" style="flex-shrink:0;color:var(--primary)"><span class="stat-num">${prestados}</span><span class="stat-label">Prestados</span></div>
-          <div class="stat-chip ${state.inventarioFiltro==='instalado'?'active':''}" onclick="setInvFiltro('instalado')" style="flex-shrink:0;color:var(--yellow)"><span class="stat-num">${enCampo}</span><span class="stat-label">En campo</span></div>
+  if (state.view === 'lista') html += renderListaEquipos();
+  else if (state.view === 'memo_nuevo' && state.memoNuevo) html += renderMemoNuevo();
+  else if (state.view === 'asignar_areas') html += renderAsignarAreas();
 
-        </div>`;
-    // Lote action bar (when in selection mode, show at top)
-
-    if (state.modoSeleccionLote) {
-      html += '<div style="background:var(--primary);border-radius:12px;padding:12px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">';
-      html += '<div style="color:#fff;font-size:13px;font-weight:700"><i class=ic-archivo></i> ' + (state.tipoLote==='prestamo'?'Memo préstamo':'Memo devolución') + ' · ' + state.seleccionLote.length + ' equipo' + (state.seleccionLote.length !== 1 ? 's' : '') + '</div>';
-      html += '<button onclick="generarLotePDF()" ' + (state.seleccionLote.length === 0 ? 'disabled' : '') + ' style="background:#fff;color:var(--primary);border:none;border-radius:8px;padding:8px 14px;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;opacity:' + (state.seleccionLote.length === 0 ? '.5' : '1') + '">Registrar y generar memo</button>';
-      html += '</div>';
-      html += '<div class="lote-ayuda">' + (state.tipoLote === 'prestamo' ? 'Toca los equipos disponibles que vas a prestar.' : 'Toca los equipos prestados que regresan.') + ' Al generar el memo se registra el movimiento de todos. Los que no aplican se ven atenuados.</div>';
-    }
-    html += '<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">';
-    html += '<div class="search-wrap" style="margin-bottom:0;flex:1"><span class="search-icon"><i class=ic-buscar></i></span><input class="search-input" placeholder="Buscar por serie o modelo..." value="' + state.inventarioSearch + '" oninput="setInvSearch(this.value)" ' + (state.inventarioSearch ? 'data-active="true"' : '') + '></div>';
-    html += '<button onclick="toggleVistaInv()" style="flex-shrink:0;padding:11px 14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--white);font-size:16px;cursor:pointer;box-shadow:var(--shadow)">' + (state.vistaInventario==='lista' ? '⊞' : '<i class=ic-menu></i>') + '</button>';
-    html += '</div>';
-    if (!state.modoSeleccionLote) {
-      html += '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">';
-      html += '<button onclick="activarModoLote(\'prestamo\')" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;background:var(--white);color:var(--text2);font-family:var(--font);font-size:11px;font-weight:600;cursor:pointer"><i class=ic-repetir></i> Lote préstamo</button>';
-      html += '<button onclick="activarModoLote(\'devolucion\')" style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;background:var(--white);color:var(--text2);font-family:var(--font);font-size:11px;font-weight:600;cursor:pointer"><i class=ic-check></i> Lote devolución</button>';
-      html += '<label style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;background:var(--white);color:var(--text2);font-family:var(--font);font-size:11px;font-weight:600;cursor:pointer"><i class=ic-bandeja></i> Importar<input type="file" accept=".xlsx,.xls" onchange="handleImportEquipos(event)" style="display:none"></label>';
-      html += '</div>';
-    }
-    if (state.equipos.length === 0) {
-      html += '<div class="empty"><div class="empty-icon"><i class=ic-equipos></i></div><div class="empty-text">El inventario está vacío</div><button class="btn btn-primary" style="max-width:240px;margin:0 auto" onclick="newEquipo()">+ Agregar primer equipo</button></div>';
-    } else {
-      const filteredEq = state.equipos.filter(eq => {
-        if (state.inventarioFiltro === 'disponible' && eqSt(eq) !== 'disponible') return false;
-        if (state.inventarioFiltro === 'prestado' && !eqPrestado(eq)) return false;
-        if (state.inventarioFiltro === 'instalado' && !eqEnCampo(eq)) return false;
-if (state.inventarioSearch) {
-          const q = state.inventarioSearch.toLowerCase();
-          return eq.serie.toLowerCase().includes(q) || (eq.modelo||'').toLowerCase().includes(q);
-        }
-        return true;
-      });
-      if (filteredEq.length === 0) {
-        html += '<div class="empty"><div class="empty-icon"><i class=ic-buscar></i></div><div class="empty-text">Sin resultados</div></div>';
-      } else {
-        const grupos = [
-          { label: '<i class=ic-fabrica></i> Plantel Central', color: 'var(--primary)', items: filteredEq.filter(e => !eqEnCampo(e) && (e.sede||'Plantel Central')==='Plantel Central') },
-          { label: '<i class=ic-instalaciones></i> Subestación Cucumacayán', color: '#00aaff', items: filteredEq.filter(e => !eqEnCampo(e) && e.sede==='Subestación Cucumacayán') },
-          { label: '<i class=ic-antena></i> En campo', color: 'var(--yellow)', items: filteredEq.filter(e => eqEnCampo(e)) },
-        ];
-        grupos.forEach(grupo => {
-          if (grupo.items.length === 0) return;
-          html += '<div style="margin-bottom:16px">';
-          html += '<div style="font-size:11px;font-weight:700;color:'+grupo.color+';letter-spacing:.5px;margin-bottom:8px;padding:6px 10px;background:'+grupo.color+'18;border-radius:8px;border-left:3px solid '+grupo.color+'">' + grupo.label + ' <span style="font-weight:400;color:var(--text3)">(' + grupo.items.length + ')</span></div>';
-          html += state.vistaInventario === 'grid' ? '<div class="eq-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' : '<div class="eq-lista">';
-          grupo.items.forEach(eq => {
-            const isPrestado = eqPrestado(eq);
-            const isEnCampo = eqEnCampo(eq);
-            const c = isEnCampo ? 'var(--yellow)' : isPrestado ? 'var(--primary)' : 'var(--green)';
-            const dep = state.records.find(r => r.equipoId === eq.id && !r.retirado);
-            const eqId = eq.id;
-            const isSelected = state.seleccionLote.includes(eqId);
-            // Determine if eligible for current lote type
-            const elegible = state.modoSeleccionLote && elegibleLote(eq, state.tipoLote);
-            const clickable = state.modoSeleccionLote ? (elegible ? `toggleLoteCard('${eqId}')` : '') : `openEqDetalle('${eqId}')`;
-
-            const cardOpacity = state.modoSeleccionLote && !elegible ? '0.35' : '1';
-            const cardBorder = isSelected ? '2px solid var(--primary)' : '1px solid var(--border)';
-            if (state.vistaInventario === 'lista') {
-              // List view
-              html += '<div onclick="' + clickable + '" style="background:' + (isSelected?'var(--primary-light)':'var(--white)') + ';border-left:4px solid ' + c + ';border:' + cardBorder + ';border-left:4px solid ' + c + ';border-radius:10px;padding:10px 14px;cursor:' + (state.modoSeleccionLote&&!elegible?'default':'pointer') + ';box-shadow:var(--shadow);display:flex;align-items:center;gap:10px;margin-bottom:6px;opacity:' + cardOpacity + '">';
-              if (isSelected) html += '<div style="width:20px;height:20px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;flex-shrink:0">✓</div>';
-
-              html += '<div style="flex:1;min-width:0">';
-              html += '<div style="display:flex;align-items:center;gap:6px"><div style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + eq.serie + '</div>' + (eq.vineta ? '<span style="font-size:10px;color:var(--text3);font-family:var(--mono);flex-shrink:0"><i class=ic-etiqueta></i>' + eq.vineta + '</span>' : '') + '</div>';
-              html += '<div style="font-size:11px;color:var(--text3)">' + (eq.modelo||'Sin modelo') + '</div>';
-              if (dep) html += '<div style="font-size:10px;color:var(--yellow);font-weight:600"><i class=ic-antena></i> #' + dep.caso + '</div>';
-              else if (isPrestado) { const movs2=eq.movimientos||[]; const lm=movs2[movs2.length-1]; html += '<div style="font-size:10px;color:var(--primary);font-weight:600">' + (lm&&lm.a==='Campos y Servicios'?'<i class=ic-casco></i> Con Campos y Servicios':'<i class=ic-repetir></i> Prestado') + '</div>'; }
-              html += '</div>';
-              html += '<div style="display:flex;flex-direction:column;gap:2px;align-items:flex-end;flex-shrink:0">';
-              const tienePendiente = state.records.some(r => r.equipoId === eq.id && r.retirado && r.descargaPendiente);
-              if (tienePendiente) html += '<span class="badge badge-yellow" style="font-size:8px;padding:2px 5px"><i class=ic-alerta></i> Desc.</span>';
-              if ((eq.condicion||'bueno')==='fuera') html += '<span class="badge badge-red" style="font-size:8px;padding:2px 5px"><i class=pt-rojo></i> Fuera</span>';
-              else if ((eq.condicion||'bueno')==='mantenimiento') html += '<span class="badge" style="font-size:8px;padding:2px 5px;background:#f3f0ff;color:#7c3aed"><i class=ic-llave></i> Mant.</span>';
-              else { if (isPrestado) html += '<span class="badge badge-blue" style="font-size:8px;padding:2px 5px">Prest.</span>'; if (isEnCampo) html += '<span class="badge badge-yellow" style="font-size:8px;padding:2px 5px">Campo</span>'; if (!isPrestado&&!isEnCampo) html += '<span class="badge badge-green" style="font-size:8px;padding:2px 5px">Disp.</span>'; if ((eq.condicion||'bueno')==='detalles') html += '<span style="font-size:10px"><i class=pt-amarillo></i></span>'; }
-              html += '</div></div>';
-            } else {
-            html += '<div onclick="' + clickable + '" style="background:' + (isSelected?'var(--primary-light)':'var(--white)') + ';border-top:3px solid ' + c + ';border:' + cardBorder + ';border-top:3px solid ' + c + ';border-radius:12px;padding:12px;cursor:' + (state.modoSeleccionLote&&!elegible?'default':'pointer') + ';box-shadow:var(--shadow);opacity:' + cardOpacity + ';position:relative">';
-            if (isSelected) html += '<div style="position:absolute;top:8px;right:8px;width:20px;height:20px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-weight:700">✓</div>';
-
-            html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px">';
-            html += '<div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text);word-break:break-all;flex:1;margin-right:4px">' + eq.serie + '</div>';
-            html += '<div style="display:flex;flex-direction:column;gap:2px;align-items:flex-end">';
-            const tienePendGrid = state.records.some(r => r.equipoId === eq.id && r.retirado && r.descargaPendiente);
-            if (tienePendGrid) html += '<span class="badge badge-yellow" style="font-size:8px;padding:2px 5px;white-space:nowrap"><i class=ic-alerta></i> Descarga pend.</span>';
-            if ((eq.condicion||'bueno') === 'fuera') {
-              html += '<span class="badge badge-red" style="font-size:8px;padding:2px 5px;white-space:nowrap"><i class=pt-rojo></i> Fuera servicio</span>';
-            } else if ((eq.condicion||'bueno') === 'mantenimiento') {
-              html += '<span class="badge" style="font-size:8px;padding:2px 5px;white-space:nowrap;background:#f3f0ff;color:#7c3aed"><i class=ic-llave></i> Mantenimiento</span>';
-            } else {
-              if (isPrestado) html += '<span class="badge badge-blue" style="font-size:8px;padding:2px 5px;white-space:nowrap">Prestado</span>';
-              if (isEnCampo) html += '<span class="badge badge-yellow" style="font-size:8px;padding:2px 5px;white-space:nowrap">En campo</span>';
-              if (!isPrestado && !isEnCampo) html += '<span class="badge badge-green" style="font-size:8px;padding:2px 5px;white-space:nowrap">Disponible</span>';
-            }
-            html += '</div></div>';
-            html += '<div style="font-size:11px;color:var(--text3);margin-bottom:3px">' + (eq.modelo||'Sin modelo') + '</div>';
-            if (eq.vineta) html += '<div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:3px"><i class=ic-etiqueta></i> ' + eq.vineta + '</div>';
-            if (dep) html += '<div style="font-size:10px;color:var(--yellow);font-weight:600"><i class=ic-antena></i> #' + dep.caso + '</div>';
-            else if (isPrestado) {
-              const movs = eq.movimientos || [];
-              const lastMov = movs[movs.length-1];
-              const destino = (lastMov && lastMov.a) ? lastMov.a : 'otra área';
-              if (destino === 'Campos y Servicios') html += '<div style="font-size:10px;color:var(--primary);font-weight:600"><i class=ic-casco></i> Con Campos y Servicios</div>';
-              else html += '<div style="font-size:10px;color:var(--primary);font-weight:600"><i class=ic-repetir></i> Prestado a ' + destino + '</div>';
-            }
-            const cond = CONDICIONES.find(x => x.key === (eq.condicion||'bueno'));
-            if (cond && cond.key !== 'bueno' && cond.key !== 'fuera') html += '<div style="font-size:10px;color:'+cond.color+';margin-top:2px">'+cond.icon+' '+cond.label+'</div>';
-            if (state.vistaInventario === 'grid') html += '</div>';
-            } // end else grid
-          });
-          html += '<\/div>';
-          html += '<\/div>';
-        });
-      }
-    }
-
-    if (!state.modoSeleccionLote) {
-      html += '<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">'; 
-      html += '<div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">Memorándums de lote</div>';
-      html += '<div style="display:flex;gap:8px">';
-      html += "<button onclick=\"activarModoLote('prestamo')\" style=\"flex:1;padding:9px;border:1px solid var(--border);border-radius:10px;background:var(--white);color:var(--text2);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer\"><i class=ic-repetir></i> Lote préstamo</button>";
-      html += "<button onclick=\"activarModoLote('devolucion')\" style=\"flex:1;padding:9px;border:1px solid var(--border);border-radius:10px;background:var(--white);color:var(--text2);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer\"><i class=ic-check></i> Lote devolución</button>";
-      html += '</div>';
-      html += '<div style="margin-top:8px"><label style="display:flex;align-items:center;justify-content:center;gap:8px;padding:9px;border:1px solid var(--border);border-radius:10px;background:var(--white);color:var(--text2);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;width:100%"><i class=ic-bandeja></i> Importar equipos desde Excel<input type="file" accept=".xlsx,.xls" onchange="handleImportEquipos(event)" style="display:none"></label></div>';
-
-      html += '</div>';
-    }
-    html += '</div>';
-  }
-
-      else if (state.view === 'equipo_form') {
+  else if (state.view === 'equipo_form') {
     html += `<div class="content">
         <div class="page-title">${state.editEqId ? 'Editar equipo' : 'Agregar equipo'}</div>
         <div class="field"><label>Número de serie *</label>
@@ -171,6 +24,9 @@ if (state.inventarioSearch) {
         </div>
         <div class="field"><label>Modelo / marca *</label>
           <input placeholder="Ej: ECAPLUS / DRANETZ" value="${state.equipoForm.modelo}" oninput="setEF('modelo',this.value)">
+        </div>
+        <div class="field"><label>Área dueña *</label>
+          <div class="segmento segmento-ancho">${AREAS_DUENAS.map(a => `<button class="${state.equipoForm.area === a ? 'active' : ''}" onclick="setEF('area', '${a}')">${a}</button>`).join('')}</div>
         </div>
         <div class="field"><label>Sede de almacenamiento *</label>
           <select oninput="setEF('sede',this.value)" style="background-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 12 12%22%3E%3Cpath fill=%2294a3b8%22 d=%22M6 8L1 3h10z%22/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;appearance:none">
@@ -195,7 +51,7 @@ if (state.inventarioSearch) {
   else if (state.view === 'equipo_detalle') {
     const eq = state.equipos.find(x => x.id === state.editEqId);
     if (!eq) { state.view = 'lista'; return null; }
-    const st = eqSt(eq);
+    const est = estadoEquipo(eq, state.records);
     const historial = state.records.filter(r => r.equipoId === eq.id).sort((a,b) => (b.fechaRegistro||'').localeCompare(a.fechaRegistro||''));
     const condIcon = eq.condicion === 'fuera' ? '<i class=pt-rojo></i>' : eq.condicion === 'mantenimiento' ? '<i class=ic-llave></i>' : eq.condicion === 'detalles' ? '<i class=pt-amarillo></i>' : '<i class=pt-verde></i>';
 
@@ -204,13 +60,8 @@ if (state.inventarioSearch) {
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div><div class="detail-serie">${eq.serie}</div><div class="detail-modelo">${eq.modelo||''}</div></div>
             <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
-              ${(eq.condicion||'bueno') === 'fuera'
-              ? '<span class="badge badge-red"><i class=pt-rojo></i> Fuera de servicio</span>'
-              : (eq.condicion||'bueno') === 'mantenimiento'
-              ? '<span class="badge" style="background:#f3f0ff;color:#7c3aed"><i class=ic-llave></i> En mantenimiento</span>'
-              : '<span class="badge ' + (st==='disponible'?'badge-green':st==='prestado'?'badge-blue':'badge-yellow') + '">' + (st==='disponible'?'Disponible':st==='prestado'?'Prestado':'Instalado') + '</span>' +
-                ((eq.condicion||'bueno') === 'detalles' ? '<span class="badge badge-yellow"><i class=pt-amarillo></i> Con detalles</span>' : '')
-            }
+              <span class="tg ${{ disponible: 'verde', prestado: 'azul', campo: 'ambar', mantenimiento: 'morado', fuera: 'rojo' }[est.clave]}">${est.label}</span>
+              ${est.conDetalles ? '<span class="tg ambar">Con detalles</span>' : ''}
             </div>
           </div>
           <div style="display:flex;gap:12px;margin-top:14px">
@@ -235,6 +86,8 @@ if (state.inventarioSearch) {
       html += `<div class="detail-grid">
           ${eq.vineta ? '<div class="detail-row"><div class="detail-label">Viñeta</div><div class="detail-value" style="font-family:var(--mono);font-weight:700">'+eq.vineta+'</div></div>' : ''}
           <div class="detail-row"><div class="detail-label">Modelo / Marca</div><div class="detail-value">${eq.modelo||'—'}</div></div>
+          <div class="detail-row"><div class="detail-label">Área dueña</div><div class="detail-value">${eq.area || '<span class="falta">Sin área (asígnala para poder prestarlo)</span>'}</div></div>
+          ${eq.prestado ? `<div class="detail-row"><div class="detail-label">Lo tiene</div><div class="detail-value">${tenedor(eq)}${eq.prestadoFecha ? ' desde ' + fmtDate(eq.prestadoFecha) : ''}</div></div>` : ''}
           <div class="detail-row"><div class="detail-label">Sede</div><div class="detail-value">${eq.sede||'Plantel Central'}</div></div>
           <div class="detail-row"><div class="detail-label">Condición</div><div class="detail-value">${condIcon} ${(()=>{const c=CONDICIONES.find(x=>x.key===(eq.condicion||'bueno'));return c?c.label:'Bueno';})()}</div></div>
           ${eq.notas ? '<div class="detail-row"><div class="detail-label">Notas</div><div class="detail-value">'+eq.notas+'</div></div>' : ''}
@@ -242,8 +95,9 @@ if (state.inventarioSearch) {
         </div>`;
       if (isAdmin()) html += `<button class="btn btn-primary" onclick="editEquipo('${eq.id}')"><i class=ic-editar></i> Editar equipo</button>`;
       html += `<button class="btn" style="background:${(()=>{const c=CONDICIONES.find(x=>x.key===(eq.condicion||'bueno'));return c?c.bg:'var(--green-light)';})()};color:${(()=>{const c=CONDICIONES.find(x=>x.key===(eq.condicion||'bueno'));return c?c.color:'var(--green)';})()};border:1px solid ${(()=>{const c=CONDICIONES.find(x=>x.key===(eq.condicion||'bueno'));return c?c.color:'var(--green)';})()}" onclick="openCondicionModal('${eq.id}')"><i class=ic-ajustes></i> Actualizar condición</button>`;
-      if (!eq.prestado && !eqEnCampo(eq) && (eq.condicion||'bueno') !== 'fuera') html += `<button class="btn" style="background:var(--primary-light);color:var(--primary);border:1px solid var(--primary)" onclick="registrarPrestamo('${eq.id}')"><i class=ic-repetir></i> Registrar préstamo</button>`;
-      if (eq.prestado) html += `<button class="btn" style="background:var(--green-light);color:var(--green);border:1px solid var(--green)" onclick="registrarDevolucion('${eq.id}')"><i class=ic-check></i> Registrar devolución</button>`;
+      // Préstamo y devolución abren el mismo flujo del memo con este equipo ya elegido
+      if (est.clave === 'disponible' && eq.area) html += `<button class="btn" style="background:var(--primary-light);color:var(--primary);border:1px solid var(--primary)" onclick="registrarPrestamo('${eq.id}')"><i class=ic-repetir></i> Registrar préstamo</button>`;
+      if (eq.prestado && !eqEnCampo(eq)) html += `<button class="btn" style="background:var(--green-light);color:var(--green);border:1px solid var(--green)" onclick="registrarDevolucion('${eq.id}')"><i class=ic-check></i> Registrar devolución</button>`;
       if (!eqEnCampo(eq) && !(eq.sede === 'Subestación Cucumacayán' && eq.condicion === 'mantenimiento')) html += `<button class="btn" style="background:#f3f0ff;color:#7c3aed;border:1px solid #7c3aed" onclick="openRevisionModal('${eq.id}')"><i class=ic-subir></i> Enviar a revisión (Cucumacayán)</button>`;
       html += `<button class="btn" style="background:var(--primary-light);color:var(--primary);border:1px solid var(--primary)" onclick="exportHojaVida('${eq.id}')"><i class=ic-archivo></i> Exportar hoja de vida</button>`;
       if (isAdmin()) html += `<button class="btn btn-secondary" style="color:var(--red)" onclick="delEquipo('${eq.id}')">Eliminar del inventario</button>`;

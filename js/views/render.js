@@ -9,7 +9,7 @@ import { renderInventario } from './inventario.js';
 import { renderBottomNav, renderHeader } from './layout.js';
 import { renderLogin, renderMantenimiento } from './login.js';
 import { renderMapa } from './mapa.js';
-import { renderAlertaRetiros, renderCondicionModal, renderDescargaModal, renderGlobalSearch, renderImportModal, renderMantModal, renderPrestamoModal, renderDanioModal, renderRetiroModal, renderRevisionModal, renderSelectorModal } from './modals.js';
+import { renderAlertaRetiros, renderCondicionModal, renderDescargaModal, renderGlobalSearch, renderImportModal, renderMantModal, renderDanioModal, renderRetiroModal, renderRevisionModal, renderSelectorModal } from './modals.js';
 import { renderCasoModal, renderConfigCartas, renderDocsModal, renderImportListados } from './casos.js';
 import { renderProgramacionModal } from './fechas.js';
 import { renderImportMultModal, renderMultModal } from './multiplicadores.js';
@@ -68,7 +68,6 @@ export function render() {
   if (state.showCondicionModal) html += renderCondicionModal();
   if (state.showRevisionModal) html += renderRevisionModal();
   if (state.showDanioModal) html += renderDanioModal();
-  if (state.showPrestamoModal) html += renderPrestamoModal();
   if (state.showSelector) html += renderSelectorModal();
   if (state.showGlobalSearch) html += renderGlobalSearch();
   if (state.showImportListados) html += renderImportListados();

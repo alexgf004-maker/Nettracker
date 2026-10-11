@@ -328,12 +328,12 @@ test.describe('Inventario', () => {
     await nav(page, 'Equipos');
   });
 
-  test('lista, filtros, búsqueda y vista en cuadrícula', async ({ page }) => {
+  test('lista, filtros y búsqueda', async ({ page }) => {
     await expect(app$(page)).toContainText('SN-105');
     await app.ejecutar(() => setInvFiltro('prestado'));
     await expect(app$(page)).toContainText('SN-103');
     await expect(app$(page)).not.toContainText('SN-105');
-    await app.ejecutar(() => { setInvFiltro('TODOS'); toggleVistaInv(); toggleVistaInv(); setInvSearch('102'); });
+    await app.ejecutar(() => { setInvFiltro('TODOS'); setInvSearch('102'); });
     await expect(app$(page)).toContainText('SN-102');
     await expect(app$(page)).not.toContainText('SN-105');
   });
@@ -345,50 +345,156 @@ test.describe('Inventario', () => {
     }
   });
 
-  test('guardar mantenimiento, condición y préstamo', async ({ page }) => {
+  test('guardar mantenimiento y condición', async ({ page }) => {
     await app.ejecutar(() => { openMantModal('e1'); setMantForm('descripcion', 'falla x'); guardarMant(); });
     await app.ejecutar(() => { openCondicionModal('e1'); setCondicionField('condicion', 'malo'); doCondicion(); });
-    await app.ejecutar(() => { registrarPrestamo('e2'); setPrestamoField('a', 'Campos y Servicios'); doMovimiento(); });
     const rutas = (await app.escrituras()).map(([op, ruta]) => op + ' ' + ruta);
-    expect(rutas).toEqual(['update equipos/e1', 'update equipos/e1', 'update equipos/e2']);
+    expect(rutas).toEqual(['update equipos/e1', 'update equipos/e1']);
   });
 
-  test('crear equipo nuevo', async ({ page }) => {
+  test('crear equipo nuevo: pide el área dueña; editar conserva la fecha de registro', async ({ page }) => {
     await app.ejecutar(() => { newEquipo(); setEF('serie', 'SN-777'); setEF('modelo', 'PQ-9'); saveEquipo(); });
+    await expect(page.locator('.toast')).toContainText('Elige el área dueña');
+    await app.ejecutar(() => { setEF('area', 'CPT BT'); saveEquipo(); });
     const push = (await app.escrituras()).find(([op, ruta]) => op === 'push' && ruta === 'equipos');
-    expect(push[2]).toMatchObject({ serie: 'SN-777', modelo: 'PQ-9' });
+    expect(push[2]).toMatchObject({ serie: 'SN-777', modelo: 'PQ-9', area: 'CPT BT', creadoPor: 'David García' });
+    await app.ejecutar(() => { editEquipo('e1'); setEF('area', 'CPT MT'); saveEquipo(); });
+    const edicion = (await app.escrituras()).at(-1);
+    expect(edicion[1]).toBe('equipos/e1');
+    expect(edicion[2]).toMatchObject({ area: 'CPT MT', editadoPor: 'David García' });
+    expect(edicion[2].fechaRegistro).toBeUndefined();
+    expect(edicion[2].creadoPor).toBeUndefined();
   });
 
-  test('lote de devolución: se eligen los prestados y se registra la devolución de todos con un memo', async ({ page }) => {
-    await page.getByRole('button', { name: 'Lote devolución' }).first().click();
-    await expect(app$(page)).toContainText('Toca los equipos prestados que regresan');
-    // SN-104 está prestado pero instalado: no se puede elegir; SN-103 está prestado y libre
-    await page.locator('#app div[onclick^="toggleLoteCard"]', { hasText: 'SN-103' }).click();
-    await page.locator('#app div', { hasText: /^SN-104/ }).first().click({ force: true });
-    await expect(app$(page)).toContainText('Memo devolución · 1 equipo');
+});
+
+test.describe('Memos de préstamo y devolución', () => {
+  // Inventario con áreas dueñas: e2/e6 de CPT MT disponibles, e7 de CPT BT, e4 de CPT MT prestado a CPT BT,
+  // e8 de CPT MT con Campos y Servicios pero ya sin instalación (de antes de la devolución automática)
+  const conAreas = () => {
+    const d = JSON.parse(JSON.stringify(fixture));
+    Object.assign(d.equipos.e1, { area: 'CPT MT' }); Object.assign(d.equipos.e2, { area: 'CPT MT' }); Object.assign(d.equipos.e6, { area: 'CPT MT' });
+    Object.assign(d.equipos.e7, { area: 'CPT BT' }); Object.assign(d.equipos.e3, { area: 'CPT BT' });
+    Object.assign(d.equipos.e4, { area: 'CPT MT', movimientos: [{ tipo: 'prestamo', de: 'CPT MT', a: 'CPT BT', fecha: '2026-09-01' }] });
+    Object.assign(d.equipos.e5, { area: 'CPT MT' });
+    d.equipos.e8 = { serie: 'SN-108', modelo: 'PQ-1', sede: 'Subestación Cucumacayán', condicion: 'detalles', area: 'CPT MT', prestado: true, prestadoFecha: '2026-08-01',
+      movimientos: [{ tipo: 'prestamo', de: 'CPT MT', a: 'Campos y Servicios', fecha: '2026-08-01' }] };
+    d.equipos.e9 = { serie: 'SN-109', modelo: 'PQ-3', sede: 'Plantel Central', condicion: 'detalles', area: 'CPT MT', vineta: 'V9' };
+    return d;
+  };
+  const capturar = page => page.evaluate(() => {
+    window.__docs = [];
+    const crear = URL.createObjectURL.bind(URL);
+    URL.createObjectURL = b => { b.text().then(t => window.__docs.push(t)); return crear(b); };
+  });
+
+  test('lista por estado: nadie se queda fuera y los ya retirados con Campos y Servicios se pueden devolver', async ({ page }) => {
+    app = await abrirApp(page, { datos: conAreas() });
+    await cerrarAlerta(page);
+    await nav(page, 'Equipos');
+    await expect(page.locator('.eq-grupo', { hasText: 'Con Campos y Servicios' })).toContainText('SN-108');
+    await expect(page.locator('.eq-grupo', { hasText: 'Prestados a otra área' })).toContainText('SN-103');
+    await expect(page.locator('.eq-grupo', { hasText: 'En campo' })).toContainText('SN-104');
+    // Buscar por viñeta
+    await app.ejecutar(() => setInvSearch('V7'));
+    await expect(page.locator('.eq-item')).toHaveCount(1);
+    await app.ejecutar(() => setInvSearch(''));
+    // Aviso: ya no están instalados pero siguen prestados a Campos y Servicios
+    await expect(page.locator('.inv-aviso')).toContainText('SN-108');
+    await page.getByRole('button', { name: 'Registrar devolución' }).click();
+    const [, ruta, datos] = (await app.escrituras()).at(-1);
+    expect(ruta).toBe('equipos/e8');
+    expect(datos).toMatchObject({ prestado: false, prestadoFecha: null });
+    expect(datos.movimientos.at(-1)).toMatchObject({ tipo: 'devolucion', de: 'Campos y Servicios', a: 'CPT MT', auto: true });
+  });
+
+  test('préstamo de varios equipos: solo deja elegir los que se pueden, registra todos y guarda un memo de lote', async ({ page }) => {
+    app = await abrirApp(page, { datos: conAreas() });
+    await cerrarAlerta(page);
+    await nav(page, 'Equipos');
+    await page.getByRole('button', { name: 'Nuevo préstamo' }).click();
+    await expect(page.locator('.memo-nuevo h2')).toHaveText('Nuevo memo');
+    // De CPT MT: disponibles SN-105 y SN-109 (Con detalles, se presta con aviso); los demás explican por qué no
+    await expect(page.locator('.memo-eq')).toHaveCount(2);
+    await expect(page.locator('.memo-eq', { hasText: 'SN-109' })).toContainText('Con detalles');
+    await page.locator('.memo-no summary').click();
+    await expect(page.locator('.memo-no')).toContainText('Es de CPT BT');
+    await expect(page.locator('.memo-no')).toContainText('Instalado en #C-001');
+    await expect(page.locator('.memo-no')).toContainText('Prestado a CPT BT');
+    await page.locator('.memo-eq', { hasText: 'SN-105' }).click();
+    await page.locator('.memo-eq', { hasText: 'SN-109' }).click();
+    await page.locator('.memo-chips').nth(1).getByRole('button', { name: 'Campos y Servicios' }).click();
+    await page.locator('.memo-nota').fill('Campaña de octubre');
+    await expect(page.locator('.memo-pie')).toContainText('Memo de lote con 2 equipos');
+    await capturar(page);
     await page.getByRole('button', { name: 'Registrar y generar memo' }).click();
-    await expect(page.locator('.modal-overlay')).toContainText('Registrar devolución de 1 equipo');
-    await page.evaluate(() => {
-      window.__docs = [];
-      const crear = URL.createObjectURL.bind(URL);
-      URL.createObjectURL = b => { b.text().then(t => window.__docs.push(t)); return crear(b); };
-    });
-    await page.getByRole('button', { name: /Confirmar devolución y generar memo/ }).click();
-    // Un solo memo con la hoja de la app (encabezado petróleo → turquesa) y el equipo en la tabla
+    const esc = await app.escrituras();
+    const memo = esc.find(([op, ruta]) => op === 'push' && ruta === 'memosEquipos')[2];
+    expect(memo).toMatchObject({ tipo: 'prestamo', de: 'CPT MT', a: 'Campos y Servicios', nota: 'Campaña de octubre', registradoPor: 'David García' });
+    expect(memo.equipos.map(e => e.serie)).toEqual(['SN-105', 'SN-109']);
+    const eqs = esc.filter(([op, ruta]) => op === 'update' && ruta.startsWith('equipos/'));
+    expect(eqs.map(e => e[1])).toEqual(['equipos/e6', 'equipos/e9']);
+    expect(eqs[0][2]).toMatchObject({ prestado: true, sede: 'Con Campos y Servicios' });
+    expect(eqs[0][2].movimientos.at(-1)).toMatchObject({ tipo: 'prestamo', de: 'CPT MT', a: 'Campos y Servicios', memoId: expect.any(String) });
     await expect.poll(() => page.evaluate(() => window.__docs.length)).toBe(1);
-    const memo = (await page.evaluate(() => window.__docs))[0];
-    for (const texto of ['Devolución de lote', 'SN-103', '#0b2e3b', 'Firmas de conformidad', 'Imprimir o guardar PDF']) expect(memo).toContain(texto);
-    const esc = (await app.escrituras()).filter(([op, ruta]) => op === 'update' && ruta.startsWith('equipos/'));
-    expect(esc.map(e => e[1])).toEqual(['equipos/e4']);
-    expect(esc[0][2]).toMatchObject({ prestado: false, prestadoFecha: null });
-    expect(esc[0][2].movimientos.at(-1)).toMatchObject({ tipo: 'devolucion', fecha: '2026-09-23', registradoPor: 'David García' });
-    await expect(app$(page)).not.toContainText('Memo devolución');
+    const doc = (await page.evaluate(() => window.__docs))[0];
+    for (const t of ['Préstamo de lote', 'SN-105', 'SN-109', 'Campaña de octubre', 'Con detalles']) expect(doc).toContain(t);
+    // Queda en Memos para reimprimirlo
+    await expect(page.locator('.memo-item')).toContainText('CPT MT → Campos y Servicios');
+    await page.locator('.memo-item').getByRole('button', { name: 'Memo' }).click();
+    await expect.poll(() => page.evaluate(() => window.__docs.length)).toBe(2);
   });
 
-  test('modo lote', async ({ page }) => {
-    await app.ejecutar(() => { activarModoLote('prestamo'); toggleLote('e6'); });
-    await expect(app$(page)).toContainText('Cancelar');
-    await app.ejecutar(() => cancelarLote());
+  test('devolución desde la ficha: el mismo flujo con el equipo ya elegido y memo individual', async ({ page }) => {
+    app = await abrirApp(page, { datos: conAreas() });
+    await cerrarAlerta(page);
+    await nav(page, 'Equipos');
+    await app.ejecutar(() => openEqDetalle('e4'));
+    await expect(app$(page)).toContainText('Lo tiene');
+    await page.getByRole('button', { name: 'Registrar devolución' }).click();
+    await expect(page.locator('.memo-chips').first().locator('.active')).toHaveText('CPT BT');
+    await expect(page.locator('.memo-eq.sel')).toContainText('SN-103');
+    await expect(page.locator('.memo-pie')).toContainText('Memo individual');
+    await capturar(page);
+    await page.getByRole('button', { name: 'Registrar y generar memo' }).click();
+    const [, ruta, datos] = (await app.escrituras()).filter(([op]) => op === 'update').at(-1);
+    expect(ruta).toBe('equipos/e4');
+    expect(datos).toMatchObject({ prestado: false, sede: 'Plantel Central' });
+    expect(datos.movimientos.at(-1)).toMatchObject({ tipo: 'devolucion', de: 'CPT BT', a: 'CPT MT' });
+    await expect.poll(() => page.evaluate(() => window.__docs.length)).toBe(1);
+    const doc = (await page.evaluate(() => window.__docs))[0];
+    expect(doc).toContain('Devolución');
+    expect(doc).not.toContain('de lote');
+  });
+
+  test('sin área no se puede prestar; el administrador la asigna con una sugerencia', async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await nav(page, 'Equipos');
+    await expect(page.locator('.inv-aviso').first()).toContainText('no tienen área dueña');
+    await page.getByRole('button', { name: 'Asignar área' }).click();
+    // Sugerida por su primer préstamo o por la sede (Cucumacayán → CPT BT)
+    await expect(page.locator('[data-area-eq="e3"]')).toHaveValue('CPT BT');
+    await expect(page.locator('[data-area-eq="e2"]')).toHaveValue('CPT MT');
+    await page.locator('[data-area-eq="e2"]').selectOption('CPT BT');
+    await page.getByRole('button', { name: /Guardar áreas/ }).click();
+    const esc = (await app.escrituras()).filter(([op, ruta]) => op === 'update' && ruta.startsWith('equipos/'));
+    expect(esc).toContainEqual(['update', 'equipos/e2', { area: 'CPT BT' }]);
+    expect(esc).toContainEqual(['update', 'equipos/e3', { area: 'CPT BT' }]);
+  });
+
+  test('al retirar un equipo de Campos y Servicios la devolución se registra sola', async ({ page }) => {
+    app = await abrirApp(page, { datos: conAreas() });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { switchTab('instalaciones'); openRetiroModal('r5'); });
+    await page.locator(`div[onclick="toggleSinProblema()"]`).click();
+    await page.getByText('Sí, ya descargué').click();
+    await page.getByText('Confirmar retiro').click();
+    await expect.poll(async () => (await app.escrituras()).length).toBe(2);
+    const [, [, ruta, datos]] = await app.escrituras();
+    expect(ruta).toBe('equipos/e5');
+    expect(datos).toMatchObject({ sede: 'Subestación Cucumacayán', prestado: false });
+    expect(datos.movimientos.at(-1)).toMatchObject({ tipo: 'devolucion', de: 'Campos y Servicios', a: 'CPT MT', auto: true, nota: 'Devolución automática al retirar el caso #C-005' });
   });
 });
 
@@ -602,18 +708,17 @@ test.describe('Campos y Servicios', () => {
 
   test('el retiro masivo de un despacho de CPT MT regresa los equipos a la Cucumacayán', async ({ page }) => {
     await app.ejecutar(() => retiroMasivo('hc1'));
-    expect(await app.escrituras()).toContainEqual(['update', 'equipos/e5', { sede: 'Subestación Cucumacayán' }]);
+    const datos = (await app.escrituras()).find(([op, ruta]) => op === 'update' && ruta === 'equipos/e5')[2];
+    expect(datos).toMatchObject({ sede: 'Subestación Cucumacayán', prestado: false });
+    expect(datos.movimientos.at(-1)).toMatchObject({ tipo: 'devolucion', de: 'Campos y Servicios', auto: true });
   });
 
   test('la devolución de Campos y Servicios a CPT MT deja el equipo en la Cucumacayán', async ({ page }) => {
-    await app.ejecutar(() => { switchTab('inventario'); openEqDetalle('e5'); });
-    await page.getByText('Registrar devolución').click();
-    await expect(app$(page)).toContainText('Sede destino: Subestación Cucumacayán');
-    await app.ejecutar(() => doMovimiento());
-    const [op, ruta, datos] = (await app.escrituras()).at(-1);
-    expect([op, ruta]).toEqual(['update', 'equipos/e5']);
-    expect(datos).toMatchObject({ prestado: false, sede: 'Subestación Cucumacayán' });
-    expect(datos.movimientos.at(-1)).toMatchObject({ tipo: 'devolucion', de: 'Campos y Servicios', a: 'CPT MT' });
+    const r = await page.evaluate(async () => {
+      const m = await import('/js/domain/inventario.js');
+      return [m.sedeDespues({ tipo: 'devolucion', de: 'Campos y Servicios', a: 'CPT MT' }), m.sedeDespues({ tipo: 'devolucion', de: 'CPT BT', a: 'CPT MT' }), m.sedeDespues({ tipo: 'prestamo', de: 'CPT MT', a: 'CPT BT' })];
+    });
+    expect(r).toEqual(['Subestación Cucumacayán', 'Plantel Central', 'Subestación Cucumacayán']);
   });
 
   test('eliminar el préstamo a Campos y Servicios devuelve el equipo a la Cucumacayán', async ({ page }) => {
@@ -621,13 +726,6 @@ test.describe('Campos y Servicios', () => {
     const [, ruta, datos] = (await app.escrituras()).at(-1);
     expect(ruta).toBe('equipos/e5');
     expect(datos).toMatchObject({ prestado: false, sede: 'Subestación Cucumacayán' });
-  });
-
-  test('una devolución normal a CPT MT sigue yendo a Plantel Central', async ({ page }) => {
-    await app.ejecutar(() => { switchTab('inventario'); registrarDevolucion('e4'); setPrestamoField('de', 'CPT BT'); setPrestamoField('a', 'CPT MT'); });
-    await expect(app$(page)).toContainText('Sede destino: Plantel Central');
-    await app.ejecutar(() => doMovimiento());
-    expect((await app.escrituras()).at(-1)[2].sede).toBe('Plantel Central');
   });
 
   test('memo de equipo dañado: prellenado, tres firmas y trazabilidad', async ({ page }) => {
@@ -767,7 +865,7 @@ test.describe('Vista de PC', () => {
     expect(nav.height).toBeGreaterThan(nav.width);
     // Las tarjetas del inventario se reparten en columnas
     await page.locator('nav.bottom-nav button', { hasText: 'Equipos' }).click();
-    const [a, b] = await Promise.all(['SN-105', 'SN-106'].map(s => page.locator('.eq-lista > div', { hasText: s }).boundingBox()));
+    const [a, b] = await Promise.all(['SN-105', 'SN-106'].map(s => page.locator('.eq-lista > .eq-item', { hasText: s }).boundingBox()));
     expect(Math.abs(a.y - b.y)).toBeLessThan(2);
     // Los modales se muestran como ventana centrada
     await app.ejecutar(() => { openEqDetalle('e6'); openRevisionModal('e6'); });
