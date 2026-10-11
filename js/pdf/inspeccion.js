@@ -23,7 +23,7 @@ const filas = pares => {
   return `<table class="ft">${html}</table>`;
 };
 
-export function buildFormularioInspeccion(exp = {}, insp = {}, { inspector = '', medicion = { lista: [] } } = {}) {
+export function buildFormularioInspeccion(exp = {}, insp = {}, { inspector = '', medicion = { lista: [] }, logo = '' } = {}) {
   const sub = insp.subestacion || {}; const med = insp.medidor || {};
   const tipo = sub.tipo;
   let n = 0; const sec = (titulo, html) => seccion(`${++n}. ${titulo}`, html);
@@ -103,7 +103,7 @@ export function buildFormularioInspeccion(exp = {}, insp = {}, { inspector = '',
 
   const hora = [insp.horaInicio, insp.horaFin].filter(Boolean).join(' – ');
   return docMemo({
-    titulo: `Inspección ${exp.codigo || ''}`.trim(), tipo: 'Inspección de instalaciones', etiqueta: 'Formulario de', formal: true, subtitulo: 'Calidad del Producto Técnico',
+    titulo: `Inspección ${exp.codigo || ''}`.trim(), tipo: 'Inspección de instalaciones', etiqueta: 'Formulario de', formal: true, logo, subtitulo: 'Calidad del Producto Técnico',
     meta: [['Reclamo', e(exp.codigo)], ['Fecha de inspección', fecha(insp.fecha)], ['Hora', e(hora)], ['Área', e(exp.area)]],
     cuerpo, pie: ` · Formulario de inspección ${e(exp.codigo || '')}`,
   });

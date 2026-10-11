@@ -8,6 +8,7 @@ import { buildFormularioInspeccion } from '../pdf/inspeccion.js';
 import { medicionesExpediente } from '../domain/expedientes.js';
 import { equiposMedicion } from '../domain/inspeccion.js';
 import { hoyLocal } from '../domain/trabajo.js';
+import { configCartas } from './documentos.js';
 import { render } from '../views/render.js';
 
 const NUMERICOS = /(^|\/)(kvas\/\d|kva|tierra|vmin|vmax|monto|lect\/\w+)$/;
@@ -93,5 +94,5 @@ export function borrarFirma(id, rol) {
 export function generarFormularioInspeccion(id) {
   const exp = state.reclamos?.[id]; if (!exp) return;
   const medicion = equiposMedicion(medicionesExpediente({ ...exp, id }, state.records, hoyLocal()), state.equipos);
-  abrirDoc(buildFormularioInspeccion({ ...exp, id }, exp.inspeccion || {}, { inspector: state.sesionUsuario?.nombre || '', medicion }), `Inspeccion-${String(exp.codigo || id).replace(/[^\w-]+/g, '_')}.html`);
+  abrirDoc(buildFormularioInspeccion({ ...exp, id }, exp.inspeccion || {}, { inspector: state.sesionUsuario?.nombre || '', medicion, logo: configCartas().logo }), `Inspeccion-${String(exp.codigo || id).replace(/[^\w-]+/g, '_')}.html`);
 }

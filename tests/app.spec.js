@@ -2153,6 +2153,10 @@ test.describe('Análisis de reclamos', () => {
     expect(html).toContain('Formulario de');
     expect(html).toContain('Calidad del Producto Técnico</div>');
     expect(html).not.toContain('Documento generado');
+    expect(html).toContain('CPT INNOVA'); // sin logo configurado
+    const conLogo = await page.evaluate(async () => (await import('/js/pdf/inspeccion.js')).buildFormularioInspeccion({}, {}, { logo: 'data:image/png;base64,AAAA' }));
+    expect(conLogo).toContain('<div class="marca marca-img"><img src="data:image/png;base64,AAAA" alt=""><div class="marca-sub">Calidad del Producto Técnico</div>');
+    expect(conLogo).not.toContain('CPT INNOVA</div>');
     expect(html).toContain('Equipo de medición · RE192026456');
     expect(html).toMatch(/Punto principal<\/td><td class="val">PQ-2<\/td><td class="val">SN-202/);
     expect(html).toContain('DS100001 / CT10001');

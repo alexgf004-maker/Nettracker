@@ -22,6 +22,8 @@ const ESTILO = `
   .marca-logo { width: 50px; height: 50px; border-radius: 14px; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.28); display: flex; align-items: center; justify-content: center; }
   .marca-logo svg { width: 28px; height: 28px; }
   .marca-nombre { font-size: 20px; font-weight: 800; letter-spacing: .3px; }
+  .marca-img { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .marca-img img { max-height: 58px; max-width: 240px; object-fit: contain; }
   .marca-sub { font-size: 11px; opacity: .78; margin-top: 1px; }
   .titulo { text-align: right; }
   .titulo-eti { font-size: 10px; font-weight: 700; letter-spacing: 2.4px; text-transform: uppercase; opacity: .75; }
@@ -140,7 +142,7 @@ const ESTILO = `
 const hoy = () => new Date().toLocaleDateString('es-SV');
 
 // Documento completo. meta: [[etiqueta, valor], ...] bajo el encabezado.
-export function docMemo({ titulo, tipo, meta = [], cuerpo, pie = '', rojo = false, compacta = false, apaisada = false, formal = false, etiqueta = 'Memorándum de', subtitulo = 'Calidad del Producto Técnico · Analizadores de Red' }) {
+export function docMemo({ titulo, tipo, meta = [], cuerpo, pie = '', rojo = false, compacta = false, apaisada = false, formal = false, logo = '', etiqueta = 'Memorándum de', subtitulo = 'Calidad del Producto Técnico · Analizadores de Red' }) {
   const clases = ['hoja', compacta && 'compacta', apaisada && 'apaisada', formal && 'formal'].filter(Boolean).join(' ');
   return `<!DOCTYPE html>
 <html lang="es">
@@ -154,10 +156,10 @@ export function docMemo({ titulo, tipo, meta = [], cuerpo, pie = '', rojo = fals
 <div class="barra"><button onclick="window.print()">Imprimir o guardar PDF</button></div>
 <div class="${clases}">
   <div class="enc${rojo ? ' rojo' : ''}">
-    <div class="marca">
+    ${logo ? `<div class="marca marca-img"><img src="${logo}" alt=""><div class="marca-sub">${subtitulo}</div></div>` : `<div class="marca">
       <div class="marca-logo">${LOGO}</div>
       <div><div class="marca-nombre">CPT INNOVA</div><div class="marca-sub">${subtitulo}</div></div>
-    </div>
+    </div>`}
     <div class="titulo"><div class="titulo-eti">${etiqueta}</div><div class="titulo-tipo">${tipo}</div></div>
   </div>
   ${meta.length ? `<div class="meta">${meta.map(([e, v]) => `<div><div class="meta-eti">${e}</div><div class="meta-val">${v || '—'}</div></div>`).join('')}</div>` : ''}
