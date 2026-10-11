@@ -445,6 +445,26 @@ test.describe('Memos de préstamo y devolución', () => {
     await expect.poll(() => page.evaluate(() => window.__docs.length)).toBe(2);
   });
 
+  test('a Campos y Servicios, CPT MT puede entregar equipos de la Cucumacayán (de CPT BT)', async ({ page }) => {
+    app = await abrirApp(page, { datos: conAreas() });
+    await cerrarAlerta(page);
+    await nav(page, 'Equipos');
+    await page.getByRole('button', { name: 'Nuevo préstamo' }).click();
+    await expect(page.locator('.memo-eq', { hasText: 'SN-106' })).toHaveCount(0); // a CPT BT no: es de CPT BT
+    await page.locator('.memo-chips').nth(1).getByRole('button', { name: 'Campos y Servicios' }).click();
+    const bt = page.locator('.memo-eq', { hasText: 'SN-106' });
+    await expect(bt).toContainText('de CPT BT');
+    await bt.click();
+    await capturar(page);
+    await page.getByRole('button', { name: 'Registrar y generar memo' }).click();
+    const [, ruta, datos] = (await app.escrituras()).filter(([op]) => op === 'update').at(-1);
+    expect(ruta).toBe('equipos/e7');
+    expect(datos.movimientos.at(-1)).toMatchObject({ tipo: 'prestamo', de: 'CPT MT', a: 'Campos y Servicios' });
+    // Al volver de campo regresa a su área (CPT BT)
+    const r = await page.evaluate(async eq => (await import('/js/domain/inventario.js')).devolucionAlRetirar(eq, { fecha: '2026-09-30', por: 'x' }), { area: 'CPT BT', prestado: true, movimientos: datos.movimientos });
+    expect(r.movimientos.at(-1)).toMatchObject({ tipo: 'devolucion', de: 'Campos y Servicios', a: 'CPT BT' });
+  });
+
   test('devolución desde la ficha: el mismo flujo con el equipo ya elegido y memo individual', async ({ page }) => {
     app = await abrirApp(page, { datos: conAreas() });
     await cerrarAlerta(page);

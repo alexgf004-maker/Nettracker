@@ -118,17 +118,18 @@ export function renderMemoNuevo() {
     <div class="bloque"><div class="memo-paso">1. ¿Qué vas a registrar?</div>
       <div class="segmento segmento-ancho"><button class="${esPrestamo ? 'active' : ''}" onclick="setMemoNuevo('tipo', 'prestamo')">Préstamo</button><button class="${!esPrestamo ? 'active' : ''}" onclick="setMemoNuevo('tipo', 'devolucion')">Devolución</button></div></div>
     <div class="bloque"><div class="memo-paso">2. ${esPrestamo ? '¿De qué área sale y a quién se presta?' : '¿Quién lo devuelve y a qué área regresa?'}</div>
-      <div class="memo-campo"><label>${esPrestamo ? 'Entrega (área dueña)' : 'Entrega (quien lo tiene)'}</label>${chips('de', opcionesDe, m.de)}</div>
+      <div class="memo-campo"><label>${esPrestamo ? 'Entrega' : 'Entrega (quien lo tiene)'}</label>${chips('de', opcionesDe, m.de)}</div>
       <div class="memo-campo"><label>Recibe</label>${chips('a', opcionesA, m.a)}</div></div>
     <div class="bloque"><div class="memo-paso">3. Equipos <span class="memo-cuenta">${m.sel.length} ${m.sel.length === 1 ? 'elegido' : 'elegidos'}</span></div>
       <input id="memo-buscar" class="search-input" placeholder="Buscar serie, viñeta o modelo" value="${esc(m.busqueda)}" oninput="setMemoBusqueda(this.value)">`;
-  if (!elegibles.length) html += `<div class="memo-vacio">${esPrestamo ? `No hay equipos de ${esc(m.de)} disponibles para prestar.` : `${esc(m.de)} no tiene equipos prestados de ${esc(m.a)} para devolver.`}</div>`;
+  if (esPrestamo && m.a === CAMPOS) html += '<div class="memo-ayuda">A Campos y Servicios se le pueden entregar equipos de cualquier área (los de la bodega de la Cucumacayán). Al retirarlos de campo regresan solos a su área.</div>';
+  if (!elegibles.length) html += `<div class="memo-vacio">${esPrestamo ? `No hay equipos ${m.a === CAMPOS ? '' : 'de ' + esc(m.de) + ' '}disponibles para prestar.` : `${esc(m.de)} no tiene equipos prestados de ${esc(m.a)} para devolver.`}</div>`;
   else {
     html += `<button class="btn-link memo-todos" onclick="seleccionarTodosMemo(${esc(JSON.stringify(elegibles.map(x => x.eq.id)))})">${todosSel ? 'Quitar todos' : `Elegir todos (${elegibles.length})`}</button><div class="memo-eqs">`;
     html += elegibles.map(({ eq }) => {
       const sel = m.sel.includes(eq.id);
       return `<button class="memo-eq ${sel ? 'sel' : ''}" onclick="toggleEquipoMemo('${eq.id}')"><span class="memo-check">${sel ? '<i class="ic ic-check"></i>' : ''}</span>
-        <span class="memo-eq-main"><b>${esc(eq.serie)}</b>${eq.vineta ? ` · ${esc(eq.vineta)}` : ''}<small>${esc(eq.modelo || '')}${!esPrestamo && eq.prestadoFecha ? ' · prestado desde ' + fmtDate(eq.prestadoFecha) : ''}</small></span>
+        <span class="memo-eq-main"><b>${esc(eq.serie)}</b>${eq.vineta ? ` · ${esc(eq.vineta)}` : ''}<small>${esc(eq.modelo || '')}${eq.area !== m.de && esPrestamo ? ` · de ${esc(eq.area)} (${esc(eq.sede || '')})` : ''}${!esPrestamo && eq.prestadoFecha ? ' · prestado desde ' + fmtDate(eq.prestadoFecha) : ''}</small></span>
         ${(eq.condicion || 'bueno') === 'detalles' ? '<span class="tg ambar">Con detalles</span>' : ''}</button>`;
     }).join('') + '</div>';
   }

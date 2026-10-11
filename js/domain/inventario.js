@@ -25,10 +25,12 @@ export function estadoEquipo(eq, registros) {
   return { ...base, clave: 'disponible', label: 'Disponible' };
 }
 
-// Por qué no se puede prestar (null = sí se puede)
-export function motivoNoPrestamo(eq, de, registros) {
+// Por qué no se puede prestar (null = sí se puede).
+// A Campos y Servicios se le entregan equipos de la bodega (Cucumacayán) aunque sean de otra área: CPT MT puede
+// entregar equipos de CPT BT; al retirarse regresan solos a su área. Entre áreas, el préstamo sale del área dueña.
+export function motivoNoPrestamo(eq, de, registros, a = '') {
   if (!eq.area) return 'Sin área asignada';
-  if (eq.area !== de) return `Es de ${eq.area}`;
+  if (eq.area !== de && a !== CAMPOS) return `Es de ${eq.area}`;
   const e = estadoEquipo(eq, registros);
   if (e.clave === 'campo') return `Instalado en #${e.inst.caso || '?'}`;
   if (e.clave === 'prestado') return e.label;
@@ -49,7 +51,7 @@ export function motivoNoDevolucion(eq, de, para, registros) {
 }
 
 export const motivoNoMovimiento = (eq, { tipo, de, a }, registros) =>
-  tipo === 'prestamo' ? motivoNoPrestamo(eq, de, registros) : motivoNoDevolucion(eq, de, a, registros);
+  tipo === 'prestamo' ? motivoNoPrestamo(eq, de, registros, a) : motivoNoDevolucion(eq, de, a, registros);
 
 // Sede donde queda el equipo después del movimiento (Campos y Servicios los regresa a la Cucumacayán)
 export function sedeDespues({ tipo, de, a }) {
