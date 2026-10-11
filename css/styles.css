@@ -1247,3 +1247,42 @@ header { background-image: var(--onda), var(--degradado); background-repeat: rep
 .memo-lista .memo-eqs { max-height: 46vh; overflow-y: auto; padding: 8px; border-top: 1px solid var(--border); overscroll-behavior: contain; }
 /* Sin animación de entrada cuando se redibuja la misma pantalla (evita el parpadeo) */
 #app.quieto .content { animation: none; }
+/* Inicio: casos FT primero, con su siguiente paso */
+.inicio-layout { grid-template-areas: "ft" "pend" "trabajo" "acciones" "equipos" "actividad"; }
+.ini-ft { grid-area: ft; }
+.ft-inicio { border-color: #fecaca; box-shadow: 0 6px 18px -12px rgba(220,38,38,.6); }
+.ft-inicio .bloque-titulo { color: #b91c1c; }
+.ft-caso { display: block; width: 100%; text-align: left; font-family: var(--font); background: #fff; border: 1px solid var(--border); border-left: 4px solid #f59e0b; border-radius: 12px; padding: 12px 14px; margin-top: 10px; cursor: pointer; color: var(--text); }
+.ft-caso.urgente { border-left-color: #dc2626; background: #fffafa; }
+.ft-caso-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.ft-caso-top b { font-size: 15px; font-weight: 800; }
+.ft-caso-top > span:not(.tg) { font-size: 12px; color: var(--text3); flex: 1; min-width: 120px; }
+.ft-sig { margin-top: 8px; padding: 9px 12px; border-radius: 10px; background: #fef2f2; }
+.ft-caso:not(.urgente) .ft-sig { background: #fffbeb; }
+.ft-sig-eti { display: block; font-size: 10px; font-weight: 800; letter-spacing: .8px; text-transform: uppercase; color: #b91c1c; }
+.ft-caso:not(.urgente) .ft-sig-eti { color: #b45309; }
+.ft-sig b { display: block; font-size: 14.5px; font-weight: 800; margin-top: 1px; }
+.ft-sig small { display: block; font-size: 12px; color: var(--text2); margin-top: 1px; }
+.ft-pasos { display: flex; align-items: center; gap: 5px; margin-top: 9px; }
+.ft-pasos i { width: 22px; height: 5px; border-radius: 3px; background: var(--border); }
+.ft-pasos i.ok { background: #10b981; } .ft-pasos i.act { background: #dc2626; }
+.ft-pasos span { font-size: 11px; color: var(--text3); font-weight: 700; margin-left: 4px; }
+/* Aviso al abrir la app: casos FT primero, después retiros */
+.aviso-inicio-fondo { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 300; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.aviso-inicio { background: var(--white); border-radius: 20px; width: 100%; max-width: 400px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.3); font-family: var(--font); }
+.aviso-inicio-head { display: flex; gap: 12px; align-items: center; padding: 18px 20px; color: #fff; background-image: var(--onda), linear-gradient(120deg, #92400e, #f59e0b); }
+.aviso-inicio-head.rojo { background-image: var(--onda), linear-gradient(120deg, #7f1d1d, #dc2626); }
+.aviso-inicio-head .ic { font-size: 24px; }
+.aviso-inicio-head b { display: block; font-size: 17px; font-weight: 800; }
+.aviso-inicio-head span { font-size: 12px; opacity: .85; }
+.aviso-inicio-cuerpo { padding: 6px 16px 10px; max-height: 50vh; overflow-y: auto; }
+.aviso-inicio-sec { font-size: 10.5px; font-weight: 800; letter-spacing: .8px; text-transform: uppercase; color: var(--text3); margin: 12px 0 4px; }
+.aviso-inicio-fila { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 9px 0; border: none; border-bottom: 1px solid var(--border2); background: none; font-family: var(--font); color: var(--text); }
+button.aviso-inicio-fila { cursor: pointer; }
+.aviso-inicio-fila b { font-size: 13.5px; font-weight: 800; }
+.aviso-inicio-fila small { display: block; font-size: 12px; color: var(--text2); margin-top: 1px; }
+.aviso-inicio-fila.ft small { color: #b91c1c; font-weight: 700; }
+.aviso-inicio-fila > span { font-size: 12px; font-weight: 800; color: var(--text3); flex-shrink: 0; }
+.aviso-inicio-fila > span.rojo { color: var(--red); } .aviso-inicio-fila > span.ambar { color: var(--yellow); }
+.aviso-inicio-pie { display: flex; gap: 8px; padding: 12px 16px 16px; }
+.aviso-inicio-pie .b { flex: 1; justify-content: center; padding: 12px; }

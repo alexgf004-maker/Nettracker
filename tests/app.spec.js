@@ -1491,9 +1491,12 @@ test.describe('Precampaña', () => {
     datos.campanas['2026-10_CPT-MT'].casos.CR1O2026201.resultado = { medicion: 'valida', tolerancia: 'fuera', febNoPer: 7.5 };
     app = await abrirApp(page, { datos });
     await cerrarAlerta(page);
-    // En Inicio: avisar ya y el plazo (01/07 + 90 = 29/09, faltan 6 días: aún no avisa el plazo)
-    await expect(page.locator('.pendiente', { hasText: 'Avisar a DELSUR del caso FT CR1O2026201' })).toBeVisible();
-    await page.locator('.pendiente', { hasText: 'Avisar a DELSUR' }).click();
+    // En Inicio, primero los casos FT con su siguiente paso (01/07 + 90 = 29/09: día 84)
+    const caso = page.locator('.ft-caso', { hasText: 'CR1O2026201' });
+    await expect(caso).toContainText('Avisar a DELSUR por correo');
+    await expect(caso).toContainText('Día 84 de 90');
+    await expect(page.locator('.pendiente', { hasText: 'Avisar a DELSUR' })).toHaveCount(0); // no se repite en Pendientes
+    await caso.click();
     const modal = page.locator('.modal');
     await expect(modal).toContainText('29/09/2026 · día 84');
     await expect(modal).toContainText('Instalación encontrada: CR2O2026201');
@@ -1523,9 +1526,12 @@ test.describe('Precampaña', () => {
     app = await abrirApp(page, { datos });
     await cerrarAlerta(page);
     // En Inicio, hasta marcarlos
-    const hoy = page.locator('.grupo', { has: page.locator('.grupo-titulo', { hasText: 'Hoy' }) });
-    await expect(hoy).toContainText('Subir al sistema el caso FT CR1O2026201');
-    await expect(hoy).toContainText('Enviar por correo el Resumen punto medido de CR1O2026201');
+    // En Inicio, el caso FT va primero con el paso que sigue (el aviso ya está: toca subirlo al sistema)
+    const ftInicio = page.locator('.ini-ft .ft-caso', { hasText: 'CR1O2026201' });
+    await expect(ftInicio.locator('.ft-sig')).toContainText('Subir el caso al sistema');
+    await expect(ftInicio.locator('.ft-pasos')).toContainText('1 de 6');
+    const orden = await page.evaluate(() => [...document.querySelectorAll('.inicio-layout > div')].map(d => d.className));
+    expect(orden.indexOf('ini-ft')).toBeLessThan(orden.indexOf('ini-pend'));
     await nav(page, 'Seguimiento FT');
     const card = page.locator('.card', { hasText: 'CR1O2026201' });
     await expect(card).toContainText('Falta subir al sistema');
@@ -1557,6 +1563,29 @@ test.describe('Precampaña', () => {
     await expect(page.locator('.modal')).toContainText('Fotos subidas a MEMOS el 23/09/2026');
   });
 
+  test('Inicio y aviso al abrir: los casos FT van primero, con las fotos de los trabajos cuando ya hay remedición', async ({ page }) => {
+    const datos = conCampana();
+    datos.analizadores = { ...datos.analizadores,
+      r20: { serie: 'SN-300', caso: 'CR1O2026201', fechaInstalacion: '2026-09-01', fechaRetiro: '2026-09-09', areaInstalacion: 'CPT MT', retirado: true, fechaRetiroReal: '2026-09-09', fechaRegistro: '2026-09-01' },
+      r21: { serie: 'SN-301', caso: 'CR2O2026201', fechaInstalacion: '2026-09-20', fechaRetiro: '2026-09-24', areaInstalacion: 'CPT MT', fechaRegistro: '2026-09-20' } };
+    const f = { fecha: '2026-09-10', por: 'David García' };
+    Object.assign(datos.campanas['2026-10_CPT-MT'].casos.CR1O2026201, { resultado: { medicion: 'valida', tolerancia: 'fuera' }, ft: { aviso: f, sistema: f, resumen: f, ruta: 'Transferencia de alimentador' } });
+    app = await abrirApp(page, { datos });
+    // Aviso al abrir: primero el caso FT con su paso, después los retiros
+    const aviso = page.locator('.aviso-inicio');
+    await expect(aviso).toContainText('Antes de empezar');
+    await expect(aviso.locator('.aviso-inicio-sec').first()).toHaveText('Casos FT: lo primero');
+    await expect(aviso.locator('.aviso-inicio-fila.ft')).toContainText('Tomar fotos de los trabajos y subirlas a MEMOS');
+    await expect(aviso).toContainText('Retiros');
+    await aviso.getByRole('button', { name: 'Cerrar' }).click();
+    // En Inicio la remedición ya está en campo: las fotos son el siguiente paso y va marcado como urgente
+    const caso = page.locator('.ft-caso', { hasText: 'CR1O2026201' });
+    await expect(caso).toHaveClass(/urgente/);
+    await expect(caso.locator('.ft-sig')).toContainText('Tomar fotos de los trabajos y subirlas a MEMOS');
+    await expect(caso.locator('.ft-sig')).toContainText('La remedición CR2O2026201 ya está en campo');
+    await expect(caso.locator('.ft-pasos')).toContainText('4 de 6');
+  });
+
   test('seguimiento FT: pasados los 90 días queda vencido', async ({ page }) => {
     const datos = conCampana();
     datos.analizadores = { ...datos.analizadores, r20: { serie: 'SN-300', caso: 'CR1O2026201', fechaInstalacion: '2026-06-01', fechaRetiro: '2026-06-09', areaInstalacion: 'CPT MT', retirado: true, fechaRetiroReal: '2026-06-09', fechaRegistro: '2026-06-01' } };
@@ -1564,7 +1593,7 @@ test.describe('Precampaña', () => {
     datos.campanas['2026-10_CPT-MT'].casos.CR1O2026201.ft = { aviso: { fecha: '2026-06-20', por: 'David García' } };
     app = await abrirApp(page, { datos });
     await cerrarAlerta(page);
-    await expect(page.locator('.grupo', { has: page.locator('.grupo-titulo', { hasText: 'Vencido' }) })).toContainText('Plazo de 90 días del caso FT CR1O2026201');
+    await expect(page.locator('.ft-caso', { hasText: 'CR1O2026201' })).toContainText('Plazo vencido');
     await nav(page, 'Seguimiento FT');
     await expect(page.locator('.card', { hasText: 'CR1O2026201' })).toContainText('Más de 90 días: se penalizan los 90 días y la compensación sigue');
   });

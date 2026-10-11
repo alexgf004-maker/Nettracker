@@ -1,7 +1,5 @@
 // render(): arma la pantalla completa según el estado
-import { userArea } from '../config.js';
 import { state } from '../state.js';
-import { daysUntil } from '../utils.js';
 import { renderCarga } from './carga.js';
 import { renderDashboard } from './dashboard.js';
 import { renderInstalaciones } from './instalaciones.js';
@@ -9,7 +7,7 @@ import { renderInventario } from './inventario.js';
 import { renderBottomNav, renderHeader } from './layout.js';
 import { renderLogin, renderMantenimiento } from './login.js';
 import { renderMapa } from './mapa.js';
-import { renderAlertaRetiros, renderCondicionModal, renderDescargaModal, renderGlobalSearch, renderImportModal, renderMantModal, renderDanioModal, renderRetiroModal, renderRevisionModal, renderSelectorModal } from './modals.js';
+import { ftParaAviso, retirosParaAviso, renderAlertaRetiros, renderCondicionModal, renderDescargaModal, renderGlobalSearch, renderImportModal, renderMantModal, renderDanioModal, renderRetiroModal, renderRevisionModal, renderSelectorModal } from './modals.js';
 import { renderCasoModal, renderConfigCartas, renderDocsModal, renderImportListados } from './casos.js';
 import { renderProgramacionModal } from './fechas.js';
 import { renderImportMultModal, renderMultModal } from './multiplicadores.js';
@@ -50,10 +48,9 @@ export function render() {
     return;
   }
 
-  // Auto-show alerta if not dismissed and has upcoming retiros
+  // Aviso al abrir la app (una vez por sesión): casos FT abiertos primero y retiros próximos
   if (state.sesionUsuario && !state.alertaDismissed && !state.showAlertaRetiros) {
-    const ua = userArea(); const proximos = state.records.filter(r => !r.retirado && daysUntil(r.fechaRetiro) <= 3 && daysUntil(r.fechaRetiro) >= 0 && (r.areaInstalacion||'CPT MT') === ua);
-    if (proximos.length > 0) { state.showAlertaRetiros = true; state.alertaDismissed = true; }
+    if (ftParaAviso().length || retirosParaAviso().length) { state.showAlertaRetiros = true; state.alertaDismissed = true; }
   }
 
   if (!state.sesionUsuario) {

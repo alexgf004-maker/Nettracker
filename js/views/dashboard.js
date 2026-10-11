@@ -3,6 +3,7 @@ import { isAdmin, userArea } from '../config.js';
 import { GRUPOS, calcularPendientes } from '../domain/pendientes.js';
 import { agruparCampanas, areaDeInstalacion, diasEntre, hoyLocal, registrosDeTipo } from '../domain/trabajo.js';
 import { listaExpedientes, todosFT } from '../domain/expedientes.js';
+import { DIAS_SOLUCION_FT, pasosFT, siguientePasoFT } from '../domain/ft.js';
 import { state } from '../state.js';
 import { calcSt, escapeHtml, eqEnCampo, eqSt, fmtDate } from '../utils.js';
 import { areaVista, textoPlazo } from './trabajo.js';
@@ -41,7 +42,10 @@ export function renderDashboard() {
     ],
   });
   html += '<div class="inicio-layout">';
-  html += `<div class="ini-pend">${renderPendientes(hoy, pend)}</div>`;
+  // Primero los casos FT (se penalizan); los demás pendientes (retiros, descargas…) van después
+  const ft = todosFT(state.campanas, state.reclamos, state.records, hoy).filter(x => !x.cerrado && (!area || x.area === area));
+  if (ft.length) html += `<div class="ini-ft">${renderCasosFT(hoy, ft)}</div>`;
+  html += `<div class="ini-pend">${renderPendientes(hoy, pend.filter(p => p.clase !== 'ft'))}</div>`;
   html += `<div class="ini-trabajo">${renderResumenTrabajo(hoy, area, ftAbiertos)}</div>`;
   html += `<div class="ini-equipos">${renderEquipos()}</div>`;
   html += `<div class="ini-acciones">${renderAcciones()}</div>`;
@@ -78,6 +82,23 @@ function renderPendientes(hoy, lista) {
     });
   }
   html += renderDesde(hoy, desde);
+  return html + '</div>';
+}
+
+// Casos FT abiertos con su siguiente paso en grande, el avance de los pasos y el plazo de 90 días
+function renderCasosFT(hoy, lista) {
+  let html = `<div class="bloque ft-inicio"><div class="bloque-head"><div class="bloque-titulo"><i class="ic ic-ft"></i> Casos FT <span class="cuenta">${lista.length}</span></div><button class="b b-l" onclick="switchTab('ft')">Seguimiento FT</button></div>`;
+  lista.forEach(x => {
+    const pasos = pasosFT(x); const sig = siguientePasoFT(x);
+    const hechos = pasos.filter(p => p.hecho).length;
+    const urgente = !x.ft.aviso || sig?.urgente || x.vencido;
+    html += `<button class="ft-caso ${urgente ? 'urgente' : ''}" onclick="switchTab('ft'); abrirFT('${x.clave}', '${x.id}')">
+      <div class="ft-caso-top"><b>${esc(x.codigo)}</b><span>${esc(x.caso.nombre || '')}</span>
+        ${x.limite ? `<span class="tg ${x.vencido ? 'rojo' : 'ambar'}">${x.vencido ? 'Plazo vencido' : `Día ${x.dias} de ${DIAS_SOLUCION_FT}`} · ${fmtDate(x.limite)}</span>` : ''}</div>
+      ${sig ? `<div class="ft-sig"><span class="ft-sig-eti">Siguiente paso</span><b>${esc(sig.texto)}</b>${sig.detalle ? `<small>${esc(sig.detalle)}</small>` : ''}</div>` : ''}
+      <div class="ft-pasos" title="${hechos} de ${pasos.length} pasos">${pasos.map(p => `<i class="${p.hecho ? 'ok' : p === sig ? 'act' : ''}" title="${esc(p.label)}"></i>`).join('')}<span>${hechos} de ${pasos.length}</span></div>
+    </button>`;
+  });
   return html + '</div>';
 }
 

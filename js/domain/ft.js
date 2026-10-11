@@ -52,3 +52,20 @@ export function casosFT(campanas, registros, hoy) {
   }
   return lista.sort((a, b) => Number(a.cerrado) - Number(b.cerrado) || (a.limite || '9').localeCompare(b.limite || '9'));
 }
+
+// Pasos de un caso FT en orden y el siguiente que falta (para el Inicio y el aviso al abrir la app).
+// x: caso de casosFT/todosFT. Las fotos de los trabajos se piden al acercarse la remedición: urgente si ya está instalada.
+export function pasosFT(x) {
+  const ft = x.ft || {}; const rem = ft.remedicion || {}; const inst = x.remedicionInstalada;
+  return [
+    { k: 'aviso', label: 'Aviso a DELSUR', hecho: !!ft.aviso, texto: 'Avisar a DELSUR por correo', detalle: 'Lo antes posible' },
+    { k: 'sistema', label: 'Subido al sistema', hecho: !!ft.sistema, texto: 'Subir el caso al sistema', detalle: '' },
+    { k: 'resumen', label: 'Resumen punto medido', hecho: !!ft.resumen, texto: 'Enviar por correo el Resumen punto medido', detalle: 'La gráfica que genera el sistema al subir el caso' },
+    { k: 'ruta', label: 'Ruta de solución', hecho: !!ft.ruta, texto: 'Definir la ruta de solución', detalle: 'Obras, transferencia de alimentador o CPT DELSUR y Planificación' },
+    { k: 'fotos', label: 'Fotos en MEMOS', hecho: !!ft.fotos, texto: inst ? 'Tomar fotos de los trabajos y subirlas a MEMOS' : 'Antes de remedir: fotos de los trabajos a MEMOS',
+      detalle: inst ? `La remedición ${inst.codigo} ya está ${inst.retirado ? 'retirada' : 'en campo'}` : 'Lo que se hizo para mejorar el voltaje', urgente: !!inst },
+    { k: 'remedicion', label: 'Remedición normalizada', hecho: rem.normalizado === true,
+      texto: inst?.retirado ? 'Revisar la remedición: ¿se normalizó?' : inst ? 'Remedición en campo' : 'Programar la remedición', detalle: inst ? `${inst.codigo} desde el ${(inst.fecha || '').split('-').reverse().join('/')}` : '' },
+  ];
+}
+export const siguientePasoFT = x => pasosFT(x).find(p => !p.hecho) || null;
