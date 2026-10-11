@@ -257,6 +257,8 @@ function bloqueDatos(p) {
       <div class="field"><label>Urbanidad y red</label><select id="ar-red" onchange="setParamReclamo('red', this.value)">${Object.entries(TIPOS_RED).map(([k, x]) => opcion(k, `${x.label} (±${Math.round(x.tol * 100)} %)`, p.red)).join('')}</select></div>
       <div class="field"><label>Capacidad del trafo (kVA)</label><input id="ar-kva" inputmode="decimal" value="${esc(p.kva)}" onchange="setParamReclamo('kva', this.value)" placeholder="Para corriente máxima y cargabilidad"></div>
       <div class="field"><label>Voltaje L-L de salida del trafo (V)</label><input id="ar-vll" inputmode="decimal" value="${esc(p.vll)}" onchange="setParamReclamo('vll', this.value)" placeholder="Para la corriente máxima del trafo"></div>
+      <div class="field"><label>Relación de voltaje (TP)</label><input id="ar-relv" value="${esc(p.relV || '')}" onchange="setParamReclamo('relV', this.value)" placeholder="Ej. 22290/240 · para el informe"></div>
+      <div class="field"><label>Relación de corriente (TC)</label><input id="ar-reli" value="${esc(p.relI || '')}" onchange="setParamReclamo('relI', this.value)" placeholder="Ej. 800/5 · para el informe"></div>
     </div></div>`;
 }
 
@@ -405,7 +407,8 @@ function cuerpoAnalisis(a, { guardar }) {
     html += `<div class="barra-acciones analisis-acciones">
       ${guardar ? `<button class="b b-p" onclick="guardarAnalisisReclamo()" ${a.guardando ? 'disabled' : ''}><i class="ic ic-check"></i> ${a.guardando ? 'Guardando…' : 'Guardar en el reclamo'}</button>` : ''}
       ${c.d ? '<button class="b b-g" onclick="exportarTensionReclamo()"><i class="ic ic-excel"></i> Excel de tensión</button>' : ''}
-      ${c.arm?.n ? '<button class="b b-g" onclick="exportarArmonicosReclamo()"><i class="ic ic-excel"></i> Excel de armónicos</button>' : ''}</div>`;
+      ${c.arm?.n ? '<button class="b b-g" onclick="exportarArmonicosReclamo()"><i class="ic ic-excel"></i> Excel de armónicos</button>' : ''}
+      ${guardar ? '<button class="b b-g" onclick="exportarBorradorInforme()"><i class="ic ic-archivo"></i> Borrador de informe (Word)</button>' : ''}</div>`;
   }
   return html;
 }

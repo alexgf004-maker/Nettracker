@@ -290,6 +290,20 @@ En el detalle de la campaña:
 - Se guarda en el reclamo `analizadores/{id}/analisisReclamo` = { params, archivos (nombres), resultado (FebNoPer y estado; CUMPLE/NO CUMPLE de armónicos en tensión y corriente), fecha, por }. Los TXT van comprimidos (gzip + base64, ~600 KB los dos) en `archivosReclamo/{id}` y se leen con `get` al abrir el análisis. La lista de Reclamos muestra el FebNoPer y si los armónicos cumplen.
 - Excel (`js/actions/excel-reclamo.js`) con las hojas de las macros y **gráficas nativas de Excel** (`js/excel-graficas.js`: se abre el xlsx de SheetJS con `XLSX.CFB` y se agregan los archivos de dibujo/gráfica que apuntan a las celdas). Tensión: una hoja por perfil con datos, límites, resumen en H2 y la gráfica. Armónicos: Detalle_V, Detalle_I, Resumen_Armonicos, Resumen_Compacto y Graficos (2 espectros de barras con el límite y 2 tendencias). Colores de fase de los informes CPT (amarillo, azul, rojo) y Century Gothic.
 
+## Borrador de informe de reclamo (Word)
+
+- En el análisis del reclamo, "Borrador de informe (Word)" descarga `<código>[_punto]_Borrador_informe.docx` con las secciones del informe CPT ya redactadas con los datos del expediente, de la instalación y de los TXT abiertos. Lo que la app no sabe va como `[completar]` resaltado en amarillo; las gráficas van como marcas `[Gráfica: …]` que dicen de qué hoja del Excel de tensión o de armónicos se pegan.
+- `js/domain/informe.js` (`borradorInforme`, funciones puras con prueba) arma bloques (título, párrafos, tablas, fórmula, viñetas):
+  1. Generalidades: usuario, NC, dirección, CT, tensión nominal, urbanidad y red, código/WO y tipo de reclamo (circuito/subestación a completar).
+  2. Equipo de medición: modelo y serie, punto, fechas de instalación y retiro, factor multiplicador (relación TP y TC, campos nuevos "Relación de voltaje (TP)" y "Relación de corriente (TC)" en los datos de la medición, `params.relV`/`params.relI`), intervalos y total de registros.
+  3. Inspección: a completar (todavía no se captura en la app).
+  4. Mediciones: regulación (Art. 22-23, FEBNoPer con su fórmula, tabla Máx/Prom/Mín y extremos respecto al nominal); perfil secundario equivalente si es MT y hay relación TP (tensión ÷ relación, banda sobre el secundario); corrientes (tabla, hora de mayor y menor demanda promedio, fase mayor y menor, desbalance = mayor desviación respecto al promedio de las fases ÷ promedio, promedio y P95); flicker (P95 por fase, picos sobre 1 y veredicto).
+  5. Armónicos: VDAT y DATI por P95 con veredicto, armónicos individuales que no cumplen agrupados por orden (aunque el total cumpla), intervalos con carga y los tres órdenes con más contenido de corriente; tabla de indicadores que no cumplen.
+  6-7. Calidad del servicio y evento: a completar.
+  8. Conclusiones: tabla parámetro / límite / resultado / veredicto (CUMPLE en verde, NO CUMPLE en rojo) y viñetas; continuidad a completar.
+  9. Recomendaciones: a completar.
+- `js/docx.js` escribe el WordprocessingML a mano (Century Gothic, encabezados de tabla azules) y lo empaqueta con `XLSX.CFB`, sin librerías nuevas. Acción en `js/actions/informe.js`.
+
 ## Seguimiento FT
 Pestaña Trabajo → Seguimiento FT (`js/domain/ft.js`, `casos/{id}/ft`). Los casos FT salen de Resultados (válida + fuera de tolerancia):
 - Plazo: 90 días calendario desde la instalación de la medición inicial (no desde el retiro ni la descarga).
