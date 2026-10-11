@@ -1,5 +1,5 @@
 // Sincronización en tiempo real con Firebase
-import { campanasRef, reclamosRef, configCartasRef, seguimientoDesdeRef, equiposRef, historialAccesoriosRef, historialCargasRef, installsRef, mantenimientoRef, onValue as onValueFb, validacionesRef } from '../firebase.js';
+import { campanasRef, reclamosRef, configCartasRef, seguimientoDesdeRef, equiposRef, historialAccesoriosRef, historialCargasRef, installsRef, mantenimientoRef, onValue as onValueFb, validacionesRef, db, ref } from '../firebase.js';
 import { state } from '../state.js';
 import { render } from '../views/render.js';
 
@@ -70,6 +70,14 @@ export function iniciarSync() {
       state.validaciones.push({ id: x.key, ...v });
     });
     state.validaciones.reverse();
+    render();
+  });
+
+  // Memos de préstamo/devolución guardados (para reimprimirlos), del más reciente al más antiguo
+  onValue(ref(db, 'memosEquipos'), snap => {
+    state.memosEquipos = [];
+    snap.forEach(x => { state.memosEquipos.push({ id: x.key, ...x.val() }); });
+    state.memosEquipos.sort((a, b) => ((b.fecha || '') + (b.hora || '')).localeCompare((a.fecha || '') + (a.hora || '')));
     render();
   });
 

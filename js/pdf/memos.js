@@ -7,6 +7,8 @@ import { areaToSede, escapeHtml as e, fmtDate } from '../utils.js';
 import { cuenta, dato, datos, docMemo, firmas, movimiento as bloqueMovimiento, seccion, texto } from './memo-base.js';
 
 const nombreArchivo = (prefijo, serie) => prefijo + '-' + String(serie || 'equipo').replace(/[^\w-]+/g, '_') + '.html';
+// Condición del equipo en el memo ("Con detalles" se marca para que quede constancia al entregarlo)
+const condicionTexto = c => e(CONDICIONES.find(x => x.key === (c || 'bueno'))?.label || c || 'Bueno');
 const hora = () => new Date().toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' });
 
 export function generateLotePDF(equiposLote, tipo) {
@@ -17,22 +19,20 @@ export function generateLotePDF(equiposLote, tipo) {
   const registrado = mov0.registradoPor || '';
   const areaRegistro = USUARIOS.find(x => x.nombre === registrado)?.area; // el nombre va bajo el área de quien registra
 
-  const filas = equiposLote.map((item, i) => {
-    const mov = item.movimiento;
-    return `<tr>
+  const filas = equiposLote.map((item, i) => `<tr>
       <td class="num">${i + 1}</td>
       <td class="mono"><b>${e(item.eq.serie)}</b></td>
       <td class="mono">${e(item.eq.vineta || '—')}</td>
       <td>${e(item.eq.modelo || '—')}</td>
-      <td class="c">${mov ? fmtDate(mov.fecha) : '—'}</td>
-    </tr>`;
-  }).join('');
+      <td>${condicionTexto(item.eq.condicion)}</td>
+    </tr>`).join('');
 
   const cuerpo =
     seccion('Movimiento', bloqueMovimiento({ eti: 'Área que entrega', val: e(de) }, { eti: 'Área que recibe', val: e(a) }))
     + seccion('Equipos incluidos', `<div class="tabla-wrap"><table class="tabla">
-        <thead><tr><th>#</th><th>N° de serie</th><th>Viñeta</th><th>Modelo</th><th class="c">Fecha</th></tr></thead>
+        <thead><tr><th>#</th><th>N° de serie</th><th>Viñeta</th><th>Modelo</th><th>Condición</th></tr></thead>
         <tbody>${filas}</tbody></table></div>`, cuenta(equiposLote.length))
+    + (mov0.nota ? seccion('Observaciones', texto(e(mov0.nota))) : '')
     + seccion('Firmas de conformidad', firmas([
       { eti: 'Entrega', nom: e(de), sub: areaRegistro === de ? e(registrado) : '' },
       { eti: 'Recibe', nom: e(a), sub: areaRegistro === a ? e(registrado) : '' },
@@ -59,7 +59,8 @@ export function generateMemoPDF(eq, mov) {
       dato('Número de serie', e(eq.serie), true),
       dato('Modelo / Marca', e(eq.modelo)),
       dato('Viñeta', e(eq.vineta), true),
-    ]))
+      dato('Condición', condicionTexto(eq.condicion)),
+    ], 4))
     + seccion('Movimiento', bloqueMovimiento({ eti: 'Área que entrega', val: e(de) }, { eti: 'Área que recibe', val: e(a) }))
     + (mov.nota ? seccion('Observaciones', texto(e(mov.nota))) : '')
     + seccion('Firmas de conformidad', firmas([

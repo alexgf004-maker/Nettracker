@@ -82,7 +82,6 @@ export const state = {
   search: '',
   showSelector: false,
   showDescargaModal: false,
-  showPrestamoModal: false,
   showCondicionModal: false,
   showMantModal: false,
   mantEqId: null,
@@ -97,10 +96,10 @@ export const state = {
   danioId: null,
   danioEditando: false,
   danioForm: { fechaDanio: '', descripcion: '', condicion: 'detalles', tecnicoCampos: '' },
-  prestamoId: null,
-  prestamoForm: { de: 'CPT BT', a: 'CPT MT', nota: '', tipo: 'prestamo' },
-  modoSeleccionLote: false,
-  loteMovimiento: false, // el modal de préstamo/devolución registra el movimiento de todo el lote
+  memoNuevo: null, // flujo de memo de préstamo/devolución: { tipo, de, a, sel: [ids], nota, busqueda }
+  memosEquipos: [], // memosEquipos/{id}: memos generados, para reimprimir
+  invVista: 'equipos', // pestaña de Equipos: 'equipos' | 'memos'
+  invArea: '', // filtro por área dueña ('' = todas)
   cargaData: [], // preview rows from excel
   cargaView: 'upload', // upload | preview
   cargaSubView: 'subir', // subir | historial | accesorios
@@ -110,8 +109,6 @@ export const state = {
   cargaAreaOrigen: 'CPT BT',
   showImportModal: false,
   importData: [],
-  seleccionLote: [],
-  tipoLote: 'prestamo',
   descargaId: null,
   descargaForm: { tecnico: 'David García', notas: '', medicionOk: null, fallasMedicion: [], descripcionFalla: '' },
   showRetiroModal: false,
@@ -120,7 +117,6 @@ export const state = {
   locMode: 'gps',
   selectorSearch: '',
   inventarioSearch: '',
-  vistaInventario: 'lista', // lista | grid
   eqDetalleTab: 'general', // general | mantenimiento | instalaciones | movimientos
   inventarioFiltro: 'TODOS',
   form: emptyForm(),

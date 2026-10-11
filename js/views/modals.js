@@ -1,8 +1,8 @@
 // Modales (retiro, descarga, importar, mantenimiento, condición, préstamo, selector, búsqueda, alerta)
-import { AREAS, CONDICIONES, FALLAS_GRAVES, FALLAS_RETIRO, SEDES, TECNICOS, userArea } from '../config.js';
+import { CONDICIONES, FALLAS_GRAVES, FALLAS_RETIRO, SEDES, TECNICOS, userArea } from '../config.js';
 import { state } from '../state.js';
 import { badgeSt } from '../ui.js';
-import { calcSt, daysUntil, eqSt, escapeHtml, sedeDestinoMovimiento } from '../utils.js';
+import { calcSt, daysUntil, eqSt, escapeHtml } from '../utils.js';
 
 export function renderRetiroModal() {
   let html = '';
@@ -199,40 +199,6 @@ export function renderCondicionModal() {
         </div>
         <button onclick="doCondicion()" style="width:100%;background:var(--primary);color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">Guardar condición</button>
         <button onclick="closeCondicionModal()" style="width:100%;background:#fff;color:var(--text3);border:1px solid var(--border);border-radius:10px;padding:13px;font-family:var(--font);font-size:15px;cursor:pointer">Cancelar</button>
-      </div>
-    </div>`;
-  return html;
-}
-
-export function renderPrestamoModal() {
-  let html = '';
-  const esPrestamo = state.prestamoForm.tipo === 'prestamo';
-  html += `<div class="modal-overlay" style="position:fixed;inset:0;background:#00000066;z-index:200;display:flex;align-items:flex-end">
-      <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:85vh;overflow-y:auto;padding:20px;font-family:var(--font)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-          <div style="font-size:17px;font-weight:700;color:var(--text)">${esPrestamo ? '<i class=ic-repetir></i> Registrar préstamo' : '<i class=ic-check></i> Registrar devolución'}${state.loteMovimiento ? ` de ${state.seleccionLote.length} ${state.seleccionLote.length === 1 ? 'equipo' : 'equipos'}` : ''}</div>
-          <button onclick="closePrestamoModal()" style="background:none;border:none;font-size:24px;color:var(--text3);cursor:pointer">✕</button>
-        </div>
-        <div style="display:flex;gap:10px;margin-bottom:16px">
-          <div style="flex:1">
-            <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">De (entrega)</div>
-            ${AREAS.map(a => `<div onclick="setPrestamoField('de','${a}')" style="padding:11px 14px;border:2px solid ${state.prestamoForm.de===a?'var(--primary)':'var(--border)'};border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:14px;font-weight:600;color:${state.prestamoForm.de===a?'var(--primary)':'var(--text2)'};background:${state.prestamoForm.de===a?'var(--primary-light)':'#fff'}">${a}</div>`).join('')}
-          </div>
-          <div style="display:flex;align-items:center;font-size:22px;color:var(--primary);padding-top:30px">→</div>
-          <div style="flex:1">
-            <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Para (recibe)</div>
-            ${AREAS.map(a => `<div onclick="setPrestamoField('a','${a}')" style="padding:11px 14px;border:2px solid ${state.prestamoForm.a===a?'var(--green)':'var(--border)'};border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:14px;font-weight:600;color:${state.prestamoForm.a===a?'var(--green)':'var(--text2)'};background:${state.prestamoForm.a===a?'var(--green-light)':'#fff'}">${a}</div>`).join('')}
-          </div>
-        </div>
-        <div style="font-size:11px;color:var(--text3);text-align:center;margin-bottom:14px">
-          Sede destino: <strong style="color:var(--primary)">${sedeDestinoMovimiento(state.prestamoForm)}</strong>
-        </div>
-        <div style="margin-bottom:16px">
-          <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px">NOTA (OPCIONAL)</div>
-          <textarea placeholder="Observaciones del movimiento..." oninput="setPrestamoNota(this.value)" style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;outline:none;min-height:60px">${state.prestamoForm.nota}</textarea>
-        </div>
-        <button onclick="doMovimiento()" style="width:100%;background:var(--primary);color:#fff;border:none;border-radius:10px;padding:14px;font-family:var(--font);font-weight:700;font-size:15px;cursor:pointer;margin-bottom:8px">${esPrestamo ? '<i class=ic-repetir></i> Confirmar préstamo' : '<i class=ic-check></i> Confirmar devolución'}${state.loteMovimiento ? ' y generar memo' : ''}</button>
-        <button onclick="closePrestamoModal()" style="width:100%;background:#fff;color:var(--text3);border:1px solid var(--border);border-radius:10px;padding:13px;font-family:var(--font);font-size:15px;cursor:pointer">Cancelar</button>
       </div>
     </div>`;
   return html;

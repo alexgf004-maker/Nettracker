@@ -1,5 +1,6 @@
 // Lógica de instalaciones: guardar, retiro, descarga, calendario
 import { FALLAS_GRAVES, isAdmin, sedeRetorno } from '../config.js';
+import { devolucionAlRetirar } from '../domain/inventario.js';
 import { db, installsRef, push, ref, remove, update } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
@@ -107,7 +108,8 @@ export function handleRetiro() {
       } else if (fallas.length > 0) {
         nuevaCondicion = 'detalles';
       }
-      const eqUpdates = { sede: sedeRetiro };
+      // Si estaba con Campos y Servicios, la devolución a su área se registra sola
+      const eqUpdates = { sede: sedeRetiro, ...devolucionAlRetirar(eq, { caso: deployRec.caso, fecha: today(), por: state.sesionUsuario?.nombre }) };
       if (nuevaCondicion && eq) {
         const condAnterior = eq.condicion || 'bueno';
         if (condAnterior !== nuevaCondicion) {

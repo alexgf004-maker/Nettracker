@@ -350,22 +350,25 @@ Cada mes Campos y Servicios saca equipos de la **Subestación Cucumacayán**, lo
 ## Área: Inventario
 Catálogo de equipos físicos del equipo.
 
-**Estado**: `equipos[]` (del nodo `equipos`)
-**Vistas** (`vistaInventario`): `'lista'` | `'detalle'`
-**Filtros**: por status, área, búsqueda por texto
+**Estado**: `equipos[]` (nodo `equipos`), `memosEquipos[]` (nodo `memosEquipos`)
+**Vistas** (`state.view` en la pestaña Equipos): `lista` (pestañas Equipos | Memos, `invVista`), `memo_nuevo`, `asignar_areas`, `equipo_form`, `equipo_detalle`
 
-**Equipo tiene**:
-- Serie, modelo, tipo (analizador / accesorio)
-- Condición (`bueno` / `regular` / `malo`)
-- Movimientos (préstamos/devoluciones), mantenimientos, historial de retiros
+**Reglas** (`js/domain/inventario.js`, funciones puras con prueba):
+- **Área dueña** (`eq.area`, CPT MT o CPT BT): el préstamo sale de esa área y la devolución regresa a ella. Sin área no se puede prestar ni devolver; el administrador la asigna en "Asignar área" (sugerida por el primer préstamo o, si no hay, por la sede: Plantel Central → CPT MT, Cucumacayán → CPT BT). Al crear un equipo es obligatoria.
+- **Quién lo tiene** (`tenedor`): si está prestado, el área del último préstamo; si no, su área dueña.
+- **Estado único** (`estadoEquipo`): En campo (instalación activa) > Fuera de servicio > En mantenimiento > Prestado (a Campos y Servicios o a otra área) > Disponible. "Con detalles" se marca aparte y sí se presta (con aviso en la lista y en el memo).
+- **Préstamo** (`motivoNoPrestamo`): de su área dueña, disponible (no instalado, no prestado, ni en mantenimiento ni fuera). **Devolución** (`motivoNoDevolucion`): prestado, no instalado, que lo tenga el área que entrega y que regrese a su área dueña.
+- **Sede después del movimiento** (`sedeDespues`): según el área que recibe (CPT BT → Cucumacayán, Campos y Servicios → "Con Campos y Servicios", otras → Plantel Central); lo que devuelve Campos y Servicios queda en la Cucumacayán.
+- **Devolución automática al retirar** (`devolucionAlRetirar`): si el equipo estaba con Campos y Servicios, al registrar el retiro (individual o masivo del despacho) se agrega la devolución a su área (`auto: true`, nota "Devolución automática al retirar el caso #…"), sin memo. Los que quedaron prestados de antes salen en un aviso con "Registrar devolución".
 
-**Funciones clave**:
-- `doMovimiento()` — registrar préstamo o devolución
-- `generarMemo(id)` — genera PDF del memo de movimiento
-- `generarLotePDF()` — memo de múltiples equipos a la vez. Lote préstamo: se eligen equipos disponibles (no prestados, sin instalación activa, sin falla ni mantenimiento); lote devolución: equipos prestados sin instalación activa (`elegibleLote`). Al generar, se piden una vez De/Para/nota, se registra el movimiento en todos los elegidos (igual que uno por uno) y sale un solo memo.
-- `doCondicion()` — registrar condición del equipo
-- `guardarMant()` — registrar mantenimiento
-- `doRetiro()` / `doDescarga()` — retiro/descarga de campo
+**Lista**: grupos por dónde está cada equipo (Disponibles por sede, Con Campos y Servicios, Prestados a otra área, En campo, En mantenimiento, Fuera de servicio), indicadores corregidos, filtro por estado y por área dueña, búsqueda por serie, viñeta o modelo.
+
+**Memos de préstamo y devolución** (`js/actions/memos-equipos.js`, `js/views/equipos.js`): un solo flujo para uno o varios equipos ("Nuevo préstamo" / "Nueva devolución", o desde la ficha con el equipo ya elegido):
+1. Tipo; 2. De → Para; 3. Equipos: solo se pueden elegir los que cumplen las reglas, con buscador y "Elegir todos"; los demás aparecen en "No se pueden elegir" con el motivo; 4. Nota.
+- Al confirmar se guarda el memo en `memosEquipos/{id}` (`tipo, de, a, fecha, hora, nota, registradoPor, equipos[{id, serie, modelo, vineta, condicion}]`), se registra el movimiento en cada equipo con `memoId` y se abre el memo: individual con un equipo, de lote con varios (con la condición de cada uno y la nota).
+- Pestaña **Memos**: todos los memos guardados para reimprimir. En Movimientos de la ficha, "Memo PDF" abre el memo guardado (de lote si eran varios); los movimientos de antes sacan el memo individual como siempre.
+
+**Otras funciones**: `doCondicion()` (condición), `guardarMant()` (mantenimiento), retiro y descarga en Instalaciones. Editar un equipo conserva su fecha de registro y quién lo creó.
 
 **Envío a revisión (Cucumacayán)** (`js/actions/revision.js`):
 Cuando un equipo asignado falla, la Subestación Cucumacayán es el primer filtro que lo revisa.

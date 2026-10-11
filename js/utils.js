@@ -1,13 +1,6 @@
 // Utilidades puras: fechas, formularios vacíos y cálculo de estados
 import { state } from './state.js';
 
-// Sede donde queda un equipo después de un préstamo/devolución.
-// Campos y Servicios regresa los equipos a la Cucumacayán, aunque el despacho haya sido de CPT MT.
-export function sedeDestinoMovimiento({ tipo, de, a }) {
-  if (tipo === 'devolucion' && de === 'Campos y Servicios') return 'Subestación Cucumacayán';
-  return areaToSede(a);
-}
-
 export function areaToSede(area) {
   if (area === 'CPT BT') return 'Subestación Cucumacayán';
   if (area === 'Campos y Servicios') return 'Con Campos y Servicios';
@@ -19,7 +12,7 @@ export function emptyForm() {
 }
 
 export function emptyEF() {
-  return { serie: '', modelo: '', notas: '', sede: 'Plantel Central', condicion: 'bueno', vineta: '' };
+  return { serie: '', modelo: '', notas: '', sede: 'Plantel Central', condicion: 'bueno', vineta: '', area: '' };
 }
 
 export function today() { return new Date().toISOString().split('T')[0]; }
@@ -42,14 +35,6 @@ export function eqSt(eq) {
 
 export function eqEnCampo(eq) { return !!state.records.find(r => r.equipoId === eq.id && !r.retirado); }
 export function eqPrestado(eq) { return !!eq.prestado; }
-
-// ¿Se puede elegir el equipo en un lote? Préstamo: disponible (no prestado, no instalado, en buen estado).
-// Devolución: prestado y sin instalación activa. El movimiento se registra al generar el memo del lote.
-export function elegibleLote(eq, tipo) {
-  if (eqEnCampo(eq)) return false;
-  if (tipo === 'devolucion') return eqPrestado(eq);
-  return !eqPrestado(eq) && !['fuera', 'mantenimiento'].includes(eq.condicion || 'bueno');
-}
 
 // Escapa texto escrito por el usuario antes de meterlo en HTML
 export function escapeHtml(s) {
