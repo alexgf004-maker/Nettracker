@@ -145,3 +145,51 @@ export function equiposMedicion(mediciones = [], equipos = []) {
   };
   return { codigo: m.codigo, lista: [...(m.inst ? [fila(m.inst, 'Punto principal')] : []), ...(m.puntos || []).map(p => fila(p.inst, p.nombre))] };
 }
+
+// ── Datos de la primera versión del formulario ──
+// Subestación con tipo libre ("Banco de transformadores"…), cantidad y un solo kVA; tableros con protecciones en
+// texto; "atendió" en lugar de la firma del acompañante. Se leen como el formato nuevo para no perder lo llenado.
+const TIPO_ANTERIOR = {
+  'Banco de transformadores': { tipo: 'tri', construccion: 'banco' },
+  'Transformador trifásico': { tipo: 'tri', construccion: 'unidad' },
+  'Transformador pad mounted': { tipo: 'tri', construccion: 'unidad', montaje: 'Pedestal (pad mounted)' },
+  'Transformador monofásico': { tipo: 'mono' },
+};
+export function subestacionAnterior(sub) {
+  if (!sub || !sub.tipo || TIPOS_SUBESTACION[sub.tipo]) return null;
+  const base = TIPO_ANTERIOR[sub.tipo] || { tipo: null };
+  const cant = Number(sub.cantidad) || 0;
+  if (base.tipo === 'tri' && base.construccion === 'banco' && cant === 2) Object.assign(base, { tipo: 'bi', construccion: null });
+  const nuevo = { ...base, montaje: base.montaje || sub.montaje || null, kvas: null, cantidad: null, kva: null };
+  const n = cantidadTrafos(nuevo);
+  if (sub.kva && n) nuevo.kvas = Object.fromEntries(Array.from({ length: n }, (_, i) => [i + 1, sub.kva]));
+  // Conexiones que no existen para el tipo se dejan como "Otra" con lo que decía
+  for (const [lado, lista] of [['conexionPri', CONEXIONES_PRI], ['conexionSec', CONEXIONES_SEC]]) {
+    const v = sub[lado];
+    if (!v || !nuevo.tipo) nuevo[lado] = null;
+    else if ((lista[nuevo.tipo] || []).includes(v)) nuevo[lado] = v;
+    else { nuevo[lado] = OTRA; nuevo[lado + 'Otra'] = v; }
+  }
+  return nuevo;
+}
+export function normalizarInspeccion(insp) {
+  if (!insp) return {};
+  const out = { ...insp };
+  const sub = subestacionAnterior(insp.subestacion);
+  if (sub) out.subestacion = { ...insp.subestacion, ...sub };
+  if (insp.tableros) {
+    out.tableros = Object.fromEntries(Object.entries(insp.tableros).map(([k, t]) => [k, t.protecciones && !t.protOtras ? { ...t, protOtras: t.protecciones } : t]));
+  }
+  if (insp.atendio && !insp.firmas?.acompanante?.nombre) out.firmas = { ...insp.firmas, acompanante: { ...insp.firmas?.acompanante, nombre: insp.atendio } };
+  return out;
+}
+// Cambios a guardar para dejar la inspección en el formato nuevo (rutas → valores), o null si ya lo está
+export function migracionInspeccion(insp) {
+  if (!insp) return null;
+  const c = {};
+  const sub = subestacionAnterior(insp.subestacion);
+  if (sub) Object.entries(sub).forEach(([k, v]) => { c['subestacion/' + k] = v ?? null; });
+  Object.entries(insp.tableros || {}).forEach(([k, t]) => { if (t.protecciones) { if (!t.protOtras) c[`tableros/${k}/protOtras`] = t.protecciones; c[`tableros/${k}/protecciones`] = null; } });
+  if (insp.atendio) { if (!insp.firmas?.acompanante?.nombre) c['firmas/acompanante/nombre'] = insp.atendio; c.atendio = null; }
+  return Object.keys(c).length ? c : null;
+}

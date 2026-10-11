@@ -2,7 +2,7 @@
 // análisis de los TXT. Funciones puras: devuelven bloques (títulos, párrafos, tablas y marcas de gráfica) que
 // js/docx.js convierte en un Word para terminarlo a mano. Lo que la app no sabe queda como [completar].
 // Redacción y artículos citados como en los informes CPT (SIGET, Acuerdo 38-E-2015).
-import { CARGAS, conexion, CONDICIONES_TABLERO, INSTALACION_GENERAL, kvasTrafos, kvaTotal, LIMITE_TIERRA, lista, marcados, PROTECCIONES, TIPOS_SUBESTACION, veredictoTierra, tensionVsEquipo } from './inspeccion.js';
+import { CARGAS, conexion, normalizarInspeccion, CONDICIONES_TABLERO, INSTALACION_GENERAL, kvasTrafos, kvaTotal, LIMITE_TIERRA, lista, marcados, PROTECCIONES, TIPOS_SUBESTACION, veredictoTierra, tensionVsEquipo } from './inspeccion.js';
 import { DATI_LIM, estadisticas, LIMITE_PST, P_UMBRAL, percentil, TIPOS_RED, UMBRAL_FT, VDAT_LIM } from './reclamo.js';
 
 export const COMPLETAR = '[completar]';
@@ -133,7 +133,7 @@ export function borradorInforme({ exp = {}, inst = {}, params = {}, d = null, t 
   const periodo = d ? periodoTexto(d.inicio, d.fin) : arm?.n ? periodoTexto(arm.inicio, arm.fin) : COMPLETAR;
   const punto = inst.reclamo?.punto || '';
   const conclusiones = []; const bullets = [];
-  const insp = exp.inspeccion || {};
+  const insp = normalizarInspeccion(exp.inspeccion);
   const sub = insp.subestacion || {}; const med = insp.medidor || {};
   const tableros = lista(insp.tableros); const equipos = lista(insp.equipos);
   const minus = x => String(x || '').replace(/^[A-ZÁÉÍÓÚ](?![A-Z\s/])/, c => c.toLowerCase());

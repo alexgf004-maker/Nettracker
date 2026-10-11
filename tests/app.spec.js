@@ -2071,6 +2071,29 @@ test.describe('Análisis de reclamos', () => {
     expect(r.sinRango).toBeNull();
   });
 
+  test('inspección: abre lo llenado con la primera versión del formulario y lo pasa al formato nuevo', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    const datos = JSON.parse(JSON.stringify(fixture));
+    datos.reclamos['RE-92026456'].inspeccion = { fecha: '2026-09-01', atendio: 'Persona X',
+      subestacion: { tipo: 'Banco de transformadores', cantidad: '3', kva: '100', conexionPri: 'Estrella', conexionSec: 'Delta', tap: '4' },
+      tableros: { a: { orden: 1, nombre: 'Tablero general', tierra: '22', protecciones: 'DPS en cada fase' } } };
+    app = await abrirApp(page, { datos });
+    await cerrarAlerta(page);
+    await nav(page, 'Reclamos');
+    await page.locator('.exp-card', { hasText: 'RE192026456' }).click();
+    await page.getByRole('tab', { name: /Inspección/ }).click();
+    await expect(page.locator('.insp-op.sel')).toHaveText(['Trifásica', 'Banco de 3 transformadores']);
+    await expect(page.locator('.bloque', { hasText: 'Subestación del usuario' })).toContainText('300 kVA en total');
+    await expect(page.locator('#insp-subestacion-conexionPri')).toHaveValue('Estrella');
+    await expect(page.locator('#insp-subestacion-conexionSec')).toHaveValue('Delta');
+    await expect(page.locator('input[id$="-protOtras"]')).toHaveValue('DPS en cada fase');
+    await expect(page.locator('#insp-firmas-acompanante-nombre')).toHaveValue('Persona X');
+    // Al editar cualquier campo se guarda en el formato nuevo
+    await page.locator('#insp-circuito').fill('AL1'); await page.locator('#insp-circuito').press('Tab');
+    await expect.poll(async () => (await app.escrituras()).some(([, ruta, v]) => ruta === 'reclamos/RE-92026456/inspeccion' && v['subestacion/tipo'] === 'tri' && v['subestacion/kvas']?.[3] === '100' && v.atendio === null)).toBe(true);
+    expect(errores).toEqual([]);
+  });
+
   test('inspección: formulario en el expediente, PDF con firmas y sección en el borrador', async ({ page }) => {
     app = await abrirApp(page, { excel: true });
     await cerrarAlerta(page);

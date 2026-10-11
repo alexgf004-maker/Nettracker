@@ -5,7 +5,7 @@ import {
   kvaTotal, LECTURAS, LIMITE_TIERRA, lista, MONTAJES, OTRA, PROTECCIONES, ROLES_FIRMA, TIPOS_SUBESTACION, veredictoTierra,
 } from '../domain/inspeccion.js';
 import { medicionesExpediente } from '../domain/expedientes.js';
-import { equiposMedicion } from '../domain/inspeccion.js';
+import { equiposMedicion, normalizarInspeccion } from '../domain/inspeccion.js';
 import { hoyLocal } from '../domain/trabajo.js';
 import { state } from '../state.js';
 import { escapeHtml } from '../utils.js';
@@ -14,7 +14,7 @@ const esc = s => escapeHtml(s ?? '');
 const aObj = arr => Object.fromEntries(arr.map(x => [x, x]));
 
 export function vistaInspeccion(e) {
-  const insp = e.inspeccion || {};
+  const insp = normalizarInspeccion(e.inspeccion);
   const val = ruta => ruta.split('/').reduce((o, k) => (o == null ? undefined : o[k]), insp) ?? '';
   const id = ruta => 'insp-' + ruta.replace(/\//g, '-');
   const guardar = ruta => `guardarInspeccion('${e.id}', '${ruta}', this.value)`;
@@ -55,17 +55,17 @@ export function vistaInspeccion(e) {
   const sub = insp.subestacion || {};
   const tipo = sub.tipo;
   let cs = botones('subestacion/tipo', 'Tipo de subestación', TIPOS_SUBESTACION);
-  if (tipo) {
+  if (TIPOS_SUBESTACION[tipo]) {
     if (tipo === 'tri') cs += botones('subestacion/construccion', 'Construcción', CONSTRUCCION_TRI);
     const n = cantidadTrafos(sub);
     cs += '<div class="form-analisis">';
     for (let i = 1; i <= n; i++) cs += texto(`subestacion/kvas/${i}`, n === 1 ? 'Capacidad del transformador (kVA)' : `Transformador ${i} (kVA)`, '', 'decimal');
     cs += opciones('subestacion/montaje', 'Montaje', aObj(MONTAJES));
-    cs += opciones('subestacion/conexionPri', 'Conexión del primario', aObj([...CONEXIONES_PRI[tipo], OTRA]));
+    cs += opciones('subestacion/conexionPri', 'Conexión del primario', aObj([...(CONEXIONES_PRI[tipo] || []), OTRA]));
     if (sub.conexionPri === OTRA) cs += texto('subestacion/conexionPriOtra', '¿Cuál conexión del primario?');
-    cs += CONEXIONES_SEC[tipo].length === 1
+    cs += (CONEXIONES_SEC[tipo] || []).length === 1
       ? `<div class="field"><label>Conexión del secundario</label><input value="${esc(CONEXIONES_SEC[tipo][0])}" disabled></div>`
-      : opciones('subestacion/conexionSec', 'Conexión del secundario', aObj([...CONEXIONES_SEC[tipo], OTRA]));
+      : opciones('subestacion/conexionSec', 'Conexión del secundario', aObj([...(CONEXIONES_SEC[tipo] || []), OTRA]));
     if (sub.conexionSec === OTRA) cs += texto('subestacion/conexionSecOtra', '¿Cuál conexión del secundario?');
     cs += texto('subestacion/vPri', 'Tensión primaria (V)', 'Ej. 23000 o 13200');
     cs += texto('subestacion/vSec', 'Tensión secundaria (V)', tipo === 'tri' ? 'Ej. 240 o 480/277' : 'Ej. 240/120');
