@@ -19,52 +19,56 @@ test.afterEach(async () => {
 });
 
 test.describe('Perfiles', () => {
-  // PIN de prueba (inventado) guardado como lo guarda la app: SHA-256 de "sal:pin"
-  const conPin = (perfil, pin) => {
-    const sal = 'sal-de-prueba';
-    const hash = require('crypto').createHash('sha256').update(`${sal}:${pin}`).digest('hex');
-    return { ...fixture, pines: { [perfil]: { sal, hash, creado: '2026-01-01' } } };
-  };
   const marcar = async (page, pin) => { for (const d of pin) await page.locator('.pin-tecla', { hasText: new RegExp(`^${d}$`) }).click(); };
 
-  test('la primera vez cada quien crea su PIN (dos veces) y entra', async ({ page }) => {
+  test('la primera vez cada quien crea su PIN de 6 dígitos (dos veces): queda una cuenta de Firebase y entra', async ({ page }) => {
     app = await abrirApp(page, { usuario: null });
     await expect(app$(page)).toContainText('¿Quién eres?');
     await page.getByText('David García').first().click();
     await expect(app$(page)).toContainText('Crea tu PIN');
-    await marcar(page, '1234');
+    await expect(page.locator('.pin-puntos i')).toHaveCount(6);
+    await marcar(page, '123456');
     await expect(app$(page)).toContainText('Confirma tu PIN');
-    await marcar(page, '9999');
+    await marcar(page, '999999');
     await expect(page.locator('.pin-error')).toContainText('no coinciden');
-    await marcar(page, '1234'); await marcar(page, '1234');
+    await marcar(page, '123456'); await marcar(page, '123456');
     await expect(app$(page)).toContainText('Hola, David');
-    const guardado = (await app.escrituras()).find(([op, ruta]) => op === 'set' && ruta === 'pines/david-garcia')[2];
-    expect(guardado.hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(JSON.stringify(guardado)).not.toContain('1234'); // el PIN no se guarda tal cual
-    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('cpt_session')))).toEqual({ nombre: 'David García' });
+    // La cuenta queda en Auth (el PIN es la contraseña); en la base solo la marca de que ya tiene cuenta
+    expect(await page.evaluate(() => window.__AUTH__.cuentas)).toEqual({ 'david-garcia@usuarios.nettracker.app': '123456' });
+    const escrituras = await app.escrituras();
+    expect(escrituras.find(([op, ruta]) => op === 'set' && ruta === 'cuentas/david-garcia')[2]).toEqual({ creado: expect.any(String) });
+    expect(JSON.stringify(escrituras)).not.toContain('123456'); // el PIN no se guarda en la base
   });
 
-  test('con PIN: uno equivocado no deja entrar y el correcto sí', async ({ page }) => {
-    app = await abrirApp(page, { usuario: null, datos: conPin('samuel-villalobos', '4321') });
+  test('con cuenta: un PIN equivocado no deja entrar y el correcto sí', async ({ page }) => {
+    app = await abrirApp(page, { usuario: null, cuentas: { 'Samuel Villalobos': '432100' } });
     await page.getByText('Samuel Villalobos').click();
     await expect(app$(page)).toContainText('Pon tu PIN');
-    await marcar(page, '1111');
+    await marcar(page, '111111');
     await expect(page.locator('.pin-error')).toContainText('PIN incorrecto');
     await expect(app$(page)).not.toContainText('Hola, Samuel');
-    await marcar(page, '4321');
+    await marcar(page, '432100');
     await expect(app$(page)).toContainText('Hola, Samuel');
   });
 
-  test('cambiar de perfil vuelve a la pantalla de perfiles; el administrador puede borrar un PIN', async ({ page }) => {
+  test('sin sesión no se lee nada de la base', async ({ page }) => {
+    app = await abrirApp(page, { usuario: null });
+    await expect(app$(page)).toContainText('¿Quién eres?');
+    expect(await page.evaluate(() => window.__LECTURAS__)).toEqual([]);
+  });
+
+  test('cambiar de perfil cierra la sesión de Firebase; el administrador puede borrar un PIN', async ({ page }) => {
     app = await abrirApp(page);
     await cerrarAlerta(page);
     await page.locator('.user-chip').click();
     await page.locator('.perfil-menu button', { hasText: 'Samuel Villalobos' }).click();
-    expect((await app.escrituras()).at(-1)).toEqual(['remove', 'pines/samuel-villalobos']);
+    expect((await app.escrituras()).at(-1)).toEqual(['remove', 'cuentas/samuel-villalobos']);
     await page.locator('.user-chip').click();
     await page.getByRole('button', { name: 'Cambiar de perfil' }).click();
     await expect(app$(page)).toContainText('¿Quién eres?');
     await expect(app$(page)).not.toContainText('Vicente Ramos');
+    await page.reload();
+    await expect(app$(page)).toContainText('¿Quién eres?'); // la sesión ya no se recuerda
   });
 });
 
