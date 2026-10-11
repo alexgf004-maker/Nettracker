@@ -15,7 +15,7 @@ import { agregarComboReclamo, limpiarComboReclamo, limpiarGraficar, quitarComboR
 import { abrirAnalisisReclamo, cargarTXTReclamo, cerrarAnalisisReclamo, guardarAnalisisReclamo, setParamReclamo, setVistaReclamo, subirTXTReclamo } from '../actions/analisis-reclamo.js';
 import { exportarArmonicosReclamo, exportarTensionReclamo } from '../actions/excel-reclamo.js';
 import { exportarBorradorInforme } from '../actions/informe.js';
-import { agregarItemInspeccion, guardarInspeccion, quitarItemInspeccion } from '../actions/inspeccion.js';
+import { abrirFirma, agregarItemInspeccion, borrarFirma, cerrarFirma, firmaFin, firmaInicio, firmaMover, generarFormularioInspeccion, guardarFirma, guardarInspeccion, limpiarFirma, marcarInspeccion, quitarItemInspeccion } from '../actions/inspeccion.js';
 import { cursorReclamo, salirCursorReclamo, zoomFin, zoomInicio } from '../views/analisis-reclamo.js';
 import { abrirPuntoReclamo, cerrarPuntoReclamo, desvincularPuntoReclamo, registrarPuntoReclamo, setNombrePunto, vincularPuntoReclamo } from '../actions/expedientes.js';
 import { abrirExpediente, abrirNuevoReclamo, cerrarExpediente, cerrarNuevoReclamo, completarCoordenadasReclamo, eliminarExpediente, guardarDatoExpediente, guardarNuevoReclamo, leerCorreoNuevoReclamo, registrarInstalacionReclamo, setCampoNuevoReclamo, setExpedienteVista } from '../actions/expedientes.js';
@@ -74,6 +74,6 @@ Object.assign(window, { verGraficas, cerrarGraficas, exportarSeries, moverCursor
 Object.assign(window, { abrirAnalisisReclamo, cerrarAnalisisReclamo, subirTXTReclamo, cargarTXTReclamo, setParamReclamo, setVistaReclamo, guardarAnalisisReclamo, exportarTensionReclamo, exportarArmonicosReclamo, exportarBorradorInforme, cursorReclamo, salirCursorReclamo, zoomInicio, zoomFin });
 
 // Expedientes de reclamo
-Object.assign(window, { abrirNuevoReclamo, cerrarNuevoReclamo, leerCorreoNuevoReclamo, setCampoNuevoReclamo, guardarNuevoReclamo, abrirExpediente, cerrarExpediente, setExpedienteVista, guardarDatoExpediente, completarCoordenadasReclamo, registrarInstalacionReclamo, eliminarExpediente, guardarInspeccion, agregarItemInspeccion, quitarItemInspeccion });
+Object.assign(window, { abrirNuevoReclamo, cerrarNuevoReclamo, leerCorreoNuevoReclamo, setCampoNuevoReclamo, guardarNuevoReclamo, abrirExpediente, cerrarExpediente, setExpedienteVista, guardarDatoExpediente, completarCoordenadasReclamo, registrarInstalacionReclamo, eliminarExpediente, guardarInspeccion, marcarInspeccion, agregarItemInspeccion, quitarItemInspeccion, generarFormularioInspeccion, abrirFirma, cerrarFirma, firmaInicio, firmaMover, firmaFin, limpiarFirma, guardarFirma, borrarFirma });
 Object.assign(window, { abrirPuntoReclamo, cerrarPuntoReclamo, setNombrePunto, registrarPuntoReclamo, vincularPuntoReclamo, desvincularPuntoReclamo });
 Object.assign(window, { limpiarGraficar, setZoomReclamo, restablecerZoomReclamo, toggleEscalaReclamo, toggleSerieComboReclamo, agregarComboReclamo, quitarComboReclamo, limpiarComboReclamo });

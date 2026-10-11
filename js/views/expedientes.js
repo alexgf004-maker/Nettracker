@@ -3,7 +3,8 @@
 import { userArea } from '../config.js';
 import { CAMPOS_RECLAMO, ETAPAS_MEDICION, listaExpedientes, PASOS_RECLAMO } from '../domain/expedientes.js';
 import { DIAS_SOLUCION_FT } from '../domain/ft.js';
-import { BASES_EQUIPO, CONEXIONES, inspeccionVacia, kvaTotal, LIMITE_TIERRA, lista, TIPOS_SUBESTACION, veredictoTierra } from '../domain/inspeccion.js';
+import { inspeccionVacia } from '../domain/inspeccion.js';
+import { vistaInspeccion } from './inspeccion.js';
 import { hoyLocal, tipoDeTrabajo, urgencia } from '../domain/trabajo.js';
 import { state } from '../state.js';
 import { escapeHtml, fmtDate } from '../utils.js';
@@ -104,62 +105,6 @@ function vistaDatos(e) {
     <div class="barra-acciones"><button class="b b-g" onclick="completarCoordenadasReclamo('${e.id}')"><i class="ic ic-map-pin"></i> Buscar en la base por NC</button>
       ${ubicado ? `<a class="b b-g" href="https://www.google.com/maps?q=${e.lat},${e.lng}" target="_blank" rel="noopener"><i class="ic ic-mapa"></i> Ver en Google Maps</a>` : ''}
       <span class="sep"></span><button class="b b-l" onclick="eliminarExpediente('${e.id}')">Eliminar expediente</button></div></div>`;
-  return html;
-}
-
-// Checklist de inspección: se llena en la visita y alimenta la sección 3 del borrador de informe
-function vistaInspeccion(e) {
-  const insp = e.inspeccion || {};
-  const val = ruta => ruta.split('/').reduce((o, k) => (o == null ? undefined : o[k]), insp) ?? '';
-  const id = ruta => 'insp-' + ruta.replace(/\//g, '-');
-  const guardar = ruta => `guardarInspeccion('${e.id}', '${ruta}', this.value)`;
-  const texto = (ruta, label, ph = '', modo = '') => `<div class="field"><label>${label}</label><input id="${id(ruta)}" ${modo ? `inputmode="${modo}"` : ''} value="${esc(val(ruta))}" placeholder="${esc(ph)}" onchange="${guardar(ruta)}"></div>`;
-  const area = (ruta, label, ph = '') => `<div class="field field-ancho"><label>${label}</label><textarea id="${id(ruta)}" rows="2" placeholder="${esc(ph)}" onchange="${guardar(ruta)}">${esc(val(ruta))}</textarea></div>`;
-  const opciones = (ruta, label, ops, vacio = '—') => `<div class="field"><label>${label}</label><select id="${id(ruta)}" onchange="${guardar(ruta)}"><option value="">${esc(vacio)}</option>${Object.entries(ops).map(([k, l]) => `<option value="${esc(k)}" ${String(val(ruta)) === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>`;
-  const lista2obj = arr => Object.fromEntries(arr.map(x => [x, x]));
-  const bloque = (titulo, cuerpo, extra = '') => `<div class="bloque"><div class="bloque-head"><div class="bloque-titulo">${titulo}</div>${extra}</div>${cuerpo}</div>`;
-  let html = '<div class="page-sub" style="margin-bottom:10px">Se llena una vez por reclamo, en la visita. Sale en la sección 3 del borrador de informe y en sus conclusiones. Las fotos siguen fuera de la app: el borrador deja el espacio para pegarlas.</div>';
-  html += bloque('Visita', `<div class="form-analisis">
-    <div class="field"><label>Fecha de la inspección</label><input type="date" id="insp-fecha" value="${esc(insp.fecha || '')}" onchange="${guardar('fecha')}"></div>
-    ${texto('atendio', 'Atendió por parte del usuario', 'Nombre y cargo')}
-    ${texto('circuito', 'Circuito MT', 'Ej. AL013-23KV')}
-    ${texto('subestacionDist', 'Subestación de distribución', 'Ej. Subestación Nuevo Cuscatlán')}</div>`);
-  const total = kvaTotal(insp.subestacion);
-  html += bloque('Subestación del usuario', `<div class="form-analisis">
-    ${opciones('subestacion/tipo', 'Tipo', lista2obj(TIPOS_SUBESTACION))}
-    ${texto('subestacion/cantidad', 'Cantidad de transformadores', '', 'numeric')}
-    ${texto('subestacion/kva', 'kVA de cada transformador', '', 'decimal')}
-    ${opciones('subestacion/conexionPri', 'Conexión primario', lista2obj(CONEXIONES))}
-    ${opciones('subestacion/conexionSec', 'Conexión secundario', lista2obj(CONEXIONES))}
-    ${texto('subestacion/vSec', 'Tensión secundaria (V)', 'Ej. 240 o 240/120')}
-    ${texto('subestacion/tap', 'Posición del TAP', 'Ej. nivel 4 (posición D)')}
-    ${area('subestacion/notas', 'Observaciones')}</div>`, total ? `<span class="tg gris">${total} kVA en total</span>` : '');
-  html += bloque('Medidor de facturación', `<div class="form-analisis">
-    ${texto('medidor/modelo', 'Modelo', 'Ej. ION8650')}
-    ${texto('medidor/serie', 'Número de serie')}
-    ${texto('medidor/rtc', 'RTC (corriente)', 'Ej. 800/5')}
-    ${texto('medidor/rtp', 'RTP (voltaje)', 'Si aplica')}
-    ${area('medidor/notas', 'Observaciones')}</div>`);
-  const tableros = lista(insp.tableros);
-  html += bloque('Tableros y puesta a tierra', tableros.map(tb => {
-    const r = `tableros/${tb.id}`; const ver = veredictoTierra(tb.tierra);
-    return `<div class="insp-item"><div class="insp-item-head"><b>${esc(tb.nombre || 'Tablero sin nombre')}</b>${ver ? `<span class="tg ${ver === 'CUMPLE' ? 'verde' : 'rojo'}">${tb.tierra} Ω · ${ver === 'CUMPLE' ? 'cumple' : 'no cumple'}</span>` : ''}
-      <button class="b b-l" onclick="quitarItemInspeccion('${e.id}', 'tableros', '${tb.id}')">Quitar</button></div>
-      <div class="form-analisis">${texto(r + '/nombre', 'Nombre', 'Ej. Tablero general del cuarto de máquinas')}${texto(r + '/tierra', `Resistencia a tierra (Ω) · límite ${LIMITE_TIERRA} Ω`, '', 'decimal')}
-      ${area(r + '/observaciones', 'Observaciones', 'Estado, corrosión, polvo, conexiones…')}${area(r + '/protecciones', 'Protecciones', 'Interruptores, DPS, relés y sus ajustes')}</div></div>`;
-  }).join('') + `<button class="b b-g" onclick="agregarItemInspeccion('${e.id}', 'tableros')"><i class="ic ic-plus"></i> Agregar tablero</button>`);
-  const equipos = lista(insp.equipos);
-  html += bloque('Equipo dañado', equipos.map(eq => {
-    const r = `equipos/${eq.id}`;
-    return `<div class="insp-item"><div class="insp-item-head"><b>${esc(eq.equipo || 'Equipo sin nombre')}</b>${eq.vmin && eq.vmax ? `<span class="tg gris">${eq.vmin}–${eq.vmax} V</span>` : ''}
-      <button class="b b-l" onclick="quitarItemInspeccion('${e.id}', 'equipos', '${eq.id}')">Quitar</button></div>
-      <div class="form-analisis">${texto(r + '/equipo', 'Equipo', 'Ej. Variador de frecuencia')}${texto(r + '/marca', 'Marca')}${texto(r + '/modelo', 'Modelo')}
-      ${texto(r + '/vmin', 'Voltaje mínimo de placa (V)', '', 'decimal')}${texto(r + '/vmax', 'Voltaje máximo de placa (V)', '', 'decimal')}
-      ${opciones(r + '/base', 'Comparar la placa con', { ff: BASES_EQUIPO.ff }, BASES_EQUIPO.directa)}
-      ${texto(r + '/monto', 'Monto reclamado ($)', '', 'decimal')}${opciones(r + '/disponible', '¿Disponible en sitio para verificarlo?', { si: 'Sí', no: 'No' })}
-      ${area(r + '/descripcion', 'Descripción del daño', 'Lo que reporta el usuario')}</div></div>`;
-  }).join('') + `<div class="page-sub" style="margin:4px 0 10px">Con el rango de placa, el borrador calcula el % del tiempo que la tensión estuvo fuera de él (secundario equivalente si la medición es en MT con relación TP). Más del 5 % del tiempo: NO CUMPLE.</div>
-    <button class="b b-g" onclick="agregarItemInspeccion('${e.id}', 'equipos')"><i class="ic ic-plus"></i> Agregar equipo dañado</button>`);
   return html;
 }
 

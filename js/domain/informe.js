@@ -2,7 +2,7 @@
 // análisis de los TXT. Funciones puras: devuelven bloques (títulos, párrafos, tablas y marcas de gráfica) que
 // js/docx.js convierte en un Word para terminarlo a mano. Lo que la app no sabe queda como [completar].
 // Redacción y artículos citados como en los informes CPT (SIGET, Acuerdo 38-E-2015).
-import { kvaTotal, LIMITE_TIERRA, lista, tensionVsEquipo, veredictoTierra } from './inspeccion.js';
+import { CARGAS, conexion, CONDICIONES_TABLERO, INSTALACION_GENERAL, kvasTrafos, kvaTotal, LIMITE_TIERRA, lista, marcados, PROTECCIONES, TIPOS_SUBESTACION, veredictoTierra, tensionVsEquipo } from './inspeccion.js';
 import { DATI_LIM, estadisticas, LIMITE_PST, P_UMBRAL, percentil, TIPOS_RED, UMBRAL_FT, VDAT_LIM } from './reclamo.js';
 
 export const COMPLETAR = '[completar]';
@@ -136,7 +136,7 @@ export function borradorInforme({ exp = {}, inst = {}, params = {}, d = null, t 
   const insp = exp.inspeccion || {};
   const sub = insp.subestacion || {}; const med = insp.medidor || {};
   const tableros = lista(insp.tableros); const equipos = lista(insp.equipos);
-  const minus = x => String(x || '').toLowerCase();
+  const minus = x => String(x || '').replace(/^[A-ZÁÉÍÓÚ](?![A-Z\s/])/, c => c.toLowerCase());
   const foto = texto => B.push({ t: 'grafica', texto: texto, foto: true });
 
   B.push({ t: 'titulo', texto: `INFORME DE RECLAMO ${exp.codigo || inst.caso || ''}`.trim(), sub: `${usuario}${exp.ct ? ' · ' + exp.ct : ''}` });
@@ -174,12 +174,17 @@ export function borradorInforme({ exp = {}, inst = {}, params = {}, d = null, t 
   // 3. Inspección (checklist del expediente)
   h('3. INSPECCIÓN DE INSTALACIONES DEL USUARIO');
   let sub3 = 0; const h3 = texto => h(`3.${++sub3}. ${texto}`, 2);
-  if (insp.fecha) p(`La inspección se realizó el ${fechaISO(insp.fecha)}${insp.atendio ? `, atendida por ${insp.atendio} por parte del usuario` : ''}.`);
+  const acomp = insp.firmas?.acompanante || {};
+  if (insp.fecha) p(`La inspección se realizó el ${fechaISO(insp.fecha)}${acomp.nombre ? `, en compañía de ${acomp.nombre}${acomp.cargo ? `, ${acomp.cargo}` : ''}, por parte del usuario` : ''}.`);
   h3('Subestación del usuario');
   if (Object.values(sub).some(Boolean)) {
-    const total = kvaTotal(sub); const cant = Number(sub.cantidad) || 0;
-    let tx = `La subestación en análisis está conformada por ${sub.tipo && sub.tipo !== 'Otro' ? (/^Banco/.test(sub.tipo) ? 'un banco de transformadores' : 'un ' + minus(sub.tipo)) : `equipo de transformación ${COMPLETAR}`}${total ? ` con una capacidad nominal total de ${n(total, 0)} kVA` : ''}${cant > 1 && sub.kva ? `, integrado por ${cant} transformadores de ${sub.kva} kVA` : ''}.`;
-    if (sub.conexionPri || sub.conexionSec) tx += ` ${cant > 1 ? 'El banco presenta' : 'Presenta'} una configuración ${minus(sub.conexionPri) || COMPLETAR} en el lado primario y ${minus(sub.conexionSec) || COMPLETAR} en el lado secundario${sub.vSec ? `, con tensión secundaria de ${sub.vSec} V` : ''}.`;
+    const total = kvaTotal(sub); const kvas = kvasTrafos(sub); const cant = kvas.length;
+    const iguales = kvas.length > 1 && kvas.every(k => k !== null && k === kvas[0]);
+    const tipoTx = TIPOS_SUBESTACION[sub.tipo] ? minus(TIPOS_SUBESTACION[sub.tipo]) : COMPLETAR;
+    const cantTx = { 1: 'un transformador', 2: 'dos transformadores', 3: 'tres transformadores' }[cant] || 'transformadores';
+    let tx = `La subestación en análisis es ${tipoTx}${cant > 1 ? `, conformada por un banco de ${cantTx}` : cant === 1 ? `, conformada por ${sub.tipo === 'tri' ? 'un transformador trifásico' : cantTx}` : ''}${total ? ` con una capacidad nominal total de ${n(total, 0)} kVA` : ''}${cant > 1 && kvas.some(k => k !== null) ? (iguales ? ` (${cant} × ${n(kvas[0], 0)} kVA)` : ` (${kvas.map(k => (k === null ? COMPLETAR : n(k, 0))).join(' + ')} kVA)`) : ''}${sub.montaje ? `, con montaje en ${minus(sub.montaje)}` : ''}.`;
+    const pri = conexion(sub, 'conexionPri'); const secu = sub.tipo === 'mono' ? 'monofásica' : conexion(sub, 'conexionSec');
+    if (pri || secu) tx += ` ${cant > 1 ? 'El banco presenta' : 'Presenta'} una configuración ${minus(pri) || COMPLETAR} en el lado primario y ${minus(secu) || COMPLETAR} en el lado secundario${sub.vPri || sub.vSec ? `, con tensión ${[sub.vPri && `primaria de ${sub.vPri} V`, sub.vSec && `secundaria de ${sub.vSec} V`].filter(Boolean).join(' y ')}` : ''}.`;
     if (sub.tap) tx += ` Actualmente, ${cant > 1 ? 'los transformadores se encuentran' : 'el transformador se encuentra'} operando con el TAP en ${sub.tap}.`;
     if (sub.notas) tx += ` ${sub.notas}`;
     p(tx);
@@ -194,10 +199,28 @@ export function borradorInforme({ exp = {}, inst = {}, params = {}, d = null, t 
     p(tx);
   } else p(COMPLETAR);
   foto('Medidor de facturación');
+  const gen = marcados(insp.general, INSTALACION_GENERAL); const cargas = marcados(insp.cargas, CARGAS);
+  const secos = lista(insp.trafosSecos);
+  if (gen.length || cargas.length || insp.cargasOtras || insp.horario || secos.length) {
+    h3('Instalaciones del usuario');
+    let tx = '';
+    if (gen.length) tx += `La instalación cuenta con ${enumerar(gen.map(k => minus(INSTALACION_GENERAL[k])))}. `;
+    const cg = [...cargas.map(k => minus(CARGAS[k])), insp.cargasOtras].filter(Boolean);
+    if (cg.length) tx += `Entre las cargas principales se identifican ${enumerar(cg)}. `;
+    if (insp.horario) tx += `Horario de operación: ${insp.horario}.`;
+    if (tx) p(tx.trim());
+    if (secos.length) tabla(['Transformador seco', 'Capacidad (kVA)', 'Voltaje primario (V)', 'Voltaje secundario (V)', 'Ubicación / cargas'], secos.map((x, i) => [`${i + 1}`, x.kva || COMPLETAR, x.vPri || COMPLETAR, x.vSec || COMPLETAR, x.ubicacion || '—']), { anchos: [14, 16, 18, 18, 34] });
+  }
   tableros.forEach(tb => {
     h3(`Tablero ${tb.nombre || COMPLETAR}`);
+    const prot = marcados(tb.prot, PROTECCIONES); const cond = marcados(tb.cond, CONDICIONES_TABLERO).filter(k => k !== 'limpio');
+    if (prot.length || tb.protOtras) p(`El tablero cuenta con los siguientes elementos de protección: ${enumerar([...prot.map(k => minus(PROTECCIONES[k])), tb.protOtras].filter(Boolean))}.${prot.length < Object.keys(PROTECCIONES).length ? ` No se identificaron: ${enumerar(Object.keys(PROTECCIONES).filter(k => !prot.includes(k)).map(k => minus(PROTECCIONES[k])))}.` : ''}`);
+    if (cond.length) p(`Durante la inspección se observó: ${enumerar(cond.map(k => minus(CONDICIONES_TABLERO[k])))}.`);
+    else if (tb.cond?.limpio) p('El tablero se encontró limpio y ordenado.');
+    const lect = tb.lect || {};
+    const lv = [['v1n', 'V L1-N'], ['v2n', 'V L2-N'], ['v3n', 'V L3-N'], ['v12', 'V L1-L2'], ['v23', 'V L2-L3'], ['v31', 'V L3-L1'], ['i1', 'I L1'], ['i2', 'I L2'], ['i3', 'I L3'], ['in', 'I N']].filter(([k]) => lect[k]);
+    if (lv.length) tabla(['Lectura instantánea', ...lv.map(([, l]) => l)], [['Valor', ...lv.map(([k]) => `${lect[k]} ${k.startsWith('i') ? 'A' : 'V'}`)]]);
     if (tb.observaciones) p(tb.observaciones);
-    if (tb.protecciones) p(`Protecciones: ${tb.protecciones}`);
     const ver = veredictoTierra(tb.tierra);
     if (ver) {
       p(`Se realizó medición de resistencia a tierra en este punto, obteniéndose un valor de ${tb.tierra} Ω, valor que, conforme al Código Eléctrico Nacional (NEC 2008), adoptado por referencia por la SIGET para la verificación de redes de puesta a tierra, se encuentra ${ver === 'CUMPLE' ? `dentro del límite máximo aceptable (${LIMITE_TIERRA} Ω)` : `por encima del límite máximo aceptable (${LIMITE_TIERRA} Ω)`}.`);
