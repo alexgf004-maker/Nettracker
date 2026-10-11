@@ -5,6 +5,7 @@ import './handlers/inventario.js';
 import './handlers/validaciones.js';
 import './handlers/carga.js';
 import './handlers/campanas.js';
+import './handlers/dibujo.js';
 import { initTheme, iniciarMonitorConexion } from './ui.js';
 import { iniciarAuth } from './actions/auth.js';
 

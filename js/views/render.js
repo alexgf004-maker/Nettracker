@@ -19,6 +19,7 @@ import { renderFT, renderFTModal } from './ft.js';
 import { renderCampanas, renderRequerimientos } from './trabajo.js';
 import { renderNuevoReclamo, renderPuntoReclamo, renderReclamos } from './expedientes.js';
 import { renderValidaciones } from './validaciones.js';
+import { renderDibujar } from './dibujo.js';
 
 export const TAB_VIEWS = {
   dashboard: renderDashboard,
@@ -32,6 +33,7 @@ export const TAB_VIEWS = {
   mapa: renderMapa,
   graficar: () => { state.graficar ??= nuevoGraficar(); return renderGraficar(); },
   carga: renderCarga,
+  dibujar: renderDibujar,
 };
 
 // Redibuja toda la app a partir del estado. Cualquier handler que cambie

@@ -2464,3 +2464,78 @@ test.describe('Expedientes de reclamo', () => {
     await expect(page.locator('input[oninput*="\'caso\'"]')).toHaveValue('trafo');
   });
 });
+
+test.describe('Herramienta Dibujar', () => {
+  test('dibuja sobre una imagen, edita, deshace y descarga el PNG', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await nav(page, 'Dibujar');
+    await expect(page.locator('#dib-svg')).toHaveAttribute('viewBox', '0 0 1600 1000');
+    // Imagen de fondo (PNG de 400×200 hecho en el navegador)
+    const png = await page.evaluate(() => { const c = document.createElement('canvas'); c.width = 400; c.height = 200; const x = c.getContext('2d'); x.fillStyle = '#9cc'; x.fillRect(0, 0, 400, 200); return c.toDataURL('image/png').split(',')[1]; });
+    await page.locator('label', { hasText: 'Subir imagen' }).locator('input').setInputFiles({ name: 'foto.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
+    await expect(page.locator('#dib-svg')).toHaveAttribute('viewBox', '0 0 400 200');
+    let caja = await page.locator('#dib-svg').boundingBox();
+    const en = (fx, fy) => [caja.x + caja.width * fx, caja.y + caja.height * fy];
+    const medir = async () => { caja = await page.locator('#dib-svg').boundingBox(); };
+    const arrastrar = async (a, b) => { await medir(); await page.mouse.move(...en(...a)); await page.mouse.down(); await page.mouse.move(...en(...b), { steps: 6 }); await page.mouse.up(); };
+    // Línea roja
+    await page.getByRole('button', { name: 'Línea' }).click();
+    await arrastrar([0.1, 0.2], [0.5, 0.2]);
+    await expect(page.locator('#dib-capa line[stroke="#dc2626"]')).toHaveCount(1);
+    // Un clic sin arrastrar no deja una línea vacía
+    await page.mouse.click(...en(0.8, 0.8));
+    await expect(page.locator('#dib-capa [data-id]')).toHaveCount(1);
+    // Flecha azul y rectángulo
+    await page.getByRole('button', { name: 'Color #2563eb' }).click();
+    await page.getByRole('button', { name: 'Flecha' }).click();
+    await arrastrar([0.2, 0.6], [0.4, 0.8]);
+    await expect(page.locator('#dib-capa marker#punta-2563eb')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Rectángulo' }).click();
+    await arrastrar([0.6, 0.5], [0.9, 0.9]);
+    // Texto: se escribe en el recuadro
+    await page.getByRole('button', { name: 'Texto', exact: true }).click();
+    const y0 = (await page.locator('#dib-svg').boundingBox()).y;
+    await page.mouse.click(...en(0.1, 0.5));
+    expect((await page.locator('#dib-svg').boundingBox()).y).toBe(y0); // al seleccionar, el lienzo no se mueve
+    await page.locator('#dib-texto').fill('Tablero general');
+    await page.locator('#dib-texto').press('Tab');
+    await expect(page.locator('#dib-capa text')).toContainText('Tablero general');
+    // Símbolo: transformador, se gira
+    await page.getByRole('button', { name: 'Símbolos eléctricos' }).click();
+    await page.locator('.dib-simbolo', { hasText: 'Transformador' }).click();
+    await medir(); // la paleta de símbolos aparece arriba del lienzo
+    await page.mouse.click(...en(0.75, 0.25));
+    await page.getByRole('button', { name: 'Girar 90°' }).click();
+    await expect(page.locator('#dib-capa g[transform*="rotate(90"]')).toHaveCount(1);
+    expect(await page.locator('#dib-capa [data-id]').count()).toBe(5);
+    // Mover con Seleccionar y borrar; deshacer lo trae de vuelta
+    await page.getByRole('button', { name: 'Seleccionar y mover' }).click();
+    const antes = await page.locator('#dib-capa rect[data-id]').getAttribute('x');
+    await arrastrar([0.75, 0.7], [0.65, 0.6]);
+    expect(await page.locator('#dib-capa rect[data-id]').getAttribute('x')).not.toBe(antes);
+    await page.getByRole('button', { name: 'Borrar' }).click();
+    await expect(page.locator('#dib-capa [data-id]')).toHaveCount(4);
+    await page.getByRole('button', { name: 'Deshacer' }).click();
+    await expect(page.locator('#dib-capa [data-id]')).toHaveCount(5);
+    // El borrador queda en el navegador: al volver a la pestaña sigue ahí
+    await nav(page, 'Inicio'); await nav(page, 'Dibujar');
+    await expect(page.locator('#dib-capa [data-id]')).toHaveCount(5);
+    // Descarga el PNG del tamaño de la imagen
+    const descarga = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Descargar PNG' }).click();
+    const d = await descarga;
+    expect(d.suggestedFilename()).toMatch(/^dibujo-\d{4}-\d{2}-\d{2}\.png$/);
+    const buf = require('fs').readFileSync(await d.path());
+    expect(buf.slice(1, 4).toString()).toBe('PNG');
+    expect(buf.readUInt32BE(16)).toBe(400); expect(buf.readUInt32BE(20)).toBe(200);
+    // Nuevo dibujo
+    page.once('dialog', dl => dl.accept());
+    await page.getByRole('button', { name: 'Nuevo' }).click();
+    await expect(page.locator('#dib-capa [data-id]')).toHaveCount(0);
+    await expect(page.locator('#dib-svg')).toHaveAttribute('viewBox', '0 0 1600 1000');
+    expect(errores).toEqual([]);
+  });
+});

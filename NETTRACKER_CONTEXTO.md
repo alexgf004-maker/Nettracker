@@ -271,6 +271,12 @@ En el detalle de la campaña:
 - Armónicos o flicker (P95 del PST > 1) fuera de límite: solo aviso en el expediente; le compete al usuario (confirmado).
 - Pendientes del Inicio: "Ubicar e instalar el reclamo" mientras no hay instalación, "Entregar informe del reclamo" por medición retirada y los de FT.
 
+## Dibujar (Herramientas)
+
+- Pestaña aparte, sin relación con ningún caso (confirmado): se sube una imagen (foto, captura o plano) y se dibuja encima. Herramientas: seleccionar y mover, línea, flecha, rectángulo, círculo, texto, trazo libre y símbolos eléctricos (transformador, interruptor, fusible, medidor, analizador, tablero, tierra, motor, variador, capacitor, DPS, carga, poste, generador). Seis colores, tres grosores, tres tamaños de texto; girar símbolos, duplicar, al frente, borrar, deshacer y rehacer (Ctrl+Z, Ctrl+Y, Supr, Esc).
+- Solo se descarga (confirmado): "Descargar PNG" del tamaño de la imagen y "Copiar" al portapapeles para pegar en Word. No se guarda en la base; el borrador queda en este navegador (`localStorage` `nettracker_dibujo`). La imagen se reduce a 2400 px por lado.
+- `js/domain/dibujo.js` (elementos, símbolos, SVG en pantalla y exportable, funciones puras), `js/actions/dibujo.js` (punteros, barra, historial, borrador, exportar), `js/views/dibujo.js`. Coordenadas en píxeles de la imagen (viewBox); mientras se arrastra se repinta solo `#dib-capa`, sin `render()`. La fila de opciones del elemento tiene alto fijo para que el lienzo no salte al seleccionar.
+
 ## Graficar (Herramientas)
 
 - Pestaña para revisar rápido una medición en campo: se sube el TXT (de tensión, de armónicos o de campaña), se ponen nominal y red, y se ven el veredicto DT/FT con el FebNoPer, los valores y todas las gráficas del análisis de reclamos, con los dos Excel. No se guarda nada (`state.graficar`, `renderGraficar`; mismo cuerpo que el análisis del reclamo con `analisisActivo()`).

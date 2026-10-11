@@ -1329,3 +1329,30 @@ button.aviso-inicio-fila { cursor: pointer; }
 .inf-barra { display: flex; gap: 3px; margin-top: 6px; }
 .inf-barra i { flex: 1; max-width: 26px; height: 5px; border-radius: 3px; background: var(--border); }
 .inf-barra i.ok { background: var(--c); }
+
+/* ── Herramienta Dibujar ── */
+.dib-barra { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; background: var(--white); border: 1px solid var(--border); border-radius: 14px; padding: 8px 10px; margin-bottom: 8px; position: sticky; top: 64px; z-index: 5; }
+.dib-grupo { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.dib-final { margin-left: auto; gap: 6px; }
+.dib-btn { width: 40px; height: 40px; border-radius: 10px; border: 1.5px solid transparent; background: transparent; color: var(--text); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.dib-btn:hover { background: var(--bg); }
+.dib-btn.activo { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
+.dib-btn:disabled { opacity: .35; cursor: default; }
+.dib-grosor { display: block; width: 22px; background: currentColor; border-radius: 4px; }
+.dib-color { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--border); cursor: pointer; }
+.dib-color.activo { outline: 3px solid var(--primary); outline-offset: 2px; }
+.dib-simbolos { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; margin-bottom: 8px; }
+.dib-simbolo { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--white); color: var(--text); font: inherit; font-size: 11px; cursor: pointer; }
+.dib-simbolo.activo { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
+.dib-sel-barra { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; min-height: 44px; }
+.dib-sel-barra textarea { flex: 1 1 220px; min-height: 40px; height: 40px; }
+.dib-borrar { color: var(--red); }
+.dib-ayuda { margin: 0 0 8px; }
+.dib-lienzo { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: repeating-conic-gradient(#e5e7eb 0% 25%, #f8fafc 0% 50%) 50% / 20px 20px; }
+.dib-svg { display: block; width: 100%; height: auto; max-height: 78vh; touch-action: none; user-select: none; -webkit-user-select: none; }
+.dib-svg.herr-seleccionar { cursor: default; } .dib-svg:not(.herr-seleccionar) { cursor: crosshair; }
+.dib-svg [data-id] { cursor: move; }
+.dib-svg:not(.herr-seleccionar) [data-id] { cursor: crosshair; }
+.dib-sel { fill: none; stroke: #0ea5e9; stroke-width: 2; stroke-dasharray: 8 6; vector-effect: non-scaling-stroke; pointer-events: none; }
+.dib-tirador { fill: #ffffff; stroke: #0ea5e9; stroke-width: 3; vector-effect: non-scaling-stroke; cursor: nwse-resize; }
+@media (max-width: 700px) { .dib-barra { position: static; } .dib-final { margin-left: 0; } .dib-btn { width: 38px; height: 38px; } }

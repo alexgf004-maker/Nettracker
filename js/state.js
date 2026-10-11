@@ -61,6 +61,7 @@ export const state = {
   puntoReclamo: null, // { id, n, nombre } agregar un punto de medición al reclamo
   nuevoReclamo: null, // { texto, datos } formulario de Nuevo reclamo
   graficar: null, // pestaña Graficar: análisis rápido de un TXT sin guardar
+  dibujo: null, // pestaña Dibujar: imagen de fondo y dibujo encima (borrador en este navegador)
   analisisReclamo: null, // { id, params, tension, armonicos } análisis de un reclamo (macros Graficar y Armónicos)
   casoForm: {},
   configCartas: null, // config/cartas: firmante, contacto, contratista y logo
