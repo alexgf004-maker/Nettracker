@@ -2786,6 +2786,39 @@ test.describe('Herramienta Dibujar', () => {
     expect(errores).toEqual([]);
   });
 
+  test('metros de los vanos que se arrastran (y vuelven a su lugar) y puente al vuelo sobre la línea', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    await page.setViewportSize({ width: 1280, height: 1100 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await page.evaluate(() => localStorage.removeItem('nettracker_dibujo'));
+    await nav(page, 'Dibujar');
+    await subirImagen(page, 1600, 900);
+    await page.getByRole('button', { name: 'Tramo de red' }).click();
+    await tocar(page, 200, 500); await tocar(page, 1000, 500);
+    await page.getByRole('button', { name: 'Terminar tramo' }).click();
+    await page.locator('#dib-vano-1').fill('40'); await page.locator('#dib-vano-1').press('Tab');
+    await expect(page.locator('#dib-capa [data-chip="1"]')).toContainText('40.0 m');
+    const tramo = () => page.evaluate(async () => (await import('/js/state.js')).state.dibujo.elementos.find(e => e.tipo === 'polilinea'));
+    // Arrastrar el chip de metros: se corre (con guía) y el tramo no se mueve
+    await page.getByRole('button', { name: 'Seleccionar y mover' }).click();
+    await arrastrar(page, [600, 500], [600, 400]);
+    let t = await tramo();
+    expect(t.puntos.map(q => q.map(Math.round))).toEqual([[200, 500], [1000, 500]]);
+    expect(t.desfases['1'].map(Math.round)).toEqual([0, -100]);
+    await expect(page.locator('#dib-capa line[stroke-dasharray]')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Metros a su lugar' }).click();
+    t = await tramo();
+    expect(t.desfases).toBeUndefined();
+    // Puente al vuelo: cae sobre la línea (imán) y sale en la simbología del cajetín
+    await page.getByRole('button', { name: 'Puente al vuelo' }).click();
+    await tocar(page, 400, 488);
+    const p = await page.evaluate(async () => (await import('/js/state.js')).state.dibujo.elementos.filter(e => e.simbolo === 'puente').map(e => [Math.round(e.x + 30 * e.escala), Math.round(e.y + 30 * e.escala)]));
+    expect(p).toEqual([[400, 500]]);
+    await expect(page.locator('#dib-cajetin text', { hasText: 'Puente al vuelo' })).toHaveCount(1);
+    expect(errores).toEqual([]);
+  });
+
   test('proyectos: se guardan en la base para el equipo, se marcan los cambios sin guardar y se vuelven a abrir', async ({ page }) => {
     const errores = []; page.on('pageerror', e => errores.push(e.message));
     await page.setViewportSize({ width: 1280, height: 1100 });

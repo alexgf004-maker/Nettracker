@@ -1441,3 +1441,5 @@ button.aviso-inicio-fila { cursor: pointer; }
   .dib-pagina.ampliada .dib-grupo-t, .dib-pagina.ampliada .dib-grupo { flex-wrap: nowrap; flex: 0 0 auto; }
   .dib-pagina.ampliada .dib-sel-barra { flex-wrap: nowrap; overflow-x: auto; min-height: 0; }
   .dib-pagina.ampliada .dib-sel-barra .page-sub { white-space: nowrap; } }
+
+.dib-svg.herr-seleccionar [data-chip] { cursor: grab; }

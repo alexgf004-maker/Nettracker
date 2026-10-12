@@ -83,7 +83,8 @@ export function renderDibujar() {
       ? `<label class="dib-prefijo">La línea mide <input id="dib-metros" inputmode="decimal" placeholder="Ej. 50" onkeydown="if (event.key === 'Enter') aplicarCalibracionDib()"> metros</label><button class="b b-p" onclick="aplicarCalibracionDib()">Aplicar escala</button><button class="b b-l" onclick="cancelarCalibracionDib()">Cancelar</button>`
       : '<span class="page-sub">Traza una línea sobre algo cuya medida conozcas (la barra de escala del mapa, un vano o una calle medida en Google Maps con clic derecho → Medir distancia); luego escribe cuántos metros mide.</span><button class="b b-l" onclick="cancelarCalibracionDib()">Cancelar</button>';
   } else if (sel?.tipo === 'polilinea') {
-    fila = `${tiposTramo(sel.tramo)}<span class="tg gris dib-total-tramo">${metrosTramo(sel, d.escala) !== null ? `Total ${fmtMetros(metrosTramo(sel, d.escala))}` : ''}</span>${d.tramo === sel.id ? '<button class="b b-p" onclick="terminarTramoDib()"><i class="ic ic-check"></i> Terminar tramo</button>' : acciones()}`;
+    const movidos = Object.keys(sel.desfases || {}).length ? '<button class="b b-g" onclick="metrosASuLugarDib()">Metros a su lugar</button>' : '';
+    fila = `${tiposTramo(sel.tramo)}<span class="tg gris dib-total-tramo">${metrosTramo(sel, d.escala) !== null ? `Total ${fmtMetros(metrosTramo(sel, d.escala))}` : ''}</span>${d.tramo === sel.id ? '<button class="b b-p" onclick="terminarTramoDib()"><i class="ic ic-check"></i> Terminar tramo</button>' : acciones(movidos)}`;
   } else if (h === 'tramo') {
     fila = `${tiposTramo(d.tramoTipo)}<span class="page-sub">Toca cada poste del recorrido; se ajusta al poste más cercano.</span>`;
   } else if (sel?.tipo === 'etiqueta') {
@@ -91,7 +92,7 @@ export function renderDibujar() {
   } else if (h === 'etiqueta') {
     fila = `${estilos(d.estiloEtiqueta)}<label class="dib-prefijo">Prefijo <input id="dib-prefijo" value="${esc(d.prefijo)}" maxlength="6" oninput="setPrefijoDib(this.value)"></label><span class="page-sub">Toca el poste y arrastra hasta donde va la etiqueta.</span>`;
   } else if (sel?.tipo === 'cota') {
-    fila = `<span class="page-sub">${d.escala ? `Mide ${fmtMetros(Math.hypot(sel.x2 - sel.x1, sel.y2 - sel.y1) * d.escala)}. Arrastra sus extremos para ajustarla.` : 'Calibra la escala para ver los metros.'}</span>${acciones()}`;
+    fila = `<span class="page-sub">${d.escala ? `Mide ${fmtMetros(Math.hypot(sel.x2 - sel.x1, sel.y2 - sel.y1) * d.escala)}. Arrastra sus extremos para ajustarla; la medida también se arrastra.` : 'Calibra la escala para ver los metros.'}</span>${acciones(sel.desfase ? '<button class="b b-g" onclick="metrosASuLugarDib()">Medida a su lugar</button>' : '')}`;
   } else if (sel?.tipo === 'texto') {
     fila = `<textarea id="dib-texto" rows="1" oninput="textoDib(this.value)" onchange="finTextoDib()" placeholder="Escribe el texto">${esc(sel.texto)}</textarea>${Object.keys(TAM_TEXTO).map(t => `<button class="b ${d.tamTexto === t ? 'b-p' : 'b-g'}" onclick="setTamTextoDib('${t}')">${t[0].toUpperCase() + t.slice(1)}</button>`).join('')}${acciones()}`;
   } else if (sel?.tipo === 'leyenda' || sel?.tipo === 'tabla') {
@@ -100,7 +101,7 @@ export function renderDibujar() {
     fila = acciones(sel.tipo === 'simbolo' ? `<span class="page-sub">${esc(SIMBOLOS[sel.simbolo]?.nombre || '')}</span><button class="b b-g" onclick="girarDib()">Girar 90°</button>` : '');
   } else {
     fila = `<span class="page-sub">${{
-      seleccionar: 'Toca un elemento para seleccionarlo y arrastrarlo. Supr borra y Ctrl+Z deshace.',
+      seleccionar: 'Toca un elemento para seleccionarlo y arrastrarlo; los metros de los vanos también se arrastran. Supr borra y Ctrl+Z deshace.',
       cota: d.escala ? 'Arrastra entre dos puntos para medir; se ajusta a los postes.' : 'La cota necesita la escala calibrada. Sin escala, escribe los metros de cada vano al seleccionar el tramo.',
       texto: 'Toca donde va el texto y escríbelo aquí.', flecha: 'Arrastra desde el inicio hasta donde apunta la flecha.',
       linea: 'Arrastra para trazar la línea.', rect: 'Arrastra para dibujar el rectángulo.', elipse: 'Arrastra para dibujar el círculo.', trazo: 'Dibuja a mano alzada.',

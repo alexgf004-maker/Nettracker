@@ -212,6 +212,13 @@ export function dibPointerDown(ev) {
     let tirador = ev.target.closest?.('[data-tirador]')?.dataset.tirador;
     // La punta de una etiqueta sobre un poste: se mueve el poste (con lo que tiene pegado), no se despega la etiqueta
     if (tirador === 'destino' && seleccionado() && d.elementos.some(e => e.tipo === 'simbolo' && SIMBOLOS[e.simbolo]?.grupo === 'red' && Math.hypot(centroSimbolo(e)[0] - seleccionado().tx, centroSimbolo(e)[1] - seleccionado().ty) < 1)) tirador = null;
+    // Los metros de un vano o de una cota se arrastran para que no queden encimados
+    const chip = ev.target.closest?.('[data-chip]'); const idChip = chip?.closest('[data-id]')?.dataset.id;
+    if (!tirador && chip && idChip) {
+      d.sel = idChip; memorizar();
+      arrastre = { modo: 'chip', k: Number(chip.dataset.chip), ultimo: [x, y], cambio: false };
+      repintar(); return;
+    }
     if (tirador && seleccionado()) { memorizar(); arrastre = { modo: 'tirador', tirador, cambio: false, ajuste: tirador === 'destino' || /^v\d+$/.test(tirador) || seleccionado().tipo === 'cota' }; return; }
     // Tocando justo sobre un poste o transformador se agarra el símbolo (no la punta de una etiqueta o el vértice encima)
     const simbolo = d.elementos.filter(e => e.tipo === 'simbolo' && SIMBOLOS[e.simbolo]?.grupo === 'red')
@@ -341,6 +348,12 @@ export function dibPointerMove(ev) {
         const e = dib().elementos.find(z => z.id === pg.id); if (!e) return;
         reemplazar(pg.destino ? { ...e, tx: cx, ty: cy } : { ...e, puntos: e.puntos.map((q, k) => (k === pg.i ? [cx, cy] : q)) });
       });
+    } else if (arrastre.modo === 'chip') {
+      const dx = x - arrastre.ultimo[0]; const dy = y - arrastre.ultimo[1]; arrastre.ultimo = [x, y];
+      if (el.tipo === 'cota') { const [ox, oy] = el.desfase || [0, 0]; reemplazar({ ...el, desfase: [ox + dx, oy + dy] }); } else {
+        const [ox, oy] = el.desfases?.[arrastre.k] || [0, 0];
+        reemplazar({ ...el, desfases: { ...(el.desfases || {}), [arrastre.k]: [ox + dx, oy + dy] } });
+      }
     } else if (arrastre.modo === 'mover') {
       reemplazar(mover(el, x - arrastre.ultimo[0], y - arrastre.ultimo[1]));
       arrastre.ultimo = [x, y];
@@ -494,6 +507,11 @@ export function setLaminaDib(campo, valor) {
   if (['activa', 'distancias', 'norte', 'distanciasEnTramos'].includes(campo)) render();
 }
 
+// Devuelve los metros movidos del tramo o la cota seleccionada a su lugar (el centro del vano)
+export function metrosASuLugarDib() {
+  const el = seleccionado(); if (!el) return;
+  memorizar(); const { desfases, desfase, ...resto } = el; reemplazar(resto); guardarBorrador(); render();
+}
 export function girarDib() { const el = seleccionado(); if (el?.tipo !== 'simbolo') return; memorizar(); reemplazar({ ...el, rot: ((el.rot || 0) + 90) % 360 }); guardarBorrador(); render(); }
 export function duplicarDib() {
   const d = dib(); const el = seleccionado(); if (!el) return;
