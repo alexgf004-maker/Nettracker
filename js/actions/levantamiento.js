@@ -5,6 +5,7 @@ import { db, push, ref, remove, update } from '../firebase.js';
 import { SIMBOLOS } from '../domain/dibujo.js';
 import { aDibujo, cambiosPartirVano, distancia, kmlLevantamiento, listaPuntos, listaVanos, metrosDeVano, nuevaPantallaLev, PRECISION_BAJA, siguienteNombre } from '../domain/levantamiento.js';
 import { TIPOS_TRAMO } from '../domain/plano.js';
+import { leerAltura } from '../domain/red.js';
 import { hoyLocal } from '../domain/trabajo.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
@@ -160,7 +161,7 @@ function marcar(lat, lng, acc = null) {
   const l = lev(); const u = ui(); if (!l || !u) return;
   const datos = { lat, lng, tipo: u.tipo, nombre: siguienteNombre(l), orden: Date.now(), por: por(), fecha: hoyLocal(), ...(acc !== null ? { acc: Math.round(acc * 10) / 10 } : { manual: true }) };
   const { key } = push(ref(db, ruta(state.levId, 'puntos')), datos);
-  if (u.unir && u.actual && l.puntos?.[u.actual]) push(ref(db, ruta(state.levId, 'vanos')), { a: u.actual, b: key, tramo: u.tramo, orden: Date.now() });
+  if (u.unir && u.actual && l.puntos?.[u.actual]) push(ref(db, ruta(state.levId, 'vanos')), { a: u.actual, b: key, tramo: u.tramo, ...(u.cond || {}), orden: Date.now() });
   u.actual = key; u.sel = null; u.movida = null;
   showToast(`${datos.nombre} marcado`);
 }
@@ -191,7 +192,7 @@ function unir(a, b) {
   const l = lev(); const u = ui();
   if (!a || !b || a === b) return false;
   if (listaVanos(l).some(v => (v.a === a && v.b === b) || (v.a === b && v.b === a))) return false;
-  push(ref(db, ruta(state.levId, 'vanos')), { a, b, tramo: u.tramo, orden: Date.now() });
+  push(ref(db, ruta(state.levId, 'vanos')), { a, b, tramo: u.tramo, ...(u.cond || {}), orden: Date.now() });
   return true;
 }
 // El vano más cercano al toque (a menos de 24 px en pantalla) y el punto de la línea más cercano
@@ -284,6 +285,32 @@ export function moverAGpsLev() {
 export function datoPuntoLev(campo, valor) {
   const u = ui(); if (!u?.sel) return;
   update(ref(db, ruta(state.levId, 'puntos/' + u.sel)), { [campo]: String(valor ?? '').trim() || null });
+}
+// Altura y estructuras del punto seleccionado
+export function alturaPuntoLev(v) {
+  const u = ui(); if (!u?.sel) return;
+  const a = leerAltura(v);
+  if (String(v ?? '').trim() && a === null) return showToast('Escribe la altura en pies (solo el número)');
+  update(ref(db, ruta(state.levId, 'puntos/' + u.sel)), { altura: a });
+}
+function estructurasSel() { const u = ui(); return [...(lev()?.puntos?.[u?.sel]?.estructuras || [])]; }
+export function agregarEstructuraLev(codigo) {
+  const u = ui(); const c = String(codigo || '').trim().toUpperCase(); if (!u?.sel || !c) return;
+  const lista = estructurasSel(); if (lista.includes(c)) return;
+  update(ref(db, ruta(state.levId, 'puntos/' + u.sel)), { estructuras: [...lista, c] });
+}
+export function agregarEstructuraEscritaLev() { const inp = document.getElementById('lev-poste-estr-otra'); if (inp?.value.trim()) { agregarEstructuraLev(inp.value); inp.value = ''; } }
+export function quitarEstructuraLev(i) {
+  const u = ui(); if (!u?.sel) return;
+  const lista = estructurasSel().filter((_, k) => k !== i);
+  update(ref(db, ruta(state.levId, 'puntos/' + u.sel)), { estructuras: lista.length ? lista : null });
+}
+// Conductor de un vano (calibre y tipo); queda para los vanos que se marquen después
+export function conductorVanoLev(id, campo, valor) {
+  const u = ui(); const v = String(valor ?? '').trim();
+  const clave = campo === 'tipo' ? 'conductor' : 'calibre';
+  update(ref(db, ruta(state.levId, 'vanos/' + id)), { [clave]: v || null });
+  if (u) { u.cond = { ...(u.cond || {}), [clave]: v || null }; Object.keys(u.cond).forEach(k => { if (!u.cond[k]) delete u.cond[k]; }); }
 }
 export function datoVanoLev(id, campo, valor) {
   let v = String(valor ?? '').trim();
