@@ -1333,7 +1333,14 @@ button.aviso-inicio-fila { cursor: pointer; }
 /* ── Herramienta Dibujar ── */
 .dib-barra { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; background: var(--white); border: 1px solid var(--border); border-radius: 14px; padding: 8px 10px; margin-bottom: 8px; position: sticky; top: 64px; z-index: 5; }
 .dib-grupo { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
-.dib-final { margin-left: auto; gap: 6px; }
+.dib-grupo-t { display: flex; flex-direction: column; gap: 2px; padding-right: 12px; border-right: 1px solid var(--border); }
+.dib-grupo-t:last-of-type { border-right: 0; }
+.dib-grupo-t small { font-size: 10px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--text3); }
+.dib-btn-chico { width: 32px; }
+.dib-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1.5px solid var(--border); border-radius: 999px; background: var(--white); color: var(--text); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.dib-chip.activo { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
+.dib-chip-etq { display: inline-block; min-width: 22px; padding: 1px 6px; border-radius: 6px; font-size: 11px; font-weight: 800; text-align: center; border: 1px solid rgba(0,0,0,.15); }
+.dib-final { margin-left: auto; gap: 6px; align-self: flex-end; }
 .dib-btn { width: 40px; height: 40px; border-radius: 10px; border: 1.5px solid transparent; background: transparent; color: var(--text); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .dib-btn:hover { background: var(--bg); }
 .dib-btn.activo { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
@@ -1361,4 +1368,4 @@ button.aviso-inicio-fila { cursor: pointer; }
 .dib-svg:not(.herr-seleccionar) [data-id] { cursor: crosshair; }
 .dib-sel { fill: none; stroke: #0ea5e9; stroke-width: 2; stroke-dasharray: 8 6; vector-effect: non-scaling-stroke; pointer-events: none; }
 .dib-tirador { fill: #ffffff; stroke: #0ea5e9; stroke-width: 3; vector-effect: non-scaling-stroke; cursor: nwse-resize; }
-@media (max-width: 700px) { .dib-barra { position: static; } .dib-final { margin-left: 0; } .dib-btn { width: 38px; height: 38px; } }
+@media (max-width: 700px) { .dib-barra { position: static; } .dib-final { margin-left: 0; } .dib-btn { width: 38px; height: 38px; } .dib-grupo-t { border-right: 0; padding-right: 0; } }
