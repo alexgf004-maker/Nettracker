@@ -1,11 +1,11 @@
 // Levantamiento de red en campo (levantamientos/{id}, se guarda en la base y lo ve el equipo; independiente, con
 // referencia libre). Mapa Leaflet con calles o satélite y la ubicación GPS en vivo; "Poste aquí" marca un punto en la
 // posición actual y lo une con el anterior. El mapa se crea una sola vez y se vuelve a colocar tras cada render().
-import { db, push, ref, remove, update } from '../firebase.js';
+import { db, push, ref, remove, set, update } from '../firebase.js';
 import { SIMBOLOS } from '../domain/dibujo.js';
 import { aDibujo, cambiosPartirVano, distancia, kmlLevantamiento, listaPuntos, listaVanos, metrosDeVano, nuevaPantallaLev, PRECISION_BAJA, siguienteNombre } from '../domain/levantamiento.js';
 import { TIPOS_TRAMO } from '../domain/plano.js';
-import { leerAltura } from '../domain/red.js';
+import { hayAcometidas, leerAltura } from '../domain/red.js';
 import { hoyLocal } from '../domain/trabajo.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
@@ -161,8 +161,8 @@ function marcar(lat, lng, acc = null) {
   const l = lev(); const u = ui(); if (!l || !u) return;
   const datos = { lat, lng, tipo: u.tipo, nombre: siguienteNombre(l), orden: Date.now(), por: por(), fecha: hoyLocal(), ...(acc !== null ? { acc: Math.round(acc * 10) / 10 } : { manual: true }) };
   const { key } = push(ref(db, ruta(state.levId, 'puntos')), datos);
-  if (u.unir && u.actual && l.puntos?.[u.actual]) push(ref(db, ruta(state.levId, 'vanos')), { a: u.actual, b: key, tramo: u.tramo, ...(u.cond || {}), orden: Date.now() });
-  u.actual = key; u.sel = null; u.movida = null;
+  if (u.unir && u.actual && l.puntos?.[u.actual]) push(ref(db, ruta(state.levId, 'vanos')), { a: u.actual, b: key, tramo: u.tramo, ...(u.cond || {}), ...conPendiente(u.actual), orden: Date.now() });
+  u.actual = key; u.sel = null; u.movida = null; u.vanoAcom = null;
   showToast(`${datos.nombre} marcado`);
 }
 export function marcarAqui() {
@@ -192,7 +192,8 @@ function unir(a, b) {
   const l = lev(); const u = ui();
   if (!a || !b || a === b) return false;
   if (listaVanos(l).some(v => (v.a === a && v.b === b) || (v.a === b && v.b === a))) return false;
-  push(ref(db, ruta(state.levId, 'vanos')), { a, b, tramo: u.tramo, ...(u.cond || {}), orden: Date.now() });
+  push(ref(db, ruta(state.levId, 'vanos')), { a, b, tramo: u.tramo, ...(u.cond || {}), ...conPendiente(a), orden: Date.now() });
+  u.vanoAcom = null;
   return true;
 }
 // El vano más cercano al toque (a menos de 24 px en pantalla) y el punto de la línea más cercano
@@ -311,6 +312,29 @@ export function conductorVanoLev(id, campo, valor) {
   const clave = campo === 'tipo' ? 'conductor' : 'calibre';
   update(ref(db, ruta(state.levId, 'vanos/' + id)), { [clave]: v || null });
   if (u) { u.cond = { ...(u.cond || {}), [clave]: v || null }; Object.keys(u.cond).forEach(k => { if (!u.cond[k]) delete u.cond[k]; }); }
+}
+// ── Acometidas por vano (120 A, 120 B, 240) ──
+// Se cuentan en el vano elegido o, por defecto, en el próximo vano que sale del punto actual: quedan "pendientes"
+// (levantamientos/{id}/pendiente = { desde, a, b, d }) y se pasan al vano cuando se marca el siguiente poste.
+function conPendiente(desde) {
+  const p = lev()?.pendiente;
+  if (!p || p.desde !== desde || !hayAcometidas(p)) return {};
+  remove(ref(db, ruta(state.levId, 'pendiente')));
+  return { acom: { a: Number(p.a) || 0, b: Number(p.b) || 0, d: Number(p.d) || 0 } };
+}
+export function setVanoAcomLev(id) { const u = ui(); if (!u) return; u.vanoAcom = id || null; render(); }
+export function sumarAcometidaLev(k, delta) {
+  const l = lev(); const u = ui(); if (!l || !u) return;
+  const vano = u.vanoAcom && l.vanos?.[u.vanoAcom] ? u.vanoAcom : null;
+  if (vano) {
+    const n = Math.max(0, (Number(l.vanos[vano].acom?.[k]) || 0) + delta);
+    update(ref(db, ruta(state.levId, `vanos/${vano}/acom`)), { [k]: n });
+  } else {
+    if (!u.actual || !l.puntos?.[u.actual]) return showToast('Marca primero el poste desde donde sale el vano');
+    const p = l.pendiente?.desde === u.actual ? l.pendiente : { desde: u.actual };
+    const n = Math.max(0, (Number(p[k]) || 0) + delta);
+    set(ref(db, ruta(state.levId, 'pendiente')), { ...p, desde: u.actual, [k]: n });
+  }
 }
 export function datoVanoLev(id, campo, valor) {
   let v = String(valor ?? '').trim();

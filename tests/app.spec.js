@@ -3128,6 +3128,55 @@ test.describe('Levantamiento en campo', () => {
     expect(errores).toEqual([]);
   });
 
+  test('acometidas por vano: se cuentan antes de marcar el siguiente poste, se corrigen en un vano y pasan a la lámina y al KML', async ({ page, context }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    await context.grantPermissions(['geolocation']);
+    await context.setGeolocation({ latitude: 13.5, longitude: -88.87, accuracy: 4 });
+    await page.setViewportSize({ width: 1280, height: 1100 });
+    app = await abrirApp(page, { leaflet: true });
+    await cerrarAlerta(page);
+    await nav(page, 'Levantamiento');
+    await page.locator('#lev-nombre').fill('Acometidas');
+    await page.getByRole('button', { name: 'Empezar levantamiento' }).click();
+    await expect(page.locator('#lev-gps')).toHaveText('GPS ±4 m');
+    const poste = page.getByRole('button', { name: 'Poste aquí' });
+    await poste.click();
+    // Caminando hacia el siguiente poste: 2 de 120 en A y una de 240
+    await expect(page.locator('#lev-acom-vano')).toContainText('Próximo vano desde P1');
+    await page.getByRole('button', { name: 'Sumar acometida 120 A' }).click();
+    await page.getByRole('button', { name: 'Sumar acometida 120 A' }).click();
+    await page.getByRole('button', { name: 'Sumar acometida 240' }).click();
+    await expect(page.locator('#lev-acom-a')).toHaveText('2');
+    await expect(page.locator('#lev-acom-d')).toHaveText('1');
+    await context.setGeolocation({ latitude: 13.50027, longitude: -88.87, accuracy: 4 });
+    await expect(page.locator('#lev-gps')).toHaveText('GPS ±4 m');
+    await poste.click();
+    // Pasaron al vano P1 – P2; el contador vuelve a cero para el próximo vano
+    await expect(page.locator('.lev-vano', { hasText: 'P1 – P2' })).toContainText('Acom. A:2 240:1');
+    await expect(page.locator('#lev-acom-a')).toHaveText('0');
+    // Corregir en el vano P1 – P2: una de 120 en B
+    await page.locator('#lev-acom-vano').selectOption({ label: 'P1 – P2' });
+    await page.getByRole('button', { name: 'Sumar acometida 120 B' }).click();
+    await expect(page.locator('.lev-vano', { hasText: 'P1 – P2' })).toContainText('Acom. A:2 B:1 240:1');
+    await expect(page.locator('.lev-acom-total')).toContainText('fase A 3, fase B 2');
+    await expect(page.locator('.lev-acom-total')).toContainText('diferencia 1 (más en A)');
+    // Restar no baja de cero
+    await page.getByRole('button', { name: 'Restar acometida 120 B' }).click();
+    await page.getByRole('button', { name: 'Restar acometida 120 B' }).click();
+    await expect(page.locator('#lev-acom-b')).toHaveText('0');
+    await page.getByRole('button', { name: 'Sumar acometida 120 B' }).click();
+    // KML y lámina
+    const kml = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'KML para Google Earth' }).click();
+    expect(require('fs').readFileSync(await (await kml).path(), 'utf8')).toContain('Acom. A:2 B:1 240:1');
+    await page.getByRole('button', { name: 'Pasar a Dibujar (lámina)' }).click();
+    await expect(page.locator('#dib-capa text', { hasText: 'Acom. A:2 B:1 240:1' })).toHaveCount(1);
+    const caj = page.locator('#dib-cajetin');
+    await expect(caj.locator('text', { hasText: /^Cant\.$/ })).toHaveCount(1); // tabla de acometidas
+    await expect(caj.locator('text', { hasText: '1 (más en A)' })).toHaveCount(1);
+    expect(errores).toEqual([]);
+  });
+
   test('corregir en campo: arrastrar un poste sin seleccionarlo (y deshacer) y poner un poste en medio de un vano', async ({ page, context }) => {
     const errores = []; page.on('pageerror', e => errores.push(e.message));
     await context.grantPermissions(['geolocation']);

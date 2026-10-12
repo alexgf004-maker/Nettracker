@@ -3,6 +3,7 @@
 // cada vano sale de las coordenadas (precisión del GPS del celular: 3 a 10 m con buena señal) salvo que se escriban los
 // metros medidos (cinta o telémetro), que mandan. Se pasa a la herramienta Dibujar como lámina y se exporta a KML.
 import { TIPOS_TRAMO } from './plano.js';
+import { hayAcometidas, sumaAcometidas, textoAcometidas } from './red.js';
 
 // Tipos de punto que se marcan en campo (los mismos símbolos de red de Dibujar)
 export const TIPOS_PUNTO = ['poste', 'poste_nuevo', 'puente', 'trafo', 'trafo_nuevo', 'banco', 'usuario', 'medidor_red', 'seccionador', 'medicion'];
@@ -76,7 +77,7 @@ export function aDibujo(lev, { ancho = 1600, alto = 1000, margen = 140 } = {}) {
     if (!pos[v.a] || !pos[v.b]) return;
     const m = metrosDeVano(lev, v);
     const conductor = v.calibre || v.conductor ? { ...(v.calibre ? { calibre: v.calibre } : {}), ...(v.conductor ? { tipo: v.conductor } : {}) } : null;
-    elementos.push({ id: id(), tipo: 'polilinea', tramo: TIPOS_TRAMO[v.tramo] ? v.tramo : 'bt', color: '#000000', grosor: 6, puntos: [pos[v.a], pos[v.b]], metros: m.origen === 'medido' ? { 1: m.metros } : {}, ...(conductor ? { conductor } : {}) });
+    elementos.push({ id: id(), tipo: 'polilinea', tramo: TIPOS_TRAMO[v.tramo] ? v.tramo : 'bt', color: '#000000', grosor: 6, puntos: [pos[v.a], pos[v.b]], metros: m.origen === 'medido' ? { 1: m.metros } : {}, ...(conductor ? { conductor } : {}), ...(hayAcometidas(v.acom) ? { acometidas: { 1: { a: Number(v.acom.a) || 0, b: Number(v.acom.b) || 0, d: Number(v.acom.d) || 0 } } } : {}) });
   });
   puntos.forEach(p => {
     const [x, y] = pos[p.id]; const escala = p.tipo === 'usuario' ? 0.8 : 0.6;
@@ -102,7 +103,10 @@ export function kmlLevantamiento(lev, nombresTipo = {}) {
   const ln = listaVanos(lev).map(v => {
     const a = lev.puntos?.[v.a]; const b = lev.puntos?.[v.b]; if (!a || !b) return '';
     const m = metrosDeVano(lev, v);
-    return `<Placemark><name>${x(`${a.nombre || ''} – ${b.nombre || ''}`)}</name><description>${x([TIPOS_TRAMO[v.tramo]?.nombre || '', [v.calibre, v.conductor].filter(Boolean).join(' '), `${m.metros?.toFixed(1)} m (${m.origen === 'medido' ? 'medido' : 'GPS'})`].filter(Boolean).join(' · '))}</description><LineString><coordinates>${a.lng},${a.lat},0 ${b.lng},${b.lat},0</coordinates></LineString></Placemark>`;
+    return `<Placemark><name>${x(`${a.nombre || ''} – ${b.nombre || ''}`)}</name><description>${x([TIPOS_TRAMO[v.tramo]?.nombre || '', [v.calibre, v.conductor].filter(Boolean).join(' '), textoAcometidas(v.acom), `${m.metros?.toFixed(1)} m (${m.origen === 'medido' ? 'medido' : 'GPS'})`].filter(Boolean).join(' · '))}</description><LineString><coordinates>${a.lng},${a.lat},0 ${b.lng},${b.lat},0</coordinates></LineString></Placemark>`;
   }).join('');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${x(lev.nombre || 'Levantamiento')}</name>${pm}${ln}</Document></kml>`;
 }
+
+// Acometidas de todo el levantamiento (los vanos y las pendientes del próximo vano)
+export const acometidasLevantamiento = lev => sumaAcometidas([...listaVanos(lev).map(v => v.acom), lev?.pendiente]);

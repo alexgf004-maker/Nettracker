@@ -1522,3 +1522,14 @@ button.aviso-inicio-fila { cursor: pointer; }
 .lev-datos-poste { display: grid; grid-template-columns: minmax(0, 160px) minmax(0, 1fr); gap: 12px; margin-top: 4px; }
 .lev-vano input[list] { width: 90px; }
 @media (max-width: 700px) { .lev-datos-poste { grid-template-columns: 1fr; } }
+
+/* Levantamiento: acometidas */
+.lev-acom .bloque-head { gap: 8px; flex-wrap: wrap; }
+.lev-acom select { max-width: 240px; }
+.lev-acom-botones { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.lev-acom-tipo { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 6px; }
+.lev-acom-mas { grid-column: 1 / -1; padding: 14px 6px; font-size: 16px; }
+.lev-acom-n { text-align: center; font-size: 20px; font-weight: 800; }
+.lev-acom-tipo .b-l { border: 1.5px solid var(--border); border-radius: 10px; padding: 6px 0; font-size: 18px; text-decoration: none; }
+.lev-acom-total { margin-top: 10px; font-size: 13px; }
+.lev-acom-dif { color: var(--red); font-weight: 700; }

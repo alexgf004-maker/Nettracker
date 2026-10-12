@@ -1,8 +1,8 @@
 // Pestaña Levantamiento (Herramientas): levantamientos de red en campo con GPS, guardados en la base para el equipo.
 import { SIMBOLOS } from '../domain/dibujo.js';
-import { listaPuntos, listaVanos, metrosDeVano, nuevaPantallaLev, resumenLevantamiento, TIPOS_PUNTO } from '../domain/levantamiento.js';
+import { acometidasLevantamiento, listaPuntos, listaVanos, metrosDeVano, nuevaPantallaLev, resumenLevantamiento, TIPOS_PUNTO } from '../domain/levantamiento.js';
 import { fmtMetros, TIPOS_TRAMO } from '../domain/plano.js';
-import { CALIBRES, textoAltura, textoEstructuras, TIPOS_CONDUCTOR } from '../domain/red.js';
+import { balanceAcometidas, CALIBRES, textoAcometidas, textoAltura, textoEstructuras, TIPOS_ACOMETIDA, TIPOS_CONDUCTOR } from '../domain/red.js';
 import { state } from '../state.js';
 import { controlesPoste } from './dibujo.js';
 import { escapeHtml, fmtDate } from '../utils.js';
@@ -67,6 +67,7 @@ function renderDetalle(id, l) {
     <button class="b b-l" onclick="deshacerUltimoLev()" ${puntos.length ? '' : 'disabled'}>Quitar el último</button>
     <span class="page-sub">${r.puntos} puntos · ${r.vanos} vanos${r.vanos ? ` · ${fmtMetros(r.metros)}` : ''}</span></div>`;
   if (u.movida && l.puntos?.[u.movida.id]) html += `<div class="alert-banner alert-yellow">${esc(u.movida.nombre || 'Punto')} movido. <button class="b b-l" onclick="deshacerMovidaLev()">Deshacer</button></div>`;
+  html += bloqueAcometidas(l, u, vanos, actual);
   if (u.unirDesde) html += `<div class="alert-banner alert-yellow">Toca en el mapa el punto con el que se une ${esc(l.puntos?.[u.unirDesde]?.nombre || '')}. <button class="b b-l" onclick="setLev('unirDesde', null)">Cancelar</button></div>`;
 
   // El mapa con el botón principal flotando encima (en campo se marca sin bajar la pantalla)
@@ -92,7 +93,7 @@ function renderDetalle(id, l) {
       ${vanos.map(v => {
         const a = l.puntos?.[v.a]; const b = l.puntos?.[v.b]; const m = metrosDeVano(l, v);
         const gps = a && b ? metrosDeVano(l, { ...v, metros: null }).metros : null;
-        return `<div class="lev-vano"><b>${esc(a?.nombre || '?')} – ${esc(b?.nombre || '?')}</b>
+        return `<div class="lev-vano"><b>${esc(a?.nombre || '?')} – ${esc(b?.nombre || '?')}</b>${textoAcometidas(v.acom) ? `<span class="tg azul">${esc(textoAcometidas(v.acom))}</span>` : ''}
           <span class="tg ${m.origen === 'medido' ? 'verde' : 'gris'}">${fmtMetros(m.metros)} ${m.origen === 'medido' ? 'medido' : 'GPS'}</span>
           <input id="lev-v-${v.id}" inputmode="decimal" value="${v.metros ?? ''}" placeholder="Medido (m)${gps !== null ? ` · GPS ${gps.toFixed(1)}` : ''}" onchange="datoVanoLev('${v.id}', 'metros', this.value)" aria-label="Metros medidos">
           <input id="lev-v-cal-${v.id}" list="lev-calibres" value="${esc(v.calibre || '')}" placeholder="Calibre" aria-label="Calibre" onchange="conductorVanoLev('${v.id}', 'calibre', this.value)">
@@ -108,4 +109,22 @@ function renderDetalle(id, l) {
     <button class="b b-g" onclick="descargarKmlLev()"><i class="ic ic-descargar"></i> KML para Google Earth</button>
     <span class="sep"></span><button class="b b-l" onclick="eliminarLevantamiento()">Eliminar levantamiento</button></div>`;
   return html + '</div>';
+}
+
+// Contador de acometidas: en el vano elegido o en el próximo vano que sale del punto actual
+function bloqueAcometidas(l, u, vanos, actual) {
+  const nombre = id => l.puntos?.[id]?.nombre || '?';
+  const elegido = u.vanoAcom && l.vanos?.[u.vanoAcom] ? u.vanoAcom : '';
+  const pend = l.pendiente?.desde === u.actual ? l.pendiente : null;
+  const cuenta = elegido ? l.vanos[elegido].acom || {} : pend || {};
+  const t = acometidasLevantamiento(l); const b = balanceAcometidas(t);
+  if (!actual && !vanos.length) return '';
+  return `<div class="bloque lev-acom"><div class="bloque-head"><div class="bloque-titulo">Acometidas</div>
+      <select id="lev-acom-vano" aria-label="Vano donde se cuentan" onchange="setVanoAcomLev(this.value)">
+        ${actual ? `<option value="" ${elegido ? '' : 'selected'}>Próximo vano desde ${esc(actual.nombre)}</option>` : ''}
+        ${vanos.slice().reverse().map(v => `<option value="${v.id}" ${elegido === v.id ? 'selected' : ''}>${esc(nombre(v.a))} – ${esc(nombre(v.b))}</option>`).join('')}</select></div>
+    <div class="lev-acom-botones">${TIPOS_ACOMETIDA.map(x => `<div class="lev-acom-tipo"><button class="b b-p lev-acom-mas" onclick="sumarAcometidaLev('${x.k}', 1)" aria-label="Sumar acometida ${x.nombre}">+ ${x.nombre}</button>
+      <span class="lev-acom-n" id="lev-acom-${x.k}">${Number(cuenta[x.k]) || 0}</span><button class="b b-l" onclick="sumarAcometidaLev('${x.k}', -1)" aria-label="Restar acometida ${x.nombre}">−</button></div>`).join('')}</div>
+    ${!elegido && actual ? `<div class="page-sub">Se pasan al vano cuando marques el siguiente poste desde ${esc(actual.nombre)}.</div>` : ''}
+    ${b.total ? `<div class="lev-acom-total">Total: 120 A <b>${t.a}</b> · 120 B <b>${t.b}</b> · 240 <b>${t.d}</b> → fase A ${b.faseA}, fase B ${b.faseB} · <span class="${b.dif ? 'lev-acom-dif' : ''}">${b.mayor ? `diferencia ${b.dif} (más en ${b.mayor})` : 'balanceadas'}</span></div>` : ''}</div>`;
 }
