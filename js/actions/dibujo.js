@@ -1,7 +1,11 @@
-// Herramienta Dibujar: subir una imagen y dibujar encima; se descarga como PNG (confirmado: no se guarda en la base).
-// El borrador queda solo en este navegador (localStorage). Mientras se arrastra se repinta solo el SVG, sin render().
+// Herramienta Dibujar: subir una imagen y dibujar encima; se descarga como PNG. El borrador queda en este navegador
+// (localStorage) y, para poder modificarlo después, se guarda como proyecto en la base para el equipo:
+// dibujos/{id} = { nombre, referencia, creado, editado } (liviano, para la lista) y dibujosDatos/{id} = { fondo, datos }
+// (la imagen en JPG y el dibujo en JSON, que se baja solo al abrirlo). Mientras se arrastra se repinta solo el SVG.
 import { caja, COLORES, coloresTramos, GROSORES, leerFilasTabla, medidaEtiqueta, medidaReducida, mover, nuevoId, redimensionar, siguienteEtiqueta, SIMBOLOS, svgExportable, svgLamina, tamano, TAM_TEXTO } from '../domain/dibujo.js';
 import { anclas, escalaDe, ESTILOS_ETIQUETA, fmtMetros, imanar, metrosTramo, nombrePunto, segmentosTramos } from '../domain/plano.js';
+import { db, get, push, ref, remove, set } from '../firebase.js';
+import { hoyLocal } from '../domain/trabajo.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { render } from '../views/render.js';
@@ -17,6 +21,7 @@ export function nuevoDibujo() {
   return {
     fondo: null, elementos: [], escala: null, lamina: nuevaLamina(), sel: null, herramienta: 'seleccionar', simbolo: 'poste', color: COLORES[0], grosor: 'medio',
     tamTexto: 'mediano', tramoTipo: 'bt', estiloEtiqueta: 'existente', prefijo: 'P', tramo: null, calibracion: null, historial: [], rehacer: [],
+    proyecto: null, sinGuardar: false, // proyecto: { id, nombre, referencia } del proyecto abierto en la base
   };
 }
 // Carga una lámina armada en otra parte (p. ej. un levantamiento de campo) como dibujo actual
@@ -28,14 +33,16 @@ export function cargarBorrador() {
   const d = nuevoDibujo();
   try {
     const g = JSON.parse(localStorage.getItem(CLAVE) || 'null');
-    if (g && Array.isArray(g.elementos)) Object.assign(d, { fondo: g.fondo || null, elementos: g.elementos, escala: g.escala || null, lamina: { ...d.lamina, ...(g.lamina || {}) } });
+    if (g && Array.isArray(g.elementos)) Object.assign(d, { fondo: g.fondo || null, elementos: g.elementos, escala: g.escala || null, lamina: { ...d.lamina, ...(g.lamina || {}) }, proyecto: g.proyecto || null, sinGuardar: !!g.sinGuardar });
   } catch { /* sin borrador */ }
   return d;
 }
 let avisoEspacio = false;
-function guardarBorrador() {
+// cambio = false: solo se guarda el borrador (al abrir o guardar un proyecto), sin marcarlo como "sin guardar"
+function guardarBorrador(cambio = true) {
   const d = state.dibujo; if (!d) return;
-  try { localStorage.setItem(CLAVE, JSON.stringify({ fondo: d.fondo, elementos: d.elementos, escala: d.escala, lamina: d.lamina })); avisoEspacio = false; } catch {
+  if (cambio && d.proyecto) d.sinGuardar = true;
+  try { localStorage.setItem(CLAVE, JSON.stringify({ fondo: d.fondo, elementos: d.elementos, escala: d.escala, lamina: d.lamina, proyecto: d.proyecto, sinGuardar: d.sinGuardar })); avisoEspacio = false; } catch {
     if (!avisoEspacio) showToast('El dibujo es muy grande para guardarse como borrador en este navegador; descárgalo antes de cerrar');
     avisoEspacio = true;
   }
@@ -419,7 +426,7 @@ export function rehacerDib() {
 }
 export function nuevoLienzoDib() {
   const d = dib(); if (!d) return;
-  if ((d.elementos.length || d.fondo) && !confirm('¿Empezar un dibujo nuevo? Se borra el actual (descárgalo antes si lo necesitas).')) return;
+  if (d.proyecto && !d.sinGuardar ? false : (d.elementos.length || d.fondo) && !confirm(d.proyecto ? `¿Empezar un dibujo nuevo? Los cambios sin guardar de "${d.proyecto.nombre}" se pierden.` : '¿Empezar un dibujo nuevo? Se borra el actual (guárdalo como proyecto o descárgalo antes si lo necesitas).')) return;
   state.dibujo = nuevoDibujo(); guardarBorrador(); render();
 }
 
@@ -489,6 +496,85 @@ export async function copiarDib() {
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngDelDibujo() })]);
     showToast('Imagen copiada: pégala en Word con Ctrl+V');
   } catch { showToast('No se pudo copiar; usa Descargar PNG'); }
+}
+
+// ── Proyectos guardados en la base ──
+// La imagen de fondo se guarda en JPG (pesa mucho menos; con fondo blanco donde la captura era transparente)
+function fondoJpg(fondo) {
+  if (!fondo?.src || fondo.src.startsWith('data:image/jpeg')) return Promise.resolve(fondo || null);
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas'); c.width = fondo.w; c.height = fondo.h;
+      const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(img, 0, 0, c.width, c.height);
+      resolve({ ...fondo, src: c.toDataURL('image/jpeg', 0.85) });
+    };
+    img.onerror = () => resolve(fondo);
+    img.src = fondo.src;
+  });
+}
+const por = () => state.sesionUsuario?.nombre || '';
+export function setVistaProyectosDib(v) { state.dibProyectos = v; render(); }
+async function escribirProyecto(id, meta) {
+  const d = dib();
+  const fondo = await fondoJpg(d.fondo);
+  if (fondo) d.fondo = fondo;
+  await set(ref(db, `dibujosDatos/${id}`), { fondo: fondo || null, datos: JSON.stringify({ elementos: d.elementos, escala: d.escala, lamina: d.lamina }) });
+  await set(ref(db, `dibujos/${id}`), meta);
+  d.proyecto = { id, nombre: meta.nombre, referencia: meta.referencia || '' }; d.sinGuardar = false;
+  guardarBorrador(false);
+}
+// Guardar: el proyecto abierto se actualiza; si no hay, se pide nombre (formulario en la pantalla)
+export async function guardarProyectoDib() {
+  const d = dib(); if (!d) return;
+  if (!d.proyecto) { state.dibProyectos = 'guardar'; render(); return; }
+  const previo = state.dibujos?.[d.proyecto.id] || {};
+  try {
+    await escribirProyecto(d.proyecto.id, { ...previo, nombre: d.proyecto.nombre, referencia: d.proyecto.referencia || '', editado: { fecha: hoyLocal(), por: por() } });
+    showToast(`"${d.proyecto.nombre}" guardado`);
+  } catch { showToast('No se pudo guardar; revisa la conexión'); }
+  render();
+}
+export async function guardarComoProyectoDib() {
+  const d = dib(); if (!d) return;
+  const nombre = document.getElementById('dib-proy-nombre')?.value.trim();
+  if (!nombre) return showToast('Ponle un nombre al proyecto');
+  if (!d.fondo && !d.elementos.length) return showToast('Todavía no hay nada que guardar');
+  const referencia = document.getElementById('dib-proy-ref')?.value.trim() || '';
+  const id = push(ref(db, 'dibujos')).key;
+  const hoy = { fecha: hoyLocal(), por: por() };
+  try {
+    await escribirProyecto(id, { nombre, referencia, creado: hoy, editado: hoy });
+    state.dibProyectos = null; showToast(`Proyecto "${nombre}" guardado`);
+  } catch { showToast('No se pudo guardar; revisa la conexión'); }
+  render();
+}
+export async function abrirProyectoDib(id) {
+  const d = dib(); const meta = state.dibujos?.[id]; if (!meta) return;
+  if (d && (d.proyecto ? d.sinGuardar : d.elementos.length || d.fondo) && !confirm(d.proyecto ? `Los cambios sin guardar de "${d.proyecto.nombre}" se pierden. ¿Abrir "${meta.nombre}"?` : `¿Abrir "${meta.nombre}"? El dibujo actual (sin guardar como proyecto) se reemplaza.`)) return;
+  showToast('Abriendo…');
+  try {
+    const snap = await get(ref(db, `dibujosDatos/${id}`));
+    const g = snap.exists() ? snap.val() : null;
+    const datos = g?.datos ? JSON.parse(g.datos) : {};
+    state.dibujo = { ...nuevoDibujo(), fondo: g?.fondo || null, elementos: datos.elementos || [], escala: datos.escala || null, lamina: { ...nuevaLamina(), ...(datos.lamina || {}) }, proyecto: { id, nombre: meta.nombre, referencia: meta.referencia || '' } };
+    state.dibProyectos = null;
+    guardarBorrador(false);
+  } catch { showToast('No se pudo abrir el proyecto'); }
+  render();
+}
+export function eliminarProyectoDib(id) {
+  const meta = state.dibujos?.[id]; if (!meta) return;
+  if (!confirm(`¿Eliminar el proyecto "${meta.nombre}"? Se borra para todo el equipo.`)) return;
+  remove(ref(db, `dibujos/${id}`)); remove(ref(db, `dibujosDatos/${id}`));
+  const d = dib(); if (d?.proyecto?.id === id) { d.proyecto = null; d.sinGuardar = false; guardarBorrador(false); }
+  render();
+}
+// El dibujo sigue en pantalla pero deja de estar ligado al proyecto (para no pisarlo al guardar)
+export function soltarProyectoDib() {
+  const d = dib(); if (!d?.proyecto) return;
+  if (d.sinGuardar && !confirm(`Hay cambios sin guardar en "${d.proyecto.nombre}". ¿Cerrarlo sin guardarlos? El dibujo queda en pantalla como borrador.`)) return;
+  d.proyecto = null; d.sinGuardar = false; guardarBorrador(false); render();
 }
 
 // Atajos: Supr/Retroceso borra, Ctrl+Z deshace, Ctrl+Y o Ctrl+Mayús+Z rehace, Enter/Esc cierran el tramo, Esc suelta

@@ -3,7 +3,7 @@
 // posición actual y lo une con el anterior. El mapa se crea una sola vez y se vuelve a colocar tras cada render().
 import { db, push, ref, remove, update } from '../firebase.js';
 import { SIMBOLOS } from '../domain/dibujo.js';
-import { aDibujo, distancia, kmlLevantamiento, listaPuntos, listaVanos, metrosDeVano, nuevaPantallaLev, PRECISION_BAJA, siguienteNombre } from '../domain/levantamiento.js';
+import { aDibujo, cambiosPartirVano, distancia, kmlLevantamiento, listaPuntos, listaVanos, metrosDeVano, nuevaPantallaLev, PRECISION_BAJA, siguienteNombre } from '../domain/levantamiento.js';
 import { TIPOS_TRAMO } from '../domain/plano.js';
 import { hoyLocal } from '../domain/trabajo.js';
 import { state } from '../state.js';
@@ -142,9 +142,15 @@ function dibujarRed() {
       .bindTooltip(`${m.metros.toFixed(1)} m${m.origen === 'medido' ? '' : ' GPS'}`, { permanent: true, direction: 'center', className: 'lev-dist' }).addTo(capaRed);
   });
   listaPuntos(l).forEach(p => {
-    const mk = L.marker([p.lat, p.lng], { icon: icono(p, { actual: u.actual === p.id, sel: u.sel === p.id }), draggable: u.sel === p.id, zIndexOffset: u.sel === p.id ? 1000 : 0 }).addTo(capaRed);
+    // Cualquier punto se arrastra directo (sin seleccionarlo antes); la última movida se puede deshacer
+    const mk = L.marker([p.lat, p.lng], { icon: icono(p, { actual: u.actual === p.id, sel: u.sel === p.id }), draggable: true, autoPan: true, zIndexOffset: u.sel === p.id ? 1000 : 0 }).addTo(capaRed);
     mk.on('click', ev => { L.DomEvent.stopPropagation(ev); alTocarPunto(p.id); });
-    mk.on('dragend', () => { const ll = mk.getLatLng(); update(ref(db, ruta(state.levId, 'puntos/' + p.id)), { lat: ll.lat, lng: ll.lng, movido: true }); });
+    mk.on('dragend', () => {
+      const ll = mk.getLatLng();
+      u.movida = { id: p.id, nombre: p.nombre, lat: p.lat, lng: p.lng, movido: !!p.movido };
+      update(ref(db, ruta(state.levId, 'puntos/' + p.id)), { lat: ll.lat, lng: ll.lng, movido: true });
+      render();
+    });
   });
 }
 function actualizarSeguir() { const b = document.getElementById('lev-seguir'); if (b) b.classList.toggle('activo', !!ui()?.seguir); }
@@ -155,7 +161,7 @@ function marcar(lat, lng, acc = null) {
   const datos = { lat, lng, tipo: u.tipo, nombre: siguienteNombre(l), orden: Date.now(), por: por(), fecha: hoyLocal(), ...(acc !== null ? { acc: Math.round(acc * 10) / 10 } : { manual: true }) };
   const { key } = push(ref(db, ruta(state.levId, 'puntos')), datos);
   if (u.unir && u.actual && l.puntos?.[u.actual]) push(ref(db, ruta(state.levId, 'vanos')), { a: u.actual, b: key, tramo: u.tramo, orden: Date.now() });
-  u.actual = key; u.sel = null;
+  u.actual = key; u.sel = null; u.movida = null;
   showToast(`${datos.nombre} marcado`);
 }
 export function marcarAqui() {
@@ -188,10 +194,42 @@ function unir(a, b) {
   push(ref(db, ruta(state.levId, 'vanos')), { a, b, tramo: u.tramo, orden: Date.now() });
   return true;
 }
+// El vano más cercano al toque (a menos de 24 px en pantalla) y el punto de la línea más cercano
+const VANO_PX = 24;
+function vanoCerca(ll) {
+  const l = lev(); if (!l || !mapa) return null;
+  const c = mapa.latLngToContainerPoint(ll); let mejor = null; let dmin = VANO_PX;
+  listaVanos(l).forEach(v => {
+    const a = l.puntos?.[v.a]; const b = l.puntos?.[v.b]; if (!a || !b) return;
+    const p0 = mapa.latLngToContainerPoint([a.lat, a.lng]); const p1 = mapa.latLngToContainerPoint([b.lat, b.lng]);
+    const vx = p1.x - p0.x; const vy = p1.y - p0.y; const l2 = vx * vx + vy * vy; if (!l2) return;
+    const t = Math.max(0.05, Math.min(0.95, ((c.x - p0.x) * vx + (c.y - p0.y) * vy) / l2));
+    const x = p0.x + vx * t; const y = p0.y + vy * t; const d = Math.hypot(x - c.x, y - c.y);
+    if (d <= dmin) { dmin = d; mejor = { v, en: mapa.containerPointToLatLng([x, y]), a, b }; }
+  });
+  return mejor;
+}
+// Poste en medio de un vano: A–B pasa a A–nuevo–B; el nuevo queda seleccionado para nombrarlo o moverlo
+function insertarEnVano({ v, en, a, b }) {
+  const l = lev(); const u = ui();
+  const r = ref(db, ruta(state.levId, 'puntos'));
+  const id = push(r).key; const keys = [push(ref(db, ruta(state.levId, 'vanos'))).key, push(ref(db, ruta(state.levId, 'vanos'))).key];
+  const nombre = siguienteNombre(l);
+  update(ref(db, ruta(state.levId)), {
+    [`puntos/${id}`]: { lat: en.lat, lng: en.lng, tipo: u.tipo, nombre, manual: true, orden: Date.now(), por: por(), fecha: hoyLocal() },
+    ...cambiosPartirVano(v, id, keys),
+  });
+  u.sel = id; u.movida = null;
+  showToast(`${nombre} puesto entre ${a.nombre} y ${b.nombre}${v.metros !== undefined && v.metros !== null && v.metros !== '' ? '; los metros medidos de ese vano se quitaron' : ''}`);
+  render();
+}
 function alTocarMapa(ll) {
   const u = ui(); if (!u) return;
   const cerca = puntoCerca(ll);
   if (cerca) return alTocarPunto(cerca.id); // tocar cerca de un punto es tocar el punto
+  // Tocar una línea: poste en medio de ese vano
+  const vano = !u.unirDesde && vanoCerca(ll);
+  if (vano && confirm(`¿Poner un ${(SIMBOLOS[u.tipo]?.nombre || 'punto').toLowerCase()} en medio del vano ${vano.a.nombre} – ${vano.b.nombre}?`)) return insertarEnVano(vano);
   if (u.modo === 'tocar') { marcar(ll.lat, ll.lng); return; }
   if (u.sel || u.unirDesde) { u.sel = null; u.unirDesde = null; render(); }
 }
@@ -215,6 +253,11 @@ export function setLev(campo, valor) {
   u[campo] = valor;
   if (campo === 'seguir' && valor && state.gps?.lat && mapa) mapa.setView([state.gps.lat, state.gps.lng], Math.max(mapa.getZoom(), 18));
   render();
+}
+export function deshacerMovidaLev() {
+  const u = ui(); const m = u?.movida; if (!m) return;
+  update(ref(db, ruta(state.levId, 'puntos/' + m.id)), { lat: m.lat, lng: m.lng, movido: m.movido || null });
+  u.movida = null; showToast(`${m.nombre} volvió a su lugar`); render();
 }
 export function deshacerUltimoLev() {
   const l = lev(); const u = ui(); if (!l) return;

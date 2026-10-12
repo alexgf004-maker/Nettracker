@@ -1407,3 +1407,9 @@ button.aviso-inicio-fila { cursor: pointer; }
   /* En celular el botón queda fijo sobre la barra de navegación, siempre a mano */
   .lev-flotante { position: fixed; bottom: calc(78px + env(safe-area-inset-bottom)); }
 }
+
+/* Dibujar: proyecto guardado */
+.dib-proyecto { margin: 0 0 10px; align-items: center; }
+.dib-proyecto.bloque { display: block; }
+.dib-proy-nombre { font-size: 15px; }
+.dib-proy-card.activo { border-color: var(--accent, #0e7490); }

@@ -64,6 +64,8 @@ export const state = {
   levantamientos: {}, // levantamientos/{id}: levantamientos de red en campo
   levId: null, // levantamiento abierto
   lev: null, // estado de la pantalla del levantamiento (modo, tipo de punto, punto actual…)
+  dibujos: {}, // dibujos/{id}: proyectos de Dibujar guardados (nombre, referencia, creado, editado); el contenido en dibujosDatos/{id}
+  dibProyectos: null, // Dibujar: null | 'lista' | 'guardar'
   dibujo: null, // pestaña Dibujar: imagen de fondo y dibujo encima (borrador en este navegador)
   analisisReclamo: null, // { id, params, tension, armonicos } análisis de un reclamo (macros Graficar y Armónicos)
   casoForm: {},

@@ -2650,6 +2650,51 @@ test.describe('Herramienta Dibujar', () => {
     await expect(page.locator('.toast')).toContainText('solo el número');
     expect(errores).toEqual([]);
   });
+  test('proyectos: se guardan en la base para el equipo, se marcan los cambios sin guardar y se vuelven a abrir', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    await page.setViewportSize({ width: 1280, height: 1100 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await page.evaluate(() => localStorage.removeItem('nettracker_dibujo'));
+    await nav(page, 'Dibujar');
+    await subirImagen(page, 1600, 900);
+    await page.getByRole('button', { name: 'Tramo de red' }).click();
+    await tocar(page, 200, 500); await tocar(page, 1000, 500);
+    await page.getByRole('button', { name: 'Terminar tramo' }).click();
+    // Guardar como proyecto: nombre y referencia
+    await page.getByRole('button', { name: 'Guardar como proyecto' }).click();
+    await page.locator('#dib-proy-nombre').fill('Propuesta Col. Prueba');
+    await page.locator('#dib-proy-ref').fill('WO-1');
+    await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+    await expect(page.locator('.dib-proyecto')).toContainText('Propuesta Col. Prueba');
+    await expect(page.locator('.dib-proyecto .tg')).toHaveText('Guardado');
+    let esc = await app.escrituras();
+    const meta = esc.find(([op, r]) => op === 'set' && /^dibujos\/[^/]+$/.test(r));
+    const datos = esc.find(([op, r]) => op === 'set' && /^dibujosDatos\/[^/]+$/.test(r));
+    expect(meta[2]).toMatchObject({ nombre: 'Propuesta Col. Prueba', referencia: 'WO-1' });
+    expect(datos[2].fondo.src.startsWith('data:image/jpeg')).toBe(true); // la imagen se guarda en JPG
+    expect(JSON.parse(datos[2].datos).elementos.filter(e => e.tipo === 'polilinea')).toHaveLength(1);
+    // Un cambio: queda "sin guardar"; Guardar actualiza el mismo proyecto
+    await page.getByRole('button', { name: 'Poste existente' }).click();
+    await tocar(page, 600, 500);
+    await expect(page.locator('.dib-proyecto .tg')).toHaveText('Cambios sin guardar');
+    await page.locator('.dib-proyecto').getByRole('button', { name: 'Guardar', exact: true }).click();
+    await expect(page.locator('.dib-proyecto .tg')).toHaveText('Guardado');
+    esc = await app.escrituras();
+    expect(esc.filter(([op, r]) => op === 'set' && /^dibujos\/[^/]+$/.test(r)).map(([, r]) => r)).toEqual([meta[1], meta[1]]);
+    // Nuevo dibujo y volver a abrir el proyecto desde la lista
+    await page.getByRole('button', { name: 'Nuevo', exact: true }).click();
+    await expect(page.locator('.dib-proyecto')).toContainText('Borrador');
+    await page.getByRole('button', { name: /Proyectos guardados \(1\)/ }).click();
+    await expect(page.locator('.dib-proy-card')).toContainText('WO-1');
+    await page.locator('.dib-proy-card').getByRole('button', { name: 'Abrir' }).click();
+    await expect(page.locator('.dib-proyecto')).toContainText('Propuesta Col. Prueba');
+    const el = await page.evaluate(async () => (await import('/js/state.js')).state.dibujo.elementos.map(e => e.tipo));
+    expect(el.sort()).toEqual(['polilinea', 'simbolo']);
+    await expect(page.locator('#dib-svg image')).toHaveCount(1);
+    expect(errores).toEqual([]);
+  });
+
   test('imán: el poste cae sobre la línea, se pega a los vértices y arrastra lo que tiene pegado', async ({ page }) => {
     const errores = []; page.on('pageerror', e => errores.push(e.message));
     await page.setViewportSize({ width: 1280, height: 1100 });
@@ -2807,6 +2852,52 @@ test.describe('Levantamiento en campo', () => {
     await page.mouse.click(p2.x + p2.width / 2 + 26, p2.y + p2.height / 2 + 10);
     await expect(page.locator('.lev-vano', { hasText: 'P3 – P2' })).toHaveCount(1);
     await expect(page.locator('.leaflet-marker-icon')).toHaveCount(3);
+    expect(errores).toEqual([]);
+  });
+
+  test('corregir en campo: arrastrar un poste sin seleccionarlo (y deshacer) y poner un poste en medio de un vano', async ({ page, context }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    await context.grantPermissions(['geolocation']);
+    await context.setGeolocation({ latitude: 13.5, longitude: -88.87, accuracy: 4 });
+    await page.setViewportSize({ width: 1280, height: 1100 });
+    app = await abrirApp(page, { leaflet: true });
+    await cerrarAlerta(page);
+    await nav(page, 'Levantamiento');
+    await page.locator('#lev-nombre').fill('Corregir');
+    await page.getByRole('button', { name: 'Empezar levantamiento' }).click();
+    await expect(page.locator('#lev-gps')).toHaveText('GPS ±4 m');
+    const poste = page.getByRole('button', { name: 'Poste aquí' });
+    await poste.click();
+    await context.setGeolocation({ latitude: 13.5, longitude: -88.8694, accuracy: 4 });
+    await expect(page.locator('#lev-gps')).toHaveText('GPS ±4 m');
+    await poste.click();
+    await expect(page.locator('.leaflet-marker-icon')).toHaveCount(2);
+    await page.getByRole('button', { name: 'Seguir mi ubicación' }).click(); // que el mapa no se mueva solo
+    const centro = async n => { const b = await page.locator('.leaflet-marker-icon', { hasText: n }).boundingBox(); return [b.x + b.width / 2, b.y + b.height / 2]; };
+    const pos = async n => page.evaluate(async n => { const { state } = await import('/js/state.js'); return Object.values(state.levantamientos[state.levId].puntos).find(p => p.nombre === n); }, n);
+    // Arrastrar P1 directo (sin tocarlo antes)
+    const antes = await pos('P1');
+    const [x1, y1] = await centro('P1');
+    await page.mouse.move(x1, y1); await page.mouse.down(); await page.mouse.move(x1, y1 + 60, { steps: 8 }); await page.mouse.up();
+    await expect(page.locator('.alert-banner', { hasText: 'P1 movido' })).toHaveCount(1);
+    const despues = await pos('P1');
+    expect(despues.lat).toBeLessThan(antes.lat);
+    expect(despues.movido).toBe(true);
+    await page.locator('.alert-banner', { hasText: 'P1 movido' }).getByRole('button', { name: 'Deshacer' }).click();
+    await expect(page.locator('.alert-banner', { hasText: 'P1 movido' })).toHaveCount(0);
+    expect((await pos('P1')).lat).toBeCloseTo(antes.lat, 7);
+    // Tocar la línea entre P1 y P2: poste nuevo en medio, el vano se parte en dos
+    const [a, b] = [await centro('P1'), await centro('P2')];
+    await page.evaluate(() => { window.__preguntas = []; window.confirm = m => { window.__preguntas.push(m); return true; }; });
+    await page.mouse.click((a[0] + b[0]) / 2 + 10, (a[1] + b[1]) / 2 + 8);
+    expect((await page.evaluate(() => window.__preguntas)).join(' ')).toContain('en medio del vano P1 – P2');
+    await expect(page.locator('.leaflet-marker-icon')).toHaveCount(3);
+    await expect(page.locator('.lev-vano')).toHaveCount(2);
+    await expect(page.locator('.lev-vano', { hasText: 'P1 – P3' })).toHaveCount(1);
+    await expect(page.locator('.lev-vano', { hasText: 'P3 – P2' })).toHaveCount(1);
+    await expect(page.locator('.lev-panel')).toContainText('P3'); // queda seleccionado
+    const p3 = await pos('P3');
+    expect(Math.abs(p3.lat - 13.5)).toBeLessThan(0.00002); // sobre la línea
     expect(errores).toEqual([]);
   });
 });
