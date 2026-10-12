@@ -95,14 +95,17 @@ export function tablaDistancias(elementos, escala, tol = 12) {
   });
   return filas;
 }
-// Total por tipo de tramo (solo los tramos con todos sus vanos medidos)
+// Nombre de una red en la simbología y los totales: el que se le puso o el de su tipo
+export const nombreRed = t => String(t.nombreRed || '').trim() || TIPOS_TRAMO[t.tramo]?.nombre || 'Red';
+// Total por red (tipo, color propio y nombre; solo los tramos con todos sus vanos medidos)
 export function totalesPorTipo(elementos, escala) {
-  const tot = {};
+  const tot = new Map();
   elementos.filter(e => e.tipo === 'polilinea' && e.puntos.length > 1).forEach(t => {
     const m = metrosTramo(t, escala); if (m === null) return;
-    const k = t.tramo || 'bt'; tot[k] = (tot[k] || 0) + m;
+    const k = `${t.tramo || 'bt'}|${t.colorRed || ''}|${nombreRed(t)}`;
+    const x = tot.get(k) || { tipo: t.tramo || 'bt', nombre: nombreRed(t), metros: 0 }; x.metros += m; tot.set(k, x);
   });
-  return Object.entries(tot).map(([k, m]) => ({ tipo: k, nombre: TIPOS_TRAMO[k]?.nombre || k, metros: m }));
+  return [...tot.values()];
 }
 // Nombre de cada vano para escribir sus metros: "P1 → P2" si los extremos tienen etiqueta, si no "punto 1 → 2"
 export function nombresVanos(t, elementos, tol = 12) {

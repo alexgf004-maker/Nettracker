@@ -1364,7 +1364,6 @@ button.aviso-inicio-fila { cursor: pointer; }
 .dib-destino { fill: #fde047; }
 .dib-iman { fill: rgba(245, 158, 11, .25); stroke: #f59e0b; stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: none; }
 .dib-ayuda { margin: 0 0 8px; }
-.dib-lienzo { position: relative; height: max(360px, calc(100vh - 64px - var(--dib-barra, 130px) - 80px)); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: repeating-conic-gradient(#e5e7eb 0% 25%, #f8fafc 0% 50%) 50% / 20px 20px; }
 .dib-svg { display: block; width: 100%; height: 100%; touch-action: none; user-select: none; -webkit-user-select: none; }
 .dib-svg.herr-seleccionar { cursor: default; } .dib-svg:not(.herr-seleccionar) { cursor: crosshair; }
 .dib-svg [data-id] { cursor: move; }
@@ -1372,7 +1371,6 @@ button.aviso-inicio-fila { cursor: pointer; }
 .dib-sel { fill: none; stroke: #0ea5e9; stroke-width: 2; stroke-dasharray: 8 6; vector-effect: non-scaling-stroke; pointer-events: none; }
 .dib-tirador { fill: #ffffff; stroke: #0ea5e9; stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: none; }
 .dib-toque { fill: transparent; stroke: none; cursor: nwse-resize; }
-@media (max-width: 700px) { .dib-barra { position: static; } .dib-final { margin-left: 0; } .dib-btn { width: 38px; height: 38px; } .dib-grupo-t { border-right: 0; padding-right: 0; } }
 
 /* ── Levantamiento en campo ── */
 .lev-cabecera { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
@@ -1427,19 +1425,88 @@ button.aviso-inicio-fila { cursor: pointer; }
 .tap-tabla tr.tap-mejor td { background: rgba(16, 185, 129, .08); }
 .tap-tabla tr.tap-prop td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
 
-/* Dibujar: zoom y pantalla completa */
-.dib-zoom { position: absolute; bottom: 8px; right: 8px; z-index: 2; display: flex; align-items: center; gap: 4px; background: rgba(255, 255, 255, .94); border: 1px solid var(--border); border-radius: 12px; padding: 4px 6px; box-shadow: 0 2px 8px rgba(15, 23, 42, .12); }
-.dib-zoom #dib-zoom-pct { min-width: 46px; text-align: center; font-size: 12px; font-weight: 700; color: #334155; }
-.dib-zoom .b { padding: 6px 10px; font-size: 13px; }
-.dib-pagina.ampliada { position: fixed; inset: 64px 0 0 0; z-index: 60; max-width: none; margin: 0; padding: 8px; background: var(--bg, #f1f5f9); display: flex; flex-direction: column; overflow: hidden; }
-.dib-pagina.ampliada > :not(.dib-barra):not(.dib-sel-barra):not(.dib-lienzo):not(.dib-simbolos) { display: none; }
-.dib-pagina.ampliada .dib-barra { position: static; }
-.dib-pagina.ampliada .dib-lienzo { flex: 1; height: auto; min-height: 0; }
-@media (max-width: 700px) { .dib-lienzo { height: max(320px, calc(100vh - 150px)); } .dib-zoom { bottom: 6px; right: 6px; } .dib-zoom .b-l { display: none; } .dib-pagina.ampliada { bottom: 64px; }
-  .dib-pagina.ampliada .dib-barra { flex-wrap: nowrap; overflow-x: auto; gap: 10px; padding: 6px 8px; scrollbar-width: none; }
-  .dib-pagina.ampliada .dib-barra small { display: none; }
-  .dib-pagina.ampliada .dib-grupo-t, .dib-pagina.ampliada .dib-grupo { flex-wrap: nowrap; flex: 0 0 auto; }
-  .dib-pagina.ampliada .dib-sel-barra { flex-wrap: nowrap; overflow-x: auto; min-height: 0; }
-  .dib-pagina.ampliada .dib-sel-barra .page-sub { white-space: nowrap; } }
+
 
 .dib-svg.herr-seleccionar [data-chip] { cursor: grab; }
+
+/* ── Dibujar: editor (como un programa de diseño) ── */
+.dib-app { position: fixed; top: var(--dib-top, 64px); left: var(--dib-left, 0px); right: 0; bottom: var(--dib-bottom, 0px); z-index: 40; display: flex; flex-direction: column; background: #e9edf2; }
+.dib-app.ampliada { left: 0; z-index: 65; }
+.dib-superior { display: flex; align-items: center; gap: 10px; padding: 6px 10px; background: var(--white); border-bottom: 1px solid var(--border); flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.dib-superior > * { flex: 0 0 auto; }
+.dib-superior .b { padding: 7px 12px; font-size: 13px; }
+.dib-proyecto { display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: nowrap; }
+.dib-proy-nombre { font-size: 14px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dib-sup-grupo { display: flex; align-items: center; gap: 4px; }
+.dib-sup-fin { margin-left: auto; gap: 6px; }
+.dib-subir { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.dib-cuerpo { flex: 1; min-height: 0; display: flex; }
+.dib-herramientas { width: 96px; flex: 0 0 96px; background: var(--white); border-right: 1px solid var(--border); overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 4px; scrollbar-width: thin; }
+.dib-herr-grupo small { display: block; font-size: 9.5px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; color: var(--text3); padding: 4px 2px 2px; }
+.dib-herr-grupo > div { display: grid; grid-template-columns: repeat(2, 40px); gap: 4px; }
+.dib-lienzo { position: relative; flex: 1; min-width: 0; overflow: hidden; background: repeating-conic-gradient(#dfe4ea 0% 25%, #eef1f5 0% 50%) 50% / 20px 20px; }
+.dib-ayuda-lienzo { position: absolute; left: 10px; top: 10px; z-index: 2; max-width: min(520px, 55%); font-size: 12px; color: #334155; background: rgba(255, 255, 255, .92); border: 1px solid var(--border); border-radius: 10px; padding: 6px 10px; pointer-events: none; }
+.dib-zoom { position: absolute; bottom: 10px; right: 10px; z-index: 2; display: flex; align-items: center; gap: 4px; background: rgba(255, 255, 255, .95); border: 1px solid var(--border); border-radius: 12px; padding: 4px 6px; box-shadow: 0 2px 8px rgba(15, 23, 42, .12); }
+.dib-zoom #dib-zoom-pct { min-width: 46px; text-align: center; font-size: 12px; font-weight: 700; color: #334155; }
+.dib-zoom .b { padding: 6px 10px; font-size: 13px; }
+.dib-panel { width: 300px; flex: 0 0 300px; background: var(--white); border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+.dib-app.sin-panel .dib-panel { display: none; }
+.dib-panel-cab { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 14px; }
+.dib-panel-cuerpo { flex: 1; overflow-y: auto; padding: 4px 14px 16px; }
+.dib-sec { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.dib-sec:last-child { border-bottom: 0; }
+.dib-sec h4 { margin: 0 0 8px; font-size: 11px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; color: var(--text3); }
+.dib-sec .field { margin-bottom: 8px; }
+.dib-sec textarea, .dib-sec input:not([type=checkbox]):not([type=color]), .dib-sec select { width: 100%; }
+.dib-sec .page-sub { font-size: 12px; margin-top: 6px; }
+.dib-lista { display: flex; flex-direction: column; gap: 4px; }
+.dib-lista .dib-chip { border-radius: 10px; justify-content: flex-start; }
+.dib-colores { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.dib-color-auto { height: 28px; padding: 0 6px; border-radius: 14px; border: 2px solid var(--border); background: var(--white); cursor: pointer; display: inline-flex; align-items: center; }
+.dib-color-auto.activo { outline: 3px solid var(--primary); outline-offset: 2px; }
+.dib-color-libre { position: relative; overflow: hidden; display: inline-block; }
+.dib-color-libre input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.dib-tamano { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+.dib-tamano span { flex: 1; }
+.dib-tamano .dib-btn { border: 1.5px solid var(--border); }
+.dib-acciones-el { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.dib-simbolo-sel { display: flex; align-items: center; gap: 10px; font-weight: 700; margin-bottom: 8px; }
+.dib-vanos { display: block; }
+.dib-sec .dib-simbolos { grid-template-columns: repeat(3, 1fr); }
+.dib-abrir-panel { display: none; }
+.dib-cerrar-movil { display: none; }
+.dib-modal { z-index: 90; align-items: center; justify-content: center; }
+.dib-modal .modal { max-width: 560px; width: calc(100% - 24px); padding: 16px; border-radius: 16px; }
+.dib-svg [data-chip] { cursor: grab; }
+@media (max-width: 1240px) { .dib-borrador { display: none; } }
+@media (max-width: 900px) {
+  .dib-panel { width: 260px; flex-basis: 260px; }
+  .dib-subir span { display: none; }
+}
+@media (max-width: 700px) {
+  .dib-superior { flex-wrap: nowrap; overflow-x: auto; gap: 8px; padding: 6px 8px; scrollbar-width: none; }
+  .dib-superior > * { flex: 0 0 auto; }
+  .dib-proyecto { flex-wrap: nowrap; }
+  .dib-proy-nombre { max-width: 140px; }
+  .dib-sup-fin { margin-left: 0; }
+  .dib-toggle-panel { display: none; }
+  .dib-cuerpo { flex-direction: column-reverse; }
+  .dib-herramientas { width: auto; flex: 0 0 auto; flex-direction: row; overflow-x: auto; overflow-y: hidden; border-right: 0; border-top: 1px solid var(--border); padding: 4px 6px; gap: 8px; scrollbar-width: none; }
+  .dib-herr-grupo { display: flex; align-items: center; flex: 0 0 auto; }
+  .dib-herr-grupo small { display: none; }
+  .dib-herr-grupo > div { display: flex; gap: 2px; }
+  .dib-herr-grupo + .dib-herr-grupo { border-left: 1px solid var(--border); padding-left: 6px; }
+  .dib-lienzo { flex: 1; }
+  .dib-panel { display: none; position: absolute; left: 0; right: 0; bottom: 0; width: auto; max-height: 58%; border-left: 0; border-top: 1px solid var(--border); border-radius: 16px 16px 0 0; box-shadow: 0 -10px 30px -10px rgba(15, 23, 42, .4); z-index: 6; }
+  .dib-app.panel-movil .dib-panel { display: flex; }
+  .dib-app.sin-panel.panel-movil .dib-panel { display: flex; }
+  .dib-cuerpo { position: relative; }
+  .dib-cerrar-movil { display: inline-flex; }
+  .dib-abrir-panel { display: inline-flex; align-items: center; gap: 6px; position: absolute; top: 8px; left: 8px; z-index: 3; max-width: calc(100% - 16px); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: rgba(255, 255, 255, .96); font: inherit; font-size: 13px; font-weight: 700; color: var(--text); box-shadow: 0 2px 8px rgba(15, 23, 42, .15); }
+  .dib-abrir-panel span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dib-ayuda-lienzo { display: none; }
+  .dib-zoom { bottom: 8px; right: 8px; }
+  .dib-zoom .b-l { display: none; }
+  .dib-app.ampliada { bottom: 0; }
+}
+.dib-sec h4 .dib-total-tramo { float: right; text-transform: none; letter-spacing: 0; color: var(--primary); }
