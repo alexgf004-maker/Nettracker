@@ -3,7 +3,8 @@
 // cada vano sale de las coordenadas (precisión del GPS del celular: 3 a 10 m con buena señal) salvo que se escriban los
 // metros medidos (cinta o telémetro), que mandan. Se pasa a la herramienta Dibujar como lámina y se exporta a KML.
 import { TIPOS_TRAMO } from './plano.js';
-import { hayAcometidas, sumaAcometidas, textoAcometidas } from './red.js';
+import { medidaEtiqueta } from './dibujo.js';
+import { hayAcometidas, sumaAcometidas, textoAcometidas, textoPoste } from './red.js';
 
 // Tipos de punto que se marcan en campo (los mismos símbolos de red de Dibujar)
 export const TIPOS_PUNTO = ['poste', 'poste_nuevo', 'puente', 'trafo', 'trafo_nuevo', 'banco', 'usuario', 'medidor_red', 'seccionador', 'medicion'];
@@ -84,12 +85,29 @@ export function aDibujo(lev, { ancho = 1600, alto = 1000, margen = 140 } = {}) {
     elementos.push({ id: id(), tipo: 'simbolo', simbolo: p.tipo || 'poste', color: SIMBOLO_COLOR[p.tipo] || '#111827', grosor: 3, escala, rot: 0, x: x - 30 * escala, y: y - 30 * escala,
       ...(p.altura ? { altura: Number(p.altura) } : {}), ...(p.estructuras?.length ? { estructuras: [...p.estructuras] } : {}) });
   });
+  // Etiquetas: nombre y nota (en dos líneas) hacia el lado más libre de vanos, dentro de la lámina
+  const vecinos = {};
+  listaVanos(lev).forEach(v => { if (pos[v.a] && pos[v.b]) { (vecinos[v.a] ??= []).push(pos[v.b]); (vecinos[v.b] ??= []).push(pos[v.a]); } });
+  const DIRS = [-90, -45, -135, 0, 180, 45, 135, 90].map(g => (g * Math.PI) / 180); // arriba primero
+  const difAng = (a, b) => { const d = Math.abs(a - b) % (2 * Math.PI); return d > Math.PI ? 2 * Math.PI - d : d; };
   puntos.forEach(p => {
     const [x, y] = pos[p.id];
-    const texto = [p.nombre, p.nota].filter(Boolean).join(': ');
+    const texto = [p.nombre, p.nota].filter(Boolean).join('\n');
     if (!texto) return;
     const proyectado = p.tipo === 'poste_nuevo' || p.tipo === 'trafo_nuevo';
-    elementos.push({ id: id(), tipo: 'etiqueta', estilo: p.tipo === 'usuario' ? 'destacado' : proyectado ? 'proyectado' : 'existente', texto, tam: 19, tx: x, ty: y, x: x + 26, y: y - 64 });
+    const tam = 19; const m = medidaEtiqueta({ texto, tam }, textoPoste(p));
+    const angs = (vecinos[p.id] || []).map(([vx, vy]) => Math.atan2(vy - y, vx - x));
+    // Puntaje: lo más lejos posible de los vanos, mejor arriba (abajo van los metros) y sin salirse de la lámina
+    const caja = a => { const ux = Math.cos(a); const uy = Math.sin(a); const dist = 34 + Math.abs(ux) * m.w / 2 + Math.abs(uy) * m.h / 2; return [x + ux * dist - m.w / 2, y + uy * dist - m.h / 2]; };
+    const puntaje = (a, i) => {
+      const libre = (angs.length ? Math.min(...angs.map(b => difAng(a, b))) : Math.PI) * 180 / Math.PI;
+      const [bx, by] = caja(a); const fuera = bx < 8 || by < 8 || bx + m.w > ancho - 8 || by + m.h > alto - 8;
+      return Math.min(libre, 90) - (fuera ? 200 : 0) - (Math.sin(a) > 0.3 ? 30 : 0) - i;
+    };
+    const dir = DIRS.map((a, i) => ({ a, p: puntaje(a, i) })).sort((p, q) => q.p - p.p)[0].a;
+    const [bx, by] = caja(dir);
+    const ex = Math.max(8, Math.min(ancho - m.w - 8, bx)); const ey = Math.max(8, Math.min(alto - m.h - 8, by));
+    elementos.push({ id: id(), tipo: 'etiqueta', estilo: p.tipo === 'usuario' ? 'destacado' : proyectado ? 'proyectado' : 'existente', texto, tam, tx: x, ty: y, x: ex, y: ey });
   });
   return { fondo: null, elementos, escala: 1 / k, lienzo: { w: ancho, h: alto } };
 }

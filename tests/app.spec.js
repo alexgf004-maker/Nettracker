@@ -2804,7 +2804,10 @@ test.describe('Herramienta Dibujar', () => {
     const tramo = () => page.evaluate(async () => (await import('/js/state.js')).state.dibujo.elementos.find(e => e.tipo === 'polilinea'));
     // Arrastrar el chip de metros: se corre (con guía) y el tramo no se mueve
     await page.getByRole('button', { name: 'Seleccionar y mover (V)' }).click();
-    await arrastrar(page, [600, 500], [600, 400]);
+    // (el chip va al lado de la línea, debajo en un vano acostado)
+    const chip = await page.evaluate(() => { const b = document.querySelector('#dib-capa [data-chip="1"]').getBBox(); return [b.x + b.width / 2, b.y + b.height / 2]; });
+    expect(chip[1]).toBeGreaterThan(510);
+    await arrastrar(page, chip, [chip[0], chip[1] - 100]);
     let t = await tramo();
     expect(t.puntos.map(q => q.map(Math.round))).toEqual([[200, 500], [1000, 500]]);
     expect(t.desfases['1'].map(Math.round)).toEqual([0, -100]);
@@ -3079,10 +3082,12 @@ test.describe('Levantamiento en campo', () => {
     await expect(page.locator('#dib-cajetin text', { hasText: /^P1 – P2$/ })).toHaveCount(1);
     await expect(page.locator('#dib-cajetin text', { hasText: /^32\.0$/ })).toHaveCount(1);
     await expect(page.locator('#dib-cajetin text', { hasText: 'LEVANTAMIENTO DE RED' })).toHaveCount(1);
-    await expect(page.locator('#dib-capa text', { hasText: 'P1: Poste de madera deteriorado' })).toHaveCount(1);
+    // Etiqueta en dos líneas: nombre y nota
+    await expect(page.locator('#dib-capa text', { hasText: /^P1$/ })).toHaveCount(1);
+    await expect(page.locator('#dib-capa text', { hasText: /^Poste de madera deteriorado$/ })).toHaveCount(1);
     // Pasan a la lámina: altura y estructuras junto al poste y el conductor junto a los metros del vano
     await expect(page.locator('#dib-capa text', { hasText: "35' · 23TS3 / TS3" })).toHaveCount(1);
-    await expect(page.locator('#dib-capa text', { hasText: '32.0 m · #2 ACSR' })).toHaveCount(1);
+    await expect(page.locator('#dib-capa [data-chip] text', { hasText: /^#2 ACSR$/ })).toHaveCount(3); // debajo de los metros; los vanos siguientes heredan el conductor
     // Se pueden ocultar desde la lámina
     await page.locator('#dib-lam-verEstructuras').uncheck();
     await expect(page.locator('#dib-capa text', { hasText: /^35'$/ })).toHaveCount(1);

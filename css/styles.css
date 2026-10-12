@@ -1393,7 +1393,10 @@ button.aviso-inicio-fila { cursor: pointer; }
 .lev-dist::before { display: none; }
 .lev-panel, .lev-vanos { margin-top: 10px; }
 .lev-vanos summary { cursor: pointer; padding: 4px 0 8px; }
-.lev-vano { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--border); }
+.lev-vano { display: grid; grid-template-columns: minmax(0, 1.6fr) 120px 90px 140px 160px auto; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--border); }
+.lev-vano > input, .lev-vano > select { width: 100%; min-width: 0; height: 38px; padding: 4px 10px; }
+.lev-vano-nombre { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+@media (max-width: 900px) { .lev-vano { grid-template-columns: 1fr 1fr; } .lev-vano-nombre { grid-column: 1 / -1; } }
 .lev-vano input { width: 170px; }
 .lev-salidas { margin-top: 12px; }
 @media (max-width: 700px) {
@@ -1520,7 +1523,6 @@ button.aviso-inicio-fila { cursor: pointer; }
 .dib-dos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .dib-vano-fila { display: grid; grid-template-columns: 1fr 108px; gap: 6px; }
 .lev-datos-poste { display: grid; grid-template-columns: minmax(0, 160px) minmax(0, 1fr); gap: 12px; margin-top: 4px; }
-.lev-vano input[list] { width: 90px; }
 @media (max-width: 700px) { .lev-datos-poste { grid-template-columns: 1fr; } }
 
 /* Levantamiento: acometidas */
@@ -1533,3 +1535,5 @@ button.aviso-inicio-fila { cursor: pointer; }
 .lev-acom-tipo .b-l { border: 1.5px solid var(--border); border-radius: 10px; padding: 6px 0; font-size: 18px; text-decoration: none; }
 .lev-acom-total { margin-top: 10px; font-size: 13px; }
 .lev-acom-dif { color: var(--red); font-weight: 700; }
+.lev-acom { margin-top: 10px; }
+.dib-panel-ayuda { padding: 8px 14px; font-size: 12px; line-height: 1.4; color: #475569; background: #f8fafc; border-bottom: 1px solid var(--border); }

@@ -49,9 +49,12 @@ export const nuevoId = () => `e${Date.now().toString(36)}${(contador++).toString
 
 // ── Medidas de etiquetas, leyendas y tablas (texto en negrita Arial, ancho aproximado por carácter) ──
 const ANCHO_LETRA = 0.68; // mayúsculas en negrita (P1, USUARIO) caben con holgura
-export function medidaEtiqueta(el) {
+// sub: datos del poste al que apunta (altura y estructuras), en una franja blanca debajo del nombre
+export function medidaEtiqueta(el, sub = '') {
   const lineas = String(el.texto || '').split('\n'); const pad = el.tam * 0.45;
-  return { w: Math.max(1, ...lineas.map(l => l.length)) * el.tam * ANCHO_LETRA + pad * 2, h: lineas.length * el.tam * 1.2 + pad * 0.8, pad, lineas };
+  const ts = el.tam * 0.8; const altoSub = sub ? ts * 1.45 : 0;
+  const w = Math.max(Math.max(1, ...lineas.map(l => l.length)) * el.tam * ANCHO_LETRA, sub ? sub.length * ts * ANCHO_LETRA : 0) + pad * 2;
+  return { w, h: lineas.length * el.tam * 1.2 + pad * 0.8 + altoSub, hNombre: lineas.length * el.tam * 1.2 + pad * 0.8, pad, lineas, sub, ts };
 }
 export function medidaLeyenda(el) {
   const pad = el.tam * 0.5; const muestra = el.tam * 1.8; const alto = el.tam * 1.5;
@@ -116,10 +119,20 @@ export const coloresTramos = elementos => [...new Set(elementos.filter(e => e.ti
 
 // Recuadro blanco redondeado con un texto centrado en (cx, cy): metros de tramos y cotas
 // Chip que se puede arrastrar (metros de un vano o de una cota): `off` lo corre de su lugar; si se aleja, una guía lo une
-function chipMovible(k, cx, cy, off, texto, tam, color) {
-  const [dx, dy] = off || [0, 0];
-  const guia = Math.hypot(dx, dy) > tam * 1.2 ? `<line x1="${r1(cx)}" y1="${r1(cy)}" x2="${r1(cx + dx)}" y2="${r1(cy + dy)}" stroke="${color}" stroke-width="${r1(Math.max(1, tam * 0.09))}" stroke-dasharray="${r1(tam * 0.3)} ${r1(tam * 0.2)}"/><circle cx="${r1(cx)}" cy="${r1(cy)}" r="${r1(tam * 0.18)}" fill="${color}"/>` : '';
-  return `${guia}<g data-chip="${k}">${chipTexto(cx + dx, cy + dy, texto, tam, color)}</g>`;
+// texto: una línea o [principal, secundaria] (la secundaria más chica). base: dónde va sin moverlo (por defecto cx, cy)
+function chipMovible(k, cx, cy, off, texto, tam, color, base = null) {
+  const [dx, dy] = off || [0, 0]; const [bx, by] = base || [cx, cy];
+  const px = bx + dx; const py = by + dy;
+  const guia = Math.hypot(px - cx, py - cy) > tam * 2.4 ? `<line x1="${r1(cx)}" y1="${r1(cy)}" x2="${r1(px)}" y2="${r1(py)}" stroke="${color}" stroke-width="${r1(Math.max(1, tam * 0.09))}" stroke-dasharray="${r1(tam * 0.3)} ${r1(tam * 0.2)}"/><circle cx="${r1(cx)}" cy="${r1(cy)}" r="${r1(tam * 0.18)}" fill="${color}"/>` : '';
+  const [l1, l2] = Array.isArray(texto) ? texto : [texto, ''];
+  return `${guia}<g data-chip="${k}">${l2 ? chipDoble(px, py, l1, l2, tam, color) : chipTexto(px, py, l1, tam, color)}</g>`;
+}
+export const medidaChip = (l1, l2, tam) => ({ w: Math.max(String(l1).length * tam * 0.6, String(l2 || '').length * tam * 0.8 * 0.6) + tam, h: l2 ? tam * 1.3 + tam * 0.8 * 1.2 : tam * 1.5 });
+function chipDoble(cx, cy, l1, l2, tam, color) {
+  const { w, h } = medidaChip(l1, l2, tam); const t2 = tam * 0.8;
+  return `<rect x="${r1(cx - w / 2)}" y="${r1(cy - h / 2)}" width="${r1(w)}" height="${r1(h)}" rx="${r1(tam * 0.55)}" fill="#ffffff" stroke="${color}" stroke-width="${r1(Math.max(1, tam * 0.12))}"/>`
+    + `<text x="${r1(cx)}" y="${r1(cy - h / 2 + tam * 1.05)}" text-anchor="middle" font-size="${r1(tam)}" font-weight="800" font-family="${FUENTE}" fill="${NEGRO}">${esc(l1)}</text>`
+    + `<text x="${r1(cx)}" y="${r1(cy - h / 2 + tam * 1.3 + t2 * 0.95)}" text-anchor="middle" font-size="${r1(t2)}" font-weight="600" font-family="${FUENTE}" fill="#334155">${esc(l2)}</text>`;
 }
 function chipTexto(cx, cy, texto, tam, color) {
   const w = String(texto).length * tam * 0.6 + tam * 1; const h = tam * 1.5;
@@ -134,7 +147,8 @@ function trazosTramo(d, color, ancho, dash) {
 
 // SVG de un elemento. sel: tiradores de edición; ui: tamaño de tiradores; escala y distancias: metros por vano
 // ver: qué datos técnicos salen en el plano (calibre de los vanos, altura y estructuras de los postes)
-export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias = false, ver = {} } = {}) {
+// datoEn(x, y): datos del poste en ese punto (para la etiqueta que apunta a él); conEtiqueta(x, y): hay una etiqueta ahí
+export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias = false, ver = {}, datoEn = null, conEtiqueta = null } = {}) {
   const st = `stroke="${el.color}" stroke-width="${el.grosor || 3}" fill="none" stroke-linecap="round" stroke-linejoin="round"`;
   const id = `data-id="${el.id}"`;
   let s = '';
@@ -164,9 +178,18 @@ export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias
           const m = distancias ? metrosVano(el, i, escala) : null;
           const cond = ver.calibre !== false ? textoConductor(conductorVano(el, i)) : '';
           const acom = ver.acometidas !== false ? textoAcometidas(el.acometidas?.[i]) : '';
-          const texto = [m !== null ? fmtMetros(m) : '', cond, acom].filter(Boolean).join(' · ');
-          if (!texto || Math.hypot(x1 - x0, y1 - y0) < ancho * 10) continue;
-          chips += chipMovible(i, (x0 + x1) / 2, (y0 + y1) / 2, el.desfases?.[i], texto, Math.max(15, ancho * 2.8), color);
+          // Metros arriba (grande); conductor y acometidas debajo (más chico)
+          const detalle = [cond, acom].filter(Boolean).join(' · ');
+          const texto = m !== null ? [fmtMetros(m), detalle] : [detalle, ''];
+          const largo = Math.hypot(x1 - x0, y1 - y0);
+          if (!texto[0] || largo < ancho * 10) continue;
+          // Al lado de la línea (no encima): abajo en los vanos acostados, a la izquierda en los parados
+          const tam = Math.max(15, ancho * 2.8); const mc = medidaChip(texto[0], texto[1], tam);
+          let nx = -(y1 - y0) / largo; let ny = (x1 - x0) / largo;
+          if (Math.abs(ny) >= 0.45 ? ny < 0 : nx > 0) { nx = -nx; ny = -ny; }
+          const sep = Math.abs(ny) * mc.h / 2 + Math.abs(nx) * mc.w / 2 + ancho * 0.8 + tam * 0.25;
+          const mx = (x0 + x1) / 2; const my = (y0 + y1) / 2;
+          chips += chipMovible(i, mx, my, el.desfases?.[i], texto, tam, color, [mx + nx * sep, my + ny * sep]);
         }
       }
       s = `<g ${id}><path d="${d}" stroke="transparent" stroke-width="${Math.max(18, ancho * 3)}" fill="none"/>${trazosTramo(d, color, ancho, tp?.dash)}${el.puntos.length === 1 ? `<circle cx="${r1(el.puntos[0][0])}" cy="${r1(el.puntos[0][1])}" r="${r1(ancho)}" fill="${color}"/>` : ''}${chips}</g>`;
@@ -186,7 +209,8 @@ export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias
       const sw = 3 / el.escala;
       const dibujo = `<g transform="translate(${r1(el.x)} ${r1(el.y)}) scale(${el.escala}) rotate(${el.rot || 0} 30 30)" color="${el.color}" stroke="${el.color}" stroke-width="${r1(sw * (el.grosor || 3) / 3)}" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="0" y="0" width="60" height="60" fill="transparent" stroke="none"/>${sim.svg}</g>`;
       // Altura y estructuras del poste debajo de él (se arrastran como los metros)
-      const datos = textoPoste(el, { altura: ver.altura !== false, estructuras: ver.estructuras !== false });
+      const centro = [el.x + 30 * el.escala, el.y + 30 * el.escala];
+      const datos = conEtiqueta?.(...centro) ? '' : textoPoste(el, { altura: ver.altura !== false, estructuras: ver.estructuras !== false });
       // Por defecto arriba a la derecha del símbolo (lejos de los tramos que entran por los lados)
       const tam = Math.max(15, 27 * el.escala); const ancho = String(datos).length * tam * 0.6 + tam;
       const cx = el.x + 60 * el.escala + ancho / 2; const cy = el.y - tam * 0.4;
@@ -198,12 +222,13 @@ export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias
       const est = ESTILOS_ETIQUETA[el.estilo] || null;
       const fondo = est ? est.fondo : el.fondo || '#ffffff'; const tinta = est ? est.texto : NEGRO;
       const linea = est && fondo.toLowerCase() !== '#ffffff' && fondo.toLowerCase() !== '#facc15' ? fondo : NEGRO;
-      const m = medidaEtiqueta(el); const [sx, sy] = salidaEtiqueta(el, m);
+      const m = medidaEtiqueta(el, datoEn?.(el.tx, el.ty) || ''); const [sx, sy] = salidaEtiqueta(el, m);
       const lw = r1(Math.max(1.5, el.tam * 0.09));
       const guia = Math.hypot(el.tx - sx, el.ty - sy) > el.tam * 0.5
         ? `<line x1="${r1(sx)}" y1="${r1(sy)}" x2="${r1(el.tx)}" y2="${r1(el.ty)}" stroke="#ffffff" stroke-width="${r1(lw * 3.4)}" stroke-linecap="round"/><line x1="${r1(sx)}" y1="${r1(sy)}" x2="${r1(el.tx)}" y2="${r1(el.ty)}" stroke="${linea}" stroke-width="${r1(lw * 1.4)}" stroke-linecap="round"/><circle cx="${r1(el.tx)}" cy="${r1(el.ty)}" r="${r1(el.tam * 0.2)}" fill="${linea}" stroke="#ffffff" stroke-width="${lw}"/>` : '';
       const borde = fondo.toLowerCase() === '#ffffff' ? NEGRO : '#ffffff';
-      s = `<g ${id}>${guia}<rect x="${r1(el.x)}" y="${r1(el.y)}" width="${r1(m.w)}" height="${r1(m.h)}" rx="${r1(el.tam * 0.32)}" fill="${fondo}" stroke="${borde}" stroke-width="${r1(lw * 1.3)}" filter="url(#dib-sombra)"/>${m.lineas.map((l, i) => `<text x="${r1(el.x + m.w / 2)}" y="${r1(el.y + m.pad * 0.4 + el.tam * (i + 1) * 1.2 - el.tam * 0.25)}" text-anchor="middle" font-size="${el.tam}" font-weight="700" font-family="${FUENTE}" fill="${tinta}">${esc(l) || ' '}</text>`).join('')}</g>`;
+      const franja = m.sub ? `<rect x="${r1(el.x + lw)}" y="${r1(el.y + m.hNombre)}" width="${r1(m.w - lw * 2)}" height="${r1(m.h - m.hNombre - lw)}" rx="${r1(el.tam * 0.22)}" fill="#ffffff"/><text x="${r1(el.x + m.w / 2)}" y="${r1(el.y + m.hNombre + m.ts * 1.02)}" text-anchor="middle" font-size="${r1(m.ts)}" font-weight="700" font-family="${FUENTE}" fill="${NEGRO}">${esc(m.sub)}</text>` : '';
+      s = `<g ${id}>${guia}<rect x="${r1(el.x)}" y="${r1(el.y)}" width="${r1(m.w)}" height="${r1(m.h)}" rx="${r1(el.tam * 0.32)}" fill="${fondo}" stroke="${m.sub && fondo.toLowerCase() !== '#ffffff' ? fondo : borde}" stroke-width="${r1(lw * 1.3)}" filter="url(#dib-sombra)"/>${m.lineas.map((l, i) => `<text x="${r1(el.x + m.w / 2)}" y="${r1(el.y + m.pad * 0.4 + el.tam * (i + 1) * 1.2 - el.tam * 0.25)}" text-anchor="middle" font-size="${el.tam}" font-weight="700" font-family="${FUENTE}" fill="${tinta}">${esc(l) || ' '}</text>`).join('')}${franja}</g>`;
       break;
     }
     case 'leyenda': {
@@ -380,7 +405,13 @@ export function svgLamina(d, { pantalla = false, ui = 1 } = {}) {
   const H = h + (conCajetin ? altoCajetin(d) : 0);
   const fondo = d.fondo ? `<image href="${d.fondo.src}" x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="none"/>` : `<rect width="${w}" height="${h}" fill="#ffffff"/>`;
   const l = d.lamina || {};
-  const opts = { escala: d.escala, distancias: l.distanciasEnTramos !== false, ver: { calibre: l.verCalibre !== false, altura: l.verAltura !== false, estructuras: l.verEstructuras !== false, acometidas: l.verAcometidas !== false } };
+  const ver = { calibre: l.verCalibre !== false, altura: l.verAltura !== false, estructuras: l.verEstructuras !== false, acometidas: l.verAcometidas !== false };
+  // Un poste con etiqueta lleva sus datos dentro de la etiqueta (un solo rótulo por poste, sin encimarse)
+  const postes = d.elementos.filter(e => e.tipo === 'simbolo' && SIMBOLOS[e.simbolo]?.grupo === 'red').map(e => ({ x: e.x + 30 * e.escala, y: e.y + 30 * e.escala, texto: textoPoste(e, ver) })).filter(p => p.texto);
+  const puntas = d.elementos.filter(e => e.tipo === 'etiqueta').map(e => [e.tx, e.ty]);
+  const cerca = (a, x, y) => Math.hypot(a[0] - x, a[1] - y) < 2;
+  const opts = { escala: d.escala, distancias: l.distanciasEnTramos !== false, ver,
+    datoEn: (x, y) => postes.find(p => cerca([p.x, p.y], x, y))?.texto || '', conEtiqueta: (x, y) => puntas.some(p => cerca(p, x, y)) };
   const capa = definiciones(d.elementos) + d.elementos.map(e => svgElemento(e, { ...opts, sel: pantalla && e.id === d.sel, ui })).join('')
     + (pantalla && d.iman ? `<circle class="dib-iman" cx="${r1(d.iman[0])}" cy="${r1(d.iman[1])}" r="${r1(8 * ui)}"/>` : '')
     + (pantalla && d.calibracion ? `<line x1="${r1(d.calibracion.x1)}" y1="${r1(d.calibracion.y1)}" x2="${r1(d.calibracion.x2)}" y2="${r1(d.calibracion.y2)}" stroke="#f97316" stroke-width="${r1(4 * ui)}" stroke-dasharray="${r1(10 * ui)} ${r1(6 * ui)}"/>` : '');
