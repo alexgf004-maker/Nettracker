@@ -32,6 +32,12 @@ export function resumenProyectado(U, nFases, nominal, tol, factor) {
   const Up = proyectarU(U, fases, factor);
   return { factor, resumen: resumenTension(Up, nFases, nominal, tol), est: Object.fromEntries(fases.map(p => [p, estadisticas(Up[p].v)])) };
 }
+// U prom (promedio de las fases), máx y mín de todas las fases de unas estadísticas por fase
+export function totalesFases(est) {
+  const e = Object.values(est || {});
+  const conMin = e.filter(x => x.min !== null);
+  return { prom: e.length ? e.reduce((s, x) => s + (x.prom || 0), 0) / e.length : null, max: e.length ? Math.max(...e.map(x => x.max ?? -Infinity)) : null, min: conMin.length ? Math.min(...conMin.map(x => x.min)) : null };
+}
 // Todas las posiciones con placa, comparadas desde la actual; `mejor`: la de menor FebNoPer (empate: la más cercana a la actual)
 export function compararPosiciones(U, nFases, nominal, tol, proy) {
   if (!placaDe(proy, proy?.actual)) return [];

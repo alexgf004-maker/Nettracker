@@ -2367,6 +2367,28 @@ test.describe('Análisis de reclamos', () => {
     expect(combo).toContain('<c:axPos val="r"/>');
     expect(combo).toContain("'Combinada 1'!$C$2:$C$145");
 
+    // Proyección con cambio de TAP activa: hoja propia con medida y proyectada (punteada), resumen y todas las posiciones
+    await page.evaluate(() => { setTapReclamo('activo', true); setTapReclamo('red', '23kv'); setTapReclamo('actual', '3'); setTapReclamo('propuesta', '2'); });
+    const dp = await bajar('Excel de tensión');
+    const bp = require('fs').readFileSync(await dp.path());
+    const wp = XLSX.read(bp);
+    expect(wp.SheetNames.slice(0, 2)).toEqual(['Tensión promedio', 'Proyección TAP']);
+    const proy = XLSX.utils.sheet_to_json(wp.Sheets['Proyección TAP'], { header: 1 });
+    expect(proy[0].slice(0, 9)).toEqual(['Fecha/Hora', 'U1 [V]', 'U2 [V]', 'U3 [V]', 'U1 TAP 2 [V]', 'U2 TAP 2 [V]', 'U3 TAP 2 [V]', 'SOBRE+6%', 'SUB-6%']);
+    expect(proy[1][4]).toBeCloseTo(14256 * 13200 / 13800, 2); // primer registro (alto) proyectado
+    const fila = txt => proy.find(f => f.includes(txt));
+    expect(fila('Posición propuesta')).toContain('2 (placa 13800 V)');
+    const resumen = proy[proy.indexOf(fila('Registros Totales')) + 1].filter(v => v !== undefined && v !== null && v !== '');
+    expect(resumen.slice(-2)).toEqual([0, 'DENTRO DE TOLERANCIA']);
+    const pos2 = proy.find(f => f[10] === 2 && f[11] === 13800);
+    expect(pos2).toContain('propuesta · menor FebNoPer');
+    expect(proy.filter(f => typeof f[10] === 'number' && f[11] >= 12540 && f[11] <= 14400)).toHaveLength(5);
+    const zp = XLSX.CFB.read(bp, { type: 'buffer' });
+    const chartP = Buffer.from(XLSX.CFB.find(zp, '/xl/charts/chart2.xml').content).toString();
+    expect(chartP).toContain('TENSIÓN PROMEDIO MEDIDA Y PROYECTADA EN TAP 2');
+    expect(chartP).toContain("'Proyección TAP'!$E$2:$E$145");
+    expect(chartP).toContain('<a:prstDash val="dash"/>');
+
     const da = await bajar('Excel de armónicos');
     expect(da.suggestedFilename()).toBe('RE1920264560_Armonicos.xlsx');
     const ba = require('fs').readFileSync(await da.path());

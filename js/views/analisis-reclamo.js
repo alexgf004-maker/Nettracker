@@ -7,7 +7,7 @@ import {
 import { diagnosticarArmonicos } from '../domain/diagnostico.js';
 import { claveExpediente } from '../domain/expedientes.js';
 import { normalizarInspeccion } from '../domain/inspeccion.js';
-import { compararPosiciones, factorTap, PLACAS_TAP, placaDe, POSICIONES, proyectarU, resumenProyectado } from '../domain/tap.js';
+import { compararPosiciones, factorTap, PLACAS_TAP, placaDe, POSICIONES, proyectarU, resumenProyectado, totalesFases } from '../domain/tap.js';
 import { state } from '../state.js';
 import { escapeHtml, fmtDate } from '../utils.js';
 import { COLOR_FASE } from './graficas.js';
@@ -355,7 +355,7 @@ function bloqueTap(a, d, fases, nominal, tol) {
   if (t.propuesta && factor) {
     const pr = resumenProyectado(d.U, a.params.fases || 3, nominal, tol, factor); const r = pr.resumen;
     const err = r.validos === 0; const ft = r.estado === 'FUERA DE TOLERANCIA';
-    const todas = Object.values(pr.est); const max = Math.max(...todas.map(e => e.max ?? -Infinity)); const min = Math.min(...todas.filter(e => e.min !== null).map(e => e.min));
+    const { max, min } = totalesFases(pr.est);
     html += `<div class="veredicto-dtft ${err ? 'error' : ft ? 'ft' : 'dt'}"><b>${err ? 'Revisar' : ft ? 'FT' : 'DT'}</b><span>En TAP ${esc(t.propuesta)} (${factor >= 1 ? '+' : '−'}${fmt(Math.abs(factor - 1) * 100, 2)} %): ${err ? 'ningún registro válido' : ft ? 'quedaría fuera de tolerancia' : 'quedaría dentro de tolerancia'} · FebNoPer ${fmt(r.febNoPer * 100, 2)} %</span></div>
       <table class="tabla-est"><thead><tr><th>Proyectada en TAP ${esc(t.propuesta)} (V)</th>${fases.filter(p => pr.est[p]).map(p => `<th><i style="background:${COLOR_FASE[p]}"></i>Fase ${p}</th>`).join('')}</tr></thead><tbody>
       ${[['Máx', 'max'], ['Prom', 'prom'], ['Mín', 'min']].map(([l, k]) => `<tr><td>${l}</td>${fases.filter(p => pr.est[p]).map(p => { const v = pr.est[p][k]; return `<td class="${v !== null && v > 0 && (v > nominal * (1 + tol) || v < nominal * (1 - tol)) ? 'mal' : ''}">${fmt(v, 1)}</td>`; }).join('')}</tr>`).join('')}</tbody></table>
@@ -365,9 +365,7 @@ function bloqueTap(a, d, fases, nominal, tol) {
   if (filas.length > 1) {
     html += `<table class="tabla-est tap-tabla"><thead><tr><th>Posición</th><th>Placa (V)</th><th>Cambio</th><th>U prom (V)</th><th>U máx (V)</th><th>U mín (V)</th><th>FebNoPer</th><th></th></tr></thead><tbody>
       ${filas.map(f => {
-        const e = Object.values(f.est); const r = f.resumen;
-        const prom = e.reduce((s, x) => s + (x.prom || 0), 0) / (e.length || 1);
-        const mx = Math.max(...e.map(x => x.max ?? -Infinity)); const mn = Math.min(...e.filter(x => x.min !== null).map(x => x.min));
+        const r = f.resumen; const { prom, max: mx, min: mn } = totalesFases(f.est);
         const nota = [f.pos === String(t.actual) ? 'actual' : '', f.pos === String(t.propuesta) ? 'propuesta' : '', f.mejor ? 'menor FebNoPer' : ''].filter(Boolean).join(' · ');
         return `<tr class="${f.pos === String(t.propuesta) ? 'tap-prop' : ''} ${f.mejor ? 'tap-mejor' : ''}"><td><b>${f.pos}</b></td><td>${fmt(f.placa)}</td><td>${f.cambio >= 0 ? '+' : '−'}${fmt(Math.abs(f.cambio), 2)} %</td><td>${fmt(prom, 1)}</td><td>${fmt(mx, 1)}</td><td>${fmt(mn, 1)}</td>
           <td class="${r.validos === 0 || r.febNoPer > 0.05 ? 'mal' : 'ok'}">${r.validos === 0 ? '—' : `${fmt(r.febNoPer * 100, 2)} % ${r.febNoPer > 0.05 ? 'FT' : 'DT'}`}</td><td class="page-sub">${nota}</td></tr>`;

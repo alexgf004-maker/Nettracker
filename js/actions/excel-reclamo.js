@@ -4,6 +4,7 @@
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { ARMONICAS, catalogoSeries, estadisticas, tituloCombo, CARGA_ALERTA, DATI_LIM, LIMITE_PST, PERC_MAX, TIPOS_RED, VDAT_LIM } from '../domain/reclamo.js';
+import { compararPosiciones, factorTap, PLACAS_TAP, placaDe, proyectarU, resumenProyectado, totalesFases } from '../domain/tap.js';
 import { descargarXlsx, escribirConGraficas, rango } from '../excel-graficas.js';
 import { analisisActivo, calculoReclamo, seriesCombo } from '../views/analisis-reclamo.js';
 
@@ -65,7 +66,8 @@ export function escalaTension(nominal, tol) {
 }
 
 // Hoja de una gráfica de la macro de tensión
-function hojaPerfil({ fechas, t, series, limites = [], titulo, usuario, escalaY = null, tablas }) {
+// desplazar: columnas extra de datos (las tablas y la gráfica se corren a la derecha)
+function hojaPerfil({ fechas, t, series, limites = [], titulo, usuario, escalaY = null, tablas, desplazar = 0 }) {
   const ws = {};
   const n = fechas.length;
   celda(ws, 0, 0, 'Fecha/Hora', st('0E7490'));
@@ -83,17 +85,17 @@ function hojaPerfil({ fechas, t, series, limites = [], titulo, usuario, escalaY 
   for (const [ref, cel] of Object.entries(tmp)) {
     if (ref[0] === '!') continue;
     const { c, r } = XLSX.utils.decode_cell(ref);
-    ws[XLSX.utils.encode_cell({ c, r: r - 1 + FILA_TABLAS })] = cel;
+    ws[XLSX.utils.encode_cell({ c: c + desplazar, r: r - 1 + FILA_TABLAS })] = cel;
   }
   const ultFila = Math.max(n + 1, ultTabla - 1 + FILA_TABLAS + 1);
-  cerrarHoja(ws, 14, ultFila);
-  ws['!cols'] = [{ wch: 16 }, ...Array(5).fill({ wch: 13 }), { wch: 3 }, { wch: 18 }, ...Array(5).fill({ wch: 14 })];
+  cerrarHoja(ws, 16 + desplazar, ultFila);
+  ws['!cols'] = [{ wch: 16 }, ...Array(5 + desplazar).fill({ wch: 13 }), { wch: 3 }, { wch: 18 }, ...Array(7).fill({ wch: 14 })];
   ws['!freeze'] = { xSplit: 1, ySplit: 1 };
   const grafica = hoja => ({
     titulo: `${titulo}${usuario ? ' - ' + usuario.toUpperCase() : ''}`,
     categorias: rango(hoja, 1, 2, n + 1),
     series: [
-      ...series.map((s, k) => ({ nombre: s.nombre, ref: rango(hoja, 2 + k, 2, n + 1), color: s.color, ancho: 1.5, eje: s.eje })),
+      ...series.map((s, k) => ({ nombre: s.nombre, ref: rango(hoja, 2 + k, 2, n + 1), color: s.color, ancho: 1.5, eje: s.eje, guion: !!s.guion })),
       ...limites.map((l, k) => ({ nombre: l.nombre, ref: rango(hoja, 2 + series.length + k, 2, n + 1), color: l.color, guion: l.guion !== false, ancho: 2 })),
     ],
     y: escalaY || undefined, saltoEtiquetas: saltoEtiquetas(t), rotarEtiquetas: true,
@@ -148,6 +150,68 @@ export function exportarTensionReclamo() {
       return 13;
     },
   }), ANCLA_GRAFICA);
+
+  // Proyección con cambio de TAP (si está activa): medida y proyectada, resumen proyectado y todas las posiciones
+  const tp = p.tapProy;
+  if (tp?.activo && nominal > 0 && placaDe(tp, tp.actual)) {
+    const factor = factorTap(tp);
+    const Up = factor ? proyectarU(d.U, fases, factor) : null;
+    const sProy = Up ? fases.filter(x => Up[x]).map(x => ({ nombre: `U${x} TAP ${tp.propuesta} [V]`, v: Up[x].v, color: COLOR_FASE[x], clave: x, guion: true })) : [];
+    const pr = factor ? resumenProyectado(d.U, p.fases || 3, nominal, tol, factor) : null;
+    const filas = compararPosiciones(d.U, p.fases || 3, nominal, tol, tp);
+    const desplazar = sProy.length;
+    const encab = st(AZUL_TABLA); const etq = st('D9E1F2', { color: '000000' }); const valor = st(null, { color: '000000', negrita: false });
+    const estadoCelda = (ws, c, r, res) => {
+      const fuera = res.validos === 0 || res.febNoPer > 0.05;
+      celda(ws, c, r, res.validos === 0 ? 'ERROR - NIVEL DE TENSIÓN INCORRECTO' : res.estado, st(fuera ? 'FFC7CE' : 'C6EFCE', { color: fuera ? '9C0006' : '006100' }));
+    };
+    agregar('Proyección TAP', hojaPerfil({
+      fechas: d.fechas, t: d.t, series: [...sProm, ...sProy], limites: limTension, usuario, escalaY: escala, desplazar,
+      titulo: factor ? `TENSIÓN PROMEDIO MEDIDA Y PROYECTADA EN TAP ${tp.propuesta}` : 'PERFIL DE TENSIÓN PROMEDIO',
+      tablas: ws => {
+        celda(ws, 7, 1, 'PROYECCIÓN CON CAMBIO DE TAP', st('0B2E3B', { sz: 10 }));
+        const datos = [
+          ['Red y transformador', PLACAS_TAP[tp.red]?.nombre || '—'],
+          ['Posición actual', `${tp.actual} (placa ${placaDe(tp, tp.actual)} V)`],
+          ['Posición propuesta', factor ? `${tp.propuesta} (placa ${placaDe(tp, tp.propuesta)} V)` : '—'],
+          ['Factor (placa actual / propuesta)', factor ? Math.round(factor * 10000) / 10000 : '—'],
+          ['Cambio de la tensión', factor ? factor - 1 : '—'],
+        ];
+        datos.forEach(([l, v], i) => { celda(ws, 7, 2 + i, l, etq); celda(ws, 8, 2 + i, v, i === 4 && factor ? st(null, { color: '000000', negrita: false, fmt: '+0.00%;-0.00%' }) : st(null, { color: '000000', negrita: false, centro: false })); });
+        let r = 8;
+        if (pr) {
+          celda(ws, 7, r, `RESUMEN PROYECTADO EN TAP ${tp.propuesta}`, st('0B2E3B', { sz: 10 }));
+          ['Registros Totales', 'Registros Inválidos', 'Registros Válidos', 'Registros FT', 'FebNoPer', 'Estado'].forEach((h, i) => celda(ws, 7 + i, r + 1, h, encab));
+          const x = pr.resumen;
+          [x.total, x.invalidos, x.validos, x.ft].forEach((v, i) => celda(ws, 7 + i, r + 2, v, st(null, { color: '000000' })));
+          celda(ws, 11, r + 2, x.febNoPer, st(null, { color: '000000', fmt: '0.00%' }));
+          estadoCelda(ws, 12, r + 2, x);
+          tablaEstadistica(ws, 7, r + 4, sProy, pr.est);
+          r += 9;
+        }
+        if (filas.length) {
+          celda(ws, 7, r, 'TODAS LAS POSICIONES', st('0B2E3B', { sz: 10 }));
+          ['Posición', 'Placa (V)', 'Cambio', 'U prom (V)', 'U máx (V)', 'U mín (V)', 'FebNoPer', 'Estado', 'Nota'].forEach((h, i) => celda(ws, 7 + i, r + 1, h, encab));
+          filas.forEach((f, j) => {
+            const y = r + 2 + j; const tot = totalesFases(f.est); const red = v => (v === null || !Number.isFinite(v) ? '' : Math.round(v * 10) / 10);
+            const nota = [f.pos === String(tp.actual) ? 'actual' : '', f.pos === String(tp.propuesta) ? 'propuesta' : '', f.mejor ? 'menor FebNoPer' : ''].filter(Boolean).join(' · ');
+            const fondo = f.mejor ? 'E2EFDA' : null;
+            celda(ws, 7, y, Number(f.pos), st(fondo, { color: '000000' }));
+            celda(ws, 8, y, f.placa, st(fondo, { color: '000000', negrita: false }));
+            celda(ws, 9, y, f.cambio / 100, st(fondo, { color: '000000', negrita: false, fmt: '+0.00%;-0.00%' }));
+            [tot.prom, tot.max, tot.min].forEach((v, k) => celda(ws, 10 + k, y, red(v), st(fondo, { color: '000000', negrita: false, fmt: '0.0' })));
+            celda(ws, 13, y, f.resumen.validos ? f.resumen.febNoPer : '', st(fondo, { color: '000000', fmt: '0.00%' }));
+            estadoCelda(ws, 14, y, f.resumen);
+            celda(ws, 15, y, nota, st(fondo, { color: '000000', negrita: false, centro: false }));
+          });
+          r += 2 + filas.length;
+          celda(ws, 7, r + 1, 'Cada posición multiplica la tensión medida por placa actual ÷ placa de la posición. Es una proyección: no considera cambios de carga ni del alimentador.', st(null, { color: '595959', negrita: false, centro: false, borde: false, italica: true }));
+          r += 2;
+        }
+        return r;
+      },
+    }), [[7 + desplazar, 1], [21 + desplazar, 23]]);
+  }
 
   const perfil = (nombre, titulo, series, est, limites = [], extra = {}) => {
     if (!series.length) return;
