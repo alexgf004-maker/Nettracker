@@ -271,6 +271,15 @@ En el detalle de la campaña:
 - Armónicos o flicker (P95 del PST > 1) fuera de límite: solo aviso en el expediente; le compete al usuario (confirmado).
 - Pendientes del Inicio: "Ubicar e instalar el reclamo" mientras no hay instalación, "Entregar informe del reclamo" por medición retirada y los de FT.
 
+## Levantamiento (Herramientas)
+
+- Levantamiento de red en campo con el GPS del celular, independiente de los casos con una referencia libre (confirmado), guardado en la base para el equipo: `levantamientos/{id}` = { nombre, referencia, creado: { fecha, por }, puntos: { id: { lat, lng, tipo, nombre, nota, acc, manual, movido, orden, por, fecha } }, vanos: { id: { a, b, tramo, metros, orden } } }.
+- Mapa Leaflet (unpkg 1.9.4, se carga solo al abrir un levantamiento) con calles (OpenStreetMap) o satélite (Esri), a elegir (confirmado); sin internet se sigue marcando con el GPS. El mapa se crea una sola vez y se vuelve a colocar después de cada `render()` (gancho `alRedibujar` en `views/render.js`, registrado desde `handlers/levantamiento.js`). El GPS (`watchPosition`, alta precisión) solo corre con un levantamiento abierto; se muestra la precisión y "Seguir mi ubicación".
+- "Poste aquí" (flotante sobre el mapa; en celular fijo sobre la barra) marca un punto en la posición actual con el tipo elegido (simbología de red de Dibujar), lo nombra solo (P1, P2…) y lo une con el anterior con el tipo de vano elegido. Con precisión peor a 15 m pide confirmar. También se marca tocando el mapa. Al tocar un punto: nombre, tipo, nota, "Seguir desde aquí" (ramal), "Unir con otro punto", "Mover a mi ubicación", arrastrarlo para corregir y borrar. "Quitar el último".
+- Distancias: las de cada vano salen de las coordenadas (`distancia`, haversine; precisión del celular 3 a 10 m); los metros medidos con cinta o telémetro se escriben en el vano y mandan.
+- Salidas: "Pasar a Dibujar" arma la lámina (`aDibujo`: croquis en blanco con el norte arriba y la escala exacta, postes, vanos con sus metros medidos, etiquetas con nombre y nota) y "KML para Google Earth" (`kmlLevantamiento`).
+- Archivos: `js/domain/levantamiento.js`, `js/actions/levantamiento.js`, `js/views/levantamiento.js`, `js/handlers/levantamiento.js`. Pruebas con el GPS simulado de Playwright y Leaflet real desde node_modules (`abrirApp(page, { leaflet: true })`).
+
 ## Dibujar (Herramientas)
 
 - Pestaña aparte, sin relación con ningún caso (confirmado). Pensada para las propuestas de modificación de red sobre la captura del mapa, como lámina profesional (no solo rayas sobre la imagen). Solo se descarga (confirmado): PNG de la lámina completa o "Copiar" para pegar en Word; el borrador queda en este navegador (`localStorage` `nettracker_dibujo`, con escala y cajetín). La imagen se reduce a 2400 px por lado.

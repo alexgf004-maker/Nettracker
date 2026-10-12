@@ -19,6 +19,11 @@ export function nuevoDibujo() {
     tamTexto: 'mediano', tramoTipo: 'bt', estiloEtiqueta: 'existente', prefijo: 'P', tramo: null, calibracion: null, historial: [], rehacer: [],
   };
 }
+// Carga una lámina armada en otra parte (p. ej. un levantamiento de campo) como dibujo actual
+export function cargarEnDibujo(datos) {
+  state.dibujo = { ...nuevoDibujo(), ...datos, lamina: { ...nuevaLamina(), ...(datos.lamina || {}) } };
+  guardarBorrador();
+}
 export function cargarBorrador() {
   const d = nuevoDibujo();
   try {

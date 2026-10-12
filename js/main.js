@@ -6,6 +6,7 @@ import './handlers/validaciones.js';
 import './handlers/carga.js';
 import './handlers/campanas.js';
 import './handlers/dibujo.js';
+import './handlers/levantamiento.js';
 import { initTheme, iniciarMonitorConexion } from './ui.js';
 import { iniciarAuth } from './actions/auth.js';
 

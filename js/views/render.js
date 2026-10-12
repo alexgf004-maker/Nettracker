@@ -20,6 +20,7 @@ import { renderCampanas, renderRequerimientos } from './trabajo.js';
 import { renderNuevoReclamo, renderPuntoReclamo, renderReclamos } from './expedientes.js';
 import { renderValidaciones } from './validaciones.js';
 import { renderDibujar } from './dibujo.js';
+import { renderLevantamientos } from './levantamiento.js';
 
 export const TAB_VIEWS = {
   dashboard: renderDashboard,
@@ -34,7 +35,13 @@ export const TAB_VIEWS = {
   graficar: () => { state.graficar ??= nuevoGraficar(); return renderGraficar(); },
   carga: renderCarga,
   dibujar: renderDibujar,
+  levantamiento: renderLevantamientos,
 };
+
+// Funciones que se ejecutan después de cada redibujo (p. ej. volver a colocar el mapa del levantamiento, que no se
+// reconstruye con el HTML)
+const trasRender = [];
+export const alRedibujar = fn => { trasRender.push(fn); };
 
 // Redibuja toda la app a partir del estado. Cualquier handler que cambie
 // el estado debe llamar render() al final.
@@ -119,6 +126,8 @@ export function render() {
     }
   }
   el.dataset.view = state.tab === 'validaciones' ? 'val-' + state.valView : state.view; // el CSS de PC ajusta el ancho según la vista
+
+  trasRender.forEach(fn => { try { fn(); } catch (err) { console.error(err); } });
 
   // Restore focus to search input if one was active
   const activeSearch = el.querySelector('input.search-input[data-active="true"]');
