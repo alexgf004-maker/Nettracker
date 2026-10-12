@@ -2464,3 +2464,147 @@ test.describe('Expedientes de reclamo', () => {
     await expect(page.locator('input[oninput*="\'caso\'"]')).toHaveValue('trafo');
   });
 });
+
+test.describe('Herramienta Dibujar', () => {
+  // Imagen de fondo hecha en el navegador (w×h) y subida con el botón
+  async function subirImagen(page, w, h) {
+    const png = await page.evaluate(([w, h]) => { const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.fillStyle = '#e5e7eb'; x.fillRect(0, 0, w, h); return c.toDataURL('image/png').split(',')[1]; }, [w, h]);
+    await page.locator('label', { hasText: /Subir imagen|Cambiar imagen/ }).locator('input').setInputFiles({ name: 'mapa.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
+    await expect(page.locator('#dib-svg')).toHaveAttribute('viewBox', new RegExp(`^0 0 ${w} `));
+  }
+  // Coordenadas de pantalla de un punto del plano (en píxeles de la imagen)
+  const pantalla = async (page, x, y) => page.evaluate(([x, y]) => { const s = document.getElementById('dib-svg'); const p = new DOMPoint(x, y).matrixTransform(s.getScreenCTM()); return [p.x, p.y]; }, [x, y]);
+  const tocar = async (page, x, y) => { await page.mouse.click(...await pantalla(page, x, y)); await page.waitForTimeout(380); };
+  const arrastrar = async (page, a, b) => { await page.mouse.move(...await pantalla(page, ...a)); await page.mouse.down(); await page.mouse.move(...await pantalla(page, ...b), { steps: 6 }); await page.mouse.up(); };
+
+  test('dibujo libre: líneas, figuras, texto y unifilar; deshacer, borrador, cajetín opcional y PNG', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await page.evaluate(() => localStorage.removeItem('nettracker_dibujo'));
+    await nav(page, 'Dibujar');
+    await subirImagen(page, 800, 400);
+    await page.getByRole('button', { name: 'Línea', exact: true }).click();
+    await arrastrar(page, [80, 80], [400, 80]);
+    await expect(page.locator('#dib-capa line[stroke="#dc2626"]')).toHaveCount(1);
+    await tocar(page, 700, 350); // un clic sin arrastrar no deja una línea vacía
+    await expect(page.locator('#dib-capa [data-id]')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Color #2563eb' }).click();
+    await page.getByRole('button', { name: 'Flecha' }).click();
+    await arrastrar(page, [160, 240], [320, 320]);
+    await expect(page.locator('#dib-capa marker#punta-2563eb')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Rectángulo' }).click();
+    await arrastrar(page, [480, 200], [720, 360]);
+    await page.getByRole('button', { name: 'Texto', exact: true }).click();
+    const y0 = (await page.locator('#dib-svg').boundingBox()).y;
+    await tocar(page, 80, 200);
+    expect((await page.locator('#dib-svg').boundingBox()).y).toBe(y0); // al seleccionar, el lienzo no se mueve
+    await page.locator('#dib-texto').fill('Tablero general'); await page.locator('#dib-texto').press('Tab');
+    await expect(page.locator('#dib-capa text')).toContainText('Tablero general');
+    await page.getByRole('button', { name: 'Símbolos de unifilar' }).click();
+    await page.locator('.dib-simbolo', { hasText: 'Transformador' }).click();
+    await tocar(page, 600, 100);
+    await page.getByRole('button', { name: 'Girar 90°' }).click();
+    await expect(page.locator('#dib-capa g[transform*="rotate(90"]')).toHaveCount(1);
+    await expect(page.locator('#dib-capa [data-id]')).toHaveCount(5);
+    // Mover, borrar y deshacer
+    await page.getByRole('button', { name: 'Seleccionar y mover' }).click();
+    const antes = await page.locator('#dib-capa rect[data-id]').getAttribute('x');
+    await arrastrar(page, [600, 280], [560, 260]);
+    expect(await page.locator('#dib-capa rect[data-id]').getAttribute('x')).not.toBe(antes);
+    await page.getByRole('button', { name: 'Borrar' }).click();
+    await expect(page.locator('#dib-capa [data-id]')).toHaveCount(4);
+    await page.getByRole('button', { name: 'Deshacer' }).click();
+    await expect(page.locator('#dib-capa [data-id]')).toHaveCount(5);
+    // El borrador queda en el navegador
+    await nav(page, 'Inicio'); await nav(page, 'Dibujar');
+    await expect(page.locator('#dib-capa [data-id]')).toHaveCount(5);
+    // Sin cajetín la lámina es solo la imagen; el PNG sale de ese tamaño
+    await page.locator('#dib-lam-activa').uncheck();
+    await expect(page.locator('#dib-svg')).toHaveAttribute('viewBox', '0 0 800 400');
+    const descarga = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Descargar PNG' }).click();
+    const buf = require('fs').readFileSync(await (await descarga).path());
+    expect(buf.slice(1, 4).toString()).toBe('PNG');
+    expect([buf.readUInt32BE(16), buf.readUInt32BE(20)]).toEqual([800, 400]);
+    page.once('dialog', dl => dl.accept());
+    await page.getByRole('button', { name: 'Nuevo' }).click();
+    await expect(page.locator('#dib-capa [data-id]')).toHaveCount(0);
+    expect(errores).toEqual([]);
+  });
+
+  test('lámina de red: escala calibrada, postes, tramos ajustados, etiquetas, distancias automáticas y cajetín', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    await page.setViewportSize({ width: 1280, height: 1100 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await page.evaluate(() => localStorage.removeItem('nettracker_dibujo'));
+    await nav(page, 'Dibujar');
+    await subirImagen(page, 1600, 900);
+    // Calibrar: 800 px = 100 m → 0.125 m/px
+    await page.getByRole('button', { name: 'Calibrar' }).click();
+    await arrastrar(page, [100, 850], [900, 850]);
+    await page.locator('#dib-metros').fill('100');
+    await page.getByRole('button', { name: 'Aplicar escala' }).click();
+    await expect(page.locator('.tg', { hasText: '1 m = 8.0 px' })).toHaveCount(1);
+    // Postes existentes y un transformador proyectado
+    const postes = [[200, 500], [600, 400], [1000, 300]];
+    await page.getByRole('button', { name: 'Poste existente' }).click();
+    for (const [x, y] of postes) await tocar(page, x, y);
+    await page.getByRole('button', { name: 'Transformador proyectado' }).click();
+    await tocar(page, 1000, 200);
+    // Tramo BT existente: los toques cerca de los postes se ajustan a su centro
+    await page.getByRole('button', { name: 'Tramo de red' }).click();
+    await page.locator('.dib-chip', { hasText: 'Red BT existente' }).click();
+    for (const [x, y] of postes) await tocar(page, x + 6, y - 5);
+    await page.getByRole('button', { name: 'Terminar tramo' }).click();
+    const d = await page.evaluate(async () => (await import('/js/state.js')).state.dibujo.elementos.find(e => e.tipo === 'polilinea').puntos.map(p => p.map(Math.round)));
+    expect(d).toEqual(postes);
+    // Metros por vano sobre el tramo: √(400²+100²) × 0.125 = 51.5 m
+    await expect(page.locator('#dib-capa text', { hasText: '51.5 m' })).toHaveCount(2);
+    // Etiquetas: P1 en el primer poste; W1 (estilo proyectado) en el tercero
+    await page.getByRole('button', { name: 'Etiqueta de punto (P1, W1…)' }).click();
+    await tocar(page, 205, 495);
+    await page.locator('#dib-texto').fill('P1: DS111267'); await page.locator('#dib-texto').press('Tab');
+    await page.getByRole('button', { name: 'Etiqueta de punto (P1, W1…)' }).click();
+    await page.locator('.dib-chip', { hasText: 'Punto proyectado' }).click();
+    await expect(page.locator('#dib-prefijo')).toHaveValue('W');
+    await tocar(page, 995, 305);
+    await expect(page.locator('#dib-capa text', { hasText: /^W1$/ })).toHaveCount(1);
+    // Distancias automáticas en el cajetín: P1 – W1 = 103.1 m y el total del tipo
+    const caj = page.locator('#dib-cajetin');
+    await expect(caj.locator('text', { hasText: 'P1 – W1' })).toHaveCount(1);
+    await expect(caj.locator('text', { hasText: /^103\.1$/ })).toHaveCount(2); // tramo y total
+    await expect(caj.locator('text', { hasText: 'Total red BT existente' })).toHaveCount(1);
+    // Simbología: solo lo usado
+    const exacto = t => caj.locator('text', { hasText: new RegExp(`^${t}$`) });
+    for (const t of ['Red BT existente', 'Poste existente', 'Transformador proyectado', 'Punto existente', 'Punto proyectado']) await expect(exacto(t)).toHaveCount(1);
+    await expect(exacto('Red MT')).toHaveCount(0);
+    // Escala gráfica y título
+    await expect(caj.locator('text', { hasText: /^\d+ m$/ })).toHaveCount(1);
+    await page.locator('#dib-lam-titulo').fill('Referencia eléctrica');
+    await expect(caj.locator('text', { hasText: 'REFERENCIA ELÉCTRICA' })).toHaveCount(1);
+    // Cota entre dos postes (se ajusta a ellos): 400 px × 0.125 = 50.0 m… en diagonal √(400²+100²) = 51.5 m
+    await page.getByRole('button', { name: 'Cota (medir distancia)' }).click();
+    await arrastrar(page, [604, 396], [996, 304]);
+    await expect(page.locator('.dib-sel-barra')).toContainText('Mide 51.5 m');
+    // Cambiar el tipo del tramo seleccionado cambia su estilo y la simbología
+    await page.getByRole('button', { name: 'Seleccionar y mover' }).click();
+    await tocar(page, 400, 450);
+    await page.locator('.dib-chip', { hasText: 'Red BT proyectada' }).click();
+    await expect(exacto('Red BT proyectada')).toHaveCount(1);
+    await expect(exacto('Red BT existente')).toHaveCount(0);
+    // PNG de la lámina completa (imagen + cajetín)
+    const descarga = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Descargar PNG' }).click();
+    const dl = await descarga;
+    expect(dl.suggestedFilename()).toMatch(/^referencia_electrica-\d{4}-\d{2}-\d{2}\.png$/);
+    const buf = require('fs').readFileSync(await dl.path());
+    expect(buf.readUInt32BE(16)).toBe(1600);
+    expect(buf.readUInt32BE(20)).toBeGreaterThan(900);
+    const filas = await page.evaluate(async () => (await import('/js/domain/dibujo.js')).leerFilasTabla('A 1\nB C, 2\n\nD'));
+    expect(filas).toEqual([['A', '1'], ['B C', '2'], ['D', '']]);
+    expect(errores).toEqual([]);
+  });
+});
