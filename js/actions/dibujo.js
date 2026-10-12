@@ -5,6 +5,7 @@
 import { altoCajetin, caja, COLORES, coloresTramos, GROSORES, leerFilasTabla, medidaEtiqueta, medidaReducida, mover, nuevoId, redimensionar, siguienteEtiqueta, SIMBOLOS, svgExportable, svgLamina, tamano, TAM_TEXTO } from '../domain/dibujo.js';
 import { anclas, escalaDe, ESTILOS_ETIQUETA, fmtMetros, imanar, metrosTramo, nombrePunto, segmentosTramos } from '../domain/plano.js';
 import { db, get, push, ref, remove, set } from '../firebase.js';
+import { leerAltura } from '../domain/red.js';
 import { hoyLocal } from '../domain/trabajo.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
@@ -21,7 +22,7 @@ export function nuevoDibujo() {
   return {
     fondo: null, elementos: [], escala: null, lamina: nuevaLamina(), sel: null, herramienta: 'seleccionar', simbolo: 'poste', color: COLORES[0], grosor: 'medio',
     tamTexto: 'mediano', tramoTipo: 'bt', estiloEtiqueta: 'existente', prefijo: 'P', tramo: null, calibracion: null, historial: [], rehacer: [],
-    colorRed: null, tamNuevos: 1, // color de la red para los tramos nuevos (null = el de su tipo) y tamaño de los postes nuevos
+    colorRed: null, tamNuevos: 1, conductor: null, // color de la red para los tramos nuevos (null = el de su tipo) y tamaño de los postes nuevos
     proyecto: null, sinGuardar: false, // proyecto: { id, nombre, referencia } del proyecto abierto en la base
   };
 }
@@ -273,7 +274,7 @@ export function dibPointerDown(ev) {
       return;
     }
     memorizar();
-    const nuevo = { id: base.id, tipo: 'polilinea', tramo: d.tramoTipo, color: d.color, grosor: 6 * escalaBase() * (GROSORES[d.grosor] / GROSORES.medio), puntos: [[x, y]], ...(d.colorRed ? { colorRed: d.colorRed } : {}) };
+    const nuevo = { id: base.id, tipo: 'polilinea', tramo: d.tramoTipo, color: d.color, grosor: 6 * escalaBase() * (GROSORES[d.grosor] / GROSORES.medio), puntos: [[x, y]], ...(d.colorRed ? { colorRed: d.colorRed } : {}), ...(d.conductor ? { conductor: { ...d.conductor } } : {}) };
     d.elementos.push(nuevo); d.sel = nuevo.id; d.tramo = nuevo.id; d.ultimoToque = ahora;
     repintar(); render();
     return;
@@ -371,7 +372,7 @@ export function dibPointerMove(ev) {
       });
     } else if (arrastre.modo === 'chip') {
       const dx = x - arrastre.ultimo[0]; const dy = y - arrastre.ultimo[1]; arrastre.ultimo = [x, y];
-      if (el.tipo === 'cota') { const [ox, oy] = el.desfase || [0, 0]; reemplazar({ ...el, desfase: [ox + dx, oy + dy] }); } else {
+      if (el.tipo === 'cota' || el.tipo === 'simbolo') { const [ox, oy] = el.desfase || [0, 0]; reemplazar({ ...el, desfase: [ox + dx, oy + dy] }); } else {
         const [ox, oy] = el.desfases?.[arrastre.k] || [0, 0];
         reemplazar({ ...el, desfases: { ...(el.desfases || {}), [arrastre.k]: [ox + dx, oy + dy] } });
       }
@@ -525,7 +526,7 @@ export function setLaminaDib(campo, valor) {
   d.lamina = { ...d.lamina, [campo]: campo === 'filas' ? leerFilasTabla(valor) : valor };
   guardarBorrador(); repintar();
   // Lo que cambia el tamaño del cajetín o las opciones de la pantalla redibuja todo
-  if (['activa', 'distancias', 'norte', 'distanciasEnTramos'].includes(campo)) render();
+  if (['activa', 'distancias', 'norte', 'distanciasEnTramos', 'verCalibre', 'verAltura', 'verEstructuras'].includes(campo)) render();
 }
 
 // Color de la red: del tramo seleccionado o, sin selección, de los tramos nuevos (null = el de su tipo)
@@ -557,6 +558,34 @@ export function setTamNuevosDib(f) { const d = dib(); if (!d) return; d.tamNuevo
 // Panel de propiedades: abierto o cerrado (en el celular es una hoja que se abre desde abajo)
 export function togglePanelDib() { state.dibPanel = state.dibPanel === false; render(); }
 export function abrirPanelMovilDib(v) { state.dibPanelMovil = v; render(); }
+
+// ── Datos técnicos: altura y estructuras del poste, conductor del tramo ──
+function cambiarSel(cambio) { const el = seleccionado(); if (!el) return; memorizar(); reemplazar(cambio(el)); guardarBorrador(); render(); }
+export function setAlturaDib(v) {
+  const a = leerAltura(v);
+  if (String(v ?? '').trim() && a === null) return showToast('Escribe la altura en pies (solo el número)');
+  cambiarSel(el => { const { altura, ...resto } = el; return a ? { ...resto, altura: a } : resto; });
+}
+export function agregarEstructuraDib(codigo) {
+  const c = String(codigo || '').trim().toUpperCase(); if (!c) return;
+  cambiarSel(el => ((el.estructuras || []).includes(c) ? el : { ...el, estructuras: [...(el.estructuras || []), c] }));
+}
+export function agregarEstructuraEscritaDib() { const inp = document.getElementById('dib-estr-otra'); if (inp?.value.trim()) agregarEstructuraDib(inp.value); }
+export function quitarEstructuraDib(i) { cambiarSel(el => { const estructuras = (el.estructuras || []).filter((_, k) => k !== i); const { estructuras: _e, ...resto } = el; return estructuras.length ? { ...resto, estructuras } : resto; }); }
+// Conductor del tramo (calibre y tipo); queda para los tramos siguientes
+export function setConductorDib(campo, v) {
+  const d = dib(); const val = String(v || '').trim();
+  cambiarSel(el => {
+    const conductor = { ...(el.conductor || {}), [campo]: val }; if (!val) delete conductor[campo];
+    d.conductor = Object.keys(conductor).length ? conductor : null;
+    const { conductor: _c, ...resto } = el; return d.conductor ? { ...resto, conductor } : resto;
+  });
+}
+// Calibre de un vano distinto al del tramo (vacío = el del tramo)
+export function setCalibreVanoDib(i, v) {
+  const val = String(v || '').trim();
+  cambiarSel(el => { const calibres = { ...(el.calibres || {}) }; if (val) calibres[i] = val; else delete calibres[i]; const { calibres: _c, ...resto } = el; return Object.keys(calibres).length ? { ...resto, calibres } : resto; });
+}
 
 // Devuelve los metros movidos del tramo o la cota seleccionada a su lugar (el centro del vano)
 export function metrosASuLugarDib() {

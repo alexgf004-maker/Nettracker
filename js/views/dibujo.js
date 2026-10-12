@@ -5,6 +5,7 @@
 import { cargarBorrador, partesSVG, viewBoxDib, zoomPct } from '../actions/dibujo.js';
 import { COLORES, GROSORES, SIMBOLOS, TAM_TEXTO } from '../domain/dibujo.js';
 import { ACCIONES_PUNTO, ESTILOS_ETIQUETA, fmtMetros, metrosTramo, metrosVano, nombreRed, nombresVanos, TIPOS_TRAMO } from '../domain/plano.js';
+import { ALTURAS_POSTE, CALIBRES, ESTRUCTURAS, nombreEstructura, TIPOS_CONDUCTOR } from '../domain/red.js';
 import { state } from '../state.js';
 import { escapeHtml, fmtDate } from '../utils.js';
 
@@ -125,6 +126,23 @@ function tituloPanel(d, sel, h) {
 
 // ── Panel de propiedades ──
 const seccion = (titulo, cuerpo) => `<section class="dib-sec">${titulo ? `<h4>${titulo}</h4>` : ''}${cuerpo}</section>`;
+const opcion = (v, t, sel) => `<option value="${esc(v)}" ${String(sel ?? '') === String(v) ? 'selected' : ''}>${esc(t)}</option>`;
+// Altura y estructuras de un poste (los mismos controles en Dibujar y en Levantamiento)
+export function controlesPoste({ altura, estructuras }, acc) {
+  const lista = estructuras || [];
+  return `<div class="field"><label>Altura del poste (pies)</label><input id="${acc.id}-altura" inputmode="numeric" list="${acc.id}-alturas" value="${esc(altura || '')}" placeholder="Ej. 35" onchange="${acc.altura}(this.value)">
+      <datalist id="${acc.id}-alturas">${ALTURAS_POSTE.map(a => `<option value="${a}">${a}'</option>`).join('')}</datalist></div>
+    <div class="field"><label>Estructuras</label>
+      <div class="dib-estructuras">${lista.map((c, i) => `<span class="dib-estr" title="${esc(nombreEstructura(c))}">${esc(c)}<button aria-label="Quitar ${esc(c)}" onclick="${acc.quitar}(${i})">✕</button></span>`).join('') || '<span class="page-sub">Ninguna</span>'}</div>
+      <select id="${acc.id}-estructura" onchange="${acc.agregar}(this.value); this.value=''"><option value="">Agregar estructura…</option>${ESTRUCTURAS.map(g => `<optgroup label="${esc(g.grupo)}">${g.items.map(it => `<option value="${it.codigo}">${it.codigo} · ${esc(it.nombre)}</option>`).join('')}</optgroup>`).join('')}</select>
+      <div class="dib-estr-otra"><input id="${acc.id}-estr-otra" placeholder="Otro código" onkeydown="if (event.key === 'Enter') ${acc.escrita}()"><button class="b b-g" onclick="${acc.escrita}()">Agregar</button></div></div>`;
+}
+// Calibre y tipo de conductor
+export function controlesConductor(c, acc) {
+  return `<div class="dib-dos"><div class="field"><label>Calibre</label><input id="${acc.id}-calibre" list="${acc.id}-calibres" value="${esc(c?.calibre || '')}" placeholder="Ej. #2" onchange="${acc.fn}('calibre', this.value)">
+      <datalist id="${acc.id}-calibres">${CALIBRES.map(x => `<option value="${x}">`).join('')}</datalist></div>
+    <div class="field"><label>Tipo</label><select id="${acc.id}-tipo" onchange="${acc.fn}('tipo', this.value)">${opcion('', '—', c?.tipo || '')}${TIPOS_CONDUCTOR.map(t => opcion(t, t, c?.tipo)).join('')}</select></div></div>`;
+}
 function panel(d, sel, h, p) {
   const tiposTramo = actual => `<div class="dib-lista">${Object.entries(TIPOS_TRAMO).map(([k, t]) => `<button class="dib-chip ${actual === k ? 'activo' : ''}" onclick="setTipoTramoDib('${k}')">${muestraTramo(k)}${t.nombre}</button>`).join('')}</div>`;
   const coloresRed = (actual, tipo) => `<div class="dib-colores">
@@ -153,27 +171,30 @@ function panel(d, sel, h, p) {
     html += seccion('Tipo de red', tiposTramo(sel.tramo));
     html += seccion('Color de la red', `${coloresRed(sel.colorRed, sel.tramo)}${nota('Para distinguir redes del mismo tipo (por ejemplo, de dos transformadores). Cada color sale aparte en la simbología.')}`);
     html += seccion('Nombre en la simbología', `<input id="dib-nombre-red" value="${esc(sel.nombreRed || '')}" placeholder="${esc(TIPOS_TRAMO[sel.tramo]?.nombre || '')}" oninput="setNombreRedDib(this.value)" onchange="finEdicionDib()">`);
+    html += seccion('Conductor', `${controlesConductor(sel.conductor, { id: 'dib-cond', fn: 'setConductorDib' })}<div class="page-sub">Los tramos que traces después salen con este conductor.</div>`);
     html += seccion('Grosor', tamano('Grosor de la línea'));
     if (d.tramo !== sel.id && sel.puntos.length > 1) {
       const nombres = nombresVanos(sel, d.elementos, 14 * Math.max(1, p.w / 1600));
       html += seccion(`Metros por vano <span class="dib-total-tramo">${total !== null ? `Total ${fmtMetros(total)}` : ''}</span>`, `<div class="dib-vanos">${nombres.map((n, k) => {
         const i = k + 1; const manual = sel.metros?.[i] !== undefined; const auto = d.escala && !manual ? metrosVano({ ...sel, metros: {} }, i, d.escala) : null;
-        return `<div class="field"><label>Vano ${i}: ${esc(n)}</label><input id="dib-vano-${i}" inputmode="decimal" value="${manual ? esc(sel.metros[i]) : ''}" placeholder="${auto !== null ? `${auto.toFixed(1)} (con la escala)` : 'metros'}" oninput="metrosVanoDib(${i}, this.value)" onchange="finVanoDib()"></div>`;
+        return `<div class="field"><label>Vano ${i}: ${esc(n)}</label><div class="dib-vano-fila"><input id="dib-vano-${i}" inputmode="decimal" value="${manual ? esc(sel.metros[i]) : ''}" placeholder="${auto !== null ? `${auto.toFixed(1)} (con la escala)` : 'metros'}" oninput="metrosVanoDib(${i}, this.value)" onchange="finVanoDib()">
+          <select id="dib-vano-cal-${i}" aria-label="Calibre del vano ${i}" onchange="setCalibreVanoDib(${i}, this.value)">${opcion('', sel.conductor?.calibre ? `${sel.conductor.calibre} (del tramo)` : 'Calibre', sel.calibres?.[i] || '')}${CALIBRES.map(c => opcion(c, c, sel.calibres?.[i])).join('')}</select></div></div>`;
       }).join('')}</div>${nota(d.escala ? 'Si escribes los metros de un vano, mandan sobre los de la escala.' : 'Sin escala, escribe los metros de cada vano; salen sobre el tramo y en la tabla de distancias.')}`);
       html += acciones(Object.keys(sel.desfases || {}).length ? '<button class="b b-g" onclick="metrosASuLugarDib()">Metros a su lugar</button>' : '');
     }
     return html;
   }
   if (h === 'tramo') {
-    return seccion('', nota(AYUDA.tramo)) + seccion('Tipo de red', tiposTramo(d.tramoTipo)) + seccion('Color de la red', coloresRed(d.colorRed, d.tramoTipo)) + seccion('Grosor', grosores());
+    return seccion('', nota(AYUDA.tramo)) + seccion('Tipo de red', tiposTramo(d.tramoTipo)) + seccion('Color de la red', coloresRed(d.colorRed, d.tramoTipo))
+      + (d.conductor ? seccion('Conductor', nota(`Los tramos nuevos salen con ${esc([d.conductor.calibre, d.conductor.tipo].filter(Boolean).join(' '))}; se cambia al seleccionar el tramo.`)) : '') + seccion('Grosor', grosores());
   }
 
   // Símbolo seleccionado
   if (sel?.tipo === 'simbolo') {
     const red = SIMBOLOS[sel.simbolo]?.grupo === 'red';
     return seccion('', `<div class="dib-simbolo-sel">${mini(sel.simbolo, 34)}<span>${esc(SIMBOLOS[sel.simbolo]?.nombre || '')}</span></div>${tamano()}${red ? nota('Los postes que pongas después salen de este tamaño.') : ''}`)
-      + (red ? '' : seccion('Color', colores()))
-      + acciones('<button class="b b-g" onclick="girarDib()">Girar 90°</button>');
+      + (red ? seccion('Datos del poste', controlesPoste(sel, { id: 'dib-poste', altura: 'setAlturaDib', agregar: 'agregarEstructuraDib', quitar: 'quitarEstructuraDib', escrita: 'agregarEstructuraEscritaDib' })) : seccion('Color', colores()))
+      + acciones(`<button class="b b-g" onclick="girarDib()">Girar 90°</button>${sel.desfase ? '<button class="b b-g" onclick="metrosASuLugarDib()">Datos a su lugar</button>' : ''}`);
   }
   if (h === 'simbolo') {
     const red = SIMBOLOS[d.simbolo]?.grupo === 'red';
@@ -227,7 +248,7 @@ function panelLamina(d) {
   let html = seccion('Escala', `<div class="dib-acciones-el"><span class="tg ${d.escala ? 'verde' : 'ambar'}">${d.escala ? `1 m = ${(1 / d.escala).toFixed(1)} px` : 'Sin escala'}</span>
     <button class="b b-g" onclick="setHerramientaDib('calibrar')">${d.escala ? 'Recalibrar' : 'Calibrar'}</button>${d.escala ? '<button class="b b-l" onclick="quitarEscalaDib()">Quitar escala</button>' : ''}</div>
     <div class="page-sub">Sin escala también puedes escribir los metros de cada vano al seleccionar el tramo.</div>`);
-  html += seccion('Cajetín de la lámina', `<div class="insp-checks">${check('activa', 'Incluir el cajetín (título, simbología, distancias, escala y norte)')}${check('norte', 'Flecha de norte (la captura tiene el norte arriba)')}${check('distanciasEnTramos', 'Metros sobre cada vano de los tramos')}</div>
+  html += seccion('Cajetín de la lámina', `<div class="insp-checks">${check('activa', 'Incluir el cajetín (título, simbología, distancias, escala y norte)')}${check('norte', 'Flecha de norte (la captura tiene el norte arriba)')}${check('distanciasEnTramos', 'Metros sobre cada vano de los tramos')}${check('verCalibre', 'Calibre y tipo de conductor en los vanos')}${check('verAltura', 'Altura de los postes')}${check('verEstructuras', 'Estructuras de los postes')}</div>
     ${l.activa !== false ? `${campo('titulo', 'Título', 'Ej. Referencia eléctrica o Propuesta')}${campo('subtitulo', 'Descripción', 'Ej. Nuevo transformador para el usuario')}${campo('proyecto', 'Proyecto / WO', 'Ej. WO-01-2025/638')}${campo('fecha', 'Fecha')}${campo('elaboro', 'Elaboró')}
       <div class="field"><label>Tabla de distancias</label><select id="dib-lam-distancias" onchange="setLaminaDib('distancias', this.value)"><option value="auto" ${l.distancias !== 'manual' ? 'selected' : ''}>Automática (entre puntos etiquetados)</option><option value="manual" ${l.distancias === 'manual' ? 'selected' : ''}>Manual</option></select></div>
       ${l.distancias === 'manual' ? `<div class="field"><label>Filas: tramo y metros, una por línea (o pegadas de Excel)</label><textarea id="dib-lam-filas" rows="3" placeholder="P1 – W1, 50" onchange="setLaminaDib('filas', this.value)">${esc((l.filas || []).map(f => f.join(', ')).join('\n'))}</textarea></div>` : ''}

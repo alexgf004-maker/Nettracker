@@ -2869,6 +2869,41 @@ test.describe('Herramienta Dibujar', () => {
     expect(errores).toEqual([]);
   });
 
+  test('datos técnicos: altura y estructuras del poste, conductor del tramo y calibre distinto en un vano', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    await page.setViewportSize({ width: 1280, height: 900 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await page.evaluate(() => localStorage.removeItem('nettracker_dibujo'));
+    await nav(page, 'Dibujar');
+    await subirImagen(page, 1600, 900);
+    await page.getByRole('button', { name: 'Poste existente' }).click();
+    await tocar(page, 400, 400);
+    await page.locator('#dib-poste-altura').fill('40'); await page.locator('#dib-poste-altura').press('Tab');
+    await page.locator('#dib-poste-estructura').selectOption('RS3');
+    await expect(page.locator('#dib-capa text', { hasText: "40' · RS3" })).toHaveCount(1);
+    await page.locator('.dib-estr button').click(); // quitar RS3
+    await expect(page.locator('#dib-capa text', { hasText: /^40'$/ })).toHaveCount(1);
+    // Tramo de dos vanos con conductor; el segundo vano con otro calibre
+    await page.getByRole('button', { name: 'Tramo de red' }).click();
+    await tocar(page, 400, 400); await tocar(page, 900, 400); await tocar(page, 900, 800);
+    await page.getByRole('button', { name: 'Terminar tramo' }).click();
+    await page.locator('#dib-cond-calibre').fill('#1/0'); await page.locator('#dib-cond-calibre').press('Tab');
+    await page.locator('#dib-cond-tipo').selectOption('Triplex');
+    await page.locator('#dib-vano-cal-2').selectOption('#2');
+    await expect(page.locator('#dib-capa text', { hasText: /^#1\/0 Tpx$/ })).toHaveCount(1);
+    await expect(page.locator('#dib-capa text', { hasText: /^#2 Tpx$/ })).toHaveCount(1);
+    const t = await page.evaluate(async () => (await import('/js/state.js')).state.dibujo.elementos.find(e => e.tipo === 'polilinea'));
+    expect(t.conductor).toEqual({ calibre: '#1/0', tipo: 'Triplex' });
+    expect(t.calibres).toEqual({ 2: '#2' });
+    // El siguiente tramo sale con el mismo conductor
+    await page.getByRole('button', { name: 'Tramo de red' }).click();
+    await tocar(page, 200, 700); await tocar(page, 600, 700);
+    await page.getByRole('button', { name: 'Terminar tramo' }).click();
+    await expect(page.locator('#dib-cond-calibre')).toHaveValue('#1/0');
+    expect(errores).toEqual([]);
+  });
+
   test('proyectos: se guardan en la base para el equipo, se marcan los cambios sin guardar y se vuelven a abrir', async ({ page }) => {
     const errores = []; page.on('pageerror', e => errores.push(e.message));
     await page.setViewportSize({ width: 1280, height: 1100 });
@@ -2998,8 +3033,11 @@ test.describe('Levantamiento en campo', () => {
     const vano = esc.find(([op, ruta]) => op === 'push' && /^levantamientos\/[^/]+\/vanos$/.test(ruta))[2];
     expect(vano.tramo).toBe('bt');
     // Medido a mano: manda sobre el GPS
-    const inp = page.locator('.lev-vano input');
+    const inp = page.locator('.lev-vano input[aria-label="Metros medidos"]');
     await inp.fill('32'); await inp.press('Tab');
+    // Conductor del vano: calibre y tipo
+    await page.locator('.lev-vano input[aria-label="Calibre"]').fill('#2'); await page.locator('.lev-vano input[aria-label="Calibre"]').press('Tab');
+    await page.locator('.lev-vano select[aria-label="Tipo de conductor"]').selectOption('ACSR');
     await expect(page.locator('.lev-dist', { hasText: '32.0 m' })).toHaveCount(1);
     await expect(page.locator('.lev-vano')).toContainText('32.0 m medido');
     // Con precisión baja pide confirmar; transformador como tipo de punto
@@ -3013,6 +3051,12 @@ test.describe('Levantamiento en campo', () => {
     await page.locator('.leaflet-marker-icon', { hasText: 'P1' }).click();
     await expect(page.locator('.lev-panel')).toContainText('GPS ±5 m');
     await page.locator('#lev-p-nota').fill('Poste de madera deteriorado'); await page.locator('#lev-p-nota').press('Tab');
+    // Altura y estructuras del poste: de la lista y una escrita
+    await page.locator('#lev-poste-altura').fill('35'); await page.locator('#lev-poste-altura').press('Tab');
+    await page.locator('#lev-poste-estructura').selectOption('23TS3');
+    await page.locator('#lev-poste-estr-otra').fill('ts3'); await page.getByRole('button', { name: 'Agregar', exact: true }).click();
+    await expect(page.locator('.lev-panel .dib-estr')).toHaveText(['23TS3✕', 'TS3✕']);
+    await expect(page.locator('.lev-panel .tg')).toContainText("35' · 23TS3 / TS3");
     await page.getByRole('button', { name: 'Seguir desde aquí' }).click();
     await page.getByRole('button', { name: 'Tocando el mapa' }).click();
     const caja = await page.locator('#lev-mapa').boundingBox();
@@ -3026,6 +3070,8 @@ test.describe('Levantamiento en campo', () => {
     const k = require('fs').readFileSync(await (await kml).path(), 'utf8');
     expect((k.match(/<Point>/g) || []).length).toBe(4);
     expect(k).toContain('Poste de madera deteriorado');
+    expect(k).toContain("35' · 23TS3 / TS3");
+    expect(k).toContain('#2 ACSR');
     // Pasar a Dibujar: lámina con escala exacta, tramos y etiquetas
     await page.getByRole('button', { name: 'Pasar a Dibujar (lámina)' }).click();
     await expect(page.locator('#dib-svg')).toHaveCount(1);
@@ -3033,6 +3079,14 @@ test.describe('Levantamiento en campo', () => {
     await expect(page.locator('#dib-cajetin text', { hasText: /^32\.0$/ })).toHaveCount(1);
     await expect(page.locator('#dib-cajetin text', { hasText: 'LEVANTAMIENTO DE RED' })).toHaveCount(1);
     await expect(page.locator('#dib-capa text', { hasText: 'P1: Poste de madera deteriorado' })).toHaveCount(1);
+    // Pasan a la lámina: altura y estructuras junto al poste y el conductor junto a los metros del vano
+    await expect(page.locator('#dib-capa text', { hasText: "35' · 23TS3 / TS3" })).toHaveCount(1);
+    await expect(page.locator('#dib-capa text', { hasText: '32.0 m · #2 ACSR' })).toHaveCount(1);
+    // Se pueden ocultar desde la lámina
+    await page.locator('#dib-lam-verEstructuras').uncheck();
+    await expect(page.locator('#dib-capa text', { hasText: /^35'$/ })).toHaveCount(1);
+    await page.locator('#dib-lam-verCalibre').uncheck();
+    await expect(page.locator('#dib-capa text', { hasText: /^32\.0 m$/ })).toHaveCount(1);
     expect(errores).toEqual([]);
   });
   test('imán en campo: junto a un poste ya marcado pregunta si es el mismo, y tocar cerca de un punto lo une', async ({ page, context }) => {

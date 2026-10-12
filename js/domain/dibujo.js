@@ -3,6 +3,7 @@
 // (título, simbología, distancias, escala y norte). Funciones puras: el estado es
 // { fondo: { src, w, h } | null, elementos: [...], escala (m por px) | null, lamina: {...} } y de aquí sale el SVG
 // que se ve en pantalla y el que se exporta a PNG. Coordenadas en píxeles de la imagen.
+import { conductorVano, textoConductor, textoPoste } from './red.js';
 import { nombreRed, ESTILOS_ETIQUETA, fmtMetros, largoEscala, longitud, metrosVano, nombrePunto, tablaDistancias, TIPOS_TRAMO, totalesPorTipo } from './plano.js';
 
 export const LIENZO = { w: 1600, h: 1000 }; // sin imagen de fondo
@@ -132,7 +133,8 @@ function trazosTramo(d, color, ancho, dash) {
 }
 
 // SVG de un elemento. sel: tiradores de edición; ui: tamaño de tiradores; escala y distancias: metros por vano
-export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias = false } = {}) {
+// ver: qué datos técnicos salen en el plano (calibre de los vanos, altura y estructuras de los postes)
+export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias = false, ver = {} } = {}) {
   const st = `stroke="${el.color}" stroke-width="${el.grosor || 3}" fill="none" stroke-linecap="round" stroke-linejoin="round"`;
   const id = `data-id="${el.id}"`;
   let s = '';
@@ -155,13 +157,15 @@ export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias
       const color = el.colorRed || (tp ? tp.color : el.color); const ancho = el.grosor * (tp ? tp.ancho : 1); // colorRed: otra red del mismo tipo
       const d = el.puntos.map(([x, y], i) => `${i ? 'L' : 'M'}${r1(x)} ${r1(y)}`).join(' ');
       let chips = '';
-      if (distancias) {
+      if (distancias || (ver.calibre !== false && (el.conductor || el.calibres))) {
         // Metros de cada vano: los escritos a mano o, con escala, los medidos
         for (let i = 1; i < el.puntos.length; i++) {
           const [x0, y0] = el.puntos[i - 1]; const [x1, y1] = el.puntos[i];
-          const m = metrosVano(el, i, escala);
-          if (m === null || Math.hypot(x1 - x0, y1 - y0) < ancho * 10) continue;
-          chips += chipMovible(i, (x0 + x1) / 2, (y0 + y1) / 2, el.desfases?.[i], fmtMetros(m), Math.max(15, ancho * 2.8), color);
+          const m = distancias ? metrosVano(el, i, escala) : null;
+          const cond = ver.calibre !== false ? textoConductor(conductorVano(el, i)) : '';
+          const texto = [m !== null ? fmtMetros(m) : '', cond].filter(Boolean).join(' · ');
+          if (!texto || Math.hypot(x1 - x0, y1 - y0) < ancho * 10) continue;
+          chips += chipMovible(i, (x0 + x1) / 2, (y0 + y1) / 2, el.desfases?.[i], texto, Math.max(15, ancho * 2.8), color);
         }
       }
       s = `<g ${id}><path d="${d}" stroke="transparent" stroke-width="${Math.max(18, ancho * 3)}" fill="none"/>${trazosTramo(d, color, ancho, tp?.dash)}${el.puntos.length === 1 ? `<circle cx="${r1(el.puntos[0][0])}" cy="${r1(el.puntos[0][1])}" r="${r1(ancho)}" fill="${color}"/>` : ''}${chips}</g>`;
@@ -179,7 +183,13 @@ export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias
     case 'simbolo': {
       const sim = SIMBOLOS[el.simbolo]; if (!sim) return '';
       const sw = 3 / el.escala;
-      s = `<g ${id} transform="translate(${r1(el.x)} ${r1(el.y)}) scale(${el.escala}) rotate(${el.rot || 0} 30 30)" color="${el.color}" stroke="${el.color}" stroke-width="${r1(sw * (el.grosor || 3) / 3)}" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="0" y="0" width="60" height="60" fill="transparent" stroke="none"/>${sim.svg}</g>`;
+      const dibujo = `<g transform="translate(${r1(el.x)} ${r1(el.y)}) scale(${el.escala}) rotate(${el.rot || 0} 30 30)" color="${el.color}" stroke="${el.color}" stroke-width="${r1(sw * (el.grosor || 3) / 3)}" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="0" y="0" width="60" height="60" fill="transparent" stroke="none"/>${sim.svg}</g>`;
+      // Altura y estructuras del poste debajo de él (se arrastran como los metros)
+      const datos = textoPoste(el, { altura: ver.altura !== false, estructuras: ver.estructuras !== false });
+      // Por defecto arriba a la derecha del símbolo (lejos de los tramos que entran por los lados)
+      const tam = Math.max(15, 27 * el.escala); const ancho = String(datos).length * tam * 0.6 + tam;
+      const cx = el.x + 60 * el.escala + ancho / 2; const cy = el.y - tam * 0.4;
+      s = datos ? `<g ${id}>${dibujo}${chipMovible(0, cx, cy, el.desfase, datos, tam, NEGRO)}</g>` : dibujo.replace('<g ', `<g ${id} `);
       break;
     }
     case 'etiqueta': {
@@ -350,7 +360,8 @@ export function svgLamina(d, { pantalla = false, ui = 1 } = {}) {
   const conCajetin = d.lamina?.activa !== false;
   const H = h + (conCajetin ? altoCajetin(d) : 0);
   const fondo = d.fondo ? `<image href="${d.fondo.src}" x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="none"/>` : `<rect width="${w}" height="${h}" fill="#ffffff"/>`;
-  const opts = { escala: d.escala, distancias: d.lamina?.distanciasEnTramos !== false };
+  const l = d.lamina || {};
+  const opts = { escala: d.escala, distancias: l.distanciasEnTramos !== false, ver: { calibre: l.verCalibre !== false, altura: l.verAltura !== false, estructuras: l.verEstructuras !== false } };
   const capa = definiciones(d.elementos) + d.elementos.map(e => svgElemento(e, { ...opts, sel: pantalla && e.id === d.sel, ui })).join('')
     + (pantalla && d.iman ? `<circle class="dib-iman" cx="${r1(d.iman[0])}" cy="${r1(d.iman[1])}" r="${r1(8 * ui)}"/>` : '')
     + (pantalla && d.calibracion ? `<line x1="${r1(d.calibracion.x1)}" y1="${r1(d.calibracion.y1)}" x2="${r1(d.calibracion.x2)}" y2="${r1(d.calibracion.y2)}" stroke="#f97316" stroke-width="${r1(4 * ui)}" stroke-dasharray="${r1(10 * ui)} ${r1(6 * ui)}"/>` : '');

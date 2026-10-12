@@ -1510,3 +1510,15 @@ button.aviso-inicio-fila { cursor: pointer; }
   .dib-app.ampliada { bottom: 0; }
 }
 .dib-sec h4 .dib-total-tramo { float: right; text-transform: none; letter-spacing: 0; color: var(--primary); }
+
+/* Datos técnicos: estructuras y conductor */
+.dib-estructuras { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.dib-estr { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 9px; border-radius: 999px; background: var(--primary-light); color: var(--primary); font-size: 12.5px; font-weight: 800; }
+.dib-estr button { border: 0; background: none; color: inherit; cursor: pointer; font-size: 12px; padding: 0 4px; }
+.dib-estr-otra { display: flex; gap: 6px; margin-top: 6px; }
+.dib-estr-otra input { flex: 1; min-width: 0; }
+.dib-dos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.dib-vano-fila { display: grid; grid-template-columns: 1fr 108px; gap: 6px; }
+.lev-datos-poste { display: grid; grid-template-columns: minmax(0, 160px) minmax(0, 1fr); gap: 12px; margin-top: 4px; }
+.lev-vano input[list] { width: 90px; }
+@media (max-width: 700px) { .lev-datos-poste { grid-template-columns: 1fr; } }

@@ -75,11 +75,13 @@ export function aDibujo(lev, { ancho = 1600, alto = 1000, margen = 140 } = {}) {
   listaVanos(lev).forEach(v => {
     if (!pos[v.a] || !pos[v.b]) return;
     const m = metrosDeVano(lev, v);
-    elementos.push({ id: id(), tipo: 'polilinea', tramo: TIPOS_TRAMO[v.tramo] ? v.tramo : 'bt', color: '#000000', grosor: 6, puntos: [pos[v.a], pos[v.b]], metros: m.origen === 'medido' ? { 1: m.metros } : {} });
+    const conductor = v.calibre || v.conductor ? { ...(v.calibre ? { calibre: v.calibre } : {}), ...(v.conductor ? { tipo: v.conductor } : {}) } : null;
+    elementos.push({ id: id(), tipo: 'polilinea', tramo: TIPOS_TRAMO[v.tramo] ? v.tramo : 'bt', color: '#000000', grosor: 6, puntos: [pos[v.a], pos[v.b]], metros: m.origen === 'medido' ? { 1: m.metros } : {}, ...(conductor ? { conductor } : {}) });
   });
   puntos.forEach(p => {
     const [x, y] = pos[p.id]; const escala = p.tipo === 'usuario' ? 0.8 : 0.6;
-    elementos.push({ id: id(), tipo: 'simbolo', simbolo: p.tipo || 'poste', color: SIMBOLO_COLOR[p.tipo] || '#111827', grosor: 3, escala, rot: 0, x: x - 30 * escala, y: y - 30 * escala });
+    elementos.push({ id: id(), tipo: 'simbolo', simbolo: p.tipo || 'poste', color: SIMBOLO_COLOR[p.tipo] || '#111827', grosor: 3, escala, rot: 0, x: x - 30 * escala, y: y - 30 * escala,
+      ...(p.altura ? { altura: Number(p.altura) } : {}), ...(p.estructuras?.length ? { estructuras: [...p.estructuras] } : {}) });
   });
   puntos.forEach(p => {
     const [x, y] = pos[p.id];
@@ -96,11 +98,11 @@ const SIMBOLO_COLOR = { puente: '#0f766e', poste: '#111827', poste_nuevo: '#2563
 export function kmlLevantamiento(lev, nombresTipo = {}) {
   const x = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const puntos = listaPuntos(lev);
-  const pm = puntos.map(p => `<Placemark><name>${x(p.nombre || '')}</name><description>${x([nombresTipo[p.tipo] || p.tipo, p.nota, p.acc ? `Precisión ±${Math.round(p.acc)} m` : ''].filter(Boolean).join(' · '))}</description><Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`).join('');
+  const pm = puntos.map(p => `<Placemark><name>${x(p.nombre || '')}</name><description>${x([nombresTipo[p.tipo] || p.tipo, p.altura ? `${p.altura}'` : '', (p.estructuras || []).join(' / '), p.nota, p.acc ? `Precisión ±${Math.round(p.acc)} m` : ''].filter(Boolean).join(' · '))}</description><Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`).join('');
   const ln = listaVanos(lev).map(v => {
     const a = lev.puntos?.[v.a]; const b = lev.puntos?.[v.b]; if (!a || !b) return '';
     const m = metrosDeVano(lev, v);
-    return `<Placemark><name>${x(`${a.nombre || ''} – ${b.nombre || ''}`)}</name><description>${x(`${TIPOS_TRAMO[v.tramo]?.nombre || ''} · ${m.metros?.toFixed(1)} m (${m.origen === 'medido' ? 'medido' : 'GPS'})`)}</description><LineString><coordinates>${a.lng},${a.lat},0 ${b.lng},${b.lat},0</coordinates></LineString></Placemark>`;
+    return `<Placemark><name>${x(`${a.nombre || ''} – ${b.nombre || ''}`)}</name><description>${x([TIPOS_TRAMO[v.tramo]?.nombre || '', [v.calibre, v.conductor].filter(Boolean).join(' '), `${m.metros?.toFixed(1)} m (${m.origen === 'medido' ? 'medido' : 'GPS'})`].filter(Boolean).join(' · '))}</description><LineString><coordinates>${a.lng},${a.lat},0 ${b.lng},${b.lat},0</coordinates></LineString></Placemark>`;
   }).join('');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${x(lev.nombre || 'Levantamiento')}</name>${pm}${ln}</Document></kml>`;
 }

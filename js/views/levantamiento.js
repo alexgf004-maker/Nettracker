@@ -2,7 +2,9 @@
 import { SIMBOLOS } from '../domain/dibujo.js';
 import { listaPuntos, listaVanos, metrosDeVano, nuevaPantallaLev, resumenLevantamiento, TIPOS_PUNTO } from '../domain/levantamiento.js';
 import { fmtMetros, TIPOS_TRAMO } from '../domain/plano.js';
+import { CALIBRES, textoAltura, textoEstructuras, TIPOS_CONDUCTOR } from '../domain/red.js';
 import { state } from '../state.js';
+import { controlesPoste } from './dibujo.js';
 import { escapeHtml, fmtDate } from '../utils.js';
 import { heroSeccion } from './componentes.js';
 
@@ -72,11 +74,12 @@ function renderDetalle(id, l) {
 
   // Punto seleccionado
   if (sel) {
-    html += `<div class="bloque lev-panel"><div class="bloque-head"><div class="bloque-titulo">${esc(sel.nombre || 'Punto')}</div><span class="tg gris">${sel.manual ? 'Marcado en el mapa' : sel.acc ? `GPS ±${Math.round(sel.acc)} m` : ''}${sel.movido ? ' · ajustado' : ''}</span></div>
+    html += `<div class="bloque lev-panel"><div class="bloque-head"><div class="bloque-titulo">${esc(sel.nombre || 'Punto')}</div><span class="tg gris">${sel.manual ? 'Marcado en el mapa' : sel.acc ? `GPS ±${Math.round(sel.acc)} m` : ''}${sel.movido ? ' · ajustado' : ''}${sel.altura ? ` · ${esc(textoAltura(sel.altura))}` : ''}${sel.estructuras?.length ? ` · ${esc(textoEstructuras(sel.estructuras))}` : ''}</span></div>
       <div class="form-analisis">
         <div class="field"><label>Nombre</label><input id="lev-p-nombre" value="${esc(sel.nombre || '')}" onchange="datoPuntoLev('nombre', this.value)"></div>
         <div class="field"><label>Tipo</label><select id="lev-p-tipo" onchange="datoPuntoLev('tipo', this.value)">${TIPOS_PUNTO.map(k => `<option value="${k}" ${sel.tipo === k ? 'selected' : ''}>${esc(SIMBOLOS[k].nombre)}</option>`).join('')}</select></div>
         <div class="field field-ancho"><label>Nota</label><input id="lev-p-nota" value="${esc(sel.nota || '')}" placeholder="Ej. poste de madera deteriorado, remate, retenida…" onchange="datoPuntoLev('nota', this.value)"></div></div>
+      <div class="lev-datos-poste">${controlesPoste(sel, { id: 'lev-poste', altura: 'alturaPuntoLev', agregar: 'agregarEstructuraLev', quitar: 'quitarEstructuraLev', escrita: 'agregarEstructuraEscritaLev' })}</div>
       <div class="barra-acciones"><button class="b b-g" onclick="seguirDesdeLev()">Seguir desde aquí</button><button class="b b-g" onclick="unirConLev()">Unir con otro punto</button><button class="b b-g" onclick="moverAGpsLev()">Mover a mi ubicación</button><button class="b b-l dib-borrar" onclick="borrarPuntoLev()">Borrar</button></div>
       <div class="page-sub">Para corregir la posición, arrastra el punto en el mapa.</div></div>`;
   } else if (puntos.length) {
@@ -92,9 +95,12 @@ function renderDetalle(id, l) {
         return `<div class="lev-vano"><b>${esc(a?.nombre || '?')} – ${esc(b?.nombre || '?')}</b>
           <span class="tg ${m.origen === 'medido' ? 'verde' : 'gris'}">${fmtMetros(m.metros)} ${m.origen === 'medido' ? 'medido' : 'GPS'}</span>
           <input id="lev-v-${v.id}" inputmode="decimal" value="${v.metros ?? ''}" placeholder="Medido (m)${gps !== null ? ` · GPS ${gps.toFixed(1)}` : ''}" onchange="datoVanoLev('${v.id}', 'metros', this.value)" aria-label="Metros medidos">
+          <input id="lev-v-cal-${v.id}" list="lev-calibres" value="${esc(v.calibre || '')}" placeholder="Calibre" aria-label="Calibre" onchange="conductorVanoLev('${v.id}', 'calibre', this.value)">
+          <select aria-label="Tipo de conductor" onchange="conductorVanoLev('${v.id}', 'tipo', this.value)"><option value="">Conductor</option>${TIPOS_CONDUCTOR.map(t => `<option ${v.conductor === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
           <select onchange="datoVanoLev('${v.id}', 'tramo', this.value)" aria-label="Tipo de vano">${Object.entries(TIPOS_TRAMO).map(([k, t]) => `<option value="${k}" ${v.tramo === k ? 'selected' : ''}>${esc(t.nombre)}</option>`).join('')}</select>
           <button class="b b-l" onclick="borrarVanoLev('${v.id}')">Quitar</button></div>`;
       }).join('')}
+      <datalist id="lev-calibres">${CALIBRES.map(c => `<option value="${c}">`).join('')}</datalist>
       <div class="page-sub">La distancia sale del GPS (precisión del celular, 3 a 10 m con buena señal). Si mediste el vano con cinta o telémetro, escríbelo: manda sobre el GPS.</div></details>`;
   }
 

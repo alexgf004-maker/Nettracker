@@ -7,6 +7,7 @@ const NOMBRES = [
   'nuevoLienzoDib', 'quitarEntradaLeyendaDib', 'quitarEscalaDib', 'quitarFondoDib', 'rehacerDib', 'setColorDib', 'setEstiloEtiquetaDib', 'setGrosorDib',
   'setHerramientaDib', 'setLaminaDib', 'setPrefijoDib', 'setSimboloDib', 'setTamTextoDib', 'setTipoTramoDib', 'subirFondoDib', 'tablaEncabezadoDib',
   'tablaFilasDib', 'terminarTramoDib', 'textoDib',
+  'setAlturaDib', 'agregarEstructuraDib', 'agregarEstructuraEscritaDib', 'quitarEstructuraDib', 'setConductorDib', 'setCalibreVanoDib',
   'metrosASuLugarDib', 'setColorRedDib', 'setNombreRedDib', 'setTamanoDib', 'setTamNuevosDib', 'togglePanelDib', 'abrirPanelMovilDib', 'zoomDib', 'ajustarVistaDib', 'ampliarDib', 'dibRueda',
   'setVistaProyectosDib', 'guardarProyectoDib', 'guardarComoProyectoDib', 'abrirProyectoDib', 'eliminarProyectoDib', 'soltarProyectoDib',
 ];
