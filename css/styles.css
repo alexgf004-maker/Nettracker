@@ -1362,6 +1362,7 @@ button.aviso-inicio-fila { cursor: pointer; }
 .dib-fila { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
 .dib-fila input { flex: 1; }
 .dib-destino { fill: #fde047; }
+.dib-iman { fill: rgba(245, 158, 11, .18); stroke: #f59e0b; stroke-width: 3; vector-effect: non-scaling-stroke; pointer-events: none; }
 .dib-ayuda { margin: 0 0 8px; }
 .dib-lienzo { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: repeating-conic-gradient(#e5e7eb 0% 25%, #f8fafc 0% 50%) 50% / 20px 20px; }
 .dib-svg { display: block; width: 100%; height: auto; max-height: 78vh; touch-action: none; user-select: none; -webkit-user-select: none; }
@@ -1385,10 +1386,10 @@ button.aviso-inicio-fila { cursor: pointer; }
 .lev-mapa { height: 62vh; min-height: 340px; border-radius: 14px; overflow: hidden; border: 1px solid var(--border); background: #e5e7eb; position: relative; z-index: 0; }
 .lev-sin-mapa { padding: 24px; color: var(--text2); font-size: 14px; }
 .lev-icono { background: none; border: 0; }
-.lev-punto { position: relative; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; }
-.lev-punto span { position: absolute; left: 26px; top: -6px; background: #0f2a43; color: #fff; font: 700 11px Arial, sans-serif; padding: 1px 5px; border-radius: 5px; white-space: nowrap; border: 1px solid #fff; }
-.lev-punto.actual::before { content: ''; position: absolute; inset: -3px; border-radius: 50%; border: 3px solid #f59e0b; }
-.lev-punto.sel::before { content: ''; position: absolute; inset: -4px; border-radius: 50%; border: 3px dashed #0ea5e9; }
+.lev-punto { position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
+.lev-punto span { position: absolute; left: 33px; top: 1px; background: #0f2a43; color: #fff; font: 700 11px Arial, sans-serif; padding: 1px 5px; border-radius: 5px; white-space: nowrap; border: 1px solid #fff; }
+.lev-punto.actual::before { content: ''; position: absolute; inset: 5px; border-radius: 50%; border: 3px solid #f59e0b; }
+.lev-punto.sel::before { content: ''; position: absolute; inset: 4px; border-radius: 50%; border: 3px dashed #0ea5e9; }
 .lev-dist { background: #fff; border: 1px solid #94a3b8; border-radius: 999px; padding: 0 6px; font: 700 11px Arial, sans-serif; color: #111827; box-shadow: none; }
 .lev-dist::before { display: none; }
 .lev-panel, .lev-vanos { margin-top: 10px; }

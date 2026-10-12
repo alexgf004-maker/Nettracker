@@ -3,7 +3,7 @@
 // posición actual y lo une con el anterior. El mapa se crea una sola vez y se vuelve a colocar tras cada render().
 import { db, push, ref, remove, update } from '../firebase.js';
 import { SIMBOLOS } from '../domain/dibujo.js';
-import { aDibujo, kmlLevantamiento, listaPuntos, listaVanos, metrosDeVano, nuevaPantallaLev, PRECISION_BAJA, siguienteNombre } from '../domain/levantamiento.js';
+import { aDibujo, distancia, kmlLevantamiento, listaPuntos, listaVanos, metrosDeVano, nuevaPantallaLev, PRECISION_BAJA, siguienteNombre } from '../domain/levantamiento.js';
 import { TIPOS_TRAMO } from '../domain/plano.js';
 import { hoyLocal } from '../domain/trabajo.js';
 import { state } from '../state.js';
@@ -119,7 +119,7 @@ const COLOR_PUNTO = { poste: '#111827', poste_nuevo: '#2563eb', trafo: '#15803d'
 function icono(p, { actual, sel }) {
   const s = SIMBOLOS[p.tipo] || SIMBOLOS.poste; const c = COLOR_PUNTO[p.tipo] || '#111827';
   return L.divIcon({
-    className: 'lev-icono', iconSize: [30, 30], iconAnchor: [15, 15],
+    className: 'lev-icono', iconSize: [44, 44], iconAnchor: [22, 22], // zona táctil grande para el dedo
     html: `<div class="lev-punto ${actual ? 'actual' : ''} ${sel ? 'sel' : ''}"><svg viewBox="-4 -4 68 68" width="26" height="26" color="${c}" stroke="${c}" stroke-width="3" fill="none">${s.svg}</svg><span>${String(p.nombre || '').replace(/</g, '&lt;')}</span></div>`,
   });
 }
@@ -158,19 +158,50 @@ function marcar(lat, lng, acc = null) {
 export function marcarAqui() {
   const g = state.gps;
   if (!g || g.error || !g.lat) return showToast(g?.error || 'Esperando señal GPS…');
+  // Imán en campo: si estás junto a un punto ya marcado (a menos de la precisión, entre 3 y 8 m), puede ser el mismo poste
+  const l = lev(); const u = ui();
+  const radio = Math.max(3, Math.min(g.acc, 8));
+  const cerca = listaPuntos(l).map(p => ({ p, d: distancia(p, g) })).filter(x => x.d <= radio && x.p.id !== u.actual).sort((a, b) => a.d - b.d)[0];
+  if (cerca && confirm(`Estás a ${cerca.d.toFixed(1)} m de ${cerca.p.nombre}. ¿Es el mismo poste?\n\nAceptar: usar ${cerca.p.nombre}${u.unir && u.actual ? ' y unirlo con el anterior' : ''}.\nCancelar: marcar un poste nuevo.`)) {
+    if (u.unir && u.actual) unir(u.actual, cerca.p.id);
+    u.actual = cerca.p.id; u.sel = null; showToast(`Sigue desde ${cerca.p.nombre}`); render(); return;
+  }
   if (g.acc > PRECISION_BAJA && !confirm(`La precisión del GPS es baja (±${Math.round(g.acc)} m). ¿Marcar igual? También puedes esperar unos segundos o marcar tocando el mapa.`)) return;
   marcar(g.lat, g.lng, g.acc);
 }
+// Imán: el punto ya marcado más cercano al toque, si está a menos de 36 px en pantalla
+const IMAN_PX = 36;
+function puntoCerca(ll) {
+  const l = lev(); if (!l || !mapa) return null;
+  const c = mapa.latLngToContainerPoint(ll); let mejor = null; let dmin = IMAN_PX;
+  listaPuntos(l).forEach(p => { const q = mapa.latLngToContainerPoint([p.lat, p.lng]); const d = Math.hypot(q.x - c.x, q.y - c.y); if (d <= dmin) { dmin = d; mejor = p; } });
+  return mejor;
+}
+// Une dos puntos con un vano (si no están unidos ya)
+function unir(a, b) {
+  const l = lev(); const u = ui();
+  if (!a || !b || a === b) return false;
+  if (listaVanos(l).some(v => (v.a === a && v.b === b) || (v.a === b && v.b === a))) return false;
+  push(ref(db, ruta(state.levId, 'vanos')), { a, b, tramo: u.tramo, orden: Date.now() });
+  return true;
+}
 function alTocarMapa(ll) {
   const u = ui(); if (!u) return;
+  const cerca = puntoCerca(ll);
+  if (cerca) return alTocarPunto(cerca.id); // tocar cerca de un punto es tocar el punto
   if (u.modo === 'tocar') { marcar(ll.lat, ll.lng); return; }
   if (u.sel || u.unirDesde) { u.sel = null; u.unirDesde = null; render(); }
 }
 function alTocarPunto(id) {
   const u = ui(); const l = lev(); if (!u || !l) return;
   if (u.unirDesde && u.unirDesde !== id) {
-    push(ref(db, ruta(state.levId, 'vanos')), { a: u.unirDesde, b: id, tramo: u.tramo, orden: Date.now() });
-    u.unirDesde = null; u.actual = id; showToast('Vano agregado'); render(); return;
+    showToast(unir(u.unirDesde, id) ? 'Vano agregado' : 'Esos puntos ya están unidos');
+    u.unirDesde = null; u.actual = id; render(); return;
+  }
+  // Marcando en el mapa con "unir al anterior": tocar un punto existente lo une y sigue desde ahí (cierra la red)
+  if (u.modo === 'tocar' && u.unir && u.actual && u.actual !== id && l.puntos?.[u.actual]) {
+    if (unir(u.actual, id)) showToast(`Unido con ${l.puntos[id]?.nombre || 'el punto'}`);
+    u.actual = id; u.sel = null; render(); return;
   }
   u.sel = u.sel === id ? null : id; render();
 }

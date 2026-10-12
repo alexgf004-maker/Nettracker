@@ -39,11 +39,26 @@ export function anclas(elementos, simbolos) {
   });
   return out;
 }
-export function ajustar([x, y], lista, tol, excluir = null) {
+export function ajustar(p, lista, tol, excluir = null) { return imanar(p, lista, [], tol, excluir).p; }
+
+// Imán: primero a un punto (poste, vértice, punta de etiqueta) dentro de `tol`; si no hay, a la línea de un tramo
+// (proyección sobre el vano) dentro de `tol` × 0.8. Devuelve { p, a: 'punto' | 'linea' | null }.
+export function imanar([x, y], puntos, segmentos, tol, excluir = null) {
   let mejor = null; let dmin = tol;
-  lista.forEach(a => { if (a.id === excluir) return; const d = Math.hypot(a.x - x, a.y - y); if (d <= dmin) { dmin = d; mejor = a; } });
-  return mejor ? [mejor.x, mejor.y] : [x, y];
+  puntos.forEach(a => { if (a.id === excluir) return; const d = Math.hypot(a.x - x, a.y - y); if (d <= dmin) { dmin = d; mejor = [a.x, a.y]; } });
+  if (mejor) return { p: mejor, a: 'punto' };
+  let dl = tol * 0.8;
+  segmentos.forEach(sg => {
+    if (sg.id === excluir) return;
+    const [x0, y0] = sg.p0; const [x1, y1] = sg.p1; const vx = x1 - x0; const vy = y1 - y0; const l2 = vx * vx + vy * vy; if (!l2) return;
+    const t = Math.max(0, Math.min(1, ((x - x0) * vx + (y - y0) * vy) / l2));
+    const px = x0 + vx * t; const py = y0 + vy * t; const d = Math.hypot(px - x, py - y);
+    if (d <= dl) { dl = d; mejor = [px, py]; }
+  });
+  return mejor ? { p: mejor, a: 'linea' } : { p: [x, y], a: null };
 }
+// Vanos de los tramos como segmentos para el imán
+export const segmentosTramos = elementos => elementos.filter(e => e.tipo === 'polilinea').flatMap(e => e.puntos.slice(1).map((p, i) => ({ id: e.id, p0: e.puntos[i], p1: p })));
 
 // Nombre corto de una etiqueta: "P1: DS111267" → "P1"
 export const nombrePunto = t => String(t || '').split(/[:\n]/)[0].trim();

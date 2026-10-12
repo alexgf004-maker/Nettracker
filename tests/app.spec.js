@@ -2650,6 +2650,38 @@ test.describe('Herramienta Dibujar', () => {
     await expect(page.locator('.toast')).toContainText('solo el número');
     expect(errores).toEqual([]);
   });
+  test('imán: el poste cae sobre la línea, se pega a los vértices y arrastra lo que tiene pegado', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    await page.setViewportSize({ width: 1280, height: 1100 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await page.evaluate(() => localStorage.removeItem('nettracker_dibujo'));
+    await nav(page, 'Dibujar');
+    await subirImagen(page, 1600, 900);
+    const estado = () => page.evaluate(async () => (await import('/js/state.js')).state.dibujo.elementos.map(e => ({ tipo: e.tipo, puntos: e.puntos?.map(p => p.map(Math.round)), c: e.tipo === 'simbolo' ? [Math.round(e.x + 30 * e.escala), Math.round(e.y + 30 * e.escala)] : null, t: e.tipo === 'etiqueta' ? [Math.round(e.tx), Math.round(e.ty)] : null })));
+    // Tramo de dos vértices
+    await page.getByRole('button', { name: 'Tramo de red' }).click();
+    await tocar(page, 200, 500); await tocar(page, 1000, 500);
+    await page.getByRole('button', { name: 'Terminar tramo' }).click();
+    // Poste tocado 15 px por encima de la línea: cae sobre ella (imán a la línea)
+    await page.getByRole('button', { name: 'Poste existente' }).click();
+    await tocar(page, 600, 485);
+    // Poste tocado cerca del extremo: cae en el vértice (el punto manda sobre la línea)
+    await tocar(page, 1008, 492);
+    let e = await estado();
+    expect(e.filter(x => x.tipo === 'simbolo').map(x => x.c)).toEqual([[600, 500], [1000, 500]]);
+    // Etiqueta al poste del extremo: su punta se pega al centro
+    await page.getByRole('button', { name: 'Etiqueta de punto (P1, W1…)' }).click();
+    await tocar(page, 1006, 494);
+    // Mover el poste del extremo arrastra el vértice del tramo y la punta de la etiqueta
+    await page.getByRole('button', { name: 'Seleccionar y mover' }).click();
+    await arrastrar(page, [1000, 500], [1100, 300]);
+    e = await estado();
+    expect(e.find(x => x.tipo === 'polilinea').puntos).toEqual([[200, 500], [1100, 300]]);
+    expect(e.filter(x => x.tipo === 'simbolo')[1].c).toEqual([1100, 300]);
+    expect(e.find(x => x.tipo === 'etiqueta').t).toEqual([1100, 300]);
+    expect(errores).toEqual([]);
+  });
 });
 
 test.describe('Levantamiento en campo', () => {
@@ -2737,6 +2769,44 @@ test.describe('Levantamiento en campo', () => {
     await expect(page.locator('#dib-cajetin text', { hasText: /^32\.0$/ })).toHaveCount(1);
     await expect(page.locator('#dib-cajetin text', { hasText: 'LEVANTAMIENTO DE RED' })).toHaveCount(1);
     await expect(page.locator('#dib-capa text', { hasText: 'P1: Poste de madera deteriorado' })).toHaveCount(1);
+    expect(errores).toEqual([]);
+  });
+  test('imán en campo: junto a un poste ya marcado pregunta si es el mismo, y tocar cerca de un punto lo une', async ({ page, context }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    await context.grantPermissions(['geolocation']);
+    await context.setGeolocation({ latitude: 13.5, longitude: -88.87, accuracy: 4 });
+    await page.setViewportSize({ width: 1280, height: 1100 });
+    app = await abrirApp(page, { leaflet: true });
+    await cerrarAlerta(page);
+    await nav(page, 'Levantamiento');
+    await page.locator('#lev-nombre').fill('Imán');
+    await page.getByRole('button', { name: 'Empezar levantamiento' }).click();
+    await expect(page.locator('#lev-gps')).toHaveText('GPS ±4 m');
+    const poste = page.getByRole('button', { name: 'Poste aquí' });
+    await poste.click();
+    await context.setGeolocation({ latitude: 13.50027, longitude: -88.87, accuracy: 4 });
+    await expect(page.locator('#lev-gps')).toHaveText('GPS ±4 m');
+    await poste.click(); // P2
+    await expect(page.locator('.leaflet-marker-icon', { hasText: 'P2' })).toHaveCount(1);
+    // De vuelta junto a P1 (a 2 m): es el mismo poste → no se crea otro; el siguiente sale desde P1
+    await context.setGeolocation({ latitude: 13.500018, longitude: -88.87, accuracy: 3 });
+    await expect(page.locator('#lev-gps')).toHaveText('GPS ±3 m');
+    await page.evaluate(() => { window.__preguntas = []; window.confirm = m => { window.__preguntas.push(m); return true; }; });
+    await poste.click();
+    expect((await page.evaluate(() => window.__preguntas)).join(' ')).toContain('Estás a 2.0 m de P1. ¿Es el mismo poste?');
+    await expect(page.locator('.leaflet-marker-icon')).toHaveCount(2); // no se creó otro poste
+    await expect(page.locator('.lev-vano')).toHaveCount(1); // P1 – P2 ya existía: no se duplica el vano
+    await expect(page.locator('.lev-accion')).toContainText('Se une a P1.');
+    await context.setGeolocation({ latitude: 13.5, longitude: -88.86973, accuracy: 5 });
+    await expect(page.locator('#lev-gps')).toHaveText('GPS ±5 m');
+    await poste.click(); // P3 unido a P1
+    await expect(page.locator('.lev-vano', { hasText: 'P1 – P3' })).toHaveCount(1);
+    // Tocando el mapa cerca (no encima) de P2 con "unir al anterior": cierra la red P3 – P2 sin crear un punto
+    await page.getByRole('button', { name: 'Tocando el mapa' }).click();
+    const p2 = await page.locator('.leaflet-marker-icon', { hasText: 'P2' }).boundingBox();
+    await page.mouse.click(p2.x + p2.width / 2 + 26, p2.y + p2.height / 2 + 10);
+    await expect(page.locator('.lev-vano', { hasText: 'P3 – P2' })).toHaveCount(1);
+    await expect(page.locator('.leaflet-marker-icon')).toHaveCount(3);
     expect(errores).toEqual([]);
   });
 });

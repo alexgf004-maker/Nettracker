@@ -1,7 +1,7 @@
 // Herramienta Dibujar: subir una imagen y dibujar encima; se descarga como PNG (confirmado: no se guarda en la base).
 // El borrador queda solo en este navegador (localStorage). Mientras se arrastra se repinta solo el SVG, sin render().
 import { caja, COLORES, coloresTramos, GROSORES, leerFilasTabla, medidaEtiqueta, medidaReducida, mover, nuevoId, redimensionar, siguienteEtiqueta, SIMBOLOS, svgExportable, svgLamina, tamano, TAM_TEXTO } from '../domain/dibujo.js';
-import { ajustar, anclas, escalaDe, ESTILOS_ETIQUETA, fmtMetros, metrosTramo, nombrePunto } from '../domain/plano.js';
+import { anclas, escalaDe, ESTILOS_ETIQUETA, fmtMetros, imanar, metrosTramo, nombrePunto, segmentosTramos } from '../domain/plano.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { render } from '../views/render.js';
@@ -52,9 +52,42 @@ function memorizar() {
 function reemplazar(el) { const d = dib(); d.elementos = d.elementos.map(e => (e.id === el.id ? el : e)); }
 // Escala de los símbolos y textos según el tamaño del lienzo
 const escalaBase = () => { const { w, h } = tamano(dib()); return Math.max(w, h) / 1600; };
-export const uiDe = d => { const { w, h } = tamano(d); return Math.max(w, h) / 1100; };
-// Ajuste a postes, vértices y puntos cercanos (tolerancia en píxeles de la imagen)
-const ajustarPunto = (p, excluir = null) => ajustar(p, anclas(dib().elementos, SIMBOLOS), 18 * uiDe(dib()), excluir);
+// Tamaño de tiradores y marcas: según la imagen y, en pantallas chicas (celular), para que se puedan tocar con el dedo
+export const uiDe = d => {
+  const { w, h } = tamano(d);
+  const ancho = document.querySelector('.dib-lienzo')?.clientWidth; const k = ancho ? ancho / w : 1; // px de pantalla por px de imagen
+  return Math.max(Math.max(w, h) / 1100, 1.2 / k);
+};
+
+// ── Imán ──
+// Se pega a postes, vértices y puntas de etiqueta y, si no hay ninguno cerca, a la línea de los tramos. La distancia se
+// mide en pantalla: 34 px con el dedo y 18 px con el mouse, sin importar el zoom ni el tamaño de la imagen.
+let tolIman = 20;
+function medirIman(ev) {
+  const k = document.getElementById('dib-svg')?.getScreenCTM()?.a || 1;
+  tolIman = (ev.pointerType === 'mouse' ? 18 : 34) / k;
+}
+function ajustarPunto(p, excluir = null, { lineas = true, ignorarEn = null } = {}) {
+  const d = dib();
+  let puntos = anclas(d.elementos, SIMBOLOS);
+  if (ignorarEn) puntos = puntos.filter(a => Math.hypot(a.x - ignorarEn[0], a.y - ignorarEn[1]) > 0.5);
+  const r = imanar(p, puntos, lineas ? segmentosTramos(d.elementos) : [], tolIman, excluir);
+  d.iman = r.a ? r.p : null; // marca visible mientras se ajusta
+  return r.p;
+}
+let quitarMarca = null;
+function marcaBreve() { clearTimeout(quitarMarca); quitarMarca = setTimeout(() => { if (dib()) { dib().iman = null; repintar(); } }, 600); }
+// Centro de un símbolo y lo que tiene pegado (vértices de tramos y puntas de etiquetas en ese punto)
+const centroSimbolo = el => [el.x + 30 * el.escala, el.y + 30 * el.escala];
+function pegadosA([cx, cy], excluir) {
+  const out = [];
+  dib().elementos.forEach(e => {
+    if (e.id === excluir) return;
+    if (e.tipo === 'polilinea') e.puntos.forEach(([x, y], i) => { if (Math.hypot(x - cx, y - cy) < 1) out.push({ id: e.id, i }); });
+    if (e.tipo === 'etiqueta' && Math.hypot(e.tx - cx, e.ty - cy) < 1) out.push({ id: e.id, destino: true });
+  });
+  return out;
+}
 
 // ── Repintado directo del SVG (durante el arrastre) ──
 export const partesSVG = d => svgLamina(d, { pantalla: true, ui: uiDe(d) });
@@ -75,6 +108,7 @@ let arrastre = null;
 export function dibPointerDown(ev) {
   const d = dib(); if (!d) return;
   ev.preventDefault();
+  medirIman(ev);
   let [x, y] = punto(ev);
   if (y > tamano(d).h) return; // el cajetín no se dibuja a mano
   const svg = document.getElementById('dib-svg');
@@ -82,12 +116,27 @@ export function dibPointerDown(ev) {
   const base = { id: nuevoId(), color: d.color, grosor: GROSORES[d.grosor] * escalaBase() };
   const h = d.herramienta;
   if (h === 'seleccionar') {
-    const tirador = ev.target.closest?.('[data-tirador]')?.dataset.tirador;
+    let tirador = ev.target.closest?.('[data-tirador]')?.dataset.tirador;
+    // La punta de una etiqueta sobre un poste: se mueve el poste (con lo que tiene pegado), no se despega la etiqueta
+    if (tirador === 'destino' && seleccionado() && d.elementos.some(e => e.tipo === 'simbolo' && SIMBOLOS[e.simbolo]?.grupo === 'red' && Math.hypot(centroSimbolo(e)[0] - seleccionado().tx, centroSimbolo(e)[1] - seleccionado().ty) < 1)) tirador = null;
     if (tirador && seleccionado()) { memorizar(); arrastre = { modo: 'tirador', tirador, cambio: false, ajuste: tirador === 'destino' || /^v\d+$/.test(tirador) || seleccionado().tipo === 'cota' }; return; }
-    const id = ev.target.closest?.('[data-id]')?.dataset.id;
+    // Tocando justo sobre un poste o transformador se agarra el símbolo (no la punta de una etiqueta o el vértice encima)
+    const simbolo = d.elementos.filter(e => e.tipo === 'simbolo' && SIMBOLOS[e.simbolo]?.grupo === 'red')
+      .map(e => ({ e, dist: Math.hypot(centroSimbolo(e)[0] - x, centroSimbolo(e)[1] - y) })).filter(o => o.dist <= Math.max(tolIman * 0.7, 30 * o.e.escala)).sort((a, b) => a.dist - b.dist)[0];
+    const id = simbolo?.e.id || ev.target.closest?.('[data-id]')?.dataset.id;
     d.sel = id || null;
     // Con algo seleccionado se puede arrastrar: se repinta solo el SVG (render() al soltar, para no perder el arrastre)
-    if (id) { memorizar(); arrastre = { modo: 'mover', ultimo: [x, y], cambio: false }; repintar(); } else render();
+    if (id) {
+      memorizar();
+      arrastre = { modo: 'mover', ultimo: [x, y], cambio: false };
+      // Un poste o transformador arrastra lo que tiene pegado y su centro se pega a otros puntos o a los tramos
+      const el = seleccionado();
+      if (el?.tipo === 'simbolo' && SIMBOLOS[el.simbolo]?.grupo === 'red') {
+        const c = centroSimbolo(el);
+        Object.assign(arrastre, { modo: 'simbolo', desfase: [c[0] - x, c[1] - y], pegados: pegadosA(c, el.id) });
+      }
+      repintar();
+    } else render();
     return;
   }
   // Calibrar la escala: se traza una línea sobre una distancia conocida
@@ -99,7 +148,7 @@ export function dibPointerDown(ev) {
   }
   // Tramo de red: cada toque agrega un vértice (ajustado al poste más cercano); doble toque, Enter o "Terminar"
   if (h === 'tramo') {
-    [x, y] = ajustarPunto([x, y], d.tramo);
+    [x, y] = ajustarPunto([x, y], d.tramo); marcaBreve();
     const t = d.tramo && d.elementos.find(e => e.id === d.tramo);
     const ahora = ev.timeStamp; // tiempo del toque (para el doble toque)
     if (t) {
@@ -119,7 +168,7 @@ export function dibPointerDown(ev) {
   let el;
   if (h === 'etiqueta') {
     // Se toca el poste (se ajusta a su centro) y se arrastra hasta donde va la etiqueta; con un toque queda arriba a la derecha
-    [x, y] = ajustarPunto([x, y]);
+    [x, y] = ajustarPunto([x, y]); marcaBreve();
     const tam = Math.round(19 * escalaBase());
     el = { id: base.id, tipo: 'etiqueta', estilo: d.estiloEtiqueta, texto: siguienteEtiqueta(d.elementos, d.prefijo), tam, tx: x, ty: y, x: x + tam * 1.4, y: y - tam * 3.6 };
     d.elementos.push(el); d.sel = el.id;
@@ -156,6 +205,7 @@ export function dibPointerDown(ev) {
   } else if (h === 'simbolo') {
     // Símbolos de red en tamaño de plano; los de unifilar más grandes. Con el color propio del símbolo si lo trae
     const sim = SIMBOLOS[d.simbolo];
+    if (sim?.grupo === 'red') { [x, y] = ajustarPunto([x, y]); marcaBreve(); } // el poste cae justo en el vértice o sobre la línea
     const escala = (sim?.grupo === 'red' ? 0.6 : 1.5) * escalaBase();
     el = { id: base.id, tipo: 'simbolo', simbolo: d.simbolo, color: sim?.color || d.color, grosor: base.grosor, escala, rot: 0, x: x - 30 * escala, y: y - 30 * escala };
     d.elementos.push(el); d.sel = el.id;
@@ -178,7 +228,16 @@ export function dibPointerMove(ev) {
   } else {
     const el = seleccionado(); if (!el) return;
     if (arrastre.ajuste) [x, y] = ajustarPunto([x, y], el.id);
-    if (arrastre.modo === 'mover') {
+    if (arrastre.modo === 'simbolo') {
+      const viejo = centroSimbolo(el);
+      const [cx, cy] = ajustarPunto([x + arrastre.desfase[0], y + arrastre.desfase[1]], el.id, { ignorarEn: viejo });
+      reemplazar(mover(el, cx - viejo[0], cy - viejo[1]));
+      // Lo pegado se mueve con el poste
+      arrastre.pegados.forEach(pg => {
+        const e = dib().elementos.find(z => z.id === pg.id); if (!e) return;
+        reemplazar(pg.destino ? { ...e, tx: cx, ty: cy } : { ...e, puntos: e.puntos.map((q, k) => (k === pg.i ? [cx, cy] : q)) });
+      });
+    } else if (arrastre.modo === 'mover') {
       reemplazar(mover(el, x - arrastre.ultimo[0], y - arrastre.ultimo[1]));
       arrastre.ultimo = [x, y];
     } else if (arrastre.modo === 'trazo') reemplazar({ ...el, puntos: [...el.puntos, [x, y]] });
@@ -191,6 +250,7 @@ export function dibPointerMove(ev) {
 export function dibPointerUp() {
   const d = dib(); if (!arrastre || !d) return;
   const a = arrastre; arrastre = null;
+  d.iman = null;
   if (a.modo === 'calibrar') { render(); setTimeout(() => document.getElementById('dib-metros')?.focus(), 0); return; }
   const el = seleccionado();
   // Un clic sin arrastrar con línea, cota, figura o trazo no deja un elemento vacío

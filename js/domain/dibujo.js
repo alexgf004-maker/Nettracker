@@ -339,6 +339,7 @@ export function svgLamina(d, { pantalla = false, ui = 1 } = {}) {
   const fondo = d.fondo ? `<image href="${d.fondo.src}" x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="none"/>` : `<rect width="${w}" height="${h}" fill="#ffffff"/>`;
   const opts = { escala: d.escala, distancias: d.lamina?.distanciasEnTramos !== false };
   const capa = definiciones(d.elementos) + d.elementos.map(e => svgElemento(e, { ...opts, sel: pantalla && e.id === d.sel, ui })).join('')
+    + (pantalla && d.iman ? `<circle class="dib-iman" cx="${r1(d.iman[0])}" cy="${r1(d.iman[1])}" r="${r1(16 * ui)}"/>` : '')
     + (pantalla && d.calibracion ? `<line x1="${r1(d.calibracion.x1)}" y1="${r1(d.calibracion.y1)}" x2="${r1(d.calibracion.x2)}" y2="${r1(d.calibracion.y2)}" stroke="#f97316" stroke-width="${r1(4 * ui)}" stroke-dasharray="${r1(10 * ui)} ${r1(6 * ui)}"/>` : '');
   const marco = `<rect x="0" y="0" width="${w}" height="${h}" fill="none" stroke="#0f2a43" stroke-width="${r1(3 * w / 1600)}"/>`;
   return { w, h, H, fondo, capa, cajetin: conCajetin ? `<g pointer-events="none">${svgCajetin(d, h)}${marco}</g>` : '' };
