@@ -207,8 +207,9 @@ export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias
   }
   if (!sel) return s;
   // Marca de selección y tiradores (ui: tamaño según la escala del lienzo en pantalla)
-  const b = caja(el); const m = 8 * ui; const rt = r1(14 * ui);
-  const tirador = (k, x, y, extra = '') => `<circle class="dib-tirador${extra}" data-tirador="${k}" cx="${r1(x)}" cy="${r1(y)}" r="${rt}"/>`;
+  // Se ve un punto chico, pero se toca en un círculo invisible del tamaño del dedo
+  const b = caja(el); const m = 8 * ui; const rt = r1(14 * ui); const rv = r1(5 * ui);
+  const tirador = (k, x, y, extra = '') => `<g data-tirador="${k}"><circle class="dib-toque" cx="${r1(x)}" cy="${r1(y)}" r="${rt}"/><circle class="dib-tirador${extra}" cx="${r1(x)}" cy="${r1(y)}" r="${rv}"/></g>`;
   let t = `<rect class="dib-sel" x="${r1(b.x - m)}" y="${r1(b.y - m)}" width="${r1(b.w + m * 2)}" height="${r1(b.h + m * 2)}"/>`;
   if (el.tipo === 'linea' || el.tipo === 'flecha' || el.tipo === 'cota') t = tirador('p1', el.x1, el.y1) + tirador('p2', el.x2, el.y2);
   else if (el.tipo === 'polilinea') t = el.puntos.map(([x, y], i) => tirador('v' + i, x, y)).join('');
@@ -339,7 +340,7 @@ export function svgLamina(d, { pantalla = false, ui = 1 } = {}) {
   const fondo = d.fondo ? `<image href="${d.fondo.src}" x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="none"/>` : `<rect width="${w}" height="${h}" fill="#ffffff"/>`;
   const opts = { escala: d.escala, distancias: d.lamina?.distanciasEnTramos !== false };
   const capa = definiciones(d.elementos) + d.elementos.map(e => svgElemento(e, { ...opts, sel: pantalla && e.id === d.sel, ui })).join('')
-    + (pantalla && d.iman ? `<circle class="dib-iman" cx="${r1(d.iman[0])}" cy="${r1(d.iman[1])}" r="${r1(16 * ui)}"/>` : '')
+    + (pantalla && d.iman ? `<circle class="dib-iman" cx="${r1(d.iman[0])}" cy="${r1(d.iman[1])}" r="${r1(8 * ui)}"/>` : '')
     + (pantalla && d.calibracion ? `<line x1="${r1(d.calibracion.x1)}" y1="${r1(d.calibracion.y1)}" x2="${r1(d.calibracion.x2)}" y2="${r1(d.calibracion.y2)}" stroke="#f97316" stroke-width="${r1(4 * ui)}" stroke-dasharray="${r1(10 * ui)} ${r1(6 * ui)}"/>` : '');
   const marco = `<rect x="0" y="0" width="${w}" height="${h}" fill="none" stroke="#0f2a43" stroke-width="${r1(3 * w / 1600)}"/>`;
   return { w, h, H, fondo, capa, cajetin: conCajetin ? `<g pointer-events="none">${svgCajetin(d, h)}${marco}</g>` : '' };

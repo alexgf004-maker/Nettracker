@@ -58,9 +58,12 @@ function textoGPS() {
   if (g.error) return { clase: 'rojo', texto: g.error };
   return { clase: g.acc <= 6 ? 'verde' : g.acc <= PRECISION_BAJA ? 'ambar' : 'rojo', texto: `GPS ±${Math.round(g.acc)} m` };
 }
-function pintarGPS() {
+function pintarEtiquetaGPS() {
   const t = textoGPS(); const el = document.getElementById('lev-gps');
   if (el) { el.className = `tg ${t.clase}`; el.textContent = t.texto; }
+}
+function pintarGPS() {
+  pintarEtiquetaGPS();
   if (!mapa || !state.gps?.lat) return;
   const ll = [state.gps.lat, state.gps.lng];
   if (!yo) {
@@ -88,7 +91,7 @@ async function montarMapa() {
   if (contenedor) {
     if (lugar !== contenedor) { lugar.replaceWith(contenedor); mapa?.invalidateSize(); }
     if (mapa && montadoPara !== state.levId) encuadrar();
-    dibujarRed(); actualizarSeguir(); return;
+    dibujarRed(); actualizarSeguir(); pintarEtiquetaGPS(); return; // tras redibujar, la señal que ya había (no "Buscando…")
   }
   contenedor = document.createElement('div'); contenedor.id = 'lev-mapa'; contenedor.className = 'lev-mapa';
   lugar.replaceWith(contenedor);
