@@ -28,5 +28,6 @@ export const reclamosRef = ref(db, 'reclamos'); // expedientes de reclamo
 export const seguimientoDesdeRef = ref(db, 'config/seguimientoDesde'); // fecha desde la que el Inicio cuenta pendientes
 // Base de coordenadas por NC: coordenadas/{NC} = [latitud, longitud] (se importa como JSON desde la consola de Firebase)
 export const coordenadasRef = ref(db, 'coordenadas');
+export const levantamientosRef = ref(db, 'levantamientos'); // levantamientos de red en campo con GPS
 export const configCartasRef = ref(db, 'config/cartas'); // firmante, contacto y logo de las cartas al cliente // estado de cada campaña (entrega en el sistema CPT DELSUR)
 export { ref, onValue, push, update, remove, get, set, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut };

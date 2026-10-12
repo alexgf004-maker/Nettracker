@@ -21,7 +21,7 @@ const correoPerfil = nombre => String(nombre).normalize('NFD').replace(/[\u0300-
 /**
  * cuentas: { nombre: pin } perfiles que ya crearon su PIN (cuenta en el Auth falso y marca en cuentas/)
  */
-async function abrirApp(page, { usuario = 'David García', datos = fixture, excel = false, cuentas = {} } = {}) {
+async function abrirApp(page, { usuario = 'David García', datos = fixture, excel = false, cuentas = {}, leaflet = false } = {}) {
   const errores = [];
   page.on('pageerror', e => errores.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errores.push('console: ' + m.text()); });
@@ -45,7 +45,12 @@ async function abrirApp(page, { usuario = 'David García', datos = fixture, exce
   // Leaflet falso: cualquier llamada (L.map(...).setView(...), etc.) devuelve el mismo objeto
   await page.route(/leaflet.*\.js$/, route => route.fulfill({ contentType: 'text/javascript',
     body: 'window.L = new Proxy(function () {}, { get: (t, k) => (k === "then" ? undefined : window.L), apply: () => window.L });' }));
-  await page.route(/cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net|fonts\.(googleapis|gstatic)\.com|unpkg\.com\/.*\.css|tile\.openstreetmap/, route => route.fulfill({ body: '' }));
+  await page.route(/cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net|fonts\.(googleapis|gstatic)\.com|unpkg\.com\/.*\.css|tile\.openstreetmap|arcgisonline/, route => route.fulfill({ body: '' }));
+  // leaflet: true carga el Leaflet real (desde node_modules) para el mapa del levantamiento
+  if (leaflet) {
+    await page.route(/unpkg\.com\/leaflet@[^/]+\/dist\/leaflet\.js$/, route => route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(require.resolve('leaflet/dist/leaflet.js')) }));
+    await page.route(/unpkg\.com\/leaflet@[^/]+\/dist\/leaflet\.css$/, route => route.fulfill({ contentType: 'text/css', body: fs.readFileSync(require.resolve('leaflet/dist/leaflet.css')) }));
+  }
   // excel: true carga la librería de Excel real (xlsx-js-style, SheetJS con estilos, desde node_modules) para leer y generar archivos
   // (va después del bloqueo general porque Playwright aplica primero la última ruta registrada)
   if (excel) await page.route(/cdn\.jsdelivr\.net\/npm\/xlsx-js-style.*\.js$/, route =>

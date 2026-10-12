@@ -2651,3 +2651,92 @@ test.describe('Herramienta Dibujar', () => {
     expect(errores).toEqual([]);
   });
 });
+
+test.describe('Levantamiento en campo', () => {
+  test('distancia entre coordenadas y lámina para Dibujar', async ({ page }) => {
+    app = await abrirApp(page);
+    const r = await page.evaluate(async () => {
+      const m = await import('/js/domain/levantamiento.js');
+      const lev = { nombre: 'X', puntos: { a: { lat: 13.5, lng: -88.87, nombre: 'P1', tipo: 'poste', orden: 1 }, b: { lat: 13.50027, lng: -88.87, nombre: 'P2', tipo: 'poste', orden: 2 }, c: { lat: 13.50027, lng: -88.8697, nombre: 'P3', tipo: 'trafo', nota: 'CT nuevo', orden: 3 } },
+        vanos: { v1: { a: 'a', b: 'b', tramo: 'bt', orden: 1 }, v2: { a: 'b', b: 'c', tramo: 'bt_nueva', metros: 35, orden: 2 } } };
+      const d = m.aDibujo(lev);
+      const { tablaDistancias } = await import('/js/domain/plano.js');
+      return { d1: m.metrosDeVano(lev, lev.vanos.v1), d2: m.metrosDeVano(lev, lev.vanos.v2), sig: m.siguienteNombre(lev), tipos: d.elementos.map(e => e.tipo), escala: d.escala,
+        tabla: tablaDistancias(d.elementos, d.escala, 14).map(f => [f.desde, f.hasta, Math.round(f.metros * 10) / 10]), kml: m.kmlLevantamiento(lev) };
+    });
+    expect(r.d1.origen).toBe('gps'); expect(r.d1.metros).toBeCloseTo(30.0, 0);
+    expect(r.d2).toEqual({ metros: 35, origen: 'medido' });
+    expect(r.sig).toBe('P4');
+    expect(r.tipos.filter(t => t === 'polilinea').length).toBe(2);
+    expect(r.tipos.filter(t => t === 'simbolo').length).toBe(3);
+    expect(r.tipos.filter(t => t === 'etiqueta').length).toBe(3);
+    // La escala de la lámina sale exacta de las coordenadas: el vano por GPS mide lo mismo en Dibujar
+    expect(r.tabla[0][0]).toBe('P1'); expect(r.tabla[0][2]).toBeCloseTo(30.0, 0);
+    expect(r.tabla[1]).toEqual(['P2', 'P3', 35]);
+    expect(r.kml).toContain('<coordinates>-88.87,13.5,0</coordinates>');
+    expect(r.kml).toContain('<LineString>');
+  });
+
+  test('en campo: marca postes con el GPS, mide los vanos, corrige, exporta y pasa a Dibujar', async ({ page, context }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    await context.grantPermissions(['geolocation']);
+    await context.setGeolocation({ latitude: 13.5, longitude: -88.87, accuracy: 5 });
+    await page.setViewportSize({ width: 1280, height: 1100 });
+    app = await abrirApp(page, { leaflet: true });
+    await cerrarAlerta(page);
+    await nav(page, 'Levantamiento');
+    await page.locator('#lev-nombre').fill('Calle de prueba');
+    await page.locator('#lev-referencia').fill('WO-PRUEBA');
+    await page.getByRole('button', { name: 'Empezar levantamiento' }).click();
+    await expect(page.locator('#lev-gps')).toHaveText('GPS ±5 m');
+    await expect(page.locator('#lev-mapa.leaflet-container')).toHaveCount(1);
+    // P1 aquí; caminar 30 m al norte y P2
+    await page.getByRole('button', { name: 'Poste aquí' }).click();
+    await expect(page.locator('.leaflet-marker-icon', { hasText: 'P1' })).toHaveCount(1);
+    await context.setGeolocation({ latitude: 13.50027, longitude: -88.87, accuracy: 4 });
+    await expect(page.locator('#lev-gps')).toHaveText('GPS ±4 m');
+    await page.getByRole('button', { name: 'Poste aquí' }).click();
+    await expect(page.locator('.leaflet-marker-icon', { hasText: 'P2' })).toHaveCount(1);
+    await expect(page.locator('.lev-dist', { hasText: '30.0 m GPS' })).toHaveCount(1);
+    const esc = await app.escrituras();
+    const vano = esc.find(([op, ruta]) => op === 'push' && /^levantamientos\/[^/]+\/vanos$/.test(ruta))[2];
+    expect(vano.tramo).toBe('bt');
+    // Medido a mano: manda sobre el GPS
+    const inp = page.locator('.lev-vano input');
+    await inp.fill('32'); await inp.press('Tab');
+    await expect(page.locator('.lev-dist', { hasText: '32.0 m' })).toHaveCount(1);
+    await expect(page.locator('.lev-vano')).toContainText('32.0 m medido');
+    // Con precisión baja pide confirmar; transformador como tipo de punto
+    await page.locator('.lev-barra .dib-chip', { hasText: 'Transformador existente' }).click();
+    await context.setGeolocation({ latitude: 13.50027, longitude: -88.86975, accuracy: 30 });
+    await expect(page.locator('#lev-gps')).toHaveText('GPS ±30 m');
+    page.once('dialog', dl => dl.accept());
+    await page.getByRole('button', { name: 'Poste aquí' }).click();
+    await expect(page.locator('.leaflet-marker-icon', { hasText: 'P3' })).toHaveCount(1);
+    // Seleccionar P1, nota y ramal desde ahí tocando el mapa
+    await page.locator('.leaflet-marker-icon', { hasText: 'P1' }).click();
+    await expect(page.locator('.lev-panel')).toContainText('GPS ±5 m');
+    await page.locator('#lev-p-nota').fill('Poste de madera deteriorado'); await page.locator('#lev-p-nota').press('Tab');
+    await page.getByRole('button', { name: 'Seguir desde aquí' }).click();
+    await page.getByRole('button', { name: 'Tocando el mapa' }).click();
+    const caja = await page.locator('#lev-mapa').boundingBox();
+    await page.mouse.click(caja.x + caja.width * 0.2, caja.y + caja.height * 0.8);
+    await expect(page.locator('.leaflet-marker-icon', { hasText: 'P4' })).toHaveCount(1);
+    await expect(page.locator('.lev-vano')).toHaveCount(3);
+    await expect(page.locator('.lev-vano', { hasText: 'P1 – P4' })).toHaveCount(1);
+    // KML
+    const kml = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'KML para Google Earth' }).click();
+    const k = require('fs').readFileSync(await (await kml).path(), 'utf8');
+    expect((k.match(/<Point>/g) || []).length).toBe(4);
+    expect(k).toContain('Poste de madera deteriorado');
+    // Pasar a Dibujar: lámina con escala exacta, tramos y etiquetas
+    await page.getByRole('button', { name: 'Pasar a Dibujar (lámina)' }).click();
+    await expect(page.locator('#dib-svg')).toHaveCount(1);
+    await expect(page.locator('#dib-cajetin text', { hasText: /^P1 – P2$/ })).toHaveCount(1);
+    await expect(page.locator('#dib-cajetin text', { hasText: /^32\.0$/ })).toHaveCount(1);
+    await expect(page.locator('#dib-cajetin text', { hasText: 'LEVANTAMIENTO DE RED' })).toHaveCount(1);
+    await expect(page.locator('#dib-capa text', { hasText: 'P1: Poste de madera deteriorado' })).toHaveCount(1);
+    expect(errores).toEqual([]);
+  });
+});
