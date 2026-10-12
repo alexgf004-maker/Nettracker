@@ -3,7 +3,7 @@
 // (título, simbología, distancias, escala y norte). Funciones puras: el estado es
 // { fondo: { src, w, h } | null, elementos: [...], escala (m por px) | null, lamina: {...} } y de aquí sale el SVG
 // que se ve en pantalla y el que se exporta a PNG. Coordenadas en píxeles de la imagen.
-import { ESTILOS_ETIQUETA, fmtMetros, largoEscala, longitud, nombrePunto, tablaDistancias, TIPOS_TRAMO, totalesPorTipo } from './plano.js';
+import { ESTILOS_ETIQUETA, fmtMetros, largoEscala, longitud, metrosVano, nombrePunto, tablaDistancias, TIPOS_TRAMO, totalesPorTipo } from './plano.js';
 
 export const LIENZO = { w: 1600, h: 1000 }; // sin imagen de fondo
 export const COLORES = ['#dc2626', '#a21caf', '#2563eb', '#15803d', '#f59e0b', '#0f172a', '#ffffff'];
@@ -25,6 +25,7 @@ export const SIMBOLOS = {
   usuario: { grupo: 'red', nombre: 'Usuario', color: '#dc2626', svg: '<path d="M30 58 C30 58 9 34 9 22 A21 21 0 0 1 51 22 C51 34 30 58 30 58 Z" fill="currentColor" stroke="#ffffff" stroke-width="3"/><path d="M21 25 L30 17 L39 25 L39 33 L21 33 Z" fill="#ffffff" stroke="none"/>' },
   medidor_red: { grupo: 'red', nombre: 'Medidor', color: '#0f172a', svg: '<rect x="12" y="12" width="36" height="36" rx="7" fill="#ffffff" stroke="currentColor" stroke-width="5"/><text x="30" y="37" text-anchor="middle" font-size="18" font-weight="800" fill="currentColor" stroke="none" font-family="Arial">M</text>' },
   seccionador: { grupo: 'red', nombre: 'Seccionador / cuchilla', color: '#ea580c', svg: '<circle cx="30" cy="30" r="15" fill="#ffffff" stroke="currentColor" stroke-width="5"/><line x1="20" y1="40" x2="40" y2="20" stroke="currentColor" stroke-width="5"/>' },
+  banco: { grupo: 'red', nombre: 'Banco de transformadores', color: '#15803d', svg: '<path d="M2 50 L12 28 L22 50 Z M19 50 L30 24 L41 50 Z M38 50 L48 28 L58 50 Z" fill="currentColor" stroke="#ffffff" stroke-width="3" stroke-linejoin="round"/><line x1="2" y1="52" x2="58" y2="52" stroke="currentColor" stroke-width="3"/>' },
   medicion: { grupo: 'red', nombre: 'Punto de medición', color: '#f59e0b', svg: '<rect x="9" y="11" width="42" height="38" rx="7" fill="currentColor" stroke="#ffffff" stroke-width="3.5"/><path d="M15 33 L21 25 L27 36 L33 21 L39 33 L45 27" stroke="#ffffff" stroke-width="3.5" fill="none"/>' },
   transformador: { grupo: 'diagrama', nombre: 'Transformador', svg: '<line x1="30" y1="0" x2="30" y2="12"/><circle cx="30" cy="23" r="11"/><circle cx="30" cy="37" r="11"/><line x1="30" y1="48" x2="30" y2="60"/>' },
   interruptor: { grupo: 'diagrama', nombre: 'Interruptor', svg: '<line x1="30" y1="0" x2="30" y2="18"/><line x1="30" y1="42" x2="30" y2="60"/><line x1="30" y1="42" x2="44" y2="20"/><circle cx="30" cy="18" r="2.5"/><circle cx="30" cy="42" r="2.5"/>' },
@@ -147,11 +148,13 @@ export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias
       const color = tp ? tp.color : el.color; const ancho = el.grosor * (tp ? tp.ancho : 1);
       const d = el.puntos.map(([x, y], i) => `${i ? 'L' : 'M'}${r1(x)} ${r1(y)}`).join(' ');
       let chips = '';
-      if (distancias && escala) {
+      if (distancias) {
+        // Metros de cada vano: los escritos a mano o, con escala, los medidos
         for (let i = 1; i < el.puntos.length; i++) {
           const [x0, y0] = el.puntos[i - 1]; const [x1, y1] = el.puntos[i];
-          const px = Math.hypot(x1 - x0, y1 - y0); if (px < ancho * 10) continue;
-          chips += chipTexto((x0 + x1) / 2, (y0 + y1) / 2, fmtMetros(px * escala), Math.max(11, ancho * 2.2), color);
+          const m = metrosVano(el, i, escala);
+          if (m === null || Math.hypot(x1 - x0, y1 - y0) < ancho * 10) continue;
+          chips += chipTexto((x0 + x1) / 2, (y0 + y1) / 2, fmtMetros(m), Math.max(11, ancho * 2.2), color);
         }
       }
       s = `<g ${id}><path d="${d}" stroke="transparent" stroke-width="${Math.max(18, ancho * 3)}" fill="none"/>${trazosTramo(d, color, ancho, tp?.dash)}${el.puntos.length === 1 ? `<circle cx="${r1(el.puntos[0][0])}" cy="${r1(el.puntos[0][1])}" r="${r1(ancho)}" fill="${color}"/>` : ''}${chips}</g>`;
@@ -260,7 +263,7 @@ export function filasDistancias(d) {
   if (l.distancias === 'manual') return (l.filas || []).map(f => [f[0] ?? '', f[1] ?? '']);
   return tablaDistancias(d.elementos, d.escala, 14 * Math.max(1, tamano(d).w / 1600)).map(f => [`${f.desde} – ${f.hasta}`, (Math.round(f.metros * 10) / 10).toFixed(1)]);
 }
-const totalesCajetin = d => (d.escala && d.lamina?.distancias !== 'manual' ? totalesPorTipo(d.elementos, d.escala).map(t => [`Total ${t.nombre.charAt(0).toLowerCase()}${t.nombre.slice(1)}`, (Math.round(t.metros * 10) / 10).toFixed(1)]) : []);
+const totalesCajetin = d => (d.lamina?.distancias !== 'manual' ? totalesPorTipo(d.elementos, d.escala).map(t => [`Total ${t.nombre.charAt(0).toLowerCase()}${t.nombre.slice(1)}`, (Math.round(t.metros * 10) / 10).toFixed(1)]) : []);
 export function altoCajetin(d) {
   const { w } = tamano(d); const k = w / 1600;
   const filasSimb = Math.ceil(simbologiaUsada(d.elementos).length / 2);
@@ -310,7 +313,7 @@ function svgCajetin(d, y0) {
     const esc2 = Math.min(1, (col[3] - col[2] - pad * 2) / mt.w);
     s += `<g transform="translate(${r1(col[2] + pad)} ${r1(y0 + 50 * k)}) scale(${r1(esc2 * 1000) / 1000})">${svgTabla(0, 0, tam, ['Tramo', 'Metros'], tabla)}</g>`;
   } else {
-    s += `<text x="${r1(col[2] + pad)}" y="${r1(y0 + 66 * k)}" font-size="${r1(f * 0.85)}" font-family="${FUENTE}" fill="#94a3b8">${d.escala ? 'Etiqueta los puntos sobre los tramos' : 'Calibra la escala para medir'}</text>`;
+    s += `<text x="${r1(col[2] + pad)}" y="${r1(y0 + 66 * k)}" font-size="${r1(f * 0.85)}" font-family="${FUENTE}" fill="#94a3b8">${d.escala || d.elementos.some(e => e.metros && Object.keys(e.metros).length) ? 'Etiqueta los puntos sobre los tramos' : 'Escribe los metros de los vanos o calibra'}</text>`;
   }
   // 4. Escala gráfica y norte
   s += tit(col[3], 'ESCALA');
