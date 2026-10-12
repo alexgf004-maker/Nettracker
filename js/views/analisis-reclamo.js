@@ -7,6 +7,7 @@ import {
 import { diagnosticarArmonicos } from '../domain/diagnostico.js';
 import { claveExpediente } from '../domain/expedientes.js';
 import { normalizarInspeccion } from '../domain/inspeccion.js';
+import { compararPosiciones, factorTap, PLACAS_TAP, placaDe, POSICIONES, proyectarU, resumenProyectado } from '../domain/tap.js';
 import { state } from '../state.js';
 import { escapeHtml, fmtDate } from '../utils.js';
 import { COLOR_FASE } from './graficas.js';
@@ -101,7 +102,7 @@ export function graficaLinea({ id, titulo, unidad, t, fechas, series, lineas = [
     svg += `<line class="graf-nominal" x1="0" x2="${W}" y1="${Y(banda.nominal)}" y2="${Y(banda.nominal)}"/>`;
   }
   lineas.forEach(l => { svg += `<line class="graf-limite" style="stroke:${COLOR_LIMITE[l.tipo || 'limite']}" x1="0" x2="${W}" y1="${Y(l.valor)}" y2="${Y(l.valor)}"/>`; });
-  svg += `<g clip-path="url(#clip-${id})">` + series.map(s => `<path class="graf-linea ${s.eje === 'der' ? 'der' : ''}" d="${camino(s.v, s.eje === 'der' ? eD.Y : Y)}" stroke="${s.color}"/>`).join('') + '</g>';
+  svg += `<g clip-path="url(#clip-${id})">` + series.map(s => `<path class="graf-linea ${s.eje === 'der' ? 'der' : ''} ${s.proyectada ? 'proy' : ''}" d="${camino(s.v, s.eje === 'der' ? eD.Y : Y)}" stroke="${s.color}"/>`).join('') + '</g>';
   svg += `<line class="graf-cursor" x1="0" x2="0" y1="0" y2="${H}" visibility="hidden"/></svg>`;
   const pct = eI.pct; const dec = eI.dec;
   let ejes = eI.ys.map(v => `<span class="graf-y" style="top:${pct(v)}%">${fmt(v, dec)}</span>`).join('');
@@ -112,7 +113,7 @@ export function graficaLinea({ id, titulo, unidad, t, fechas, series, lineas = [
   const etiquetasX = marcas.map(m => `<span class="graf-x" style="left:${(X(m) / W) * 100}%">${esc(etiqueta(m))}</span>`).join('');
   GRAFICAS.set(id, { t, fechas, series, unidad, t0, t1, dec: Math.max(dec, unidad === 'p.u.' ? 3 : dec), decDer: eD?.dec ?? 2 });
   const unidadDer = der[0]?.unidad || '';
-  const leyenda = series.map(s => `<span><i style="background:${s.color}"></i>${esc(s.nombre)}${s.eje === 'der' ? ' (eje der.)' : ''}</span>`).join('')
+  const leyenda = series.map(s => `<span><i class="${s.proyectada ? 'graf-leyenda-proy' : ''}" style="${s.proyectada ? `border-color:${s.color}` : `background:${s.color}`}"></i>${esc(s.nombre)}${s.eje === 'der' ? ' (eje der.)' : ''}</span>`).join('')
     + (banda ? '<span><i class="graf-leyenda-banda"></i>Tolerancia</span>' : '')
     + lineas.map(l => `<span><i class="graf-leyenda-lim" style="border-color:${COLOR_LIMITE[l.tipo || 'limite']}"></i>${esc(l.nombre)}</span>`).join('');
   return `<div class="graf-bloque"><div class="graf-titulo"><b>${esc(titulo)}</b><span>${esc(unidad)}${unidadDer ? ' · ' + esc(unidadDer) + ' (der.)' : ''}</span><span class="graf-leyenda">${leyenda}</span></div>
@@ -156,7 +157,7 @@ export function graficaBarras({ titulo, unidad, categorias, series, limite }) {
   const pct = v => (1 - v / yMax) * 100;
   const ejes = ys.map(v => `<span class="graf-y" style="top:${pct(v)}%">${fmt(v, decimales(yMax, 0))}</span>`).join('');
   const xs = categorias.map((c, i) => `<span class="graf-x ${i % 2 ? 'impar' : ''}" style="left:${((i + 0.5) / categorias.length) * 100}%">${esc(c.replace('H', ''))}</span>`).join('');
-  const leyenda = series.map(s => `<span><i style="background:${s.color}"></i>${esc(s.nombre)}</span>`).join('') + '<span><i class="graf-leyenda-lim"></i>Límite SIGET</span>';
+  const leyenda = series.map(s => `<span><i class="${s.proyectada ? 'graf-leyenda-proy' : ''}" style="${s.proyectada ? `border-color:${s.color}` : `background:${s.color}`}"></i>${esc(s.nombre)}</span>`).join('') + '<span><i class="graf-leyenda-lim"></i>Límite SIGET</span>';
   return `<div class="graf-bloque"><div class="graf-titulo"><b>${esc(titulo)}</b><span>${esc(unidad)}</span><span class="graf-leyenda">${leyenda}</span></div>
     <div class="graf-area graf-area-barras">${svg}<div class="graf-ejes">${ejes}</div><div class="graf-xs">${xs}</div></div></div>`;
 }
@@ -291,6 +292,7 @@ function seccionTension(a, c) {
       <table class="tabla-est"><thead><tr><th>Fase</th><th>Registros fuera de la banda</th><th>FebNoPer</th></tr></thead><tbody>
       ${Object.entries(r.porFase).map(([p, x]) => `<tr><td><span class="graf-fase"><i style="background:${COLOR_FASE[p]}"></i>U${p}</span></td><td>${fmt(x.ft)} de ${fmt(r.validos)}</td><td class="${x.febNoPer > 0.05 ? 'mal' : ''}">${fmt(x.febNoPer * 100, 2)} %</td></tr>`).join('')}</tbody></table></div>`;
   }
+  html += bloqueTap(a, d, fases, nominal, tol);
   // Zoom (igual en todas) y escala de tensión sin los registros bajo el 70 % del nominal (ceros)
   const ventana = a.zoom || null;
   const piso = !a.escalaCompleta && nominal > 0 ? nominal * LIMITE_INVALIDO : null;
@@ -299,7 +301,12 @@ function seccionTension(a, c) {
     ${nominal > 0 ? `<button class="b b-l" onclick="toggleEscalaReclamo()">${a.escalaCompleta ? 'Ocultar registros en cero' : 'Ver escala completa (con ceros)'}</button>` : ''}</div>`;
   const g = (id, titulo, unidad, series, extra = {}) => graficaLinea({ id, titulo, unidad, t: d.t, fechas: d.fechas, series, ventana, ...(unidad === 'V' ? { piso } : {}), ...extra });
   const bloqueGraf = (contenido, tabla) => `<div class="bloque graf-con-tabla">${contenido}${tabla}</div>`;
-  html += bloqueGraf(g('u', 'Tensión promedio', 'V', fasesSeries(fases, x => d.U[x]?.v, 'U'), { banda }), tablaEstadisticas('Tensión (V)', t.U.v, fases, 1));
+  // Proyección con cambio de TAP (opcional): curva punteada sobre la tensión promedio
+  const proy = p.tapProy?.activo ? p.tapProy : null;
+  const factor = proy && nominal > 0 ? factorTap(proy) : null;
+  const Up = factor && factor !== 1 ? proyectarU(d.U, fases, factor) : null;
+  const seriesU = [...fasesSeries(fases, x => d.U[x]?.v, 'U'), ...(Up ? fasesSeries(fases, x => Up[x]?.v, 'U').map(s => ({ ...s, nombre: `${s.nombre} TAP ${proy.propuesta}`, proyectada: true })) : [])];
+  html += bloqueGraf(g('u', Up ? `Tensión promedio · medida y proyectada en TAP ${proy.propuesta}` : 'Tensión promedio', 'V', seriesU, { banda }), tablaEstadisticas('Tensión (V)', t.U.v, fases, 1));
   if (fases.some(x => d.U[x]?.max)) html += bloqueGraf(g('umax', 'Tensión máxima', 'V', fasesSeries(fases, x => d.U[x]?.max, 'U'), { banda }), tablaEstadisticas('Máximos (V)', t.U.max, fases, 1));
   if (fases.some(x => d.U[x]?.min)) html += bloqueGraf(g('umin', 'Tensión mínima', 'V', fasesSeries(fases, x => d.U[x]?.min, 'U'), { banda }), tablaEstadisticas('Mínimos (V)', t.U.min, fases, 1));
   if (fases.some(x => d.I[x])) html += bloqueGraf(g('i', 'Corriente promedio', 'A', fasesSeries(fases, x => d.I[x]?.v, 'I'), { desdeCero: true }), tablaEstadisticas('Corriente (A)', t.I.v, fases));
@@ -324,6 +331,50 @@ function seccionTension(a, c) {
   }
   html += bloqueCombinadas(a, d, fases, ventana, piso);
   return html;
+}
+
+// Proyección con cambio de TAP: placas por posición (predeterminadas por red), posición actual → propuesta, resumen
+// proyectado y tabla con todas las posiciones
+function bloqueTap(a, d, fases, nominal, tol) {
+  const t = a.params.tapProy || {};
+  let html = `<div class="bloque tap-bloque"><div class="bloque-head"><div class="bloque-titulo">Proyección con cambio de TAP</div>
+    <label class="insp-check"><input type="checkbox" id="ar-tap-activo" ${t.activo ? 'checked' : ''} onchange="setTapReclamo('activo', this.checked)"><span>Proyectar</span></label></div>`;
+  if (!t.activo) return html + '<div class="page-sub">Opcional: cómo quedaría la tensión si se cambia el TAP del transformador.</div></div>';
+  const opcion = (v, label, sel) => `<option value="${v}" ${String(sel) === String(v) ? 'selected' : ''}>${label}</option>`;
+  const posiciones = sel => '<option value="">—</option>' + POSICIONES.map(pos => opcion(pos, `${pos}${placaDe(t, pos) ? ` · ${fmt(placaDe(t, pos))} V` : ''}`, sel)).join('');
+  html += `<div class="form-analisis">
+      <div class="field"><label>Red y transformador</label><select id="ar-tap-red" onchange="setTapReclamo('red', this.value)"><option value="">Elige la red</option>${Object.entries(PLACAS_TAP).map(([k, x]) => opcion(k, x.nombre, t.red)).join('')}</select></div>
+      <div class="field"><label>Posición actual</label><select id="ar-tap-actual" onchange="setTapReclamo('actual', this.value)">${posiciones(t.actual)}</select></div>
+      <div class="field"><label>Posición propuesta</label><select id="ar-tap-propuesta" onchange="setTapReclamo('propuesta', this.value)">${posiciones(t.propuesta)}</select></div></div>
+    <div class="tap-placas"><small>Tensión de placa por posición (V)</small><div>${POSICIONES.map((pos, i) => `<label>${pos}<input id="ar-tap-placa-${pos}" inputmode="numeric" value="${esc(t.placas?.[i] || '')}" onchange="setTapReclamo('placa', this.value, ${i})"></label>`).join('')}</div></div>`;
+  if (!nominal) return html + aviso('Escribe la tensión nominal para proyectar.') + '</div>';
+  if (!placaDe(t, t.actual)) return html + `<div class="page-sub">${t.actual ? 'Escribe la placa de la posición actual.' : 'Elige la posición en que está el TAP.'}</div></div>`;
+  const filas = compararPosiciones(d.U, a.params.fases || 3, nominal, tol, t);
+  // Resumen de la propuesta
+  const factor = factorTap(t);
+  if (t.propuesta && factor) {
+    const pr = resumenProyectado(d.U, a.params.fases || 3, nominal, tol, factor); const r = pr.resumen;
+    const err = r.validos === 0; const ft = r.estado === 'FUERA DE TOLERANCIA';
+    const todas = Object.values(pr.est); const max = Math.max(...todas.map(e => e.max ?? -Infinity)); const min = Math.min(...todas.filter(e => e.min !== null).map(e => e.min));
+    html += `<div class="veredicto-dtft ${err ? 'error' : ft ? 'ft' : 'dt'}"><b>${err ? 'Revisar' : ft ? 'FT' : 'DT'}</b><span>En TAP ${esc(t.propuesta)} (${factor >= 1 ? '+' : '−'}${fmt(Math.abs(factor - 1) * 100, 2)} %): ${err ? 'ningún registro válido' : ft ? 'quedaría fuera de tolerancia' : 'quedaría dentro de tolerancia'} · FebNoPer ${fmt(r.febNoPer * 100, 2)} %</span></div>
+      <table class="tabla-est"><thead><tr><th>Proyectada en TAP ${esc(t.propuesta)} (V)</th>${fases.filter(p => pr.est[p]).map(p => `<th><i style="background:${COLOR_FASE[p]}"></i>Fase ${p}</th>`).join('')}</tr></thead><tbody>
+      ${[['Máx', 'max'], ['Prom', 'prom'], ['Mín', 'min']].map(([l, k]) => `<tr><td>${l}</td>${fases.filter(p => pr.est[p]).map(p => { const v = pr.est[p][k]; return `<td class="${v !== null && v > 0 && (v > nominal * (1 + tol) || v < nominal * (1 - tol)) ? 'mal' : ''}">${fmt(v, 1)}</td>`; }).join('')}</tr>`).join('')}</tbody></table>
+      <div class="page-sub">Máxima proyectada ${fmt(max, 1)} V y mínima ${fmt(min, 1)} V; límites ${fmt(nominal * (1 - tol), 1)} a ${fmt(nominal * (1 + tol), 1)} V. La curva punteada está en la gráfica de tensión promedio.</div>`;
+  } else if (t.propuesta) html += '<div class="page-sub">Escribe la placa de la posición propuesta.</div>';
+  // Todas las posiciones
+  if (filas.length > 1) {
+    html += `<table class="tabla-est tap-tabla"><thead><tr><th>Posición</th><th>Placa (V)</th><th>Cambio</th><th>U prom (V)</th><th>U máx (V)</th><th>U mín (V)</th><th>FebNoPer</th><th></th></tr></thead><tbody>
+      ${filas.map(f => {
+        const e = Object.values(f.est); const r = f.resumen;
+        const prom = e.reduce((s, x) => s + (x.prom || 0), 0) / (e.length || 1);
+        const mx = Math.max(...e.map(x => x.max ?? -Infinity)); const mn = Math.min(...e.filter(x => x.min !== null).map(x => x.min));
+        const nota = [f.pos === String(t.actual) ? 'actual' : '', f.pos === String(t.propuesta) ? 'propuesta' : '', f.mejor ? 'menor FebNoPer' : ''].filter(Boolean).join(' · ');
+        return `<tr class="${f.pos === String(t.propuesta) ? 'tap-prop' : ''} ${f.mejor ? 'tap-mejor' : ''}"><td><b>${f.pos}</b></td><td>${fmt(f.placa)}</td><td>${f.cambio >= 0 ? '+' : '−'}${fmt(Math.abs(f.cambio), 2)} %</td><td>${fmt(prom, 1)}</td><td>${fmt(mx, 1)}</td><td>${fmt(mn, 1)}</td>
+          <td class="${r.validos === 0 || r.febNoPer > 0.05 ? 'mal' : 'ok'}">${r.validos === 0 ? '—' : `${fmt(r.febNoPer * 100, 2)} % ${r.febNoPer > 0.05 ? 'FT' : 'DT'}`}</td><td class="page-sub">${nota}</td></tr>`;
+      }).join('')}</tbody></table>
+      <div class="page-sub">Cada posición multiplica la tensión medida por placa actual ÷ placa de la posición. Es una proyección: no considera cambios de carga ni del alimentador.</div>`;
+  }
+  return html + '</div>';
 }
 
 // Gráficas combinadas: el usuario elige series de distintas variables (máximo dos unidades: la segunda va a la derecha)

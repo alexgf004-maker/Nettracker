@@ -1958,6 +1958,47 @@ test.describe('Análisis de reclamos', () => {
     await expect(modal.locator('.tile', { hasText: 'FebNoPer' })).toContainText('6.94 %');
   });
 
+  test('Graficar: proyección opcional con cambio de TAP (placas por red, curva punteada, resumen y todas las posiciones)', async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await nav(page, 'Graficar');
+    await page.locator('.graf-pagina input[type=file]').setInputFiles({ name: 'CR192026100.txt', mimeType: 'text/plain', buffer: Buffer.from(txtTension()) });
+    await expect(page.locator('#ar-nominal')).toHaveValue('13200');
+    await expect(page.locator('.veredicto-dtft').first()).toContainText('FebNoPer 6.94 %');
+    // Apagada por defecto
+    await expect(page.locator('#ar-tap-red')).toHaveCount(0);
+    await page.locator('#ar-tap-activo').check();
+    // Red de 23 kV: placas predeterminadas
+    await page.locator('#ar-tap-red').selectOption('23kv');
+    await expect(page.locator('#ar-tap-placa-1')).toHaveValue('14400');
+    await expect(page.locator('#ar-tap-placa-5')).toHaveValue('12540');
+    await page.locator('#ar-tap-actual').selectOption('3');
+    // Sin propuesta ya sale la tabla de todas las posiciones; la 2 es la de menor FebNoPer
+    const tabla = page.locator('.tap-tabla');
+    await expect(tabla.locator('tbody tr')).toHaveCount(5);
+    await expect(tabla.locator('tr', { hasText: 'actual' })).toContainText('6.94 % FT');
+    await expect(tabla.locator('tr.tap-mejor')).toContainText('13,800');
+    await expect(tabla.locator('tr.tap-mejor')).toContainText('0.00 % DT');
+    await expect(tabla.locator('tbody tr').first()).toContainText('FT'); // posición 1: baja demasiado
+    // Propuesta 2: resumen proyectado DT y curva punteada en la gráfica
+    await page.locator('#ar-tap-propuesta').selectOption('2');
+    const ver = page.locator('.tap-bloque .veredicto-dtft');
+    await expect(ver).toContainText('DT');
+    await expect(ver).toContainText('En TAP 2 (−4.35 %)');
+    await expect(page.locator('[data-graf="u"] path.graf-linea.proy')).toHaveCount(3);
+    await expect(page.locator('.graf-titulo', { hasText: 'proyectada en TAP 2' })).toHaveCount(1);
+    // La medición sigue igual (FT); la proyección no la cambia
+    await expect(page.locator('.veredicto-dtft').first()).toContainText('FebNoPer 6.94 %');
+    // Placa corregida a mano (4.16 kV solo trae la posición 3)
+    await page.locator('#ar-tap-red').selectOption('4.16kv');
+    await expect(page.locator('#ar-tap-placa-3')).toHaveValue('2200');
+    await expect(page.locator('#ar-tap-placa-2')).toHaveValue('');
+    await expect(page.locator('.tap-bloque')).toContainText('Escribe la placa de la posición propuesta');
+    await page.locator('#ar-tap-placa-2').fill('2255'); await page.locator('#ar-tap-placa-2').press('Enter');
+    await expect(page.locator('.tap-bloque .veredicto-dtft')).toContainText('En TAP 2');
+    expect((await app.escrituras()).length).toBe(0);
+  });
+
   test('Graficar: subir un TXT en la pestaña rápida muestra DT o FT sin guardar nada', async ({ page }) => {
     app = await abrirApp(page);
     await cerrarAlerta(page);

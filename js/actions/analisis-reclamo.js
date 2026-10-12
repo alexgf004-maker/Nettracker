@@ -2,6 +2,7 @@
 // Los TXT se guardan comprimidos en archivosReclamo/{id} (se leen solo al abrir el análisis) y en el
 // reclamo queda lo mínimo: datos de la medición, nombres de los archivos y el resultado.
 import { db, get, ref, update } from '../firebase.js';
+import { nuevaProyeccionTap, PLACAS_TAP } from '../domain/tap.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { catalogoSeries, fasesConTension, fasesDe, leerTension, MAX_UNIDADES_COMBO, resumenGuardado, sugerirNominal, tipoDeTXT } from '../domain/reclamo.js';
@@ -85,6 +86,16 @@ export function cargarTXTReclamo(archivos) {
 export function setParamReclamo(campo, valor) {
   const a = analisisActivo(); if (!a) return;
   a.params[campo] = campo === 'fases' ? Number(valor) : String(valor).trim();
+  a.cambios = true;
+  render();
+}
+// Proyección con cambio de TAP (opcional): params.tapProy = { activo, red, placas[5], actual, propuesta }
+export function setTapReclamo(campo, valor, i = null) {
+  const a = analisisActivo(); if (!a) return;
+  const t = a.params.tapProy = { ...nuevaProyeccionTap(), ...(a.params.tapProy || {}) };
+  if (campo === 'placa') { t.placas = [...t.placas]; t.placas[i] = String(valor).trim(); } else t[campo] = campo === 'activo' ? !!valor : String(valor);
+  // Al elegir la red se llenan sus placas predeterminadas (se pueden corregir)
+  if (campo === 'red' && PLACAS_TAP[valor]) t.placas = PLACAS_TAP[valor].v.map(x => (x ? String(x) : ''));
   a.cambios = true;
   render();
 }

@@ -1413,3 +1413,16 @@ button.aviso-inicio-fila { cursor: pointer; }
 .dib-proyecto.bloque { display: block; }
 .dib-proy-nombre { font-size: 15px; }
 .dib-proy-card.activo { border-color: var(--accent, #0e7490); }
+
+/* Proyección con cambio de TAP */
+.graf-linea.proy { stroke-dasharray: 6 4; stroke-width: 1.8; opacity: .9; }
+.graf-leyenda-proy { background: none !important; border-top: 2px dashed; height: 0 !important; align-self: center; }
+.tap-bloque .bloque-head .insp-check { margin: 0; }
+.tap-placas { margin: 6px 0 12px; }
+.tap-placas small { display: block; color: var(--muted, #64748b); margin-bottom: 4px; }
+.tap-placas > div { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.tap-placas label { display: flex; flex-direction: column; font-size: 12px; font-weight: 600; gap: 2px; }
+.tap-placas input { width: 100%; min-width: 0; }
+.tap-tabla { margin-top: 10px; }
+.tap-tabla tr.tap-mejor td { background: rgba(16, 185, 129, .08); }
+.tap-tabla tr.tap-prop td:first-child { box-shadow: inset 3px 0 0 #2563eb; }
