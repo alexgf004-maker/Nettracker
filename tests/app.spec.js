@@ -3059,6 +3059,7 @@ test.describe('Levantamiento en campo', () => {
     await expect(page.locator('.lev-panel .tg')).toContainText("35' · 23TS3 / TS3");
     await page.getByRole('button', { name: 'Seguir desde aquí' }).click();
     await page.getByRole('button', { name: 'Tocando el mapa' }).click();
+    await page.evaluate(() => document.getElementById('lev-mapa').scrollIntoView({ block: 'center' }));
     const caja = await page.locator('#lev-mapa').boundingBox();
     await page.mouse.click(caja.x + caja.width * 0.2, caja.y + caja.height * 0.8);
     await expect(page.locator('.leaflet-marker-icon', { hasText: 'P4' })).toHaveCount(1);
