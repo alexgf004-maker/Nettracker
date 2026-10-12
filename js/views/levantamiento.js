@@ -64,6 +64,7 @@ function renderDetalle(id, l) {
     : '<span class="page-sub">Toca el mapa donde está el punto.</span>'}
     <button class="b b-l" onclick="deshacerUltimoLev()" ${puntos.length ? '' : 'disabled'}>Quitar el último</button>
     <span class="page-sub">${r.puntos} puntos · ${r.vanos} vanos${r.vanos ? ` · ${fmtMetros(r.metros)}` : ''}</span></div>`;
+  if (u.movida && l.puntos?.[u.movida.id]) html += `<div class="alert-banner alert-yellow">${esc(u.movida.nombre || 'Punto')} movido. <button class="b b-l" onclick="deshacerMovidaLev()">Deshacer</button></div>`;
   if (u.unirDesde) html += `<div class="alert-banner alert-yellow">Toca en el mapa el punto con el que se une ${esc(l.puntos?.[u.unirDesde]?.nombre || '')}. <button class="b b-l" onclick="setLev('unirDesde', null)">Cancelar</button></div>`;
 
   // El mapa con el botón principal flotando encima (en campo se marca sin bajar la pantalla)
@@ -78,6 +79,8 @@ function renderDetalle(id, l) {
         <div class="field field-ancho"><label>Nota</label><input id="lev-p-nota" value="${esc(sel.nota || '')}" placeholder="Ej. poste de madera deteriorado, remate, retenida…" onchange="datoPuntoLev('nota', this.value)"></div></div>
       <div class="barra-acciones"><button class="b b-g" onclick="seguirDesdeLev()">Seguir desde aquí</button><button class="b b-g" onclick="unirConLev()">Unir con otro punto</button><button class="b b-g" onclick="moverAGpsLev()">Mover a mi ubicación</button><button class="b b-l dib-borrar" onclick="borrarPuntoLev()">Borrar</button></div>
       <div class="page-sub">Para corregir la posición, arrastra el punto en el mapa.</div></div>`;
+  } else if (puntos.length) {
+    html += '<div class="page-sub lev-tip">Arrastra un punto para corregirlo. Toca una línea para poner un poste en medio de ese vano.</div>';
   }
 
   // Vanos con sus metros

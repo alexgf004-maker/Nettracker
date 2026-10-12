@@ -1,10 +1,14 @@
-// Herramienta Dibujar: subir una imagen y dibujar encima; se descarga como PNG (confirmado: no se guarda en la base).
-// El borrador queda solo en este navegador (localStorage). Mientras se arrastra se repinta solo el SVG, sin render().
-import { caja, COLORES, coloresTramos, GROSORES, leerFilasTabla, medidaEtiqueta, medidaReducida, mover, nuevoId, redimensionar, siguienteEtiqueta, SIMBOLOS, svgExportable, svgLamina, tamano, TAM_TEXTO } from '../domain/dibujo.js';
+// Herramienta Dibujar: subir una imagen y dibujar encima; se descarga como PNG. El borrador queda en este navegador
+// (localStorage) y, para poder modificarlo después, se guarda como proyecto en la base para el equipo:
+// dibujos/{id} = { nombre, referencia, creado, editado } (liviano, para la lista) y dibujosDatos/{id} = { fondo, datos }
+// (la imagen en JPG y el dibujo en JSON, que se baja solo al abrirlo). Mientras se arrastra se repinta solo el SVG.
+import { altoCajetin, caja, COLORES, coloresTramos, GROSORES, leerFilasTabla, medidaEtiqueta, medidaReducida, mover, nuevoId, redimensionar, siguienteEtiqueta, SIMBOLOS, svgExportable, svgLamina, tamano, TAM_TEXTO } from '../domain/dibujo.js';
 import { anclas, escalaDe, ESTILOS_ETIQUETA, fmtMetros, imanar, metrosTramo, nombrePunto, segmentosTramos } from '../domain/plano.js';
+import { db, get, push, ref, remove, set } from '../firebase.js';
+import { hoyLocal } from '../domain/trabajo.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
-import { render } from '../views/render.js';
+import { alRedibujar, render } from '../views/render.js';
 
 const CLAVE = 'nettracker_dibujo';
 const HISTORIAL_MAX = 60;
@@ -17,25 +21,29 @@ export function nuevoDibujo() {
   return {
     fondo: null, elementos: [], escala: null, lamina: nuevaLamina(), sel: null, herramienta: 'seleccionar', simbolo: 'poste', color: COLORES[0], grosor: 'medio',
     tamTexto: 'mediano', tramoTipo: 'bt', estiloEtiqueta: 'existente', prefijo: 'P', tramo: null, calibracion: null, historial: [], rehacer: [],
+    proyecto: null, sinGuardar: false, // proyecto: { id, nombre, referencia } del proyecto abierto en la base
   };
 }
 // Carga una lámina armada en otra parte (p. ej. un levantamiento de campo) como dibujo actual
 export function cargarEnDibujo(datos) {
   state.dibujo = { ...nuevoDibujo(), ...datos, lamina: { ...nuevaLamina(), ...(datos.lamina || {}) } };
+  vista = null;
   guardarBorrador();
 }
 export function cargarBorrador() {
   const d = nuevoDibujo();
   try {
     const g = JSON.parse(localStorage.getItem(CLAVE) || 'null');
-    if (g && Array.isArray(g.elementos)) Object.assign(d, { fondo: g.fondo || null, elementos: g.elementos, escala: g.escala || null, lamina: { ...d.lamina, ...(g.lamina || {}) } });
+    if (g && Array.isArray(g.elementos)) Object.assign(d, { fondo: g.fondo || null, elementos: g.elementos, escala: g.escala || null, lamina: { ...d.lamina, ...(g.lamina || {}) }, proyecto: g.proyecto || null, sinGuardar: !!g.sinGuardar });
   } catch { /* sin borrador */ }
   return d;
 }
 let avisoEspacio = false;
-function guardarBorrador() {
+// cambio = false: solo se guarda el borrador (al abrir o guardar un proyecto), sin marcarlo como "sin guardar"
+function guardarBorrador(cambio = true) {
   const d = state.dibujo; if (!d) return;
-  try { localStorage.setItem(CLAVE, JSON.stringify({ fondo: d.fondo, elementos: d.elementos, escala: d.escala, lamina: d.lamina })); avisoEspacio = false; } catch {
+  if (cambio && d.proyecto) d.sinGuardar = true;
+  try { localStorage.setItem(CLAVE, JSON.stringify({ fondo: d.fondo, elementos: d.elementos, escala: d.escala, lamina: d.lamina, proyecto: d.proyecto, sinGuardar: d.sinGuardar })); avisoEspacio = false; } catch {
     if (!avisoEspacio) showToast('El dibujo es muy grande para guardarse como borrador en este navegador; descárgalo antes de cerrar');
     avisoEspacio = true;
   }
@@ -55,7 +63,9 @@ const escalaBase = () => { const { w, h } = tamano(dib()); return Math.max(w, h)
 // Tamaño de tiradores y marcas: según la imagen y, en pantallas chicas (celular), para que se puedan tocar con el dedo
 export const uiDe = d => {
   const { w, h } = tamano(d);
-  const ancho = document.querySelector('.dib-lienzo')?.clientWidth; const k = ancho ? ancho / w : 1; // px de pantalla por px de imagen
+  // px de pantalla por px de imagen (con el zoom); antes de dibujar el lienzo, por su ancho
+  const ctm = document.getElementById('dib-svg')?.getScreenCTM?.(); const ancho = document.querySelector('.dib-lienzo')?.clientWidth;
+  const k = ctm?.a || (ancho ? ancho / w : 1);
   return Math.max(Math.max(w, h) / 1100, 1.2 / k);
 };
 
@@ -104,15 +114,98 @@ function punto(ev) {
   return [p.x, p.y];
 }
 
+// ── Zoom y desplazamiento ──
+// vista: ventana de la lámina en pantalla { x, y, w, h } (con la proporción del lienzo); null = toda la lámina.
+// Botones +/−/Ajustar, Ctrl + rueda (o pellizco del trackpad), dos dedos en el celular; se desplaza arrastrando el fondo
+// con "Seleccionar" (con zoom), con la rueda del mouse apretada o con la barra espaciadora.
+let vista = null;
+const svgEl = () => document.getElementById('dib-svg');
+function laminaCompleta(d = dib()) { const { w, h } = tamano(d); return { w, h: h + (d.lamina?.activa !== false ? altoCajetin(d) : 0) }; }
+// Toda la lámina con la proporción del lienzo en pantalla (centrada)
+function cajaBase() {
+  const f = laminaCompleta(); const r = svgEl()?.getBoundingClientRect();
+  if (!r?.width || !r?.height) return { x: 0, y: 0, ...f };
+  const k = Math.min(r.width / f.w, r.height / f.h); const w = r.width / k; const h = r.height / k;
+  return { x: (f.w - w) / 2, y: (f.h - h) / 2, w, h };
+}
+const vistaActual = () => vista || cajaBase();
+export const viewBoxDib = d => { if (vista) return `${vista.x} ${vista.y} ${vista.w} ${vista.h}`; const f = laminaCompleta(d); return `0 0 ${f.w} ${f.h}`; };
+export const zoomPct = () => Math.round((cajaBase().w / vistaActual().w) * 100);
+function aplicarVista() {
+  const svg = svgEl(); if (!svg) return;
+  svg.setAttribute('viewBox', viewBoxDib(dib()));
+  const et = document.getElementById('dib-zoom-pct'); if (et) et.textContent = `${zoomPct()} %`;
+  repintar(); // tiradores e imán del tamaño de la pantalla
+}
+// Lleva la ventana a ancho w manteniendo fijo el punto de la lámina que está en (clientX, clientY)
+function ventanaEn(w, clientX, clientY, px, py) {
+  const r = svgEl().getBoundingClientRect(); const base = cajaBase();
+  if (w >= base.w * 0.999) { vista = null; return; }
+  w = Math.max(w, base.w / 12); const h = (w * r.height) / r.width;
+  vista = { x: px - ((clientX - r.left) * w) / r.width, y: py - ((clientY - r.top) * h) / r.height, w, h };
+}
+function puntoVista(clientX, clientY) {
+  const p = new DOMPoint(clientX, clientY).matrixTransform(svgEl().getScreenCTM().inverse());
+  return [p.x, p.y];
+}
+function zoomA(f, clientX, clientY) {
+  const svg = svgEl(); if (!svg) return;
+  const r = svg.getBoundingClientRect(); clientX ??= r.left + r.width / 2; clientY ??= r.top + r.height / 2;
+  const [px, py] = puntoVista(clientX, clientY);
+  ventanaEn(vistaActual().w / f, clientX, clientY, px, py);
+  aplicarVista();
+}
+export function zoomDib(f) { zoomA(f); }
+// El lienzo usa el alto que deja libre la barra de herramientas (que es fija arriba y cambia de alto con el ancho)
+export function instalarAltoDib() {
+  alRedibujar(() => { const b = document.querySelector('.dib-barra'); if (b) document.documentElement.style.setProperty('--dib-barra', `${b.offsetHeight}px`); });
+}
+export function ajustarVistaDib() { vista = null; aplicarVista(); }
+export function ampliarDib() { const d = dib(); if (!d) return; state.dibAmpliado = !state.dibAmpliado; vista = null; render(); }
+export function dibRueda(ev) {
+  if (!(ev.ctrlKey || ev.metaKey || state.dibAmpliado)) return; // sin Ctrl la rueda mueve la página
+  ev.preventDefault();
+  zoomA(Math.exp(-ev.deltaY * 0.0015), ev.clientX, ev.clientY);
+}
+window.addEventListener('resize', () => { if (vista && state.tab === 'dibujar') { vista = null; aplicarVista(); } });
+let espacio = false;
+// Dedos sobre el lienzo (dos = pellizco) y foto del dibujo al primer toque, para deshacer lo que empezó un dedo
+const toques = new Map();
+let foto = null;
+function iniciarPellizco() {
+  const d = dib();
+  if (foto) { d.elementos = JSON.parse(foto.el); d.historial.length = Math.min(d.historial.length, foto.hl); d.sel = foto.sel; d.tramo = foto.tramo; }
+  d.iman = null; d.calibracion = d.herramienta === 'calibrar' ? null : d.calibracion;
+  const [a, b] = [...toques.values()];
+  const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  arrastre = { modo: 'pellizco', dist: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, w: vistaActual().w, p: puntoVista(...mid) };
+  repintar();
+}
+function moverPellizco() {
+  const [a, b] = [...toques.values()]; const z = arrastre;
+  const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  ventanaEn(z.w / (Math.hypot(a[0] - b[0], a[1] - b[1]) / z.dist), mid[0], mid[1], z.p[0], z.p[1]);
+  if (!cuadro) cuadro = requestAnimationFrame(() => { cuadro = null; aplicarVista(); });
+}
+function iniciarDesplazamiento(ev) {
+  // Desde lo que se ve (con la proporción del lienzo) y la escala real de la pantalla
+  const r = svgEl().getBoundingClientRect(); const [x, y] = puntoVista(r.left, r.top); const s = svgEl().getScreenCTM().a;
+  arrastre = { modo: 'desplazar', inicio: [ev.clientX, ev.clientY], v: { x, y, w: r.width / s, h: r.height / s }, s, cambio: false };
+}
+
 let arrastre = null;
 export function dibPointerDown(ev) {
   const d = dib(); if (!d) return;
   ev.preventDefault();
+  toques.set(ev.pointerId, [ev.clientX, ev.clientY]);
+  try { svgEl()?.setPointerCapture?.(ev.pointerId); } catch { /* puntero ya suelto */ }
+  if (toques.size === 2 && ev.pointerType !== 'mouse') { iniciarPellizco(); return; }
+  if (toques.size > 1 || arrastre?.modo === 'pellizco' || arrastre?.modo === 'esperar') return;
+  foto = { el: JSON.stringify(d.elementos), hl: d.historial.length, sel: d.sel, tramo: d.tramo };
+  if (ev.button === 1 || espacio) { iniciarDesplazamiento(ev); return; }
   medirIman(ev);
   let [x, y] = punto(ev);
   if (y > tamano(d).h) return; // el cajetín no se dibuja a mano
-  const svg = document.getElementById('dib-svg');
-  svg.setPointerCapture?.(ev.pointerId);
   const base = { id: nuevoId(), color: d.color, grosor: GROSORES[d.grosor] * escalaBase() };
   const h = d.herramienta;
   if (h === 'seleccionar') {
@@ -125,6 +218,8 @@ export function dibPointerDown(ev) {
       .map(e => ({ e, dist: Math.hypot(centroSimbolo(e)[0] - x, centroSimbolo(e)[1] - y) })).filter(o => o.dist <= Math.max(tolIman * 0.7, 30 * o.e.escala)).sort((a, b) => a.dist - b.dist)[0];
     const id = simbolo?.e.id || ev.target.closest?.('[data-id]')?.dataset.id;
     d.sel = id || null;
+    // Con zoom, arrastrar el fondo desplaza la vista (y suelta la selección)
+    if (!id && vista) { iniciarDesplazamiento(ev); repintar(); return; }
     // Con algo seleccionado se puede arrastrar: se repinta solo el SVG (render() al soltar, para no perder el arrastre)
     if (id) {
       memorizar();
@@ -219,8 +314,17 @@ export function dibPointerDown(ev) {
 
 let cuadro = null;
 export function dibPointerMove(ev) {
+  if (toques.has(ev.pointerId)) toques.set(ev.pointerId, [ev.clientX, ev.clientY]);
   if (!arrastre || !dib()) return;
   ev.preventDefault();
+  if (arrastre.modo === 'esperar') return;
+  if (arrastre.modo === 'pellizco') { if (toques.size >= 2) moverPellizco(); return; }
+  if (arrastre.modo === 'desplazar') {
+    const a = arrastre; a.cambio = true;
+    vista = { ...a.v, x: a.v.x - (ev.clientX - a.inicio[0]) / a.s, y: a.v.y - (ev.clientY - a.inicio[1]) / a.s };
+    if (!cuadro) cuadro = requestAnimationFrame(() => { cuadro = null; aplicarVista(); });
+    return;
+  }
   let [x, y] = punto(ev);
   arrastre.cambio = true;
   if (arrastre.modo === 'calibrar') {
@@ -247,8 +351,12 @@ export function dibPointerMove(ev) {
   if (!cuadro) cuadro = requestAnimationFrame(() => { cuadro = null; repintar(); });
 }
 
-export function dibPointerUp() {
+export function dibPointerUp(ev) {
+  if (ev) toques.delete(ev.pointerId);
   const d = dib(); if (!arrastre || !d) return;
+  // Al levantar un dedo del pellizco se espera a que se levanten todos (no se dibuja con el que queda)
+  if (arrastre.modo === 'pellizco' || arrastre.modo === 'esperar') { arrastre = toques.size ? { modo: 'esperar' } : null; foto = null; if (!arrastre) aplicarVista(); return; }
+  if (arrastre.modo === 'desplazar') { const a = arrastre; arrastre = null; if (a.cambio) aplicarVista(); else render(); return; }
   const a = arrastre; arrastre = null;
   d.iman = null;
   if (a.modo === 'calibrar') { render(); setTimeout(() => document.getElementById('dib-metros')?.focus(), 0); return; }
@@ -419,8 +527,8 @@ export function rehacerDib() {
 }
 export function nuevoLienzoDib() {
   const d = dib(); if (!d) return;
-  if ((d.elementos.length || d.fondo) && !confirm('¿Empezar un dibujo nuevo? Se borra el actual (descárgalo antes si lo necesitas).')) return;
-  state.dibujo = nuevoDibujo(); guardarBorrador(); render();
+  if (d.proyecto && !d.sinGuardar ? false : (d.elementos.length || d.fondo) && !confirm(d.proyecto ? `¿Empezar un dibujo nuevo? Los cambios sin guardar de "${d.proyecto.nombre}" se pierden.` : '¿Empezar un dibujo nuevo? Se borra el actual (guárdalo como proyecto o descárgalo antes si lo necesitas).')) return;
+  state.dibujo = nuevoDibujo(); vista = null; guardarBorrador(); render();
 }
 
 // ── Imagen de fondo ──
@@ -439,7 +547,7 @@ export function subirFondoDib(files) {
       const cambiaTamano = !d.fondo || d.fondo.w !== w || d.fondo.h !== h;
       // Las fotos van en JPG (pesan mucho menos); las capturas con transparencia quedan en PNG
       d.fondo = { src: f.type === 'image/png' && f.size < 1.5e6 ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.9), w, h };
-      if (cambiaTamano) d.escala = null; // otra imagen, otra escala
+      if (cambiaTamano) { d.escala = null; vista = null; } // otra imagen, otra escala
       guardarBorrador(); render();
       if (habia) showToast(cambiaTamano ? 'Imagen cambiada; vuelve a calibrar la escala' : 'Imagen cambiada; los dibujos se conservan');
     };
@@ -491,11 +599,97 @@ export async function copiarDib() {
   } catch { showToast('No se pudo copiar; usa Descargar PNG'); }
 }
 
+// ── Proyectos guardados en la base ──
+// La imagen de fondo se guarda en JPG (pesa mucho menos; con fondo blanco donde la captura era transparente)
+function fondoJpg(fondo) {
+  if (!fondo?.src || fondo.src.startsWith('data:image/jpeg')) return Promise.resolve(fondo || null);
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas'); c.width = fondo.w; c.height = fondo.h;
+      const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(img, 0, 0, c.width, c.height);
+      resolve({ ...fondo, src: c.toDataURL('image/jpeg', 0.85) });
+    };
+    img.onerror = () => resolve(fondo);
+    img.src = fondo.src;
+  });
+}
+const por = () => state.sesionUsuario?.nombre || '';
+export function setVistaProyectosDib(v) { state.dibProyectos = v; render(); }
+async function escribirProyecto(id, meta) {
+  const d = dib();
+  const fondo = await fondoJpg(d.fondo);
+  if (fondo) d.fondo = fondo;
+  await set(ref(db, `dibujosDatos/${id}`), { fondo: fondo || null, datos: JSON.stringify({ elementos: d.elementos, escala: d.escala, lamina: d.lamina }) });
+  await set(ref(db, `dibujos/${id}`), meta);
+  d.proyecto = { id, nombre: meta.nombre, referencia: meta.referencia || '' }; d.sinGuardar = false;
+  guardarBorrador(false);
+}
+// Guardar: el proyecto abierto se actualiza; si no hay, se pide nombre (formulario en la pantalla)
+export async function guardarProyectoDib() {
+  const d = dib(); if (!d) return;
+  if (!d.proyecto) { state.dibProyectos = 'guardar'; render(); return; }
+  const previo = state.dibujos?.[d.proyecto.id] || {};
+  try {
+    await escribirProyecto(d.proyecto.id, { ...previo, nombre: d.proyecto.nombre, referencia: d.proyecto.referencia || '', editado: { fecha: hoyLocal(), por: por() } });
+    showToast(`"${d.proyecto.nombre}" guardado`);
+  } catch { showToast('No se pudo guardar; revisa la conexión'); }
+  render();
+}
+export async function guardarComoProyectoDib() {
+  const d = dib(); if (!d) return;
+  const nombre = document.getElementById('dib-proy-nombre')?.value.trim();
+  if (!nombre) return showToast('Ponle un nombre al proyecto');
+  if (!d.fondo && !d.elementos.length) return showToast('Todavía no hay nada que guardar');
+  const referencia = document.getElementById('dib-proy-ref')?.value.trim() || '';
+  const id = push(ref(db, 'dibujos')).key;
+  const hoy = { fecha: hoyLocal(), por: por() };
+  try {
+    await escribirProyecto(id, { nombre, referencia, creado: hoy, editado: hoy });
+    state.dibProyectos = null; showToast(`Proyecto "${nombre}" guardado`);
+  } catch { showToast('No se pudo guardar; revisa la conexión'); }
+  render();
+}
+export async function abrirProyectoDib(id) {
+  const d = dib(); const meta = state.dibujos?.[id]; if (!meta) return;
+  if (d && (d.proyecto ? d.sinGuardar : d.elementos.length || d.fondo) && !confirm(d.proyecto ? `Los cambios sin guardar de "${d.proyecto.nombre}" se pierden. ¿Abrir "${meta.nombre}"?` : `¿Abrir "${meta.nombre}"? El dibujo actual (sin guardar como proyecto) se reemplaza.`)) return;
+  showToast('Abriendo…');
+  try {
+    const snap = await get(ref(db, `dibujosDatos/${id}`));
+    const g = snap.exists() ? snap.val() : null;
+    const datos = g?.datos ? JSON.parse(g.datos) : {};
+    state.dibujo = { ...nuevoDibujo(), fondo: g?.fondo || null, elementos: datos.elementos || [], escala: datos.escala || null, lamina: { ...nuevaLamina(), ...(datos.lamina || {}) }, proyecto: { id, nombre: meta.nombre, referencia: meta.referencia || '' } };
+    state.dibProyectos = null; vista = null;
+    guardarBorrador(false);
+  } catch { showToast('No se pudo abrir el proyecto'); }
+  render();
+}
+export function eliminarProyectoDib(id) {
+  const meta = state.dibujos?.[id]; if (!meta) return;
+  if (!confirm(`¿Eliminar el proyecto "${meta.nombre}"? Se borra para todo el equipo.`)) return;
+  remove(ref(db, `dibujos/${id}`)); remove(ref(db, `dibujosDatos/${id}`));
+  const d = dib(); if (d?.proyecto?.id === id) { d.proyecto = null; d.sinGuardar = false; guardarBorrador(false); }
+  render();
+}
+// El dibujo sigue en pantalla pero deja de estar ligado al proyecto (para no pisarlo al guardar)
+export function soltarProyectoDib() {
+  const d = dib(); if (!d?.proyecto) return;
+  if (d.sinGuardar && !confirm(`Hay cambios sin guardar en "${d.proyecto.nombre}". ¿Cerrarlo sin guardarlos? El dibujo queda en pantalla como borrador.`)) return;
+  d.proyecto = null; d.sinGuardar = false; guardarBorrador(false); render();
+}
+
 // Atajos: Supr/Retroceso borra, Ctrl+Z deshace, Ctrl+Y o Ctrl+Mayús+Z rehace, Enter/Esc cierran el tramo, Esc suelta
 document.addEventListener('keydown', ev => {
   if (state.tab !== 'dibujar' || !dib()) return;
   if (/^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName)) return;
   const k = ev.key.toLowerCase();
+  if (k === ' ') { espacio = true; ev.preventDefault(); return; }
+  if (k === 'escape' && state.dibAmpliado && !dib().sel && !dib().tramo) { ampliarDib(); return; }
+  if (!ev.ctrlKey && !ev.metaKey && (k === '+' || k === '=')) { zoomA(1.25); return; }
+  if (!ev.ctrlKey && !ev.metaKey && (k === '-' || k === '_')) { zoomA(0.8); return; }
+  if (!ev.ctrlKey && !ev.metaKey && k === '0') { ajustarVistaDib(); return; }
   if (dib().tramo && (k === 'enter' || k === 'escape')) { ev.preventDefault(); terminarTramoDib(); return; }
   if ((ev.ctrlKey || ev.metaKey) && k === 'z') { ev.preventDefault(); ev.shiftKey ? rehacerDib() : deshacerDib(); } else if ((ev.ctrlKey || ev.metaKey) && k === 'y') { ev.preventDefault(); rehacerDib(); } else if ((k === 'delete' || k === 'backspace') && dib().sel) { ev.preventDefault(); borrarDib(); } else if (k === 'escape') { dib().sel = null; render(); }
 });
+
+document.addEventListener('keyup', ev => { if (ev.key === ' ') espacio = false; });

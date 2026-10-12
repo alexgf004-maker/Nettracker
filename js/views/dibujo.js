@@ -1,10 +1,10 @@
 // Pestaña Dibujar (Herramientas): lámina de red sobre una imagen (captura del mapa, foto o plano), sin relación con
 // ningún caso. Barra por grupos (red, anotar, dibujo libre, escala), fila de opciones de alto fijo y el cajetín.
-import { cargarBorrador, partesSVG } from '../actions/dibujo.js';
+import { cargarBorrador, partesSVG, viewBoxDib, zoomPct } from '../actions/dibujo.js';
 import { COLORES, GROSORES, SIMBOLOS, TAM_TEXTO } from '../domain/dibujo.js';
 import { ACCIONES_PUNTO, ESTILOS_ETIQUETA, fmtMetros, metrosTramo, metrosVano, nombresVanos, TIPOS_TRAMO } from '../domain/plano.js';
 import { state } from '../state.js';
-import { escapeHtml } from '../utils.js';
+import { escapeHtml, fmtDate } from '../utils.js';
 import { heroSeccion } from './componentes.js';
 
 const esc = s => escapeHtml(s ?? '');
@@ -36,12 +36,15 @@ export function renderDibujar() {
   const sel = d.elementos.find(e => e.id === d.sel) || null;
   const h = d.herramienta;
   const btn = (titulo, icono, activo, accion, extra = '') => `<button class="dib-btn ${activo ? 'activo' : ''}" title="${titulo}" aria-label="${titulo}" onclick="${accion}" ${extra}>${icono}</button>`;
-  let html = '<div class="content dib-pagina">';
+  let html = `<div class="content dib-pagina ${state.dibAmpliado ? 'ampliada' : ''}">`;
   html += heroSeccion({
     eyebrow: 'Herramientas', titulo: 'Dibujar',
-    sub: 'Lámina de red sobre la captura del mapa: tramos por tipo, simbología, etiquetas de puntos, distancias reales y cajetín con simbología, tabla de distancias, escala y norte. Se descarga en PNG para Word; el borrador queda solo en este navegador.',
+    sub: 'Lámina de red sobre la captura del mapa: tramos por tipo, simbología, etiquetas de puntos, distancias reales y cajetín con simbología, tabla de distancias, escala y norte. Se guarda como proyecto para el equipo (para modificarlo después) y se descarga en PNG para Word.',
     acciones: `<label class="hero-btn blanco"><i class="ic ic-subir"></i> ${d.fondo ? 'Cambiar imagen' : 'Subir imagen'}<input type="file" accept="image/*" hidden onchange="subirFondoDib(this.files); this.value=''"></label>`,
   });
+
+  html += barraProyecto(d);
+  if (state.dibProyectos === 'lista') return html + listaProyectos(d) + '</div>';
 
   // ── Barra por grupos ──
   const grupo = (titulo, cuerpo) => `<div class="dib-grupo-t"><small>${titulo}</small><div class="dib-grupo">${cuerpo}</div></div>`;
@@ -107,7 +110,12 @@ export function renderDibujar() {
   html += `<div class="dib-sel-barra">${fila}</div>`;
 
   // ── Lámina ──
-  html += `<div class="dib-lienzo"><svg id="dib-svg" class="dib-svg herr-${h}" viewBox="0 0 ${p.w} ${p.H}" onpointerdown="dibPointerDown(event)" onpointermove="dibPointerMove(event)" onpointerup="dibPointerUp(event)" onpointercancel="dibPointerUp(event)"><rect width="${p.w}" height="${p.H}" fill="#ffffff"/>${p.fondo}<g id="dib-capa">${p.capa}</g><g id="dib-cajetin">${p.cajetin}</g></svg></div>`;
+  const zoom = `<div class="dib-zoom"><button class="dib-btn dib-btn-chico" title="Alejar" aria-label="Alejar" onclick="zoomDib(0.8)">${ic('<path d="M5 12h14"/>')}</button>
+    <span id="dib-zoom-pct">${zoomPct()} %</span>
+    <button class="dib-btn dib-btn-chico" title="Acercar" aria-label="Acercar" onclick="zoomDib(1.25)">${ic('<path d="M12 5v14M5 12h14"/>')}</button>
+    <button class="b b-l" onclick="ajustarVistaDib()">Ajustar</button>
+    <button class="b ${state.dibAmpliado ? 'b-p' : 'b-g'}" onclick="ampliarDib()">${state.dibAmpliado ? 'Salir de pantalla completa' : 'Pantalla completa'}</button></div>`;
+  html += `<div class="dib-lienzo">${zoom}<svg id="dib-svg" class="dib-svg herr-${h}" viewBox="${viewBoxDib(d)}" onwheel="dibRueda(event)" onpointerdown="dibPointerDown(event)" onpointermove="dibPointerMove(event)" onpointerup="dibPointerUp(event)" onpointercancel="dibPointerUp(event)"><rect width="${p.w}" height="${p.H}" fill="#ffffff"/>${p.fondo}<g id="dib-capa">${p.capa}</g><g id="dib-cajetin">${p.cajetin}</g></svg></div>`;
 
   // Metros por vano del tramo seleccionado (escritos a mano; vacío = con la escala)
   if (sel?.tipo === 'polilinea' && d.tramo !== sel.id && sel.puntos.length > 1) {
@@ -151,4 +159,33 @@ export function renderDibujar() {
       ${l.distancias === 'manual' ? `<div class="field field-ancho"><label>Filas: tramo y metros, una por línea (o pegadas de Excel)</label><textarea id="dib-lam-filas" rows="3" placeholder="P1 – W1, 50" onchange="setLaminaDib('filas', this.value)">${esc((l.filas || []).map(f => f.join(', ')).join('\n'))}</textarea></div>` : ''}</div>
       <div class="page-sub">${l.distancias === 'manual' ? 'Escribe las distancias a mano.' : 'La tabla se arma sola entre los puntos etiquetados que están sobre cada tramo, con los metros de los vanos (escritos a mano o con la escala).'}</div>` : ''}</div>`;
   return html + '</div>';
+}
+
+// Proyecto abierto (o borrador) con guardar; formulario de nombre para guardar uno nuevo
+function barraProyecto(d) {
+  const n = Object.keys(state.dibujos || {}).length;
+  const abrir = `<button class="b b-g" onclick="setVistaProyectosDib(${state.dibProyectos === 'lista' ? 'null' : "'lista'"})">${state.dibProyectos === 'lista' ? 'Volver al dibujo' : `Proyectos guardados${n ? ` (${n})` : ''}`}</button>`;
+  if (state.dibProyectos === 'guardar') {
+    return `<div class="bloque dib-proyecto"><div class="bloque-head"><div class="bloque-titulo">Guardar como proyecto</div></div>
+      <div class="form-analisis"><div class="field"><label>Nombre</label><input id="dib-proy-nombre" placeholder="Ej. Propuesta nuevo transformador Col. Las Flores"></div>
+      <div class="field"><label>Referencia (opcional)</label><input id="dib-proy-ref" placeholder="WO, NC, reclamo…"></div></div>
+      <div class="barra-acciones"><button class="b b-p" onclick="guardarComoProyectoDib()">Guardar</button><button class="b b-l" onclick="setVistaProyectosDib(null)">Cancelar</button></div>
+      <div class="page-sub">Queda guardado en la base para el equipo: cualquiera lo abre y lo modifica desde su celular o compu.</div></div>`;
+  }
+  if (d.proyecto) {
+    return `<div class="dib-proyecto barra-acciones"><span class="dib-proy-nombre"><b>${esc(d.proyecto.nombre)}</b>${d.proyecto.referencia ? ` · ${esc(d.proyecto.referencia)}` : ''}</span>
+      <span class="tg ${d.sinGuardar ? 'ambar' : 'verde'}">${d.sinGuardar ? 'Cambios sin guardar' : 'Guardado'}</span>
+      <button class="b ${d.sinGuardar ? 'b-p' : 'b-g'}" onclick="guardarProyectoDib()">Guardar</button>${abrir}<button class="b b-l" onclick="soltarProyectoDib()">Cerrar proyecto</button></div>`;
+  }
+  return `<div class="dib-proyecto barra-acciones"><span class="page-sub">Borrador${d.elementos.length || d.fondo ? ' sin guardar' : ''}</span>
+    <button class="b b-p" onclick="guardarProyectoDib()">Guardar como proyecto</button>${abrir}</div>`;
+}
+function listaProyectos(d) {
+  const lista = Object.entries(state.dibujos || {}).map(([id, x]) => ({ id, ...x }))
+    .sort((a, b) => String(b.editado?.fecha || b.creado?.fecha || '').localeCompare(String(a.editado?.fecha || a.creado?.fecha || '')));
+  if (!lista.length) return '<div class="empty"><div class="empty-text">Todavía no hay proyectos guardados.</div></div>';
+  return `<div class="list">${lista.map(x => `<div class="camp-card dib-proy-card ${d.proyecto?.id === x.id ? 'activo' : ''}"><div class="camp-card-cuerpo">
+    <div class="exp-nombre">${esc(x.nombre)}</div>
+    <div class="exp-sub">${esc([x.referencia, x.editado ? `Modificado ${fmtDate(x.editado.fecha)} · ${x.editado.por}` : ''].filter(Boolean).join(' · '))}</div>
+    <div class="barra-acciones"><button class="b b-p" onclick="abrirProyectoDib('${x.id}')">${d.proyecto?.id === x.id ? 'Abierto' : 'Abrir'}</button><button class="b b-l" onclick="eliminarProyectoDib('${x.id}')">Eliminar</button></div></div></div>`).join('')}</div>`;
 }

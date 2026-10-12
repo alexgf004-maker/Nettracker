@@ -7,5 +7,8 @@ const NOMBRES = [
   'nuevoLienzoDib', 'quitarEntradaLeyendaDib', 'quitarEscalaDib', 'quitarFondoDib', 'rehacerDib', 'setColorDib', 'setEstiloEtiquetaDib', 'setGrosorDib',
   'setHerramientaDib', 'setLaminaDib', 'setPrefijoDib', 'setSimboloDib', 'setTamTextoDib', 'setTipoTramoDib', 'subirFondoDib', 'tablaEncabezadoDib',
   'tablaFilasDib', 'terminarTramoDib', 'textoDib',
+  'zoomDib', 'ajustarVistaDib', 'ampliarDib', 'dibRueda',
+  'setVistaProyectosDib', 'guardarProyectoDib', 'guardarComoProyectoDib', 'abrirProyectoDib', 'eliminarProyectoDib', 'soltarProyectoDib',
 ];
 NOMBRES.forEach(n => { window[n] = a[n]; });
+a.instalarAltoDib();

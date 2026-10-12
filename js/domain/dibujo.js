@@ -154,7 +154,7 @@ export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias
           const [x0, y0] = el.puntos[i - 1]; const [x1, y1] = el.puntos[i];
           const m = metrosVano(el, i, escala);
           if (m === null || Math.hypot(x1 - x0, y1 - y0) < ancho * 10) continue;
-          chips += chipTexto((x0 + x1) / 2, (y0 + y1) / 2, fmtMetros(m), Math.max(11, ancho * 2.2), color);
+          chips += chipTexto((x0 + x1) / 2, (y0 + y1) / 2, fmtMetros(m), Math.max(15, ancho * 2.8), color);
         }
       }
       s = `<g ${id}><path d="${d}" stroke="transparent" stroke-width="${Math.max(18, ancho * 3)}" fill="none"/>${trazosTramo(d, color, ancho, tp?.dash)}${el.puntos.length === 1 ? `<circle cx="${r1(el.puntos[0][0])}" cy="${r1(el.puntos[0][1])}" r="${r1(ancho)}" fill="${color}"/>` : ''}${chips}</g>`;

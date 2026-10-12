@@ -71,6 +71,10 @@ export function iniciarSync() {
     state.levantamientos = snap.exists() ? snap.val() : {};
     render();
   });
+  onValue(ref(db, 'dibujos'), snap => {
+    state.dibujos = snap.exists() ? snap.val() : {};
+    render();
+  });
   onValue(configCartasRef, snap => {
     state.configCartas = snap.exists() ? snap.val() : null;
     render();

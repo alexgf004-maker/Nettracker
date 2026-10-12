@@ -1958,6 +1958,47 @@ test.describe('Análisis de reclamos', () => {
     await expect(modal.locator('.tile', { hasText: 'FebNoPer' })).toContainText('6.94 %');
   });
 
+  test('Graficar: proyección opcional con cambio de TAP (placas por red, curva punteada, resumen y todas las posiciones)', async ({ page }) => {
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await nav(page, 'Graficar');
+    await page.locator('.graf-pagina input[type=file]').setInputFiles({ name: 'CR192026100.txt', mimeType: 'text/plain', buffer: Buffer.from(txtTension()) });
+    await expect(page.locator('#ar-nominal')).toHaveValue('13200');
+    await expect(page.locator('.veredicto-dtft').first()).toContainText('FebNoPer 6.94 %');
+    // Apagada por defecto
+    await expect(page.locator('#ar-tap-red')).toHaveCount(0);
+    await page.locator('#ar-tap-activo').check();
+    // Red de 23 kV: placas predeterminadas
+    await page.locator('#ar-tap-red').selectOption('23kv');
+    await expect(page.locator('#ar-tap-placa-1')).toHaveValue('14400');
+    await expect(page.locator('#ar-tap-placa-5')).toHaveValue('12540');
+    await page.locator('#ar-tap-actual').selectOption('3');
+    // Sin propuesta ya sale la tabla de todas las posiciones; la 2 es la de menor FebNoPer
+    const tabla = page.locator('.tap-tabla');
+    await expect(tabla.locator('tbody tr')).toHaveCount(5);
+    await expect(tabla.locator('tr', { hasText: 'actual' })).toContainText('6.94 % FT');
+    await expect(tabla.locator('tr.tap-mejor')).toContainText('13,800');
+    await expect(tabla.locator('tr.tap-mejor')).toContainText('0.00 % DT');
+    await expect(tabla.locator('tbody tr').first()).toContainText('FT'); // posición 1: baja demasiado
+    // Propuesta 2: resumen proyectado DT y curva punteada en la gráfica
+    await page.locator('#ar-tap-propuesta').selectOption('2');
+    const ver = page.locator('.tap-bloque .veredicto-dtft');
+    await expect(ver).toContainText('DT');
+    await expect(ver).toContainText('En TAP 2 (−4.35 %)');
+    await expect(page.locator('[data-graf="u"] path.graf-linea.proy')).toHaveCount(3);
+    await expect(page.locator('.graf-titulo', { hasText: 'proyectada en TAP 2' })).toHaveCount(1);
+    // La medición sigue igual (FT); la proyección no la cambia
+    await expect(page.locator('.veredicto-dtft').first()).toContainText('FebNoPer 6.94 %');
+    // Placa corregida a mano (4.16 kV solo trae la posición 3)
+    await page.locator('#ar-tap-red').selectOption('4.16kv');
+    await expect(page.locator('#ar-tap-placa-3')).toHaveValue('2200');
+    await expect(page.locator('#ar-tap-placa-2')).toHaveValue('');
+    await expect(page.locator('.tap-bloque')).toContainText('Escribe la placa de la posición propuesta');
+    await page.locator('#ar-tap-placa-2').fill('2255'); await page.locator('#ar-tap-placa-2').press('Enter');
+    await expect(page.locator('.tap-bloque .veredicto-dtft')).toContainText('En TAP 2');
+    expect((await app.escrituras()).length).toBe(0);
+  });
+
   test('Graficar: subir un TXT en la pestaña rápida muestra DT o FT sin guardar nada', async ({ page }) => {
     app = await abrirApp(page);
     await cerrarAlerta(page);
@@ -2474,9 +2515,20 @@ test.describe('Herramienta Dibujar', () => {
   }
   // Coordenadas de pantalla de un punto del plano (en píxeles de la imagen)
   // (se sube al inicio para que la barra fija no tape el lienzo)
-  const pantalla = async (page, x, y) => page.evaluate(([x, y]) => { window.scrollTo(0, 0); const s = document.getElementById('dib-svg'); const p = new DOMPoint(x, y).matrixTransform(s.getScreenCTM()); return [p.x, p.y]; }, [x, y]);
+  // (se lleva el punto al centro de la ventana para que la barra fija no lo tape)
+  const pantalla = async (page, x, y) => page.evaluate(([x, y]) => {
+    const s = document.getElementById('dib-svg'); const a = new DOMPoint(x, y).matrixTransform(s.getScreenCTM());
+    window.scrollBy(0, a.y - window.innerHeight / 2);
+    const p = new DOMPoint(x, y).matrixTransform(s.getScreenCTM()); return [p.x, p.y];
+  }, [x, y]);
   const tocar = async (page, x, y) => { await page.mouse.click(...await pantalla(page, x, y)); await page.waitForTimeout(380); };
-  const arrastrar = async (page, a, b) => { await page.mouse.move(...await pantalla(page, ...a)); await page.mouse.down(); await page.mouse.move(...await pantalla(page, ...b), { steps: 6 }); await page.mouse.up(); };
+  // (un solo desplazamiento de la página, centrado entre los dos puntos, antes de apretar)
+  const enPantalla = async (page, x, y) => page.evaluate(([x, y]) => { const p = new DOMPoint(x, y).matrixTransform(document.getElementById('dib-svg').getScreenCTM()); return [p.x, p.y]; }, [x, y]);
+  const arrastrar = async (page, a, b) => {
+    await pantalla(page, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+    const pa = await enPantalla(page, ...a); const pb = await enPantalla(page, ...b);
+    await page.mouse.move(...pa); await page.mouse.down(); await page.mouse.move(...pb, { steps: 6 }); await page.mouse.up();
+  };
 
   test('dibujo libre: líneas, figuras, texto y unifilar; deshacer, borrador, cajetín opcional y PNG', async ({ page }) => {
     const errores = []; page.on('pageerror', e => errores.push(e.message));
@@ -2498,6 +2550,7 @@ test.describe('Herramienta Dibujar', () => {
     await page.getByRole('button', { name: 'Rectángulo' }).click();
     await arrastrar(page, [480, 200], [720, 360]);
     await page.getByRole('button', { name: 'Texto', exact: true }).click();
+    await pantalla(page, 80, 200);
     const y0 = (await page.locator('#dib-svg').boundingBox()).y;
     await tocar(page, 80, 200);
     expect((await page.locator('#dib-svg').boundingBox()).y).toBe(y0); // al seleccionar, el lienzo no se mueve
@@ -2650,6 +2703,112 @@ test.describe('Herramienta Dibujar', () => {
     await expect(page.locator('.toast')).toContainText('solo el número');
     expect(errores).toEqual([]);
   });
+  test('zoom: acercar y dibujar en el lugar correcto, desplazar el fondo, Ctrl + rueda, pellizco con dos dedos y pantalla completa', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    await page.setViewportSize({ width: 1280, height: 900 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await page.evaluate(() => localStorage.removeItem('nettracker_dibujo'));
+    await nav(page, 'Dibujar');
+    await subirImagen(page, 1600, 900);
+    const vb = () => page.locator('#dib-svg').getAttribute('viewBox');
+    const completa = await vb();
+    await expect(page.locator('#dib-zoom-pct')).toHaveText('100 %');
+    await page.getByRole('button', { name: 'Acercar' }).click();
+    await page.getByRole('button', { name: 'Acercar' }).click();
+    await expect(page.locator('#dib-zoom-pct')).toHaveText('156 %');
+    expect(await vb()).not.toBe(completa);
+    // Con zoom, un poste cae donde se toca (en coordenadas de la lámina)
+    await page.getByRole('button', { name: 'Poste existente' }).click();
+    await tocar(page, 800, 450);
+    const c = () => page.evaluate(async () => (await import('/js/state.js')).state.dibujo.elementos.filter(e => e.tipo === 'simbolo').map(e => [Math.round(e.x + 30 * e.escala), Math.round(e.y + 30 * e.escala)]));
+    expect(await c()).toEqual([[800, 450]]);
+    // Arrastrar el fondo con Seleccionar desplaza la vista (no mueve nada)
+    await page.getByRole('button', { name: 'Seleccionar y mover' }).click();
+    const antes = (await vb()).split(' ').map(Number);
+    await arrastrar(page, [300, 300], [400, 300]);
+    const despues = (await vb()).split(' ').map(Number);
+    expect(despues[0]).toBeCloseTo(antes[0] - 100, 0);
+    expect(await c()).toEqual([[800, 450]]);
+    // Ajustar vuelve a toda la lámina
+    await page.getByRole('button', { name: 'Ajustar' }).click();
+    expect(await vb()).toBe(completa);
+    // Ctrl + rueda acerca; la rueda sola no
+    const [mx, my] = await pantalla(page, 800, 450);
+    await page.mouse.move(mx, my);
+    await page.mouse.wheel(0, -300);
+    expect(await vb()).toBe(completa);
+    // (Chromium de las pruebas toma Ctrl + rueda como zoom del navegador: el evento se manda directo)
+    await page.evaluate(([x, y]) => document.getElementById('dib-svg').dispatchEvent(new WheelEvent('wheel', { deltaY: -300, ctrlKey: true, clientX: x, clientY: y, bubbles: true, cancelable: true })), await pantalla(page, 800, 450));
+    await expect(page.locator('#dib-zoom-pct')).not.toHaveText('100 %');
+    await page.getByRole('button', { name: 'Ajustar' }).click();
+    // Pellizco con dos dedos: acerca y no deja nada dibujado (estando en Poste)
+    await page.getByRole('button', { name: 'Poste existente' }).click();
+    await page.evaluate(() => {
+      const s = document.getElementById('dib-svg'); const r = s.getBoundingClientRect(); const cx = r.left + r.width / 2; const cy = r.top + r.height / 3;
+      const ev = (tipo, id, x) => s.dispatchEvent(new PointerEvent(tipo, { pointerId: id, pointerType: 'touch', clientX: x, clientY: cy, bubbles: true, cancelable: true, isPrimary: id === 1 }));
+      ev('pointerdown', 1, cx - 40); ev('pointerdown', 2, cx + 40);
+      for (let k = 1; k <= 6; k++) { ev('pointermove', 1, cx - 40 - k * 15); ev('pointermove', 2, cx + 40 + k * 15); }
+      ev('pointerup', 2, cx + 130); ev('pointerup', 1, cx - 130);
+    });
+    await expect(page.locator('#dib-zoom-pct')).not.toHaveText('100 %');
+    expect(await c()).toEqual([[800, 450]]); // el primer dedo no dejó un poste
+    // Pantalla completa: solo la barra y el lienzo; Escape sale
+    await page.getByRole('button', { name: 'Pantalla completa' }).click();
+    await expect(page.locator('.dib-pagina.ampliada')).toHaveCount(1);
+    await expect(page.locator('.dib-pagina .hero')).toBeHidden();
+    const alto = (await page.locator('.dib-lienzo').boundingBox()).height;
+    expect(alto).toBeGreaterThan(550);
+    await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
+    await expect(page.locator('.dib-pagina.ampliada')).toHaveCount(0);
+    expect(errores).toEqual([]);
+  });
+
+  test('proyectos: se guardan en la base para el equipo, se marcan los cambios sin guardar y se vuelven a abrir', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    await page.setViewportSize({ width: 1280, height: 1100 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await page.evaluate(() => localStorage.removeItem('nettracker_dibujo'));
+    await nav(page, 'Dibujar');
+    await subirImagen(page, 1600, 900);
+    await page.getByRole('button', { name: 'Tramo de red' }).click();
+    await tocar(page, 200, 500); await tocar(page, 1000, 500);
+    await page.getByRole('button', { name: 'Terminar tramo' }).click();
+    // Guardar como proyecto: nombre y referencia
+    await page.getByRole('button', { name: 'Guardar como proyecto' }).click();
+    await page.locator('#dib-proy-nombre').fill('Propuesta Col. Prueba');
+    await page.locator('#dib-proy-ref').fill('WO-1');
+    await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+    await expect(page.locator('.dib-proyecto')).toContainText('Propuesta Col. Prueba');
+    await expect(page.locator('.dib-proyecto .tg')).toHaveText('Guardado');
+    let esc = await app.escrituras();
+    const meta = esc.find(([op, r]) => op === 'set' && /^dibujos\/[^/]+$/.test(r));
+    const datos = esc.find(([op, r]) => op === 'set' && /^dibujosDatos\/[^/]+$/.test(r));
+    expect(meta[2]).toMatchObject({ nombre: 'Propuesta Col. Prueba', referencia: 'WO-1' });
+    expect(datos[2].fondo.src.startsWith('data:image/jpeg')).toBe(true); // la imagen se guarda en JPG
+    expect(JSON.parse(datos[2].datos).elementos.filter(e => e.tipo === 'polilinea')).toHaveLength(1);
+    // Un cambio: queda "sin guardar"; Guardar actualiza el mismo proyecto
+    await page.getByRole('button', { name: 'Poste existente' }).click();
+    await tocar(page, 600, 500);
+    await expect(page.locator('.dib-proyecto .tg')).toHaveText('Cambios sin guardar');
+    await page.locator('.dib-proyecto').getByRole('button', { name: 'Guardar', exact: true }).click();
+    await expect(page.locator('.dib-proyecto .tg')).toHaveText('Guardado');
+    esc = await app.escrituras();
+    expect(esc.filter(([op, r]) => op === 'set' && /^dibujos\/[^/]+$/.test(r)).map(([, r]) => r)).toEqual([meta[1], meta[1]]);
+    // Nuevo dibujo y volver a abrir el proyecto desde la lista
+    await page.getByRole('button', { name: 'Nuevo', exact: true }).click();
+    await expect(page.locator('.dib-proyecto')).toContainText('Borrador');
+    await page.getByRole('button', { name: /Proyectos guardados \(1\)/ }).click();
+    await expect(page.locator('.dib-proy-card')).toContainText('WO-1');
+    await page.locator('.dib-proy-card').getByRole('button', { name: 'Abrir' }).click();
+    await expect(page.locator('.dib-proyecto')).toContainText('Propuesta Col. Prueba');
+    const el = await page.evaluate(async () => (await import('/js/state.js')).state.dibujo.elementos.map(e => e.tipo));
+    expect(el.sort()).toEqual(['polilinea', 'simbolo']);
+    await expect(page.locator('#dib-svg image')).toHaveCount(1);
+    expect(errores).toEqual([]);
+  });
+
   test('imán: el poste cae sobre la línea, se pega a los vértices y arrastra lo que tiene pegado', async ({ page }) => {
     const errores = []; page.on('pageerror', e => errores.push(e.message));
     await page.setViewportSize({ width: 1280, height: 1100 });
@@ -2807,6 +2966,52 @@ test.describe('Levantamiento en campo', () => {
     await page.mouse.click(p2.x + p2.width / 2 + 26, p2.y + p2.height / 2 + 10);
     await expect(page.locator('.lev-vano', { hasText: 'P3 – P2' })).toHaveCount(1);
     await expect(page.locator('.leaflet-marker-icon')).toHaveCount(3);
+    expect(errores).toEqual([]);
+  });
+
+  test('corregir en campo: arrastrar un poste sin seleccionarlo (y deshacer) y poner un poste en medio de un vano', async ({ page, context }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    await context.grantPermissions(['geolocation']);
+    await context.setGeolocation({ latitude: 13.5, longitude: -88.87, accuracy: 4 });
+    await page.setViewportSize({ width: 1280, height: 1100 });
+    app = await abrirApp(page, { leaflet: true });
+    await cerrarAlerta(page);
+    await nav(page, 'Levantamiento');
+    await page.locator('#lev-nombre').fill('Corregir');
+    await page.getByRole('button', { name: 'Empezar levantamiento' }).click();
+    await expect(page.locator('#lev-gps')).toHaveText('GPS ±4 m');
+    const poste = page.getByRole('button', { name: 'Poste aquí' });
+    await poste.click();
+    await context.setGeolocation({ latitude: 13.5, longitude: -88.8694, accuracy: 4 });
+    await expect(page.locator('#lev-gps')).toHaveText('GPS ±4 m');
+    await poste.click();
+    await expect(page.locator('.leaflet-marker-icon')).toHaveCount(2);
+    await page.getByRole('button', { name: 'Seguir mi ubicación' }).click(); // que el mapa no se mueva solo
+    const centro = async n => { const b = await page.locator('.leaflet-marker-icon', { hasText: n }).boundingBox(); return [b.x + b.width / 2, b.y + b.height / 2]; };
+    const pos = async n => page.evaluate(async n => { const { state } = await import('/js/state.js'); return Object.values(state.levantamientos[state.levId].puntos).find(p => p.nombre === n); }, n);
+    // Arrastrar P1 directo (sin tocarlo antes)
+    const antes = await pos('P1');
+    const [x1, y1] = await centro('P1');
+    await page.mouse.move(x1, y1); await page.mouse.down(); await page.mouse.move(x1, y1 + 60, { steps: 8 }); await page.mouse.up();
+    await expect(page.locator('.alert-banner', { hasText: 'P1 movido' })).toHaveCount(1);
+    const despues = await pos('P1');
+    expect(despues.lat).toBeLessThan(antes.lat);
+    expect(despues.movido).toBe(true);
+    await page.locator('.alert-banner', { hasText: 'P1 movido' }).getByRole('button', { name: 'Deshacer' }).click();
+    await expect(page.locator('.alert-banner', { hasText: 'P1 movido' })).toHaveCount(0);
+    expect((await pos('P1')).lat).toBeCloseTo(antes.lat, 7);
+    // Tocar la línea entre P1 y P2: poste nuevo en medio, el vano se parte en dos
+    const [a, b] = [await centro('P1'), await centro('P2')];
+    await page.evaluate(() => { window.__preguntas = []; window.confirm = m => { window.__preguntas.push(m); return true; }; });
+    await page.mouse.click((a[0] + b[0]) / 2 + 10, (a[1] + b[1]) / 2 + 8);
+    expect((await page.evaluate(() => window.__preguntas)).join(' ')).toContain('en medio del vano P1 – P2');
+    await expect(page.locator('.leaflet-marker-icon')).toHaveCount(3);
+    await expect(page.locator('.lev-vano')).toHaveCount(2);
+    await expect(page.locator('.lev-vano', { hasText: 'P1 – P3' })).toHaveCount(1);
+    await expect(page.locator('.lev-vano', { hasText: 'P3 – P2' })).toHaveCount(1);
+    await expect(page.locator('.lev-panel')).toContainText('P3'); // queda seleccionado
+    const p3 = await pos('P3');
+    expect(Math.abs(p3.lat - 13.5)).toBeLessThan(0.00002); // sobre la línea
     expect(errores).toEqual([]);
   });
 });

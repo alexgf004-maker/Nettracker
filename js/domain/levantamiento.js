@@ -8,7 +8,7 @@ import { TIPOS_TRAMO } from './plano.js';
 export const TIPOS_PUNTO = ['poste', 'poste_nuevo', 'trafo', 'trafo_nuevo', 'banco', 'usuario', 'medidor_red', 'seccionador', 'medicion'];
 export const PRECISION_BAJA = 15;
 // Estado inicial de la pantalla: marcar con GPS, poste, BT existente, unir al anterior, calles, seguir la ubicación
-export const nuevaPantallaLev = () => ({ modo: 'gps', tipo: 'poste', tramo: 'bt', unir: true, actual: null, sel: null, unirDesde: null, fondo: 'calles', seguir: true }); // m: se avisa antes de marcar con una precisión peor
+export const nuevaPantallaLev = () => ({ modo: 'gps', tipo: 'poste', tramo: 'bt', unir: true, actual: null, sel: null, unirDesde: null, movida: null, fondo: 'calles', seguir: true }); // m: se avisa antes de marcar con una precisión peor
 
 const RADIO = 6371008.8; // m
 const rad = g => (g * Math.PI) / 180;
@@ -40,6 +40,13 @@ export function resumenLevantamiento(lev) {
 export function siguienteNombre(lev, prefijo = 'P') {
   const n = Math.max(0, ...listaPuntos(lev).map(p => Number(String(p.nombre || '').match(new RegExp(`^${prefijo}(\\d+)$`))?.[1] || 0)));
   return `${prefijo}${n + 1}`;
+}
+
+// Partir un vano con un punto nuevo en medio: A–B pasa a A–N y N–B, del mismo tipo. Los metros medidos de A–B no se
+// pueden repartir, así que los dos vanos nuevos quedan con la distancia del GPS (hay que medirlos de nuevo).
+export function cambiosPartirVano(v, nuevoId, keys) {
+  const base = { tramo: v.tramo || 'bt' }; const o = Number(v.orden) || 0;
+  return { [`vanos/${v.id}`]: null, [`vanos/${keys[0]}`]: { ...base, a: v.a, b: nuevoId, orden: o }, [`vanos/${keys[1]}`]: { ...base, a: nuevoId, b: v.b, orden: o + 0.5 } };
 }
 
 // Proyección local (metros al este y al norte del centro), suficiente para unos cuantos kilómetros

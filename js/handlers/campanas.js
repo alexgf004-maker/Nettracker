@@ -12,7 +12,7 @@ import { asignarEquipo, asignarFecha, cerrarProgramacion, enviarFechaADespachos,
 import { abrirResultado, analizarArchivos, analizarTXT, cerrarAnalisis, cerrarGraficas, cerrarResultado, exportarAnalisis, exportarCuadroResumen, exportarSeries, guardarAnalisis, guardarResultado, recalcularTXT, verGraficas } from '../actions/resultados.js';
 import { moverCursorGrafica, salirCursorGrafica } from '../views/graficas.js';
 import { agregarComboReclamo, limpiarComboReclamo, limpiarGraficar, quitarComboReclamo, restablecerZoomReclamo, setZoomReclamo, toggleEscalaReclamo, toggleSerieComboReclamo } from '../actions/analisis-reclamo.js';
-import { abrirAnalisisReclamo, cargarTXTReclamo, cerrarAnalisisReclamo, guardarAnalisisReclamo, setParamReclamo, setVistaReclamo, subirTXTReclamo } from '../actions/analisis-reclamo.js';
+import { abrirAnalisisReclamo, cargarTXTReclamo, cerrarAnalisisReclamo, guardarAnalisisReclamo, setParamReclamo, setTapReclamo, setVistaReclamo, subirTXTReclamo } from '../actions/analisis-reclamo.js';
 import { exportarArmonicosReclamo, exportarTensionReclamo } from '../actions/excel-reclamo.js';
 import { exportarBorradorInforme } from '../actions/informe.js';
 import { abrirFirma, agregarItemInspeccion, borrarFirma, cerrarFirma, firmaFin, firmaInicio, firmaMover, generarFormularioInspeccion, guardarFirma, guardarInspeccion, limpiarFirma, marcarInspeccion, quitarItemInspeccion } from '../actions/inspeccion.js';
@@ -71,7 +71,7 @@ window.setFTNota = v => { state.ftNota = v; };
 Object.assign(window, { verGraficas, cerrarGraficas, exportarSeries, moverCursorGrafica, salirCursorGrafica });
 
 // Análisis de reclamos (macros Graficar y Armónicos)
-Object.assign(window, { abrirAnalisisReclamo, cerrarAnalisisReclamo, subirTXTReclamo, cargarTXTReclamo, setParamReclamo, setVistaReclamo, guardarAnalisisReclamo, exportarTensionReclamo, exportarArmonicosReclamo, exportarBorradorInforme, cursorReclamo, salirCursorReclamo, zoomInicio, zoomFin });
+Object.assign(window, { abrirAnalisisReclamo, cerrarAnalisisReclamo, subirTXTReclamo, cargarTXTReclamo, setParamReclamo, setTapReclamo, setVistaReclamo, guardarAnalisisReclamo, exportarTensionReclamo, exportarArmonicosReclamo, exportarBorradorInforme, cursorReclamo, salirCursorReclamo, zoomInicio, zoomFin });
 
 // Expedientes de reclamo
 Object.assign(window, { abrirNuevoReclamo, cerrarNuevoReclamo, leerCorreoNuevoReclamo, setCampoNuevoReclamo, guardarNuevoReclamo, abrirExpediente, cerrarExpediente, setExpedienteVista, guardarDatoExpediente, completarCoordenadasReclamo, registrarInstalacionReclamo, eliminarExpediente, guardarInspeccion, marcarInspeccion, agregarItemInspeccion, quitarItemInspeccion, generarFormularioInspeccion, abrirFirma, cerrarFirma, firmaInicio, firmaMover, firmaFin, limpiarFirma, guardarFirma, borrarFirma });
