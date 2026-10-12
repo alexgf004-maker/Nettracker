@@ -118,7 +118,7 @@ function encuadrar() {
 // Se registra desde handlers/levantamiento.js (cuando todos los módulos ya cargaron)
 export function instalarMapaLev() { alRedibujar(() => { montarMapa(); }); }
 
-const COLOR_PUNTO = { poste: '#111827', poste_nuevo: '#2563eb', trafo: '#15803d', trafo_nuevo: '#2563eb', banco: '#15803d', usuario: '#dc2626', medidor_red: '#0f172a', seccionador: '#ea580c', medicion: '#f59e0b' };
+const COLOR_PUNTO = { puente: '#0f766e', poste: '#111827', poste_nuevo: '#2563eb', trafo: '#15803d', trafo_nuevo: '#2563eb', banco: '#15803d', usuario: '#dc2626', medidor_red: '#0f172a', seccionador: '#ea580c', medicion: '#f59e0b' };
 function icono(p, { actual, sel }) {
   const s = SIMBOLOS[p.tipo] || SIMBOLOS.poste; const c = COLOR_PUNTO[p.tipo] || '#111827';
   return L.divIcon({

@@ -25,6 +25,7 @@ export const SIMBOLOS = {
   usuario: { grupo: 'red', nombre: 'Usuario', color: '#dc2626', svg: '<path d="M30 58 C30 58 9 34 9 22 A21 21 0 0 1 51 22 C51 34 30 58 30 58 Z" fill="currentColor" stroke="#ffffff" stroke-width="3"/><path d="M21 25 L30 17 L39 25 L39 33 L21 33 Z" fill="#ffffff" stroke="none"/>' },
   medidor_red: { grupo: 'red', nombre: 'Medidor', color: '#0f172a', svg: '<rect x="12" y="12" width="36" height="36" rx="7" fill="#ffffff" stroke="currentColor" stroke-width="5"/><text x="30" y="37" text-anchor="middle" font-size="18" font-weight="800" fill="currentColor" stroke="none" font-family="Arial">M</text>' },
   seccionador: { grupo: 'red', nombre: 'Seccionador / cuchilla', color: '#ea580c', svg: '<circle cx="30" cy="30" r="15" fill="#ffffff" stroke="currentColor" stroke-width="5"/><line x1="20" y1="40" x2="40" y2="20" stroke="currentColor" stroke-width="5"/>' },
+  puente: { grupo: 'red', nombre: 'Puente al vuelo', color: '#0f766e', svg: '<path d="M10 31 A20 20 0 0 1 50 31" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/><circle cx="30" cy="30" r="7" fill="currentColor" stroke="#ffffff" stroke-width="3"/>' },
   banco: { grupo: 'red', nombre: 'Banco de transformadores', color: '#15803d', svg: '<path d="M2 50 L12 28 L22 50 Z M19 50 L30 24 L41 50 Z M38 50 L48 28 L58 50 Z" fill="currentColor" stroke="#ffffff" stroke-width="3" stroke-linejoin="round"/><line x1="2" y1="52" x2="58" y2="52" stroke="currentColor" stroke-width="3"/>' },
   medicion: { grupo: 'red', nombre: 'Punto de medición', color: '#f59e0b', svg: '<rect x="9" y="11" width="42" height="38" rx="7" fill="currentColor" stroke="#ffffff" stroke-width="3.5"/><path d="M15 33 L21 25 L27 36 L33 21 L39 33 L45 27" stroke="#ffffff" stroke-width="3.5" fill="none"/>' },
   transformador: { grupo: 'diagrama', nombre: 'Transformador', svg: '<line x1="30" y1="0" x2="30" y2="12"/><circle cx="30" cy="23" r="11"/><circle cx="30" cy="37" r="11"/><line x1="30" y1="48" x2="30" y2="60"/>' },
@@ -113,6 +114,12 @@ export const colorTramo = e => TIPOS_TRAMO[e.tramo]?.color || e.color;
 export const coloresTramos = elementos => [...new Set(elementos.filter(e => e.tipo === 'polilinea').map(colorTramo))];
 
 // Recuadro blanco redondeado con un texto centrado en (cx, cy): metros de tramos y cotas
+// Chip que se puede arrastrar (metros de un vano o de una cota): `off` lo corre de su lugar; si se aleja, una guía lo une
+function chipMovible(k, cx, cy, off, texto, tam, color) {
+  const [dx, dy] = off || [0, 0];
+  const guia = Math.hypot(dx, dy) > tam * 1.2 ? `<line x1="${r1(cx)}" y1="${r1(cy)}" x2="${r1(cx + dx)}" y2="${r1(cy + dy)}" stroke="${color}" stroke-width="${r1(Math.max(1, tam * 0.09))}" stroke-dasharray="${r1(tam * 0.3)} ${r1(tam * 0.2)}"/><circle cx="${r1(cx)}" cy="${r1(cy)}" r="${r1(tam * 0.18)}" fill="${color}"/>` : '';
+  return `${guia}<g data-chip="${k}">${chipTexto(cx + dx, cy + dy, texto, tam, color)}</g>`;
+}
 function chipTexto(cx, cy, texto, tam, color) {
   const w = String(texto).length * tam * 0.6 + tam * 1; const h = tam * 1.5;
   return `<rect x="${r1(cx - w / 2)}" y="${r1(cy - h / 2)}" width="${r1(w)}" height="${r1(h)}" rx="${r1(h / 2)}" fill="#ffffff" stroke="${color}" stroke-width="${r1(Math.max(1, tam * 0.12))}"/><text x="${r1(cx)}" y="${r1(cy + tam * 0.36)}" text-anchor="middle" font-size="${r1(tam)}" font-weight="700" font-family="${FUENTE}" fill="${NEGRO}">${esc(texto)}</text>`;
@@ -154,7 +161,7 @@ export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias
           const [x0, y0] = el.puntos[i - 1]; const [x1, y1] = el.puntos[i];
           const m = metrosVano(el, i, escala);
           if (m === null || Math.hypot(x1 - x0, y1 - y0) < ancho * 10) continue;
-          chips += chipTexto((x0 + x1) / 2, (y0 + y1) / 2, fmtMetros(m), Math.max(15, ancho * 2.8), color);
+          chips += chipMovible(i, (x0 + x1) / 2, (y0 + y1) / 2, el.desfases?.[i], fmtMetros(m), Math.max(15, ancho * 2.8), color);
         }
       }
       s = `<g ${id}><path d="${d}" stroke="transparent" stroke-width="${Math.max(18, ancho * 3)}" fill="none"/>${trazosTramo(d, color, ancho, tp?.dash)}${el.puntos.length === 1 ? `<circle cx="${r1(el.puntos[0][0])}" cy="${r1(el.puntos[0][1])}" r="${r1(ancho)}" fill="${color}"/>` : ''}${chips}</g>`;
@@ -166,7 +173,7 @@ export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias
       const nx = -Math.sin(ang) * t; const ny = Math.cos(ang) * t;
       const px = Math.hypot(el.x2 - el.x1, el.y2 - el.y1);
       const l = (x1, y1, x2, y2, w, c) => `<line x1="${r1(x1)}" y1="${r1(y1)}" x2="${r1(x2)}" y2="${r1(y2)}" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>`;
-      s = `<g ${id}>${l(el.x1, el.y1, el.x2, el.y2, 18, 'transparent')}${l(el.x1, el.y1, el.x2, el.y2, r1(lw * 3), '#ffffff')}${l(el.x1, el.y1, el.x2, el.y2, lw, NEGRO)}${l(el.x1 - nx, el.y1 - ny, el.x1 + nx, el.y1 + ny, lw, NEGRO)}${l(el.x2 - nx, el.y2 - ny, el.x2 + nx, el.y2 + ny, lw, NEGRO)}${chipTexto((el.x1 + el.x2) / 2, (el.y1 + el.y2) / 2, escala ? fmtMetros(px * escala) : 'Sin escala', el.tam, NEGRO)}</g>`;
+      s = `<g ${id}>${l(el.x1, el.y1, el.x2, el.y2, 18, 'transparent')}${l(el.x1, el.y1, el.x2, el.y2, r1(lw * 3), '#ffffff')}${l(el.x1, el.y1, el.x2, el.y2, lw, NEGRO)}${l(el.x1 - nx, el.y1 - ny, el.x1 + nx, el.y1 + ny, lw, NEGRO)}${l(el.x2 - nx, el.y2 - ny, el.x2 + nx, el.y2 + ny, lw, NEGRO)}${chipMovible(0, (el.x1 + el.x2) / 2, (el.y1 + el.y2) / 2, el.desfase, escala ? fmtMetros(px * escala) : 'Sin escala', el.tam, NEGRO)}</g>`;
       break;
     }
     case 'simbolo': {

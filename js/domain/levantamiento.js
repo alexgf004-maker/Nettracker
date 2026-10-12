@@ -5,7 +5,7 @@
 import { TIPOS_TRAMO } from './plano.js';
 
 // Tipos de punto que se marcan en campo (los mismos símbolos de red de Dibujar)
-export const TIPOS_PUNTO = ['poste', 'poste_nuevo', 'trafo', 'trafo_nuevo', 'banco', 'usuario', 'medidor_red', 'seccionador', 'medicion'];
+export const TIPOS_PUNTO = ['poste', 'poste_nuevo', 'puente', 'trafo', 'trafo_nuevo', 'banco', 'usuario', 'medidor_red', 'seccionador', 'medicion'];
 export const PRECISION_BAJA = 15;
 // Estado inicial de la pantalla: marcar con GPS, poste, BT existente, unir al anterior, calles, seguir la ubicación
 export const nuevaPantallaLev = () => ({ modo: 'gps', tipo: 'poste', tramo: 'bt', unir: true, actual: null, sel: null, unirDesde: null, movida: null, fondo: 'calles', seguir: true }); // m: se avisa antes de marcar con una precisión peor
@@ -90,7 +90,7 @@ export function aDibujo(lev, { ancho = 1600, alto = 1000, margen = 140 } = {}) {
   });
   return { fondo: null, elementos, escala: 1 / k, lienzo: { w: ancho, h: alto } };
 }
-const SIMBOLO_COLOR = { poste: '#111827', poste_nuevo: '#2563eb', trafo: '#15803d', trafo_nuevo: '#2563eb', banco: '#15803d', usuario: '#dc2626', medidor_red: '#0f172a', seccionador: '#ea580c', medicion: '#f59e0b' };
+const SIMBOLO_COLOR = { puente: '#0f766e', poste: '#111827', poste_nuevo: '#2563eb', trafo: '#15803d', trafo_nuevo: '#2563eb', banco: '#15803d', usuario: '#dc2626', medidor_red: '#0f172a', seccionador: '#ea580c', medicion: '#f59e0b' };
 
 // KML para Google Earth o My Maps: un punto por poste y una línea por vano
 export function kmlLevantamiento(lev, nombresTipo = {}) {
