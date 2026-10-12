@@ -526,7 +526,7 @@ export function setLaminaDib(campo, valor) {
   d.lamina = { ...d.lamina, [campo]: campo === 'filas' ? leerFilasTabla(valor) : valor };
   guardarBorrador(); repintar();
   // Lo que cambia el tamaño del cajetín o las opciones de la pantalla redibuja todo
-  if (['activa', 'distancias', 'norte', 'distanciasEnTramos', 'verCalibre', 'verAltura', 'verEstructuras'].includes(campo)) render();
+  if (['activa', 'distancias', 'norte', 'distanciasEnTramos', 'verCalibre', 'verAltura', 'verEstructuras', 'verAcometidas'].includes(campo)) render();
 }
 
 // Color de la red: del tramo seleccionado o, sin selección, de los tramos nuevos (null = el de su tipo)

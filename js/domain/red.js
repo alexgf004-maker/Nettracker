@@ -53,3 +53,19 @@ export function leerAltura(v) {
   const n = Number(String(v ?? '').replace(/[^\d.,]/g, '').replace(',', '.'));
   return n > 0 && n < 200 ? n : null;
 }
+
+// ── Acometidas por vano (para revisar el balance de fases en BT) ──
+// c = { a, b, d }: acometidas 120 V en fase A, 120 V en fase B y 240 V (estas cargan las dos fases por igual)
+export const TIPOS_ACOMETIDA = [{ k: 'a', nombre: '120 A' }, { k: 'b', nombre: '120 B' }, { k: 'd', nombre: '240' }];
+export const sumaAcometidas = lista => lista.reduce((t, c) => ({ a: t.a + (Number(c?.a) || 0), b: t.b + (Number(c?.b) || 0), d: t.d + (Number(c?.d) || 0) }), { a: 0, b: 0, d: 0 });
+export const hayAcometidas = c => !!(Number(c?.a) || Number(c?.b) || Number(c?.d));
+// Texto corto para el plano: "Acom. A:3 B:2 240:1" (solo lo que hay)
+export function textoAcometidas(c) {
+  if (!hayAcometidas(c)) return '';
+  return `Acom. ${[c.a ? `A:${c.a}` : '', c.b ? `B:${c.b}` : '', c.d ? `240:${c.d}` : ''].filter(Boolean).join(' ')}`;
+}
+// Balance: cada fase lleva sus 120 más todas las 240; la diferencia sale solo de las 120
+export function balanceAcometidas(c) {
+  const a = Number(c?.a) || 0; const b = Number(c?.b) || 0; const d = Number(c?.d) || 0;
+  return { faseA: a + d, faseB: b + d, dif: Math.abs(a - b), mayor: a > b ? 'A' : b > a ? 'B' : null, total: a + b + d };
+}

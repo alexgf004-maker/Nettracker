@@ -2,7 +2,7 @@
 import * as a from '../actions/levantamiento.js';
 
 ['crearLevantamiento', 'abrirLevantamiento', 'cerrarLevantamiento', 'eliminarLevantamiento', 'guardarDatoLev', 'marcarAqui', 'setLev', 'deshacerUltimoLev', 'deshacerMovidaLev',
-  'borrarPuntoLev', 'alturaPuntoLev', 'agregarEstructuraLev', 'agregarEstructuraEscritaLev', 'quitarEstructuraLev', 'conductorVanoLev', 'seguirDesdeLev', 'unirConLev', 'moverAGpsLev', 'datoPuntoLev', 'datoVanoLev', 'borrarVanoLev', 'pasarADibujarLev', 'descargarKmlLev']
+  'borrarPuntoLev', 'alturaPuntoLev', 'agregarEstructuraLev', 'agregarEstructuraEscritaLev', 'quitarEstructuraLev', 'conductorVanoLev', 'setVanoAcomLev', 'sumarAcometidaLev', 'seguirDesdeLev', 'unirConLev', 'moverAGpsLev', 'datoPuntoLev', 'datoVanoLev', 'borrarVanoLev', 'pasarADibujarLev', 'descargarKmlLev']
   .forEach(n => { window[n] = a[n]; });
 
 a.instalarMapaLev();

@@ -3,7 +3,7 @@
 // (título, simbología, distancias, escala y norte). Funciones puras: el estado es
 // { fondo: { src, w, h } | null, elementos: [...], escala (m por px) | null, lamina: {...} } y de aquí sale el SVG
 // que se ve en pantalla y el que se exporta a PNG. Coordenadas en píxeles de la imagen.
-import { conductorVano, textoConductor, textoPoste } from './red.js';
+import { balanceAcometidas, conductorVano, hayAcometidas, sumaAcometidas, textoAcometidas, textoConductor, textoPoste } from './red.js';
 import { nombreRed, ESTILOS_ETIQUETA, fmtMetros, largoEscala, longitud, metrosVano, nombrePunto, tablaDistancias, TIPOS_TRAMO, totalesPorTipo } from './plano.js';
 
 export const LIENZO = { w: 1600, h: 1000 }; // sin imagen de fondo
@@ -157,13 +157,14 @@ export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias
       const color = el.colorRed || (tp ? tp.color : el.color); const ancho = el.grosor * (tp ? tp.ancho : 1); // colorRed: otra red del mismo tipo
       const d = el.puntos.map(([x, y], i) => `${i ? 'L' : 'M'}${r1(x)} ${r1(y)}`).join(' ');
       let chips = '';
-      if (distancias || (ver.calibre !== false && (el.conductor || el.calibres))) {
+      if (distancias || (ver.calibre !== false && (el.conductor || el.calibres)) || (ver.acometidas !== false && el.acometidas)) {
         // Metros de cada vano: los escritos a mano o, con escala, los medidos
         for (let i = 1; i < el.puntos.length; i++) {
           const [x0, y0] = el.puntos[i - 1]; const [x1, y1] = el.puntos[i];
           const m = distancias ? metrosVano(el, i, escala) : null;
           const cond = ver.calibre !== false ? textoConductor(conductorVano(el, i)) : '';
-          const texto = [m !== null ? fmtMetros(m) : '', cond].filter(Boolean).join(' · ');
+          const acom = ver.acometidas !== false ? textoAcometidas(el.acometidas?.[i]) : '';
+          const texto = [m !== null ? fmtMetros(m) : '', cond, acom].filter(Boolean).join(' · ');
           if (!texto || Math.hypot(x1 - x0, y1 - y0) < ancho * 10) continue;
           chips += chipMovible(i, (x0 + x1) / 2, (y0 + y1) / 2, el.desfases?.[i], texto, Math.max(15, ancho * 2.8), color);
         }
@@ -287,10 +288,19 @@ export function filasDistancias(d) {
   return tablaDistancias(d.elementos, d.escala, 14 * Math.max(1, tamano(d).w / 1600)).map(f => [`${f.desde} – ${f.hasta}`, (Math.round(f.metros * 10) / 10).toFixed(1)]);
 }
 const totalesCajetin = d => (d.lamina?.distancias !== 'manual' ? totalesPorTipo(d.elementos, d.escala).map(t => [`Total ${t.nombre.charAt(0).toLowerCase()}${t.nombre.slice(1)}`, (Math.round(t.metros * 10) / 10).toFixed(1)]) : []);
+// Acometidas de toda la lámina (por fase y diferencia) para el cajetín
+export function filasAcometidas(d) {
+  if (d.lamina?.verAcometidas === false) return [];
+  const t = sumaAcometidas(d.elementos.filter(e => e.tipo === 'polilinea' && e.acometidas).flatMap(e => Object.values(e.acometidas)));
+  if (!hayAcometidas(t)) return [];
+  const b = balanceAcometidas(t);
+  return [['120 fase A', String(t.a)], ['120 fase B', String(t.b)], ['240', String(t.d)], ['Diferencia A–B', b.mayor ? `${b.dif} (más en ${b.mayor})` : '0']];
+}
 export function altoCajetin(d) {
   const { w } = tamano(d); const k = w / 1600;
   const filasSimb = Math.ceil(simbologiaUsada(d.elementos).length / 2);
-  const filasDist = filasDistancias(d).length + totalesCajetin(d).length;
+  const acom = filasAcometidas(d).length;
+  const filasDist = filasDistancias(d).length + totalesCajetin(d).length + (acom ? acom + 2 : 0);
   return Math.round(k * Math.max(230, 92 + Math.max(filasSimb * 34, (filasDist + 1) * 22)));
 }
 
@@ -335,7 +345,16 @@ function svgCajetin(d, y0) {
     const mt = medidaTabla({ tam, encabezado: ['Tramo', 'Metros'], filas: tabla });
     const esc2 = Math.min(1, (col[3] - col[2] - pad * 2) / mt.w);
     s += `<g transform="translate(${r1(col[2] + pad)} ${r1(y0 + 50 * k)}) scale(${r1(esc2 * 1000) / 1000})">${svgTabla(0, 0, tam, ['Tramo', 'Metros'], tabla)}</g>`;
-  } else {
+  }
+  // Acometidas (debajo de las distancias)
+  const acom = filasAcometidas(d);
+  if (acom.length) {
+    const tam = 12.5 * k; const yA = y0 + 50 * k + (tabla.length ? (tabla.length + 1) * medidaTabla({ tam, encabezado: ['Tramo', 'Metros'], filas: tabla }).alto + 8 * k : 0);
+    const ma = medidaTabla({ tam, encabezado: ['Acometidas', 'Cant.'], filas: acom });
+    const escA = Math.min(1, (col[3] - col[2] - pad * 2) / ma.w);
+    s += `<g transform="translate(${r1(col[2] + pad)} ${r1(yA)}) scale(${r1(escA * 1000) / 1000})">${svgTabla(0, 0, tam, ['Acometidas', 'Cant.'], acom)}</g>`;
+  }
+  if (!tabla.length && !acom.length) {
     s += `<text x="${r1(col[2] + pad)}" y="${r1(y0 + 66 * k)}" font-size="${r1(f * 0.85)}" font-family="${FUENTE}" fill="#94a3b8">${d.escala || d.elementos.some(e => e.metros && Object.keys(e.metros).length) ? 'Etiqueta los puntos sobre los tramos' : 'Escribe los metros de los vanos o calibra'}</text>`;
   }
   // 4. Escala gráfica y norte
@@ -361,7 +380,7 @@ export function svgLamina(d, { pantalla = false, ui = 1 } = {}) {
   const H = h + (conCajetin ? altoCajetin(d) : 0);
   const fondo = d.fondo ? `<image href="${d.fondo.src}" x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="none"/>` : `<rect width="${w}" height="${h}" fill="#ffffff"/>`;
   const l = d.lamina || {};
-  const opts = { escala: d.escala, distancias: l.distanciasEnTramos !== false, ver: { calibre: l.verCalibre !== false, altura: l.verAltura !== false, estructuras: l.verEstructuras !== false } };
+  const opts = { escala: d.escala, distancias: l.distanciasEnTramos !== false, ver: { calibre: l.verCalibre !== false, altura: l.verAltura !== false, estructuras: l.verEstructuras !== false, acometidas: l.verAcometidas !== false } };
   const capa = definiciones(d.elementos) + d.elementos.map(e => svgElemento(e, { ...opts, sel: pantalla && e.id === d.sel, ui })).join('')
     + (pantalla && d.iman ? `<circle class="dib-iman" cx="${r1(d.iman[0])}" cy="${r1(d.iman[1])}" r="${r1(8 * ui)}"/>` : '')
     + (pantalla && d.calibracion ? `<line x1="${r1(d.calibracion.x1)}" y1="${r1(d.calibracion.y1)}" x2="${r1(d.calibracion.x2)}" y2="${r1(d.calibracion.y2)}" stroke="#f97316" stroke-width="${r1(4 * ui)}" stroke-dasharray="${r1(10 * ui)} ${r1(6 * ui)}"/>` : '');
