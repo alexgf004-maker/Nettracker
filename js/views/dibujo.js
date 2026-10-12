@@ -1,6 +1,6 @@
 // Pestaña Dibujar (Herramientas): lámina de red sobre una imagen (captura del mapa, foto o plano), sin relación con
 // ningún caso. Barra por grupos (red, anotar, dibujo libre, escala), fila de opciones de alto fijo y el cajetín.
-import { cargarBorrador, partesSVG } from '../actions/dibujo.js';
+import { cargarBorrador, partesSVG, viewBoxDib, zoomPct } from '../actions/dibujo.js';
 import { COLORES, GROSORES, SIMBOLOS, TAM_TEXTO } from '../domain/dibujo.js';
 import { ACCIONES_PUNTO, ESTILOS_ETIQUETA, fmtMetros, metrosTramo, metrosVano, nombresVanos, TIPOS_TRAMO } from '../domain/plano.js';
 import { state } from '../state.js';
@@ -36,7 +36,7 @@ export function renderDibujar() {
   const sel = d.elementos.find(e => e.id === d.sel) || null;
   const h = d.herramienta;
   const btn = (titulo, icono, activo, accion, extra = '') => `<button class="dib-btn ${activo ? 'activo' : ''}" title="${titulo}" aria-label="${titulo}" onclick="${accion}" ${extra}>${icono}</button>`;
-  let html = '<div class="content dib-pagina">';
+  let html = `<div class="content dib-pagina ${state.dibAmpliado ? 'ampliada' : ''}">`;
   html += heroSeccion({
     eyebrow: 'Herramientas', titulo: 'Dibujar',
     sub: 'Lámina de red sobre la captura del mapa: tramos por tipo, simbología, etiquetas de puntos, distancias reales y cajetín con simbología, tabla de distancias, escala y norte. Se guarda como proyecto para el equipo (para modificarlo después) y se descarga en PNG para Word.',
@@ -110,7 +110,12 @@ export function renderDibujar() {
   html += `<div class="dib-sel-barra">${fila}</div>`;
 
   // ── Lámina ──
-  html += `<div class="dib-lienzo"><svg id="dib-svg" class="dib-svg herr-${h}" viewBox="0 0 ${p.w} ${p.H}" onpointerdown="dibPointerDown(event)" onpointermove="dibPointerMove(event)" onpointerup="dibPointerUp(event)" onpointercancel="dibPointerUp(event)"><rect width="${p.w}" height="${p.H}" fill="#ffffff"/>${p.fondo}<g id="dib-capa">${p.capa}</g><g id="dib-cajetin">${p.cajetin}</g></svg></div>`;
+  const zoom = `<div class="dib-zoom"><button class="dib-btn dib-btn-chico" title="Alejar" aria-label="Alejar" onclick="zoomDib(0.8)">${ic('<path d="M5 12h14"/>')}</button>
+    <span id="dib-zoom-pct">${zoomPct()} %</span>
+    <button class="dib-btn dib-btn-chico" title="Acercar" aria-label="Acercar" onclick="zoomDib(1.25)">${ic('<path d="M12 5v14M5 12h14"/>')}</button>
+    <button class="b b-l" onclick="ajustarVistaDib()">Ajustar</button>
+    <button class="b ${state.dibAmpliado ? 'b-p' : 'b-g'}" onclick="ampliarDib()">${state.dibAmpliado ? 'Salir de pantalla completa' : 'Pantalla completa'}</button></div>`;
+  html += `<div class="dib-lienzo">${zoom}<svg id="dib-svg" class="dib-svg herr-${h}" viewBox="${viewBoxDib(d)}" onwheel="dibRueda(event)" onpointerdown="dibPointerDown(event)" onpointermove="dibPointerMove(event)" onpointerup="dibPointerUp(event)" onpointercancel="dibPointerUp(event)"><rect width="${p.w}" height="${p.H}" fill="#ffffff"/>${p.fondo}<g id="dib-capa">${p.capa}</g><g id="dib-cajetin">${p.cajetin}</g></svg></div>`;
 
   // Metros por vano del tramo seleccionado (escritos a mano; vacío = con la escala)
   if (sel?.tipo === 'polilinea' && d.tramo !== sel.id && sel.puntos.length > 1) {

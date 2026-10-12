@@ -2515,9 +2515,20 @@ test.describe('Herramienta Dibujar', () => {
   }
   // Coordenadas de pantalla de un punto del plano (en píxeles de la imagen)
   // (se sube al inicio para que la barra fija no tape el lienzo)
-  const pantalla = async (page, x, y) => page.evaluate(([x, y]) => { window.scrollTo(0, 0); const s = document.getElementById('dib-svg'); const p = new DOMPoint(x, y).matrixTransform(s.getScreenCTM()); return [p.x, p.y]; }, [x, y]);
+  // (se lleva el punto al centro de la ventana para que la barra fija no lo tape)
+  const pantalla = async (page, x, y) => page.evaluate(([x, y]) => {
+    const s = document.getElementById('dib-svg'); const a = new DOMPoint(x, y).matrixTransform(s.getScreenCTM());
+    window.scrollBy(0, a.y - window.innerHeight / 2);
+    const p = new DOMPoint(x, y).matrixTransform(s.getScreenCTM()); return [p.x, p.y];
+  }, [x, y]);
   const tocar = async (page, x, y) => { await page.mouse.click(...await pantalla(page, x, y)); await page.waitForTimeout(380); };
-  const arrastrar = async (page, a, b) => { await page.mouse.move(...await pantalla(page, ...a)); await page.mouse.down(); await page.mouse.move(...await pantalla(page, ...b), { steps: 6 }); await page.mouse.up(); };
+  // (un solo desplazamiento de la página, centrado entre los dos puntos, antes de apretar)
+  const enPantalla = async (page, x, y) => page.evaluate(([x, y]) => { const p = new DOMPoint(x, y).matrixTransform(document.getElementById('dib-svg').getScreenCTM()); return [p.x, p.y]; }, [x, y]);
+  const arrastrar = async (page, a, b) => {
+    await pantalla(page, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+    const pa = await enPantalla(page, ...a); const pb = await enPantalla(page, ...b);
+    await page.mouse.move(...pa); await page.mouse.down(); await page.mouse.move(...pb, { steps: 6 }); await page.mouse.up();
+  };
 
   test('dibujo libre: líneas, figuras, texto y unifilar; deshacer, borrador, cajetín opcional y PNG', async ({ page }) => {
     const errores = []; page.on('pageerror', e => errores.push(e.message));
@@ -2539,6 +2550,7 @@ test.describe('Herramienta Dibujar', () => {
     await page.getByRole('button', { name: 'Rectángulo' }).click();
     await arrastrar(page, [480, 200], [720, 360]);
     await page.getByRole('button', { name: 'Texto', exact: true }).click();
+    await pantalla(page, 80, 200);
     const y0 = (await page.locator('#dib-svg').boundingBox()).y;
     await tocar(page, 80, 200);
     expect((await page.locator('#dib-svg').boundingBox()).y).toBe(y0); // al seleccionar, el lienzo no se mueve
@@ -2691,6 +2703,67 @@ test.describe('Herramienta Dibujar', () => {
     await expect(page.locator('.toast')).toContainText('solo el número');
     expect(errores).toEqual([]);
   });
+  test('zoom: acercar y dibujar en el lugar correcto, desplazar el fondo, Ctrl + rueda, pellizco con dos dedos y pantalla completa', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    await page.setViewportSize({ width: 1280, height: 900 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await page.evaluate(() => localStorage.removeItem('nettracker_dibujo'));
+    await nav(page, 'Dibujar');
+    await subirImagen(page, 1600, 900);
+    const vb = () => page.locator('#dib-svg').getAttribute('viewBox');
+    const completa = await vb();
+    await expect(page.locator('#dib-zoom-pct')).toHaveText('100 %');
+    await page.getByRole('button', { name: 'Acercar' }).click();
+    await page.getByRole('button', { name: 'Acercar' }).click();
+    await expect(page.locator('#dib-zoom-pct')).toHaveText('156 %');
+    expect(await vb()).not.toBe(completa);
+    // Con zoom, un poste cae donde se toca (en coordenadas de la lámina)
+    await page.getByRole('button', { name: 'Poste existente' }).click();
+    await tocar(page, 800, 450);
+    const c = () => page.evaluate(async () => (await import('/js/state.js')).state.dibujo.elementos.filter(e => e.tipo === 'simbolo').map(e => [Math.round(e.x + 30 * e.escala), Math.round(e.y + 30 * e.escala)]));
+    expect(await c()).toEqual([[800, 450]]);
+    // Arrastrar el fondo con Seleccionar desplaza la vista (no mueve nada)
+    await page.getByRole('button', { name: 'Seleccionar y mover' }).click();
+    const antes = (await vb()).split(' ').map(Number);
+    await arrastrar(page, [300, 300], [400, 300]);
+    const despues = (await vb()).split(' ').map(Number);
+    expect(despues[0]).toBeCloseTo(antes[0] - 100, 0);
+    expect(await c()).toEqual([[800, 450]]);
+    // Ajustar vuelve a toda la lámina
+    await page.getByRole('button', { name: 'Ajustar' }).click();
+    expect(await vb()).toBe(completa);
+    // Ctrl + rueda acerca; la rueda sola no
+    const [mx, my] = await pantalla(page, 800, 450);
+    await page.mouse.move(mx, my);
+    await page.mouse.wheel(0, -300);
+    expect(await vb()).toBe(completa);
+    // (Chromium de las pruebas toma Ctrl + rueda como zoom del navegador: el evento se manda directo)
+    await page.evaluate(([x, y]) => document.getElementById('dib-svg').dispatchEvent(new WheelEvent('wheel', { deltaY: -300, ctrlKey: true, clientX: x, clientY: y, bubbles: true, cancelable: true })), await pantalla(page, 800, 450));
+    await expect(page.locator('#dib-zoom-pct')).not.toHaveText('100 %');
+    await page.getByRole('button', { name: 'Ajustar' }).click();
+    // Pellizco con dos dedos: acerca y no deja nada dibujado (estando en Poste)
+    await page.getByRole('button', { name: 'Poste existente' }).click();
+    await page.evaluate(() => {
+      const s = document.getElementById('dib-svg'); const r = s.getBoundingClientRect(); const cx = r.left + r.width / 2; const cy = r.top + r.height / 3;
+      const ev = (tipo, id, x) => s.dispatchEvent(new PointerEvent(tipo, { pointerId: id, pointerType: 'touch', clientX: x, clientY: cy, bubbles: true, cancelable: true, isPrimary: id === 1 }));
+      ev('pointerdown', 1, cx - 40); ev('pointerdown', 2, cx + 40);
+      for (let k = 1; k <= 6; k++) { ev('pointermove', 1, cx - 40 - k * 15); ev('pointermove', 2, cx + 40 + k * 15); }
+      ev('pointerup', 2, cx + 130); ev('pointerup', 1, cx - 130);
+    });
+    await expect(page.locator('#dib-zoom-pct')).not.toHaveText('100 %');
+    expect(await c()).toEqual([[800, 450]]); // el primer dedo no dejó un poste
+    // Pantalla completa: solo la barra y el lienzo; Escape sale
+    await page.getByRole('button', { name: 'Pantalla completa' }).click();
+    await expect(page.locator('.dib-pagina.ampliada')).toHaveCount(1);
+    await expect(page.locator('.dib-pagina .hero')).toBeHidden();
+    const alto = (await page.locator('.dib-lienzo').boundingBox()).height;
+    expect(alto).toBeGreaterThan(550);
+    await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
+    await expect(page.locator('.dib-pagina.ampliada')).toHaveCount(0);
+    expect(errores).toEqual([]);
+  });
+
   test('proyectos: se guardan en la base para el equipo, se marcan los cambios sin guardar y se vuelven a abrir', async ({ page }) => {
     const errores = []; page.on('pageerror', e => errores.push(e.message));
     await page.setViewportSize({ width: 1280, height: 1100 });
