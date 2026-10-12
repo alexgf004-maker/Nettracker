@@ -68,13 +68,13 @@ export function renderDibujar() {
     <button class="dib-btn dib-btn-chico" title="Acercar" aria-label="Acercar" onclick="zoomDib(1.25)">${I.mas}</button>
     <button class="b b-l" onclick="ajustarVistaDib()">Ajustar</button>
     <button class="b ${state.dibAmpliado ? 'b-p' : 'b-g'}" onclick="ampliarDib()">${state.dibAmpliado ? 'Salir de pantalla completa' : 'Pantalla completa'}</button></div>`;
-  const ayuda = `<div class="dib-ayuda-lienzo">${esc(sel && h === 'seleccionar' ? `${NOMBRE_TIPO[sel.tipo] || ''} seleccionado. Arrástralo para moverlo; sus propiedades están en el panel.` : AYUDA[h] || '')}${!d.fondo && !d.elementos.length ? ' Empieza subiendo la captura del mapa (arriba, "Subir imagen").' : ''}</div>`;
-  html += `<div class="dib-lienzo">${zoom}${ayuda}<svg id="dib-svg" class="dib-svg herr-${h}" viewBox="${viewBoxDib(d)}" onwheel="dibRueda(event)" onpointerdown="dibPointerDown(event)" onpointermove="dibPointerMove(event)" onpointerup="dibPointerUp(event)" onpointercancel="dibPointerUp(event)"><rect width="${p.w}" height="${p.H}" fill="#ffffff"/>${p.fondo}<g id="dib-capa">${p.capa}</g><g id="dib-cajetin">${p.cajetin}</g></svg>
+  const ayuda = `<div class="dib-panel-ayuda">${esc(sel && h === 'seleccionar' ? `${NOMBRE_TIPO[sel.tipo] || ''} seleccionado. Arrástralo para moverlo; sus propiedades están en el panel.` : AYUDA[h] || '')}${!d.fondo && !d.elementos.length ? ' Empieza subiendo la captura del mapa (arriba, "Subir imagen").' : ''}</div>`;
+  html += `<div class="dib-lienzo">${zoom}<svg id="dib-svg" class="dib-svg herr-${h}" viewBox="${viewBoxDib(d)}" onwheel="dibRueda(event)" onpointerdown="dibPointerDown(event)" onpointermove="dibPointerMove(event)" onpointerup="dibPointerUp(event)" onpointercancel="dibPointerUp(event)"><rect width="${p.w}" height="${p.H}" fill="#ffffff"/>${p.fondo}<g id="dib-capa">${p.capa}</g><g id="dib-cajetin">${p.cajetin}</g></svg>
     <button class="dib-abrir-panel" onclick="abrirPanelMovilDib(true)">${I.ajustes}<span>${esc(tituloPanel(d, sel, h))}</span></button></div>`;
 
   html += `<aside class="dib-panel" aria-label="Propiedades"><div class="dib-panel-cab"><b>${esc(tituloPanel(d, sel, h))}</b>
     <button class="dib-btn dib-btn-chico dib-cerrar-movil" title="Cerrar" aria-label="Cerrar propiedades" onclick="abrirPanelMovilDib(false)">✕</button></div>
-    <div class="dib-panel-cuerpo">${panel(d, sel, h, p)}</div></aside>`;
+    ${ayuda}<div class="dib-panel-cuerpo">${panel(d, sel, h, p)}</div></aside>`;
   html += '</div>';
   if (state.dibProyectos === 'lista') html += `<div class="modal-overlay dib-modal" onclick="if (event.target === this) setVistaProyectosDib(null)"><div class="modal hoja">${listaProyectos(d)}</div></div>`;
   if (state.dibProyectos === 'guardar') html += `<div class="modal-overlay dib-modal" onclick="if (event.target === this) setVistaProyectosDib(null)"><div class="modal hoja">${formGuardar()}</div></div>`;

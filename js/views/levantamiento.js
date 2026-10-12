@@ -67,11 +67,11 @@ function renderDetalle(id, l) {
     <button class="b b-l" onclick="deshacerUltimoLev()" ${puntos.length ? '' : 'disabled'}>Quitar el último</button>
     <span class="page-sub">${r.puntos} puntos · ${r.vanos} vanos${r.vanos ? ` · ${fmtMetros(r.metros)}` : ''}</span></div>`;
   if (u.movida && l.puntos?.[u.movida.id]) html += `<div class="alert-banner alert-yellow">${esc(u.movida.nombre || 'Punto')} movido. <button class="b b-l" onclick="deshacerMovidaLev()">Deshacer</button></div>`;
-  html += bloqueAcometidas(l, u, vanos, actual);
   if (u.unirDesde) html += `<div class="alert-banner alert-yellow">Toca en el mapa el punto con el que se une ${esc(l.puntos?.[u.unirDesde]?.nombre || '')}. <button class="b b-l" onclick="setLev('unirDesde', null)">Cancelar</button></div>`;
 
   // El mapa con el botón principal flotando encima (en campo se marca sin bajar la pantalla)
   html += `<div class="lev-mapa-caja"><div id="lev-mapa" class="lev-mapa"></div>${u.modo === 'gps' ? '<button class="b b-p lev-flotante" onclick="marcarAqui()"><i class="ic ic-map-pin"></i> Poste aquí</button>' : ''}</div>`;
+  html += bloqueAcometidas(l, u, vanos, actual); // junto al mapa: en campo se cuenta sin subir y bajar
 
   // Punto seleccionado
   if (sel) {
@@ -93,8 +93,8 @@ function renderDetalle(id, l) {
       ${vanos.map(v => {
         const a = l.puntos?.[v.a]; const b = l.puntos?.[v.b]; const m = metrosDeVano(l, v);
         const gps = a && b ? metrosDeVano(l, { ...v, metros: null }).metros : null;
-        return `<div class="lev-vano"><b>${esc(a?.nombre || '?')} – ${esc(b?.nombre || '?')}</b>${textoAcometidas(v.acom) ? `<span class="tg azul">${esc(textoAcometidas(v.acom))}</span>` : ''}
-          <span class="tg ${m.origen === 'medido' ? 'verde' : 'gris'}">${fmtMetros(m.metros)} ${m.origen === 'medido' ? 'medido' : 'GPS'}</span>
+        return `<div class="lev-vano"><div class="lev-vano-nombre"><b>${esc(a?.nombre || '?')} – ${esc(b?.nombre || '?')}</b>
+          <span class="tg ${m.origen === 'medido' ? 'verde' : 'gris'}">${fmtMetros(m.metros)} ${m.origen === 'medido' ? 'medido' : 'GPS'}</span>${textoAcometidas(v.acom) ? `<span class="tg azul">${esc(textoAcometidas(v.acom))}</span>` : ''}</div>
           <input id="lev-v-${v.id}" inputmode="decimal" value="${v.metros ?? ''}" placeholder="Medido (m)${gps !== null ? ` · GPS ${gps.toFixed(1)}` : ''}" onchange="datoVanoLev('${v.id}', 'metros', this.value)" aria-label="Metros medidos">
           <input id="lev-v-cal-${v.id}" list="lev-calibres" value="${esc(v.calibre || '')}" placeholder="Calibre" aria-label="Calibre" onchange="conductorVanoLev('${v.id}', 'calibre', this.value)">
           <select aria-label="Tipo de conductor" onchange="conductorVanoLev('${v.id}', 'tipo', this.value)"><option value="">Conductor</option>${TIPOS_CONDUCTOR.map(t => `<option ${v.conductor === t ? 'selected' : ''}>${t}</option>`).join('')}</select>
