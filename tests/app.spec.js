@@ -2473,7 +2473,8 @@ test.describe('Herramienta Dibujar', () => {
     await expect(page.locator('#dib-svg')).toHaveAttribute('viewBox', new RegExp(`^0 0 ${w} `));
   }
   // Coordenadas de pantalla de un punto del plano (en píxeles de la imagen)
-  const pantalla = async (page, x, y) => page.evaluate(([x, y]) => { const s = document.getElementById('dib-svg'); const p = new DOMPoint(x, y).matrixTransform(s.getScreenCTM()); return [p.x, p.y]; }, [x, y]);
+  // (se sube al inicio para que la barra fija no tape el lienzo)
+  const pantalla = async (page, x, y) => page.evaluate(([x, y]) => { window.scrollTo(0, 0); const s = document.getElementById('dib-svg'); const p = new DOMPoint(x, y).matrixTransform(s.getScreenCTM()); return [p.x, p.y]; }, [x, y]);
   const tocar = async (page, x, y) => { await page.mouse.click(...await pantalla(page, x, y)); await page.waitForTimeout(380); };
   const arrastrar = async (page, a, b) => { await page.mouse.move(...await pantalla(page, ...a)); await page.mouse.down(); await page.mouse.move(...await pantalla(page, ...b), { steps: 6 }); await page.mouse.up(); };
 
@@ -2605,6 +2606,48 @@ test.describe('Herramienta Dibujar', () => {
     expect(buf.readUInt32BE(20)).toBeGreaterThan(900);
     const filas = await page.evaluate(async () => (await import('/js/domain/dibujo.js')).leerFilasTabla('A 1\nB C, 2\n\nD'));
     expect(filas).toEqual([['A', '1'], ['B C', '2'], ['D', '']]);
+    expect(errores).toEqual([]);
+  });
+  test('sin escala: metros escritos por vano, tabla de distancias y textos rápidos de etiqueta', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    await page.setViewportSize({ width: 1280, height: 1100 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await page.evaluate(() => localStorage.removeItem('nettracker_dibujo'));
+    await nav(page, 'Dibujar');
+    await subirImagen(page, 1600, 900);
+    await page.getByRole('button', { name: 'Banco de transformadores' }).click();
+    await tocar(page, 300, 200);
+    const postes = [[200, 500], [600, 400], [1000, 300]];
+    await page.getByRole('button', { name: 'Poste existente' }).click();
+    for (const [x, y] of postes) await tocar(page, x, y);
+    await page.getByRole('button', { name: 'Tramo de red' }).click();
+    for (const [x, y] of postes) await tocar(page, x, y);
+    await page.getByRole('button', { name: 'Terminar tramo' }).click();
+    await page.getByRole('button', { name: 'Etiqueta de punto (P1, W1…)' }).click();
+    await tocar(page, 200, 500);
+    await page.getByRole('button', { name: 'Etiqueta de punto (P1, W1…)' }).click();
+    await tocar(page, 1000, 300);
+    // Texto rápido: conserva el nombre del punto
+    await page.locator('.dib-acciones .dib-chip', { hasText: 'Seccionar red BT' }).click();
+    await expect(page.locator('#dib-capa text', { hasText: 'P2: Seccionar red BT' })).toHaveCount(1);
+    // Sin escala no hay metros; se escriben por vano al seleccionar el tramo
+    await expect(page.locator('#dib-cajetin text', { hasText: 'Escribe los metros de los vanos o calibra' })).toHaveCount(1);
+    await page.getByRole('button', { name: 'Seleccionar y mover' }).click();
+    await tocar(page, 400, 450);
+    await expect(page.locator('.bloque', { hasText: 'Metros por vano' })).toContainText('Vano 1: P1 → punto 2');
+    await page.locator('#dib-vano-1').fill('20'); await page.locator('#dib-vano-2').fill('30.5');
+    await page.locator('#dib-vano-2').press('Tab');
+    await expect(page.locator('#dib-capa text', { hasText: '20.0 m' })).toHaveCount(1);
+    await expect(page.locator('#dib-capa text', { hasText: '30.5 m' })).toHaveCount(1);
+    const caj = page.locator('#dib-cajetin');
+    await expect(caj.locator('text', { hasText: 'P1 – P2' })).toHaveCount(1);
+    await expect(caj.locator('text', { hasText: /^50\.5$/ })).toHaveCount(2); // trecho y total
+    await expect(caj.locator('text', { hasText: /^Banco de transformadores$/ })).toHaveCount(1);
+    await expect(page.locator('.dib-sel-barra')).toContainText('Total 50.5 m');
+    // Letras en el campo de metros no se aceptan
+    await page.locator('#dib-vano-1').fill('abc');
+    await expect(page.locator('.toast')).toContainText('solo el número');
     expect(errores).toEqual([]);
   });
 });

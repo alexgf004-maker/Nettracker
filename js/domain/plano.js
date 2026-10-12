@@ -48,30 +48,56 @@ export function ajustar([x, y], lista, tol, excluir = null) {
 // Nombre corto de una etiqueta: "P1: DS111267" → "P1"
 export const nombrePunto = t => String(t || '').split(/[:\n]/)[0].trim();
 
-// Distancias entre puntos etiquetados a lo largo de cada tramo (los vértices que coinciden con la punta de una etiqueta)
+// Metros de un vano (entre puntos[i-1] y puntos[i]): el escrito a mano manda; si no, con la escala; si no, null
+export function metrosVano(t, i, escala) {
+  const manual = Number(t.metros?.[i]);
+  if (t.metros?.[i] !== undefined && t.metros?.[i] !== '' && manual >= 0 && !Number.isNaN(manual)) return manual;
+  if (!escala) return null;
+  const [x0, y0] = t.puntos[i - 1]; const [x1, y1] = t.puntos[i];
+  return Math.hypot(x1 - x0, y1 - y0) * escala;
+}
+// Largo total de un tramo en metros (null si falta algún vano)
+export function metrosTramo(t, escala) {
+  let total = 0;
+  for (let i = 1; i < t.puntos.length; i++) { const m = metrosVano(t, i, escala); if (m === null) return null; total += m; }
+  return total;
+}
+
+// Distancias entre puntos etiquetados a lo largo de cada tramo (los vértices que coinciden con la punta de una etiqueta).
+// Usa los metros escritos a mano y, donde no hay, la escala; un trecho con algún vano sin metros no sale.
 export function tablaDistancias(elementos, escala, tol = 12) {
-  if (!escala) return [];
   const etiquetas = elementos.filter(e => e.tipo === 'etiqueta');
   const filas = [];
   elementos.filter(e => e.tipo === 'polilinea' && e.puntos.length > 1).forEach(t => {
-    let previo = null; let acumulado = 0;
+    let previo = null; let acumulado = 0; let completo = true;
     t.puntos.forEach((p, i) => {
-      if (i) acumulado += Math.hypot(p[0] - t.puntos[i - 1][0], p[1] - t.puntos[i - 1][1]);
+      if (i) { const m = metrosVano(t, i, escala); if (m === null) completo = false; else acumulado += m; }
       const et = etiquetas.find(e => Math.hypot(e.tx - p[0], e.ty - p[1]) <= tol);
       if (!et) return;
-      if (previo) filas.push({ desde: previo.nombre, hasta: nombrePunto(et.texto), metros: (acumulado - previo.en) * escala, tramo: t.tramo || 'bt' });
-      previo = { nombre: nombrePunto(et.texto), en: acumulado };
+      if (previo && completo) filas.push({ desde: previo.nombre, hasta: nombrePunto(et.texto), metros: acumulado - previo.en, tramo: t.tramo || 'bt' });
+      previo = { nombre: nombrePunto(et.texto), en: acumulado }; completo = true;
     });
   });
   return filas;
 }
-// Total por tipo de tramo
+// Total por tipo de tramo (solo los tramos con todos sus vanos medidos)
 export function totalesPorTipo(elementos, escala) {
-  if (!escala) return [];
   const tot = {};
-  elementos.filter(e => e.tipo === 'polilinea').forEach(t => { const k = t.tramo || 'bt'; tot[k] = (tot[k] || 0) + longitud(t.puntos) * escala; });
+  elementos.filter(e => e.tipo === 'polilinea' && e.puntos.length > 1).forEach(t => {
+    const m = metrosTramo(t, escala); if (m === null) return;
+    const k = t.tramo || 'bt'; tot[k] = (tot[k] || 0) + m;
+  });
   return Object.entries(tot).map(([k, m]) => ({ tipo: k, nombre: TIPOS_TRAMO[k]?.nombre || k, metros: m }));
 }
+// Nombre de cada vano para escribir sus metros: "P1 → P2" si los extremos tienen etiqueta, si no "punto 1 → 2"
+export function nombresVanos(t, elementos, tol = 12) {
+  const etiquetas = elementos.filter(e => e.tipo === 'etiqueta');
+  const nom = (p, i) => { const et = etiquetas.find(e => Math.hypot(e.tx - p[0], e.ty - p[1]) <= tol); return et ? nombrePunto(et.texto) : `punto ${i + 1}`; };
+  return t.puntos.slice(1).map((p, k) => `${nom(t.puntos[k], k)} → ${nom(p, k + 1)}`);
+}
+
+// Textos frecuentes de las etiquetas de punto (de las propuestas de red)
+export const ACCIONES_PUNTO = ['Instalar transformador', 'Seccionar red BT', 'Remate de red BT', 'Poste de madera deteriorado', 'Cambio de poste', 'Puente al vuelo'];
 
 // Largo "redondo" para la escala gráfica que quepa en `maxPx`
 export function largoEscala(escala, maxPx) {

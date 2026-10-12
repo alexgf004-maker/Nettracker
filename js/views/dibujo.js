@@ -2,7 +2,7 @@
 // ningún caso. Barra por grupos (red, anotar, dibujo libre, escala), fila de opciones de alto fijo y el cajetín.
 import { cargarBorrador, partesSVG } from '../actions/dibujo.js';
 import { COLORES, GROSORES, SIMBOLOS, TAM_TEXTO } from '../domain/dibujo.js';
-import { ESTILOS_ETIQUETA, fmtMetros, longitud, TIPOS_TRAMO } from '../domain/plano.js';
+import { ACCIONES_PUNTO, ESTILOS_ETIQUETA, fmtMetros, metrosTramo, metrosVano, nombresVanos, TIPOS_TRAMO } from '../domain/plano.js';
 import { state } from '../state.js';
 import { escapeHtml } from '../utils.js';
 import { heroSeccion } from './componentes.js';
@@ -78,9 +78,9 @@ export function renderDibujar() {
   if (h === 'calibrar') {
     fila = d.calibracion && Math.hypot(d.calibracion.x2 - d.calibracion.x1, d.calibracion.y2 - d.calibracion.y1) > 10
       ? `<label class="dib-prefijo">La línea mide <input id="dib-metros" inputmode="decimal" placeholder="Ej. 50" onkeydown="if (event.key === 'Enter') aplicarCalibracionDib()"> metros</label><button class="b b-p" onclick="aplicarCalibracionDib()">Aplicar escala</button><button class="b b-l" onclick="cancelarCalibracionDib()">Cancelar</button>`
-      : '<span class="page-sub">Traza una línea sobre la barra de escala del mapa o sobre un vano de longitud conocida; luego escribe cuántos metros mide.</span><button class="b b-l" onclick="cancelarCalibracionDib()">Cancelar</button>';
+      : '<span class="page-sub">Traza una línea sobre algo cuya medida conozcas (la barra de escala del mapa, un vano o una calle medida en Google Maps con clic derecho → Medir distancia); luego escribe cuántos metros mide.</span><button class="b b-l" onclick="cancelarCalibracionDib()">Cancelar</button>';
   } else if (sel?.tipo === 'polilinea') {
-    fila = `${tiposTramo(sel.tramo)}${d.escala ? `<span class="tg gris">${fmtMetros(longitud(sel.puntos) * d.escala)}</span>` : ''}${d.tramo === sel.id ? '<button class="b b-p" onclick="terminarTramoDib()"><i class="ic ic-check"></i> Terminar tramo</button>' : acciones()}`;
+    fila = `${tiposTramo(sel.tramo)}<span class="tg gris dib-total-tramo">${metrosTramo(sel, d.escala) !== null ? `Total ${fmtMetros(metrosTramo(sel, d.escala))}` : ''}</span>${d.tramo === sel.id ? '<button class="b b-p" onclick="terminarTramoDib()"><i class="ic ic-check"></i> Terminar tramo</button>' : acciones()}`;
   } else if (h === 'tramo') {
     fila = `${tiposTramo(d.tramoTipo)}<span class="page-sub">Toca cada poste del recorrido; se ajusta al poste más cercano.</span>`;
   } else if (sel?.tipo === 'etiqueta') {
@@ -98,7 +98,7 @@ export function renderDibujar() {
   } else {
     fila = `<span class="page-sub">${{
       seleccionar: 'Toca un elemento para seleccionarlo y arrastrarlo. Supr borra y Ctrl+Z deshace.',
-      cota: d.escala ? 'Arrastra entre dos puntos para medir; se ajusta a los postes.' : 'Primero calibra la escala para que la cota muestre metros.',
+      cota: d.escala ? 'Arrastra entre dos puntos para medir; se ajusta a los postes.' : 'La cota necesita la escala calibrada. Sin escala, escribe los metros de cada vano al seleccionar el tramo.',
       texto: 'Toca donde va el texto y escríbelo aquí.', flecha: 'Arrastra desde el inicio hasta donde apunta la flecha.',
       linea: 'Arrastra para trazar la línea.', rect: 'Arrastra para dibujar el rectángulo.', elipse: 'Arrastra para dibujar el círculo.', trazo: 'Dibuja a mano alzada.',
       simbolo: `Toca donde va: ${esc(SIMBOLOS[d.simbolo]?.nombre || '')}.`,
@@ -108,6 +108,23 @@ export function renderDibujar() {
 
   // ── Lámina ──
   html += `<div class="dib-lienzo"><svg id="dib-svg" class="dib-svg herr-${h}" viewBox="0 0 ${p.w} ${p.H}" onpointerdown="dibPointerDown(event)" onpointermove="dibPointerMove(event)" onpointerup="dibPointerUp(event)" onpointercancel="dibPointerUp(event)"><rect width="${p.w}" height="${p.H}" fill="#ffffff"/>${p.fondo}<g id="dib-capa">${p.capa}</g><g id="dib-cajetin">${p.cajetin}</g></svg></div>`;
+
+  // Metros por vano del tramo seleccionado (escritos a mano; vacío = con la escala)
+  if (sel?.tipo === 'polilinea' && d.tramo !== sel.id && sel.puntos.length > 1) {
+    const nombres = nombresVanos(sel, d.elementos, 14 * Math.max(1, p.w / 1600));
+    html += `<div class="bloque dib-editor"><div class="bloque-head"><div class="bloque-titulo">Metros por vano</div><span class="tg gris dib-total-tramo">${metrosTramo(sel, d.escala) !== null ? `Total ${fmtMetros(metrosTramo(sel, d.escala))}` : ''}</span></div>
+      <div class="dib-vanos">${nombres.map((n, k) => {
+        const i = k + 1; const manual = sel.metros?.[i] !== undefined; const auto = d.escala && !manual ? metrosVano({ ...sel, metros: {} }, i, d.escala) : null;
+        return `<div class="field"><label>Vano ${i}: ${esc(n)}</label><input id="dib-vano-${i}" inputmode="decimal" value="${manual ? esc(sel.metros[i]) : ''}" placeholder="${auto !== null ? `${auto.toFixed(1)} (con la escala)` : 'metros'}" oninput="metrosVanoDib(${i}, this.value)" onchange="finVanoDib()"></div>`;
+      }).join('')}</div>
+      <div class="page-sub">${d.escala ? 'Si escribes los metros de un vano, mandan sobre los de la escala.' : 'Sin escala, escribe los metros de cada vano; salen sobre el tramo y en la tabla de distancias.'}</div></div>`;
+  }
+  // Textos rápidos de la etiqueta de punto
+  if (sel?.tipo === 'etiqueta') {
+    html += `<div class="bloque dib-editor"><div class="bloque-head"><div class="bloque-titulo">Texto rápido</div></div>
+      <div class="dib-acciones">${ACCIONES_PUNTO.map(a => `<button class="dib-chip" onclick="accionEtiquetaDib('${esc(a)}')">${esc(a)}</button>`).join('')}</div>
+      <div class="page-sub">Pone la acción después del nombre del punto (por ejemplo, "P8: Seccionar red BT"); luego puedes completarla arriba (por ejemplo, "Instalar transformador 23T1C de 25 kVA"). Para partir el texto en dos líneas usa Enter.</div></div>`;
+  }
 
   // Editores de leyenda y tabla manuales (dibujos anteriores)
   if (sel?.tipo === 'leyenda') {
@@ -132,6 +149,6 @@ export function renderDibujar() {
     ${l.activa !== false ? `<div class="form-analisis">${campo('titulo', 'Título', 'Ej. Referencia eléctrica o Propuesta')}${campo('subtitulo', 'Descripción', 'Ej. Nuevo transformador para el usuario')}${campo('proyecto', 'Proyecto / WO', 'Ej. WO-01-2025/638')}${campo('fecha', 'Fecha')}${campo('elaboro', 'Elaboró')}
       <div class="field"><label>Tabla de distancias</label><select id="dib-lam-distancias" onchange="setLaminaDib('distancias', this.value)"><option value="auto" ${l.distancias !== 'manual' ? 'selected' : ''}>Automática (entre puntos etiquetados)</option><option value="manual" ${l.distancias === 'manual' ? 'selected' : ''}>Manual</option></select></div>
       ${l.distancias === 'manual' ? `<div class="field field-ancho"><label>Filas: tramo y metros, una por línea (o pegadas de Excel)</label><textarea id="dib-lam-filas" rows="3" placeholder="P1 – W1, 50" onchange="setLaminaDib('filas', this.value)">${esc((l.filas || []).map(f => f.join(', ')).join('\n'))}</textarea></div>` : ''}</div>
-      <div class="page-sub">${l.distancias === 'manual' ? 'Escribe las distancias a mano.' : d.escala ? 'La tabla se arma sola con los puntos etiquetados que están sobre cada tramo (el vértice debe caer en el poste de la etiqueta).' : 'Calibra la escala para que la tabla se arme sola.'}</div>` : ''}</div>`;
+      <div class="page-sub">${l.distancias === 'manual' ? 'Escribe las distancias a mano.' : 'La tabla se arma sola entre los puntos etiquetados que están sobre cada tramo, con los metros de los vanos (escritos a mano o con la escala).'}</div>` : ''}</div>`;
   return html + '</div>';
 }

@@ -1,7 +1,7 @@
 // Herramienta Dibujar: subir una imagen y dibujar encima; se descarga como PNG (confirmado: no se guarda en la base).
 // El borrador queda solo en este navegador (localStorage). Mientras se arrastra se repinta solo el SVG, sin render().
 import { caja, COLORES, coloresTramos, GROSORES, leerFilasTabla, medidaEtiqueta, medidaReducida, mover, nuevoId, redimensionar, siguienteEtiqueta, SIMBOLOS, svgExportable, svgLamina, tamano, TAM_TEXTO } from '../domain/dibujo.js';
-import { ajustar, anclas, escalaDe, ESTILOS_ETIQUETA } from '../domain/plano.js';
+import { ajustar, anclas, escalaDe, ESTILOS_ETIQUETA, fmtMetros, metrosTramo, nombrePunto } from '../domain/plano.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { render } from '../views/render.js';
@@ -276,6 +276,23 @@ export function setEstiloEtiquetaDib(k) {
   const el = seleccionado();
   if (el?.tipo === 'etiqueta') { memorizar(); reemplazar({ ...el, estilo: k }); guardarBorrador(); } else d.prefijo = ESTILOS_ETIQUETA[k].prefijo;
   render();
+}
+
+// Metros escritos a mano para un vano del tramo seleccionado (vacío = automático con la escala)
+export function metrosVanoDib(i, valor) {
+  const el = seleccionado(); if (el?.tipo !== 'polilinea') return;
+  const v = String(valor ?? '').trim().replace(',', '.');
+  if (v && (Number.isNaN(Number(v)) || Number(v) < 0)) return showToast('Escribe solo el número de metros');
+  editar(e => { const metros = { ...(e.metros || {}) }; if (v) metros[i] = Number(v); else delete metros[i]; return { ...e, metros }; });
+  // Sin render(): se pasa de un vano a otro sin redibujar la pantalla; solo se actualizan el dibujo y los totales
+  const total = metrosTramo(seleccionado(), dib().escala);
+  document.querySelectorAll('.dib-total-tramo').forEach(n => { n.textContent = total !== null ? `Total ${fmtMetros(total)}` : ''; });
+}
+export function finVanoDib() { textoMemorizado = null; }
+// Texto rápido de la etiqueta: conserva el nombre del punto (P8) y pone la acción
+export function accionEtiquetaDib(texto) {
+  const el = seleccionado(); if (el?.tipo !== 'etiqueta') return;
+  memorizar(); reemplazar({ ...el, texto: `${nombrePunto(el.texto) || 'P'}: ${texto}` }); guardarBorrador(); render();
 }
 
 // ── Leyenda y tabla manuales ──
