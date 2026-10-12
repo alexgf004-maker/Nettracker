@@ -2585,7 +2585,7 @@ test.describe('Herramienta Dibujar', () => {
     await expect(page.locator('#dib-capa g[transform*="rotate(90"]')).toHaveCount(1);
     await expect(page.locator('#dib-capa [data-id]')).toHaveCount(5);
     // Mover, borrar y deshacer
-    await page.getByRole('button', { name: 'Seleccionar y mover' }).click();
+    await page.getByRole('button', { name: 'Seleccionar y mover (V)' }).click();
     const antes = await page.locator('#dib-capa rect[data-id]').getAttribute('x');
     await arrastrar(page, [600, 280], [560, 260]);
     expect(await page.locator('#dib-capa rect[data-id]').getAttribute('x')).not.toBe(antes);
@@ -2619,7 +2619,7 @@ test.describe('Herramienta Dibujar', () => {
     await nav(page, 'Dibujar');
     await subirImagen(page, 1600, 900);
     // Calibrar: 800 px = 100 m → 0.125 m/px
-    await page.getByRole('button', { name: 'Calibrar' }).click();
+    await page.getByRole('button', { name: 'Calibrar', exact: true }).click();
     await arrastrar(page, [100, 850], [900, 850]);
     await page.locator('#dib-metros').fill('100');
     await page.getByRole('button', { name: 'Aplicar escala' }).click();
@@ -2659,14 +2659,16 @@ test.describe('Herramienta Dibujar', () => {
     await expect(exacto('Red MT')).toHaveCount(0);
     // Escala gráfica y título
     await expect(caj.locator('text', { hasText: /^\d+ m$/ })).toHaveCount(1);
+    // Sin nada seleccionado, el panel muestra la lámina (cajetín)
+    await page.getByRole('button', { name: 'Seleccionar y mover (V)' }).click(); await page.keyboard.press('Escape');
     await page.locator('#dib-lam-titulo').fill('Referencia eléctrica');
     await expect(caj.locator('text', { hasText: 'REFERENCIA ELÉCTRICA' })).toHaveCount(1);
     // Cota entre dos postes (se ajusta a ellos): 400 px × 0.125 = 50.0 m… en diagonal √(400²+100²) = 51.5 m
     await page.getByRole('button', { name: 'Cota (medir distancia)' }).click();
     await arrastrar(page, [604, 396], [996, 304]);
-    await expect(page.locator('.dib-sel-barra')).toContainText('Mide 51.5 m');
+    await expect(page.locator('.dib-panel')).toContainText('Mide 51.5 m');
     // Cambiar el tipo del tramo seleccionado cambia su estilo y la simbología
-    await page.getByRole('button', { name: 'Seleccionar y mover' }).click();
+    await page.getByRole('button', { name: 'Seleccionar y mover (V)' }).click();
     await tocar(page, 400, 450);
     await page.locator('.dib-chip', { hasText: 'Red BT proyectada' }).click();
     await expect(exacto('Red BT proyectada')).toHaveCount(1);
@@ -2708,9 +2710,9 @@ test.describe('Herramienta Dibujar', () => {
     await expect(page.locator('#dib-capa text', { hasText: 'P2: Seccionar red BT' })).toHaveCount(1);
     // Sin escala no hay metros; se escriben por vano al seleccionar el tramo
     await expect(page.locator('#dib-cajetin text', { hasText: 'Escribe los metros de los vanos o calibra' })).toHaveCount(1);
-    await page.getByRole('button', { name: 'Seleccionar y mover' }).click();
+    await page.getByRole('button', { name: 'Seleccionar y mover (V)' }).click();
     await tocar(page, 400, 450);
-    await expect(page.locator('.bloque', { hasText: 'Metros por vano' })).toContainText('Vano 1: P1 → punto 2');
+    await expect(page.locator('.dib-sec', { hasText: 'Metros por vano' })).toContainText('Vano 1: P1 → punto 2');
     await page.locator('#dib-vano-1').fill('20'); await page.locator('#dib-vano-2').fill('30.5');
     await page.locator('#dib-vano-2').press('Tab');
     await expect(page.locator('#dib-capa text', { hasText: '20.0 m' })).toHaveCount(1);
@@ -2719,7 +2721,7 @@ test.describe('Herramienta Dibujar', () => {
     await expect(caj.locator('text', { hasText: 'P1 – P2' })).toHaveCount(1);
     await expect(caj.locator('text', { hasText: /^50\.5$/ })).toHaveCount(2); // trecho y total
     await expect(caj.locator('text', { hasText: /^Banco de transformadores$/ })).toHaveCount(1);
-    await expect(page.locator('.dib-sel-barra')).toContainText('Total 50.5 m');
+    await expect(page.locator('.dib-panel')).toContainText('Total 50.5 m');
     // Letras en el campo de metros no se aceptan
     await page.locator('#dib-vano-1').fill('abc');
     await expect(page.locator('.toast')).toContainText('solo el número');
@@ -2746,7 +2748,7 @@ test.describe('Herramienta Dibujar', () => {
     const c = () => page.evaluate(async () => (await import('/js/state.js')).state.dibujo.elementos.filter(e => e.tipo === 'simbolo').map(e => [Math.round(e.x + 30 * e.escala), Math.round(e.y + 30 * e.escala)]));
     expect(await c()).toEqual([[800, 450]]);
     // Arrastrar el fondo con Seleccionar desplaza la vista (no mueve nada)
-    await page.getByRole('button', { name: 'Seleccionar y mover' }).click();
+    await page.getByRole('button', { name: 'Seleccionar y mover (V)' }).click();
     const antes = (await vb()).split(' ').map(Number);
     await arrastrar(page, [300, 300], [400, 300]);
     const despues = (await vb()).split(' ').map(Number);
@@ -2801,7 +2803,7 @@ test.describe('Herramienta Dibujar', () => {
     await expect(page.locator('#dib-capa [data-chip="1"]')).toContainText('40.0 m');
     const tramo = () => page.evaluate(async () => (await import('/js/state.js')).state.dibujo.elementos.find(e => e.tipo === 'polilinea'));
     // Arrastrar el chip de metros: se corre (con guía) y el tramo no se mueve
-    await page.getByRole('button', { name: 'Seleccionar y mover' }).click();
+    await page.getByRole('button', { name: 'Seleccionar y mover (V)' }).click();
     await arrastrar(page, [600, 500], [600, 400]);
     let t = await tramo();
     expect(t.puntos.map(q => q.map(Math.round))).toEqual([[200, 500], [1000, 500]]);
@@ -2816,6 +2818,54 @@ test.describe('Herramienta Dibujar', () => {
     const p = await page.evaluate(async () => (await import('/js/state.js')).state.dibujo.elementos.filter(e => e.simbolo === 'puente').map(e => [Math.round(e.x + 30 * e.escala), Math.round(e.y + 30 * e.escala)]));
     expect(p).toEqual([[400, 500]]);
     await expect(page.locator('#dib-cajetin text', { hasText: 'Puente al vuelo' })).toHaveCount(1);
+    expect(errores).toEqual([]);
+  });
+
+  test('editor: con Poste activo, tocar un poste lo selecciona (no pone otro), se agranda y los nuevos salen de ese tamaño; color y nombre de cada red', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    await page.setViewportSize({ width: 1280, height: 900 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await page.evaluate(() => localStorage.removeItem('nettracker_dibujo'));
+    await nav(page, 'Dibujar');
+    await subirImagen(page, 1600, 900);
+    const elementos = () => page.evaluate(async () => (await import('/js/state.js')).state.dibujo.elementos);
+    await page.getByRole('button', { name: 'Poste existente' }).click();
+    await tocar(page, 400, 400);
+    let e = await elementos();
+    const escala0 = e[0].escala;
+    // Tocar el mismo poste: queda seleccionado, no se pone otro
+    await tocar(page, 404, 402);
+    e = await elementos();
+    expect(e).toHaveLength(1);
+    await expect(page.locator('.dib-panel-cab')).toContainText('Poste existente');
+    await page.getByRole('button', { name: 'Más grande' }).click();
+    await page.getByRole('button', { name: 'Más grande' }).click();
+    e = await elementos();
+    expect(e[0].escala).toBeCloseTo(escala0 * 1.18 * 1.18, 3);
+    expect(Math.round(e[0].x + 30 * e[0].escala)).toBe(400); // crece desde su centro
+    // El siguiente poste sale del mismo tamaño
+    await tocar(page, 800, 400);
+    e = await elementos();
+    expect(e).toHaveLength(2);
+    expect(e[1].escala).toBeCloseTo(e[0].escala, 3);
+    // Dos redes BT: la segunda en azul con nombre; cada una sale aparte en la simbología
+    await page.getByRole('button', { name: 'Tramo de red' }).click();
+    await tocar(page, 200, 600); await tocar(page, 700, 600);
+    await page.getByRole('button', { name: 'Terminar tramo' }).click();
+    await page.getByRole('button', { name: 'Tramo de red' }).click();
+    await page.getByRole('button', { name: 'Red color #2563eb' }).click();
+    await tocar(page, 200, 750); await tocar(page, 700, 750);
+    await page.getByRole('button', { name: 'Terminar tramo' }).click();
+    await page.locator('#dib-nombre-red').fill('Red BT trafo 2'); await page.locator('#dib-nombre-red').press('Tab');
+    e = await elementos();
+    const tramos = e.filter(x => x.tipo === 'polilinea');
+    expect(tramos.map(t => t.colorRed || null)).toEqual([null, '#2563eb']);
+    expect(tramos[1].nombreRed).toBe('Red BT trafo 2');
+    const caj = page.locator('#dib-cajetin');
+    await expect(caj.locator('text', { hasText: /^Red BT existente$/ })).toHaveCount(1);
+    await expect(caj.locator('text', { hasText: /^Red BT trafo 2$/ })).toHaveCount(1);
+    await expect(page.locator('#dib-capa path[stroke="#2563eb"]')).toHaveCount(1);
     expect(errores).toEqual([]);
   });
 
@@ -2888,7 +2938,7 @@ test.describe('Herramienta Dibujar', () => {
     await page.getByRole('button', { name: 'Etiqueta de punto (P1, W1…)' }).click();
     await tocar(page, 1006, 494);
     // Mover el poste del extremo arrastra el vértice del tramo y la punta de la etiqueta
-    await page.getByRole('button', { name: 'Seleccionar y mover' }).click();
+    await page.getByRole('button', { name: 'Seleccionar y mover (V)' }).click();
     await arrastrar(page, [1000, 500], [1100, 300]);
     e = await estado();
     expect(e.find(x => x.tipo === 'polilinea').puntos).toEqual([[200, 500], [1100, 300]]);

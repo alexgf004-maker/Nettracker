@@ -21,6 +21,7 @@ export function nuevoDibujo() {
   return {
     fondo: null, elementos: [], escala: null, lamina: nuevaLamina(), sel: null, herramienta: 'seleccionar', simbolo: 'poste', color: COLORES[0], grosor: 'medio',
     tamTexto: 'mediano', tramoTipo: 'bt', estiloEtiqueta: 'existente', prefijo: 'P', tramo: null, calibracion: null, historial: [], rehacer: [],
+    colorRed: null, tamNuevos: 1, // color de la red para los tramos nuevos (null = el de su tipo) y tamaño de los postes nuevos
     proyecto: null, sinGuardar: false, // proyecto: { id, nombre, referencia } del proyecto abierto en la base
   };
 }
@@ -89,6 +90,11 @@ let quitarMarca = null;
 function marcaBreve() { clearTimeout(quitarMarca); quitarMarca = setTimeout(() => { if (dib()) { dib().iman = null; repintar(); } }, 600); }
 // Centro de un símbolo y lo que tiene pegado (vértices de tramos y puntas de etiquetas en ese punto)
 const centroSimbolo = el => [el.x + 30 * el.escala, el.y + 30 * el.escala];
+// El símbolo de red más cercano a (x, y), si el toque cae sobre él
+function simboloCerca(x, y) {
+  return dib().elementos.filter(e => e.tipo === 'simbolo' && SIMBOLOS[e.simbolo]?.grupo === 'red')
+    .map(e => ({ e, dist: Math.hypot(centroSimbolo(e)[0] - x, centroSimbolo(e)[1] - y) })).filter(o => o.dist <= Math.max(tolIman * 0.7, 30 * o.e.escala)).sort((a, b) => a.dist - b.dist)[0]?.e || null;
+}
 function pegadosA([cx, cy], excluir) {
   const out = [];
   dib().elementos.forEach(e => {
@@ -156,9 +162,17 @@ function zoomA(f, clientX, clientY) {
   aplicarVista();
 }
 export function zoomDib(f) { zoomA(f); }
-// El lienzo usa el alto que deja libre la barra de herramientas (que es fija arriba y cambia de alto con el ancho)
+// El editor ocupa el espacio libre entre el encabezado, el menú lateral (compu) o la barra de abajo (celular)
 export function instalarAltoDib() {
-  alRedibujar(() => { const b = document.querySelector('.dib-barra'); if (b) document.documentElement.style.setProperty('--dib-barra', `${b.offsetHeight}px`); });
+  alRedibujar(() => {
+    if (!document.querySelector('.dib-pagina')) return;
+    const raiz = document.documentElement.style; const hd = document.querySelector('header'); const nav = document.querySelector('.bottom-nav');
+    raiz.setProperty('--dib-top', `${hd?.getBoundingClientRect().bottom || 0}px`);
+    // En el celular la barra de menú va abajo; en la compu es el menú lateral
+    const lateral = nav && nav.getBoundingClientRect().height > window.innerHeight * 0.5;
+    raiz.setProperty('--dib-bottom', `${nav && !lateral ? nav.offsetHeight : 0}px`);
+    raiz.setProperty('--dib-left', `${lateral ? nav.getBoundingClientRect().right : 0}px`);
+  });
 }
 export function ajustarVistaDib() { vista = null; aplicarVista(); }
 export function ampliarDib() { const d = dib(); if (!d) return; state.dibAmpliado = !state.dibAmpliado; vista = null; render(); }
@@ -221,9 +235,7 @@ export function dibPointerDown(ev) {
     }
     if (tirador && seleccionado()) { memorizar(); arrastre = { modo: 'tirador', tirador, cambio: false, ajuste: tirador === 'destino' || /^v\d+$/.test(tirador) || seleccionado().tipo === 'cota' }; return; }
     // Tocando justo sobre un poste o transformador se agarra el símbolo (no la punta de una etiqueta o el vértice encima)
-    const simbolo = d.elementos.filter(e => e.tipo === 'simbolo' && SIMBOLOS[e.simbolo]?.grupo === 'red')
-      .map(e => ({ e, dist: Math.hypot(centroSimbolo(e)[0] - x, centroSimbolo(e)[1] - y) })).filter(o => o.dist <= Math.max(tolIman * 0.7, 30 * o.e.escala)).sort((a, b) => a.dist - b.dist)[0];
-    const id = simbolo?.e.id || ev.target.closest?.('[data-id]')?.dataset.id;
+    const id = simboloCerca(x, y)?.id || ev.target.closest?.('[data-id]')?.dataset.id;
     d.sel = id || null;
     // Con zoom, arrastrar el fondo desplaza la vista (y suelta la selección)
     if (!id && vista) { iniciarDesplazamiento(ev); repintar(); return; }
@@ -261,7 +273,7 @@ export function dibPointerDown(ev) {
       return;
     }
     memorizar();
-    const nuevo = { id: base.id, tipo: 'polilinea', tramo: d.tramoTipo, color: d.color, grosor: 6 * escalaBase() * (GROSORES[d.grosor] / GROSORES.medio), puntos: [[x, y]] };
+    const nuevo = { id: base.id, tipo: 'polilinea', tramo: d.tramoTipo, color: d.color, grosor: 6 * escalaBase() * (GROSORES[d.grosor] / GROSORES.medio), puntos: [[x, y]], ...(d.colorRed ? { colorRed: d.colorRed } : {}) };
     d.elementos.push(nuevo); d.sel = nuevo.id; d.tramo = nuevo.id; d.ultimoToque = ahora;
     repintar(); render();
     return;
@@ -307,8 +319,17 @@ export function dibPointerDown(ev) {
   } else if (h === 'simbolo') {
     // Símbolos de red en tamaño de plano; los de unifilar más grandes. Con el color propio del símbolo si lo trae
     const sim = SIMBOLOS[d.simbolo];
+    // Tocar un poste (o símbolo de red) que ya está lo selecciona y se puede arrastrar; no se pone otro encima
+    const existente = sim?.grupo === 'red' && simboloCerca(x, y);
+    if (existente) {
+      d.historial.pop(); d.sel = existente.id;
+      memorizar();
+      const c = centroSimbolo(existente);
+      arrastre = { modo: 'simbolo', desfase: [c[0] - x, c[1] - y], pegados: pegadosA(c, existente.id), cambio: false };
+      repintar(); render(); return;
+    }
     if (sim?.grupo === 'red') { [x, y] = ajustarPunto([x, y]); marcaBreve(); } // el poste cae justo en el vértice o sobre la línea
-    const escala = (sim?.grupo === 'red' ? 0.6 : 1.5) * escalaBase();
+    const escala = (sim?.grupo === 'red' ? 0.6 * (d.tamNuevos || 1) : 1.5) * escalaBase();
     el = { id: base.id, tipo: 'simbolo', simbolo: d.simbolo, color: sim?.color || d.color, grosor: base.grosor, escala, rot: 0, x: x - 30 * escala, y: y - 30 * escala };
     d.elementos.push(el); d.sel = el.id;
     guardarBorrador(); repintar(); render();
@@ -506,6 +527,36 @@ export function setLaminaDib(campo, valor) {
   // Lo que cambia el tamaño del cajetín o las opciones de la pantalla redibuja todo
   if (['activa', 'distancias', 'norte', 'distanciasEnTramos'].includes(campo)) render();
 }
+
+// Color de la red: del tramo seleccionado o, sin selección, de los tramos nuevos (null = el de su tipo)
+export function setColorRedDib(c) {
+  const d = dib(); if (!d) return; c = c || null;
+  const el = seleccionado();
+  if (el?.tipo === 'polilinea') { memorizar(); const { colorRed, ...resto } = el; reemplazar(c ? { ...resto, colorRed: c } : resto); guardarBorrador(); }
+  d.colorRed = c;
+  render();
+}
+// Nombre de la red en la simbología y los totales (opcional)
+export function setNombreRedDib(v) { const el = seleccionado(); if (el?.tipo !== 'polilinea') return; editar(e => ({ ...e, nombreRed: String(v || '') })); }
+// Tamaño del elemento seleccionado (× f): símbolos (sin moverse del centro), textos, etiquetas, cotas y grosor de tramos.
+// Un poste agrandado deja ese tamaño para los siguientes.
+export function setTamanoDib(f) {
+  const d = dib(); const el = seleccionado(); if (!d || !el) return;
+  memorizar();
+  let nuevo = el;
+  if (el.tipo === 'simbolo') {
+    const escala = Math.max(0.15, Math.min(8, el.escala * f)); const [cx, cy] = centroSimbolo(el);
+    nuevo = { ...el, escala, x: cx - 30 * escala, y: cy - 30 * escala };
+    if (SIMBOLOS[el.simbolo]?.grupo === 'red') d.tamNuevos = escala / (0.6 * escalaBase());
+  } else if (['texto', 'etiqueta', 'cota', 'leyenda', 'tabla'].includes(el.tipo)) nuevo = { ...el, tam: Math.max(8, Math.min(200, Math.round(el.tam * f))) };
+  else if (el.grosor) nuevo = { ...el, grosor: Math.max(0.5, Math.min(60, el.grosor * f)) };
+  reemplazar(nuevo); guardarBorrador(); render();
+}
+// Tamaño de los postes nuevos (sin selección)
+export function setTamNuevosDib(f) { const d = dib(); if (!d) return; d.tamNuevos = Math.max(0.3, Math.min(5, (d.tamNuevos || 1) * f)); render(); }
+// Panel de propiedades: abierto o cerrado (en el celular es una hoja que se abre desde abajo)
+export function togglePanelDib() { state.dibPanel = state.dibPanel === false; render(); }
+export function abrirPanelMovilDib(v) { state.dibPanelMovil = v; render(); }
 
 // Devuelve los metros movidos del tramo o la cota seleccionada a su lugar (el centro del vano)
 export function metrosASuLugarDib() {
@@ -706,6 +757,7 @@ document.addEventListener('keydown', ev => {
   if (!ev.ctrlKey && !ev.metaKey && (k === '+' || k === '=')) { zoomA(1.25); return; }
   if (!ev.ctrlKey && !ev.metaKey && (k === '-' || k === '_')) { zoomA(0.8); return; }
   if (!ev.ctrlKey && !ev.metaKey && k === '0') { ajustarVistaDib(); return; }
+  if (!ev.ctrlKey && !ev.metaKey && !ev.altKey && k === 'v') { setHerramientaDib('seleccionar'); return; }
   if (dib().tramo && (k === 'enter' || k === 'escape')) { ev.preventDefault(); terminarTramoDib(); return; }
   if ((ev.ctrlKey || ev.metaKey) && k === 'z') { ev.preventDefault(); ev.shiftKey ? rehacerDib() : deshacerDib(); } else if ((ev.ctrlKey || ev.metaKey) && k === 'y') { ev.preventDefault(); rehacerDib(); } else if ((k === 'delete' || k === 'backspace') && dib().sel) { ev.preventDefault(); borrarDib(); } else if (k === 'escape') { dib().sel = null; render(); }
 });

@@ -3,7 +3,7 @@
 // (título, simbología, distancias, escala y norte). Funciones puras: el estado es
 // { fondo: { src, w, h } | null, elementos: [...], escala (m por px) | null, lamina: {...} } y de aquí sale el SVG
 // que se ve en pantalla y el que se exporta a PNG. Coordenadas en píxeles de la imagen.
-import { ESTILOS_ETIQUETA, fmtMetros, largoEscala, longitud, metrosVano, nombrePunto, tablaDistancias, TIPOS_TRAMO, totalesPorTipo } from './plano.js';
+import { nombreRed, ESTILOS_ETIQUETA, fmtMetros, largoEscala, longitud, metrosVano, nombrePunto, tablaDistancias, TIPOS_TRAMO, totalesPorTipo } from './plano.js';
 
 export const LIENZO = { w: 1600, h: 1000 }; // sin imagen de fondo
 export const COLORES = ['#dc2626', '#a21caf', '#2563eb', '#15803d', '#f59e0b', '#0f172a', '#ffffff'];
@@ -152,7 +152,7 @@ export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias
     case 'polilinea': {
       // Tramo de red: estilo según su tipo, con borde blanco para leerse sobre el mapa; metros por vano con escala
       const tp = TIPOS_TRAMO[el.tramo] || null;
-      const color = tp ? tp.color : el.color; const ancho = el.grosor * (tp ? tp.ancho : 1);
+      const color = el.colorRed || (tp ? tp.color : el.color); const ancho = el.grosor * (tp ? tp.ancho : 1); // colorRed: otra red del mismo tipo
       const d = el.puntos.map(([x, y], i) => `${i ? 'L' : 'M'}${r1(x)} ${r1(y)}`).join(' ');
       let chips = '';
       if (distancias) {
@@ -253,8 +253,13 @@ export const tamano = d => (d.fondo ? { w: d.fondo.w, h: d.fondo.h } : LIENZO);
 // Contenido: título y datos, simbología (solo lo usado), distancias (automáticas con escala o manuales), escala y norte
 export function simbologiaUsada(elementos) {
   const out = [];
-  const tramos = [...new Set(elementos.filter(e => e.tipo === 'polilinea').map(e => e.tramo || ''))];
-  tramos.forEach(k => { if (TIPOS_TRAMO[k]) out.push({ clase: 'tramo', clave: k, nombre: TIPOS_TRAMO[k].nombre }); });
+  // Una entrada por red: tipo, color propio y nombre (dos redes BT de distinto color salen por separado)
+  const redes = [];
+  elementos.filter(e => e.tipo === 'polilinea' && TIPOS_TRAMO[e.tramo]).forEach(e => {
+    const it = { clase: 'tramo', clave: e.tramo, color: e.colorRed || TIPOS_TRAMO[e.tramo].color, nombre: nombreRed(e) };
+    if (!redes.some(x => x.clave === it.clave && x.color === it.color && x.nombre === it.nombre)) redes.push(it);
+  });
+  out.push(...redes);
   const sims = [];
   elementos.filter(e => e.tipo === 'simbolo' && SIMBOLOS[e.simbolo]?.grupo === 'red').forEach(e => { if (!sims.some(x => x.simbolo === e.simbolo && x.color === e.color)) sims.push(e); });
   sims.forEach(e => out.push({ clase: 'simbolo', simbolo: e.simbolo, color: e.color, nombre: SIMBOLOS[e.simbolo].nombre }));
@@ -301,7 +306,7 @@ function svgCajetin(d, y0) {
     const x = col[1] + pad + (i % 2) * anchoCol; const cy = y0 + (62 + Math.floor(i / 2) * 34) * k;
     if (it.clase === 'tramo') {
       const tp = TIPOS_TRAMO[it.clave];
-      s += trazosTramo(`M${r1(x)} ${r1(cy)} L${r1(x + 44 * k)} ${r1(cy)}`, tp.color, 6 * k * tp.ancho, tp.dash);
+      s += trazosTramo(`M${r1(x)} ${r1(cy)} L${r1(x + 44 * k)} ${r1(cy)}`, it.color || tp.color, 6 * k * tp.ancho, tp.dash);
     } else if (it.clase === 'simbolo') {
       const e = 0.5 * k;
       s += `<g transform="translate(${r1(x + 7 * k)} ${r1(cy - 15 * k)}) scale(${r1(e * 1000) / 1000})" color="${it.color}" stroke="${it.color}" stroke-width="3" fill="none">${SIMBOLOS[it.simbolo].svg}</g>`;
