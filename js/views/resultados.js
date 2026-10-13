@@ -1,7 +1,7 @@
 // Pestaña Resultados de una campaña (cuadro resumen) y su editor
 import { ordenarCasos } from '../domain/listados.js';
 import { corteSubida, CR_OBLIGATORIOS, instalacionDeCaso, MEDICION, PERTURBACIONES_A_SUBIR, resultadoCaso, resumenResultados, situacionCaso, subidaPerturbaciones } from '../domain/resultados.js';
-import { agruparCampanas, hoyLocal } from '../domain/trabajo.js';
+import { agruparCampanas, flujoBT, hoyLocal } from '../domain/trabajo.js';
 import { casosFT, DIAS_SOLUCION_FT } from '../domain/ft.js';
 import { state } from '../state.js';
 import { hayTXTEnMemoria } from '../actions/resultados.js';
@@ -94,7 +94,9 @@ export function renderResultados(c) {
     <button class="b b-g" onclick="exportarCuadroResumen('${c.clave}')"><i class="ic ic-excel"></i> Exportar cuadro resumen</button>
     <button class="b b-g" onclick="exportarAnalisis('${c.clave}')"><i class="ic ic-grafica"></i> Exportar análisis (Resumen de la macro)</button>
   </div>`;
-  html += `<details class="ayuda"><summary><i class="ic ic-ayuda"></i> ¿Cómo se calculan?</summary><p>Sube los TXT de ECAMEC (el nombre del archivo es el código del caso): se validan y se calcula el FebNoPer como en la macro. Más de ${UMBRAL_FT * 100} % es fuera de tolerancia. Las advertencias quedan "por revisar": corrige el dato del caso (suele ser el nivel de tensión) y recalcula. También se puede anotar el resultado a mano tocando el caso.</p></details>`;
+  html += flujoBT(c.area)
+    ? `<details class="ayuda"><summary><i class="ic ic-ayuda"></i> ¿Cómo se calculan?</summary><p>Sube los TXT de ECAMEC (el nombre del archivo es el código del caso): se validan y se calcula el FebNoPer como en la macro de BT, sobre 120 V con ±7 % urbano y ±8 % rural, usando el tipo de instalación y la urbanidad del control de puntos. Más de ${UMBRAL_FT * 100} % es fuera de tolerancia. Las advertencias quedan "por revisar" (fases que no coinciden con el tipo de instalación, columnas o un dato que falta): corrige el dato del caso y recalcula. También se puede anotar el resultado a mano tocando el caso.</p></details>`
+    : `<details class="ayuda"><summary><i class="ic ic-ayuda"></i> ¿Cómo se calculan?</summary><p>Sube los TXT de ECAMEC (el nombre del archivo es el código del caso): se validan y se calcula el FebNoPer como en la macro. Más de ${UMBRAL_FT * 100} % es fuera de tolerancia. Las advertencias quedan "por revisar": corrige el dato del caso (suele ser el nivel de tensión) y recalcula. También se puede anotar el resultado a mano tocando el caso.</p></details>`;
   html += '</div>';
   html += bloquePerturbaciones(c);
 

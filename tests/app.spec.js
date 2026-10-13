@@ -1755,6 +1755,90 @@ test.describe('Precampaña', () => {
     return lineas.join('\r\n');
   };
 
+  test('análisis de TXT en BT: misma lógica que la macro de BT (120 V, 7 % urbano, 8 % rural)', async ({ page }) => {
+    app = await abrirApp(page);
+    const viejo = ['X-Data,AVrmsAvg[Volts],BVrmsAvg[Volts],CVrmsAvg[Volts]'];
+    for (let i = 0; i < 700; i++) { const m = 8 * 60 + i * 15; viejo.push(`${String(1 + Math.floor(m / 1440)).padStart(2, '0')}/10/2026 ${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}:00,120,120,120`); }
+    const txts = {
+      valida: hacerTXT({ v: () => [120, 120, 120] }),
+      ft: hacerTXT({ v: i => (i % 10 === 0 ? [130, 120, 120] : [120, 120, 120]) }),
+      rural: hacerTXT({ v: i => (i % 10 === 0 ? [129, 120, 120] : [120, 120, 120]) }),
+      bi: hacerTXT({ v: () => [120, 120, 0] }),
+      pocos: hacerTXT({ n: 500, v: () => [120, 120, 120] }),
+      pocosColumnas: hacerTXT({ n: 500, columnas: 73, v: () => [120, 120, 120] }),
+      intervalo: hacerTXT({ paso: 30, v: () => [120, 120, 120] }),
+      saltos: hacerTXT({ saltos: [100, 200], v: () => [120, 120, 120] }),
+      alim: hacerTXT({ v: () => [50, 50, 50] }),
+      perturb: hacerTXT({ n: 1100, paso: 10, columnas: 197, v: () => [120, 0, 0] }),
+      viejo: viejo.join('\r\n'),
+      vacio: '',
+    };
+    const r = await page.evaluate(async t => {
+      const m = await import('/js/domain/analisis-bt.js');
+      const { resultadoDeAnalisis } = await import('/js/domain/analisis.js');
+      const tri = { tipoInstalacion: 'TRIFÁSICO', urbanidad: 'U' };
+      const a = (n, x, d = tri) => { const z = m.analizarMedicionBT(n, x, d); return [z.estado, z.detalle, typeof z.febNoPer === 'number' ? Math.round(z.febNoPer * 10000) / 10000 : z.febNoPer]; };
+      return {
+        valida: a('CR1O2026001.txt', t.valida),
+        ft: a('CR1O2026001.txt', t.ft),
+        ruralR: a('CR1O2026001.txt', t.rural, { tipoInstalacion: 'TRIFÁSICO', urbanidad: 'R' }),
+        ruralU: a('CR1O2026001.txt', t.rural),
+        bi: a('CR1O2026001.txt', t.bi, { tipoInstalacion: 'BIFÁSICO', urbanidad: 'U' }),
+        fases: a('CR1O2026001.txt', t.ft, { tipoInstalacion: 'MONOFÁSICO', urbanidad: 'U' }),
+        sinUrbanidad: a('CR1O2026001.txt', t.valida, { tipoInstalacion: 'TRIFÁSICO' }),
+        sinTipo: a('CR1O2026001.txt', t.valida, { urbanidad: 'U' }),
+        pocos: a('CR1O2026001.txt', t.pocos),
+        pocosColumnas: a('CR1O2026001.txt', t.pocosColumnas),
+        intervalo: a('CR1O2026001.txt', t.intervalo),
+        saltos: a('CR1O2026001.txt', t.saltos),
+        alim: a('CR1O2026001.txt', t.alim),
+        perturb: a('DA1O2026013O00.txt', t.perturb, { tipoInstalacion: 'MONOFÁSICO', urbanidad: 'U' }),
+        viejo: a('CR1O2026001.txt', t.viejo),
+        vacio: a('CR1O2026001.txt', t.vacio),
+        resultadoFT: resultadoDeAnalisis(m.analizarMedicionBT('CR1O2026001.txt', t.ft, tri)),
+        banda: (({ nominal, tolerancia }) => [nominal, tolerancia])(m.analizarMedicionBT('CR1O2026001.txt', t.valida, { tipoInstalacion: 'TRIFÁSICO', urbanidad: 'R' })),
+      };
+    }, txts);
+    expect(r.valida).toEqual(['VALIDA', '', 0]);
+    expect(r.ft).toEqual(['VALIDA', '', 0.1]); // 130 V pasa de 120 + 7 %
+    expect(r.ruralR).toEqual(['VALIDA', '', 0]); // 129 V está dentro de 120 + 8 %
+    expect(r.ruralU).toEqual(['VALIDA', '', 0.1]);
+    expect(r.bi).toEqual(['VALIDA', '', 0]);
+    // Fases que no coinciden: por revisar y el FebNoPer con las fases del TXT
+    expect(r.fases).toEqual(['ADVERTENCIA', 'Verificar con planilla física: listado=MONOFÁSICO (1 fase(s)) pero TXT tiene 3 fase(s) activa(s)', 0.1]);
+    expect(r.sinUrbanidad).toEqual(['ADVERTENCIA', 'Falta la urbanidad del caso: no se calculó el FebNoPer', 'N/D']);
+    expect(r.sinTipo).toEqual(['ADVERTENCIA', 'Falta el tipo de instalación del caso: no se calculó el FebNoPer', 'N/D']);
+    expect(r.pocos).toEqual(['FALLIDA', 'Insuficientes registros válidos: 500 (mínimo 576)', 0]);
+    expect(r.pocosColumnas).toEqual(['FALLIDA', 'Número de columnas incorrecto: 73 (se esperan 74) | Insuficientes registros válidos: 500 (mínimo 576)', 0]);
+    expect(r.intervalo).toEqual(['FALLIDA', 'Intervalo predominante NO es de 15 min. Registros: 700', 0]);
+    expect(r.saltos).toEqual(['VALIDA', '', 0]); // más del 80 % de los intervalos son de 15 min
+    expect(r.alim).toEqual(['FALLIDA', 'Insuficientes registros válidos: 0 (mínimo 576) | ERROR ALIM. - Todos los registros son inválidos', 'N/A']);
+    expect(r.perturb).toEqual(['ADVERTENCIA', 'Tipo en nombre archivo (TRIFASICO) no coincide con listado (MONOFÁSICO)', 0]);
+    expect(r.viejo).toEqual(['VALIDA', '', 0]); // formato viejo: no se revisan las columnas
+    expect(r.vacio).toEqual(['FALLIDA', 'Archivo TXT vacío o sin datos', 'N/D']);
+    expect(r.resultadoFT).toEqual({ medicion: 'valida', febNoPer: 10, tolerancia: 'fuera' });
+    expect(r.banda).toEqual([120, 0.08]);
+  });
+
+  test('en una campaña de BT "Analizar TXT" usa la macro de BT con los datos del control de puntos', async ({ page }) => {
+    const datos = conCampanaBT();
+    Object.assign(datos.campanas['2026-10_CPT-BT'].casos.CR1O2026001, { tipoInstalacion: 'TRIFÁSICO', urbanidad: 'U' });
+    app = await abrirApp(page, { usuario: 'Francisco Chulo', datos });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-BT'); setCampanaVista('resultados'); });
+    await expect(page.locator('details.ayuda', { hasText: 'macro de BT' })).toHaveCount(1);
+    const txt = hacerTXT({ v: i => (i % 10 === 0 ? [130, 120, 120] : [120, 120, 120]) });
+    await page.locator('label', { hasText: 'Analizar TXT' }).locator('input').setInputFiles([{ name: 'CR1O2026001.txt', mimeType: 'text/plain', buffer: Buffer.from(txt) }]);
+    const modal = page.locator('.modal');
+    await expect(modal).toContainText('1 válidas');
+    await expect(modal).toContainText('1 fuera de tolerancia');
+    await expect(modal).toContainText('120 V · U');
+    await page.getByRole('button', { name: 'Guardar resultados' }).click();
+    const [op, ruta, valor] = (await app.escrituras()).find(([, r]) => r === 'campanas/2026-10_CPT-BT');
+    expect([op, ruta]).toEqual(['update', 'campanas/2026-10_CPT-BT']);
+    expect(valor['casos/CR1O2026001/resultado']).toMatchObject({ medicion: 'valida', febNoPer: 10, tolerancia: 'fuera', origen: 'txt', analisis: { tipoCaso: 'Regulatorio BT', nivelTension: 120 } });
+  });
+
   test('análisis de TXT: misma lógica que la macro CalidadEnergia', async ({ page }) => {
     app = await abrirApp(page);
     const txts = {

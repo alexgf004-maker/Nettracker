@@ -3,10 +3,11 @@ import { db, get, ref, set, update } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { analizarMedicion, filasResumenAnalisis, resultadoDeAnalisis } from '../domain/analisis.js';
+import { analizarMedicionBT } from '../domain/analisis-bt.js';
 import { corteSubida, CR_OBLIGATORIOS, cuadroResumen, ESTADOS_CUADRO } from '../domain/resultados.js';
 import { hojaConEstilo } from '../excel.js';
 import { extraerSeries, fechaDePunto } from '../domain/series.js';
-import { agruparCampanas, hoyLocal, MESES } from '../domain/trabajo.js';
+import { agruparCampanas, flujoBT, hoyLocal, MESES } from '../domain/trabajo.js';
 import { filasResultados } from '../views/resultados.js';
 import { render } from '../views/render.js';
 
@@ -150,7 +151,10 @@ export function analizarArchivos(clave, archivos) {
     if (!hit) { sinCaso.push(a.nombre); continue; }
     const [id, caso] = hit;
     (txtEnMemoria[clave] ??= {})[id] = a;
-    const analisis = analizarMedicion(a.nombre, a.texto, { configuracion: caso.mult?.configuracion, alimentador: caso.alimentador, urbanidad: caso.urbanidad });
+    // BT usa su macro (120 V, tipo de instalación del control de puntos); MT, la de CalidadEnergia
+    const analisis = flujoBT(g.area)
+      ? analizarMedicionBT(a.nombre, a.texto, { tipoInstalacion: caso.tipoInstalacion, urbanidad: caso.urbanidad })
+      : analizarMedicion(a.nombre, a.texto, { configuracion: caso.mult?.configuracion, alimentador: caso.alimentador, urbanidad: caso.urbanidad });
     filas.push({ id, codigo: caso.codigo || caso.codigoEnte, analisis, resultado: resultadoDeAnalisis(analisis), manual: !!caso.resultado && caso.resultado.origen !== 'txt', series: extraerSeries(a.texto) });
   }
   filas.sort((x, y) => x.codigo.localeCompare(y.codigo));

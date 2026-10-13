@@ -243,7 +243,14 @@ En el detalle de la campaña:
 - Casos: se suben los listados, se completan con el control de puntos y se sacan el listado y el mapa, igual que MT.
 - Fechas: con el mismo Excel "Usuarios seleccionados"; todos los casos se programan (no hay estado de multiplicador). La tabla muestra CT/DS y medidor; el Excel de cada Fecha lleva Transformador y Medidor en lugar de Multiplicador, Corrientes y Conexión (`COLUMNAS_FECHA_BT`) y al enviar a Despachos el transformador va en las notas y el medidor en su columna, como el formato de despacho de BT.
 - Cartas por Fecha: se entregan al instalar, así que cada Fecha tiene "Cartas" (solo sus casos, mismo texto, la visita dice "el {día de instalación}"); se marca en `campanas/{clave}/fechas/{n}/cartas`.
-- Resultados: se suben 105 CR (`CR_OBLIGATORIOS` en `domain/resultados.js`: MT 38, BT 105), con el mismo corte "Hasta aquí se sube" y en el cuadro resumen. El análisis de los TXT de BT se cambiará por la macro de BT (pendiente de recibirla).
+- Resultados: se suben 105 CR (`CR_OBLIGATORIOS` en `domain/resultados.js`: MT 38, BT 105), con el mismo corte "Hasta aquí se sube" y en el cuadro resumen.
+- Analizar TXT en BT usa la macro de BT (`MacroBT_1.bas`, `analizarMedicionBT` en `js/domain/analisis-bt.js`), para CR, DA y DF:
+  - Datos del caso: tipo de instalación y urbanidad del control de puntos (el mismo con el que se completan los casos).
+  - Nominal siempre 120 V; tolerancia 7 % urbano, 8 % el resto. Registro inválido si una fase activa baja de 84 V (70 %); FT si alguna sale de la banda; FebNoPer = FT ÷ válidos (más de 5 % es FT).
+  - Fases con tensión: más de 18 V en más del 15 % de los registros. Si no coinciden con el tipo de instalación: ADVERTENCIA ("verificar con planilla física") y el FebNoPer se calcula con las fases del TXT.
+  - ADVERTENCIA (por revisar): columnas distintas de 74 (CR) o 197 (DA/DF) en el formato nuevo; en DA/DF, el dígito del tipo de sistema no coincide con el tipo de instalación; fases que no coinciden; y (confirmado, la macro las dejaba VÁLIDAS con 0 %) sin urbanidad o sin tipo de instalación no se calcula el FebNoPer.
+  - FALLIDA (pesa más que las advertencias y se agrega al detalle): menos de 576 registros válidos (CR) o 1008 (DA/DF); el intervalo de 15 o 10 min no llega al 80 % de los intervalos; todos los registros inválidos (ERROR ALIM.); archivo vacío.
+  - Lee también el formato viejo ("X-Data" con AVrmsAvg/BVrmsAvg/CVrmsAvg). Gráficas con la banda de 120 V ± tolerancia.
 
 **Perturbaciones del mes (MT y BT)**: el ente manda 12 DA y 12 DF por mes para MT y BT juntas (normalmente 9 de BT y 3 de MT) y se suben 9 de cada tipo: en orden de código, las primeras 9 válidas sin importar el área; si una falla o no se mide, entra la siguiente (`subidaPerturbaciones`). En Resultados de cualquier área, el bloque "Perturbaciones del mes · MT y BT" muestra las DA y DF de las dos campañas del mes con área, equipo, situación y si se sube, no entra, está pendiente o ya no se sube; cuántas sube cada área, hasta cuál se sube y, si faltan, hasta cuál se subiría si las pendientes salen válidas.
 
