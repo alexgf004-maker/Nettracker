@@ -3,7 +3,7 @@
 // - Armónicos (Armonicos_SIGET10): Detalle_V, Detalle_I, Resumen_Armonicos, Resumen_Compacto y Graficos.
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
-import { ARMONICAS, catalogoSeries, estadisticas, tituloCombo, CARGA_ALERTA, DATI_LIM, LIMITE_PST, PERC_MAX, TIPOS_RED, VDAT_LIM } from '../domain/reclamo.js';
+import { ARMONICAS, catalogoSeries, estadisticas, tituloCombo, CARGA_ALERTA, DATI_LIM, LIMITE_PST, P_UMBRAL, p95CorrienteFuera, PERC_MAX, textoP95Corriente, TIPOS_RED, VDAT_LIM } from '../domain/reclamo.js';
 import { compararPosiciones, factorTap, PLACAS_TAP, placaDe, proyectarU, resumenProyectado, totalesFases } from '../domain/tap.js';
 import { descargarXlsx, escribirConGraficas, rango } from '../excel-graficas.js';
 import { analisisActivo, calculoReclamo, seriesCombo } from '../views/analisis-reclamo.js';
@@ -309,11 +309,23 @@ function filaResumen(ws, r, f, nf, sombra) {
       celda(ws, 11 + i, r, 'N/A', st('C8C8C8', { color: '646464', negrita: false }));
       return;
     }
-    celda(ws, 2 + i, r, Math.round(x.p95 * 1000) / 1000, st(fondo, { color: x.p95 > f.limite ? 'B40000' : '000000', negrita: x.p95 > f.limite, fmt: '0.000' }));
+    // Corriente sin carga (P < 3.5 kW): el P95 va en amperios (o "No aplica" en el DATI)
+    if (x.cargados !== undefined && !(x.cargados && !x.sinCarga)) {
+      const fuera = p95CorrienteFuera(f, x);
+      celda(ws, 2 + i, r, textoP95Corriente(f, x), st(fondo, { color: fuera ? 'B40000' : '000000', negrita: fuera }));
+    } else celda(ws, 2 + i, r, Math.round(x.p95 * 1000) / 1000, st(fondo, { color: x.p95 > f.limite ? 'B40000' : '000000', negrita: x.p95 > f.limite, fmt: '0.000' }));
     celda(ws, 5 + i, r, x.exc, st(fondo, { color: '000000', negrita: false }));
     celda(ws, 8 + i, r, Math.round(x.pct * 100) / 100, st(fondo, { color: '000000', negrita: false, fmt: '0.00' }));
     celda(ws, 11 + i, r, x.cumple ? 'CUMPLE' : 'NO CUMPLE', x.cumple ? st('50C850', { color: '003C00' }) : st('FF5050', { color: '640000' }));
   });
+}
+
+// Avisos del periodo: intervalo distinto de 10 minutos y corriente evaluada en amperios
+function avisosArmonicos(arm) {
+  const out = [];
+  if (arm.intervalo && arm.intervalo !== 10) out.push(`ATENCION: los registros vienen cada ${arm.intervalo} min; la norma evalua armonicos en intervalos de 10 min`);
+  if (arm.regimenCorriente === 'A') out.push(`P < ${P_UMBRAL} kW en todo el periodo: la corriente se evalua en amperios (Tabla 5) y el DATI no aplica (Art. 49a)`);
+  return out;
 }
 
 function hojaResumen(arm, nombreArchivo, tipoTxt) {
@@ -322,8 +334,10 @@ function hojaResumen(arm, nombreArchivo, tipoTxt) {
   const encabezado = r => ['Parametro', 'Limite', 'P95 F1', 'P95 F2', 'P95 F3', '# Exc. F1', '# Exc. F2', '# Exc. F3', '% Tpo F1', '% Tpo F2', '% Tpo F3', 'Estado F1', 'Estado F2', 'Estado F3']
     .forEach((h, c) => celda(ws, c, r, h, st(AZUL_ARM)));
   titulo(0, `ANALISIS DE ARMONICOS - Norma SIGET Acuerdo 38-E-2015  |  ${tipoTxt}`, 13);
-  celda(ws, 0, 1, `Archivo: ${nombreArchivo}  |  Intervalos: ${arm.n} (10 min c/u)  |  Umbral: >${PERC_MAX}% del periodo (Arts.45 y 51)`, st(null, { color: '505050', negrita: false, italica: true, centro: false, borde: false, sz: 8 }));
+  celda(ws, 0, 1, `Archivo: ${nombreArchivo}  |  Intervalos: ${arm.n} (${arm.intervalo || '?'} min c/u)  |  Umbral: >${PERC_MAX}% del periodo (Arts.45 y 51)`, st(null, { color: '505050', negrita: false, italica: true, centro: false, borde: false, sz: 8 }));
   merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: 13 } });
+  const avisos = avisosArmonicos(arm);
+  if (avisos.length) { celda(ws, 0, 2, avisos.join('  |  '), st(null, { color: 'B40000', negrita: true, centro: false, borde: false, sz: 8 })); merges.push({ s: { r: 2, c: 0 }, e: { r: 2, c: 13 } }); }
   titulo(3, 'ARMONICOS DE VOLTAJE - Tabla 4 (Art.45)  |  VDAT = 8%  |  TDI = Un/U1 x 100');
   encabezado(4);
   let r = 5;
@@ -355,7 +369,7 @@ function hojaCompacta(arm, tipoTxt) {
     ['1', '2', '3'].forEach((p, i) => {
       const x = f.fases[p];
       if (!x || Number(p) > arm.nf) return celda(ws, 2 + i, r, 'N/A', st('D2D2D2', { color: '787878', negrita: false }));
-      celda(ws, 2 + i, r, `${x.p95.toFixed(3)} %`, x.cumple ? st('50C878', { color: '003C0A' }) : st('FF5050', { color: '780000' }));
+      celda(ws, 2 + i, r, x.cargados !== undefined ? textoP95Corriente(f, x) : `${x.p95.toFixed(3)} %`, x.cumple ? st('50C878', { color: '003C0A' }) : st('FF5050', { color: '780000' }));
     });
   };
   banda(2, 'ARMONICOS DE VOLTAJE  —  Tabla 4 (Art.45)  |  TDI = Un/U1 x 100  |  Limite VDAT = 8%', '00467F');
@@ -366,7 +380,8 @@ function hojaCompacta(arm, tipoTxt) {
   arm.corriente.forEach((f, i) => fila(r++, f, i === 0));
   r++;
   const nota = st(null, { color: '505050', negrita: false, italica: true, borde: false, centro: false, sz: 8 });
-  celda(ws, 0, r++, 'P95 = Percentil 95 (IEC 61000-4-7). En corriente: P95 de DAII% sobre intervalos con P>=3.5kW', nota);
+  celda(ws, 0, r++, `P95 = Percentil 95 (IEC 61000-4-7). En corriente: P95 de DAII% sobre intervalos con P>=${P_UMBRAL}kW; sin carga, P95 en amperios`, nota);
+  avisosArmonicos(arm).forEach(t => celda(ws, 0, r++, t, st(null, { color: 'B40000', negrita: true, borde: false, centro: false, sz: 8 })));
   celda(ws, 0, r++, `Estado: CUMPLE si % tiempo fuera de limite <= ${PERC_MAX}% (Art.45/51)`, nota);
   cerrarHoja(ws, 5, r);
   ws['!merges'] = merges;
@@ -385,18 +400,22 @@ export function exportarArmonicosReclamo() {
   const colV = [...fases.map(p => ({ nombre: `VDAT F${p} (%)`, v: arm.VDAT[p], limite: VDAT_LIM })),
     ...ARMONICAS.flatMap(n => fases.map(p => ({ nombre: `TDI H${n} F${p} (%)`, v: arm.TDI[n][p] })))];
   XLSX.utils.book_append_sheet(libro, hojaDetalle(arm.fechas, colV, AZUL_ARM), 'Detalle_V');
-  // Detalle_I: P, DATI y DAII por armónica y fase
+  // Detalle_I: P, DATI, DAII (%) y la corriente en amperios por armónica y fase (con P < 3.5 kW se evalúa en A)
   const colI = [...fases.map(p => ({ nombre: `P F${p} (kW)`, v: arm.P[p] })),
     ...fases.map(p => ({ nombre: `DATI F${p} (%)`, v: arm.DATI[p], limite: DATI_LIM })),
-    ...ARMONICAS.flatMap(n => fases.map(p => ({ nombre: `DAII/Ii H${n} F${p}`, v: arm.DAII[n][p] })))];
+    ...ARMONICAS.flatMap(n => fases.map(p => ({ nombre: `DAII H${n} F${p} (%)`, v: arm.DAII[n][p] }))),
+    ...fases.map(p => ({ nombre: `I1 F${p} (A)`, v: arm.I1[p] })),
+    ...ARMONICAS.flatMap(n => fases.map(p => ({ nombre: `Ii H${n} F${p} (A)`, v: arm.IA[n][p] })))];
   XLSX.utils.book_append_sheet(libro, hojaDetalle(arm.fechas, colI, VERDE_ARM), 'Detalle_I');
   XLSX.utils.book_append_sheet(libro, hojaResumen(arm, a.armonicos.nombre, tipoTxt), 'Resumen_Armonicos');
   XLSX.utils.book_append_sheet(libro, hojaCompacta(arm, tipoTxt), 'Resumen_Compacto');
 
-  // Graficos: tabla del espectro (P95 de todos los intervalos, como la hoja de la macro) y 4 gráficas
+  // Graficos: tabla del espectro (P95 de todos los intervalos, como la hoja de la macro) y 4 gráficas.
+  // Si en todo el periodo P < 3.5 kW, la corriente se grafica en amperios contra los límites en A
+  const enA = arm.regimenCorriente === 'A';
   const ws = {};
   const enc = st(AZUL_ARM);
-  const cab = ['Armonico', 'Lim.TDI(%)', ...fases.map(p => `TDI P95 F${p}(%)`), 'Lim.DAII(%)', ...fases.map(p => `DAII P95 F${p}`)];
+  const cab = ['Armonico', 'Lim.TDI(%)', ...fases.map(p => `TDI P95 F${p}(%)`), enA ? 'Lim.Ii(A)' : 'Lim.DAII(%)', ...fases.map(p => (enA ? `Ii P95 F${p}(A)` : `DAII P95 F${p}`))];
   cab.forEach((h, i) => celda(ws, i, 0, h, enc));
   const num = st(null, { color: '000000', negrita: false, fmt: '0.000' });
   arm.espectro.forEach((e, i) => {
@@ -404,8 +423,8 @@ export function exportarArmonicosReclamo() {
     celda(ws, 0, r, `H${e.n}`, st(null, { color: '000000' }));
     celda(ws, 1, r, Math.round(e.limTDI * 1000) / 1000, num);
     fases.forEach((p, k) => celda(ws, 2 + k, r, Math.round(e.tdi[p] * 1000) / 1000, num));
-    celda(ws, 2 + nf, r, Math.round(e.limDAII * 1000) / 1000, num);
-    fases.forEach((p, k) => celda(ws, 3 + nf + k, r, Math.round(e.daii[p] * 1000) / 1000, num));
+    celda(ws, 2 + nf, r, Math.round((enA ? e.limIiA : e.limDAII) * 1000) / 1000, num);
+    fases.forEach((p, k) => celda(ws, 3 + nf + k, r, Math.round((enA ? e.daiiA[p] : e.daii[p]) * 1000) / 1000, num));
   });
   celda(ws, 0, 25, `Archivo: ${a.armonicos.nombre}  |  ${tipoTxt}`, st(null, { color: '000000', negrita: false, italica: true, borde: false, centro: false }));
   cerrarHoja(ws, 3 + 2 * nf, 26);
@@ -427,7 +446,7 @@ export function exportarArmonicosReclamo() {
   const graficas = {
     [G]: [
       { desde: [0, 27], hasta: [9, 49], grafica: espectro('Espectro Armonico de Voltaje - TDI Percentil 95 vs Limite Tabla 4', 'TDI P95 (%)', 2, 3, AZUL_ARM, 'P95 TDI') },
-      { desde: [10, 27], hasta: [19, 49], grafica: espectro('Espectro Armonico de Corriente - DAII Percentil 95 vs Limite Tabla 5', 'DAII P95 (%)', 3 + nf, 4 + nf, '006100', 'P95 DAII') },
+      { desde: [10, 27], hasta: [19, 49], grafica: enA ? espectro(`Espectro Armonico de Corriente - Ii Percentil 95 (A) vs Limite Tabla 5 (P < ${P_UMBRAL} kW)`, 'Ii P95 (A)', 3 + nf, 4 + nf, '006100', 'P95 Ii') : espectro('Espectro Armonico de Corriente - DAII Percentil 95 vs Limite Tabla 5', 'DAII P95 (%)', 3 + nf, 4 + nf, '006100', 'P95 DAII') },
       { desde: [0, 50], hasta: [9, 72], grafica: tendencia('Detalle_V', 'Tendencia VDAT en el Tiempo', 'VDAT (%)', 2, VDAT_LIM, 'Lim. SIGET 8%', 'VDAT', AZUL_ARM) },
       { desde: [10, 50], hasta: [19, 72], grafica: tendencia('Detalle_I', 'Tendencia DATI en el Tiempo', 'DATI (%)', 2 + nf, DATI_LIM, 'Lim. SIGET 20%', 'DATI', '006100') },
     ],

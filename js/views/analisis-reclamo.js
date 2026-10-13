@@ -2,7 +2,7 @@
 // SVG propio, sin librerías. Cada gráfica tiene una sola escala; los límites van como líneas punteadas.
 import {
   analizarArmonicos, analizarTension, ARMONICAS, catalogoSeries, LIMITE_INVALIDO, tituloCombo, CARGA_ALERTA, DATI_LIM, LIMITE_PST, NIVELES, PERC_MAX,
-  leerTension, TIPOS_RED, VDAT_LIM,
+  leerTension, P_UMBRAL, textoP95Corriente, TIPOS_RED, VDAT_LIM,
 } from '../domain/reclamo.js';
 import { diagnosticarArmonicos } from '../domain/diagnostico.js';
 import { claveExpediente } from '../domain/expedientes.js';
@@ -229,7 +229,9 @@ function tablaArmonicos(lista, fases, nf) {
     ${lista.map((f, i) => `<tr class="${i === 0 ? 'total' : ''}"><td>${esc(f.nombre)}</td><td>${esc(f.limTxt)}</td>${['1', '2', '3'].map(p => {
       const x = f.fases[p];
       if (!x || Number(p) > nf) return '<td class="na">N/A</td>';
-      return `<td class="${x.cumple ? 'ok' : 'mal'}" title="${x.exc} intervalos fuera (${fmt(x.pct, 2)} % del tiempo)">${fmt(x.p95, 3)} %<small>${fmt(x.pct, 1)} % fuera</small></td>`;
+      // Corriente: en % con carga, en amperios sin carga (P < 3.5 kW); el DATI sin carga no aplica
+      const valor = x.cargados !== undefined ? esc(textoP95Corriente(f, x)) : `${fmt(x.p95, 3)} %`;
+      return `<td class="${x.cumple ? 'ok' : 'mal'}" title="${x.exc} intervalos fuera (${fmt(x.pct, 2)} % del tiempo)">${valor}<small>${fmt(x.pct, 1)} % fuera</small></td>`;
     }).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
 
@@ -413,7 +415,7 @@ function bloqueDiagnostico(arm, ctx) {
   if (!dg) return '';
   const filas = [...dg.severidad.tension.map(x => ({ ...x, tipo: 'Tensión' })), ...dg.severidad.corriente.map(x => ({ ...x, tipo: 'Corriente' }))];
   const tabla = filas.length ? `<div class="tabla-wrap"><table class="tabla-est"><thead><tr><th>Orden</th><th>Tipo</th><th>Límite</th><th>P95 (fase)</th><th>Veces el límite</th><th>% del tiempo fuera</th></tr></thead><tbody>
-    ${filas.map(x => `<tr><td>H${x.n}</td><td>${x.tipo}</td><td>${fmt(x.limite, 2)} %</td><td>${fmt(x.p95, 2)} % (F${x.fase})</td><td><b>${fmt(x.veces, 2)}×</b></td><td>${fmt(x.pctTiempo, 1)} %</td></tr>`).join('')}</tbody></table></div>` : '';
+    ${filas.map(x => `<tr><td>H${x.n}</td><td>${x.tipo}</td><td>${fmt(x.limite, 2)} ${x.unidad || '%'}</td><td>${fmt(x.p95, 2)} ${x.unidad || '%'} (F${x.fase})</td><td><b>${fmt(x.veces, 2)}×</b></td><td>${fmt(x.pctTiempo, 1)} %</td></tr>`).join('')}</tbody></table></div>` : '';
   const sinInsp = !ctx.subestacion?.tipo ? '<div class="page-sub">Con la conexión del transformador de la inspección del reclamo, el diagnóstico también revisa los armónicos triplen.</div>' : '';
   return `<div class="bloque diagnostico"><div class="bloque-head"><div class="bloque-titulo">Diagnóstico</div><span class="tg gris">Indicios para el informe</span></div>
     ${dg.parrafos.map(t => `<p class="diag-p">${esc(t)}</p>`).join('') || '<div class="page-sub">Sin hallazgos que comentar.</div>'}
@@ -425,7 +427,9 @@ function seccionArmonicos(a, c) {
   if (!a.armonicos) return aviso('Sube el TXT de armónicos (el de 10 minutos, 197 columnas) para evaluar los armónicos según SIGET 38-E-2015.', 'azul');
   if (!arm?.n) return aviso('No se pudo leer el TXT de armónicos: ninguna fila trae las 194 columnas que usa la macro.');
   const fases = arm.fases;
-  let html = `<div class="graf-periodo">${esc(arm.inicio)} al ${esc(arm.fin)} · ${arm.n} intervalos de 10 minutos · cumple si está fuera de límite ${PERC_MAX} % del tiempo o menos (Arts. 45 y 51)</div>`;
+  let html = `<div class="graf-periodo">${esc(arm.inicio)} al ${esc(arm.fin)} · ${arm.n} intervalos de ${arm.intervalo || '?'} minutos · cumple si está fuera de límite ${PERC_MAX} % del tiempo o menos (Arts. 45 y 51)</div>`;
+  if (arm.intervalo && arm.intervalo !== 10) html += aviso(`Los registros vienen cada ${arm.intervalo} minutos y la norma evalúa los armónicos en intervalos de 10 minutos. Revisa que sea el TXT de armónicos correcto o cómo quedó configurado el equipo.`);
+  if (arm.regimenCorriente === 'A') html += aviso(`En todo el periodo la potencia fue menor a ${P_UMBRAL} kW: la corriente se evalúa en amperios (Tabla 5) y el DATI no aplica (Art. 49a).`, 'azul');
   if (arm.incompletas) html += aviso(`${arm.incompletas} ${arm.incompletas === 1 ? 'fila no trae' : 'filas no traen'} las 194 columnas y no se ${arm.incompletas === 1 ? 'toma' : 'toman'} en cuenta.`);
   html += '<div class="veredictos">' + fases.map(p => `<div class="veredicto"><span class="graf-fase"><i style="background:${COLOR_FASE[p]}"></i>Fase ${p}</span>
     <div><span class="tg ${arm.cumpleTension[p] ? 'verde' : 'rojo'}">Tensión: ${arm.cumpleTension[p] ? 'CUMPLE' : 'NO CUMPLE'}</span>
@@ -433,13 +437,15 @@ function seccionArmonicos(a, c) {
   html += bloqueDiagnostico(arm, contextoDiagnostico(a));
   const cats = ARMONICAS.map(n => 'H' + n);
   html += `<div class="bloque">${graficaBarras({ titulo: 'Espectro de tensión · TDI percentil 95 vs. Tabla 4', unidad: '%', categorias: cats, limite: arm.espectro.map(e => e.limTDI), series: fases.map(p => ({ nombre: `F${p}`, color: COLOR_FASE[p], v: arm.espectro.map(e => e.tdi[p]) })) })}</div>`;
-  html += `<div class="bloque">${graficaBarras({ titulo: 'Espectro de corriente · DAII percentil 95 vs. Tabla 5', unidad: '%', categorias: cats, limite: arm.espectro.map(e => e.limDAII), series: fases.map(p => ({ nombre: `F${p}`, color: COLOR_FASE[p], v: arm.espectro.map(e => e.daii[p]) })) })}</div>`;
+  html += arm.regimenCorriente === 'A'
+    ? `<div class="bloque">${graficaBarras({ titulo: `Espectro de corriente · Ii percentil 95 (A) vs. Tabla 5 (P < ${P_UMBRAL} kW)`, unidad: 'A', categorias: cats, limite: arm.espectro.map(e => e.limIiA), series: fases.map(p => ({ nombre: `F${p}`, color: COLOR_FASE[p], v: arm.espectro.map(e => e.daiiA[p]) })) })}</div>`
+    : `<div class="bloque">${graficaBarras({ titulo: 'Espectro de corriente · DAII percentil 95 vs. Tabla 5', unidad: '%', categorias: cats, limite: arm.espectro.map(e => e.limDAII), series: fases.map(p => ({ nombre: `F${p}`, color: COLOR_FASE[p], v: arm.espectro.map(e => e.daii[p]) })) })}</div>`;
   html += `<div class="bloque">${graficaLinea({ id: 'vdat', ventana: a.zoom || null, titulo: 'VDAT en el tiempo', unidad: '%', t: arm.t, fechas: arm.fechas, desdeCero: true, series: fases.map(p => ({ nombre: `VDAT F${p}`, color: COLOR_FASE[p], v: arm.VDAT[p] })), lineas: [{ valor: VDAT_LIM, nombre: 'Límite SIGET 8 %' }] })}</div>`;
   html += `<div class="bloque">${graficaLinea({ id: 'dati', ventana: a.zoom || null, titulo: 'DATI en el tiempo', unidad: '%', t: arm.t, fechas: arm.fechas, desdeCero: true, series: fases.map(p => ({ nombre: `DATI F${p}`, color: COLOR_FASE[p], v: arm.DATI[p] })), lineas: [{ valor: DATI_LIM, nombre: 'Límite SIGET 20 %' }] })}</div>`;
   html += `<div class="bloque"><div class="bloque-head"><div class="bloque-titulo">Armónicos de tensión · Tabla 4 (Art. 45)</div></div>${tablaArmonicos(arm.tension, fases, arm.nf)}
     <div class="page-sub">Percentil 95 (IEC 61000-4-7) y % del tiempo fuera del límite. TDI = Un/U1 × 100.</div></div>`;
   html += `<div class="bloque"><div class="bloque-head"><div class="bloque-titulo">Armónicos de corriente · Tabla 5 (Arts. 49-51)</div></div>${tablaArmonicos(arm.corriente, fases, arm.nf)}
-    <div class="page-sub">DAII = In/I1 × 100. El percentil 95 se calcula con los intervalos de P ≥ 3.5 kW. Cada intervalo se evalúa en % si P ≥ 3.5 kW y en amperios si es menor.</div></div>`;
+    <div class="page-sub">DAII = In/I1 × 100. Cada intervalo se evalúa en % si P ≥ ${P_UMBRAL} kW y en amperios si es menor: el percentil 95 en % sale de los intervalos con carga y el de amperios de los que no la tienen.</div></div>`;
   return html;
 }
 
