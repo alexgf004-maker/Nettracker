@@ -1376,8 +1376,23 @@ test.describe('Precampaña', () => {
     await expect(page.locator('.meta')).toContainText('1 caso listo para medir no tiene fecha');
     await page.getByLabel('Fecha de CR1O2026201').selectOption('1');
     expect((await app.escrituras()).at(-1)).toEqual(['update', 'campanas/2026-10_CPT-MT/casos/CR1O2026201/programa', { fecha: '1' }]);
-    await page.getByLabel('Equipo de CR1O2026201').selectOption('SN-105');
+    // Elegir el equipo con el buscador
+    await page.getByLabel('Equipo de CR1O2026201').click();
+    const ventana = page.locator('.eqf-modal');
+    await expect(page.locator('#eq-fecha-buscar')).toBeFocused();
+    await page.locator('#eq-fecha-buscar').fill('105');
+    await expect(ventana.locator('.eqf-op:visible')).toHaveCount(1);
+    await page.locator('#eq-fecha-buscar').fill('zzz');
+    await expect(ventana.locator('.eqf-nada')).toBeVisible();
+    await page.locator('#eq-fecha-buscar').fill('sn-105');
+    await page.locator('#eq-fecha-buscar').press('Enter');
+    await expect(ventana).toHaveCount(0);
     expect((await app.escrituras()).at(-1)).toEqual(['update', 'campanas/2026-10_CPT-MT/casos/CR1O2026201/programa', { equipo: 'SN-105' }]);
+    // Para el otro caso, el equipo ya asignado sale al final con su caso
+    await page.getByLabel('Equipo de CR1O2026202').click();
+    await expect(ventana.locator('.eqf-op').last()).toContainText('SN-105');
+    await expect(ventana.locator('.eqf-op').last()).toContainText('Ya asignado a CR1O2026201 (Fecha 1)');
+    await app.ejecutar(() => cerrarEquipoFecha());
     const tarjeta = page.locator('.fecha-card', { hasText: 'Fecha 1' });
     await expect(tarjeta).toContainText('2 casos');
     await expect(tarjeta).toContainText('Faltan las fechas de instalación o de retiro');

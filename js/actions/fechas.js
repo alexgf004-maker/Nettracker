@@ -19,6 +19,23 @@ export function asignarFecha(clave, id, fecha) {
 export function asignarEquipo(clave, id, serie) {
   update(ref(db, `campanas/${clave}/casos/${id}/programa`), { equipo: serie || null });
 }
+// Ventana para elegir el equipo de un caso, con buscador (en BT son muchos equipos)
+export function abrirEquipoFecha(clave, id) { state.equipoFecha = { clave, id }; render(); document.getElementById('eq-fecha-buscar')?.focus(); }
+export function cerrarEquipoFecha() { state.equipoFecha = null; render(); }
+export function elegirEquipoFecha(serie) {
+  const { clave, id } = state.equipoFecha || {};
+  if (!clave) return;
+  asignarEquipo(clave, id, serie);
+  state.equipoFecha = null;
+  render();
+}
+// Filtra la lista sin redibujar (para no perder lo escrito)
+export function buscarEquipoFecha(q) {
+  const caja = document.getElementById('eq-fecha-lista'); if (!caja) return;
+  const t = String(q || '').trim().toLowerCase(); let n = 0;
+  caja.querySelectorAll('.eqf-op').forEach(b => { const ver = !t || b.dataset.q.includes(t); b.hidden = !ver; if (ver) n++; });
+  caja.querySelector('.eqf-nada').hidden = n > 0;
+}
 export function setDatoFecha(clave, n, campo, valor) {
   update(ref(db, `campanas/${clave}/fechas/${n}`), { [campo]: valor || null });
 }
