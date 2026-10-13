@@ -9,7 +9,7 @@ import { renderLogin, renderMantenimiento } from './login.js';
 import { renderMapa } from './mapa.js';
 import { ftParaAviso, retirosParaAviso, renderAlertaRetiros, renderCondicionModal, renderDescargaModal, renderGlobalSearch, renderImportModal, renderMantModal, renderDanioModal, renderRetiroModal, renderRevisionModal, renderSelectorModal } from './modals.js';
 import { renderCasoModal, renderConfigCartas, renderDocsModal, renderImportListados } from './casos.js';
-import { renderProgramacionModal } from './fechas.js';
+import { renderEquipoFechaModal, renderProgramacionModal } from './fechas.js';
 import { renderImportMultModal, renderMultModal } from './multiplicadores.js';
 import { renderGraficasModal } from './graficas.js';
 import { renderAnalisisReclamo, renderGraficar } from './analisis-reclamo.js';
@@ -82,6 +82,7 @@ export function render() {
   if (state.docsModal) html += renderDocsModal();
   if (state.multEdit) html += renderMultModal();
   if (state.importProgramacion) html += renderProgramacionModal();
+  if (state.equipoFecha) html += renderEquipoFechaModal();
   if (state.importMult) html += renderImportMultModal();
   if (state.resultadoEdit) html += renderResultadoModal();
   if (state.analisisTXT) html += renderAnalisisModal();

@@ -11,14 +11,13 @@ const esc = s => escapeHtml(s ?? '');
 const TG_GRUPO = { listos: 'verde', por_resolver: 'ambar', no_se_miden: 'gris' };
 
 // Equipos que se pueden asignar: no instalados ni fuera de servicio o en mantenimiento
-const equiposDisponibles = () => state.equipos
-  .filter(e => !eqEnCampo(e) && !['fuera', 'mantenimiento'].includes(e.condicion || 'bueno'))
-  .map(e => e.serie).filter(Boolean).sort();
+const equiposLibres = () => state.equipos
+  .filter(e => e.serie && !eqEnCampo(e) && !['fuera', 'mantenimiento'].includes(e.condicion || 'bueno'))
+  .sort((a, b) => a.serie.localeCompare(b.serie));
 
 export function renderFechas(c) {
   const g = state.campanas?.[c.clave] || {};
   const casos = ordenarCasos(c.casos);
-  const disponibles = equiposDisponibles();
   const FECHAS = fechasDe(g);
   const bt = flujoBT(c.area);
   // En BT no hay multiplicadores: todos los casos del listado se programan
@@ -62,16 +61,42 @@ export function renderFechas(c) {
   casos.forEach(x => {
     const m = x.mult || {}; const k = calcularMultiplicador(m);
     const p = x.programa || {};
-    const opcionesEq = [...new Set([...(p.equipo ? [p.equipo] : []), ...disponibles])];
     html += `<tr>
       <td class="cod"><b>${esc(x.codigo || x.codigoEnte)}</b><small>${esc(x.nombre)}</small></td>
       ${bt ? `<td data-l="CT/DS">${esc(x.ct) || '—'}</td><td data-l="Medidor" class="num">${esc(x.medidor) || '—'}</td>` : `<td data-l="Estado">${m.estado ? `<span class="tg ${TG_GRUPO[grupoDeEstado(m.estado)]}">${esc(m.estado)}</span>` : '<span class="falta">Sin estado</span>'}</td>
       <td data-l="Multiplicador" class="num">${esc(k.ecamec) || '—'}<small>${esc(k.ti)}${m.configuracion ? ' · ' + esc(m.configuracion) : ''}</small></td>`}
       <td data-l="Fecha"><select aria-label="Fecha de ${esc(x.codigo)}" onchange="asignarFecha('${c.clave}', '${x.id}', this.value)"><option value="">—</option>${FECHAS.map(n => `<option value="${n}" ${String(p.fecha || '') === n ? 'selected' : ''}>Fecha ${n}</option>`).join('')}</select></td>
-      <td data-l="Equipo"><select aria-label="Equipo de ${esc(x.codigo)}" onchange="asignarEquipo('${c.clave}', '${x.id}', this.value)"><option value="">—</option>${opcionesEq.map(s => `<option ${p.equipo === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></td>
+      <td data-l="Equipo"><button class="eqf-elegir ${p.equipo ? '' : 'vacio'}" aria-label="Equipo de ${esc(x.codigo)}" onclick="abrirEquipoFecha('${c.clave}', '${x.id}')">${p.equipo ? `<b>${esc(p.equipo)}</b>` : 'Elegir equipo'}<i class="ic ic-chevron-right"></i></button></td>
     </tr>`;
   });
   return html + '</tbody></table></div></div>';
+}
+
+// Ventana para elegir el equipo de un caso: buscador por serie, modelo, viñeta o sede; los que ya tienen otro
+// caso de la campaña salen al final con su caso (se pueden elegir; la Fecha avisa si se repiten)
+export function renderEquipoFechaModal() {
+  const { clave, id } = state.equipoFecha;
+  const g = state.campanas?.[clave] || {};
+  const caso = g.casos?.[id] || {};
+  const actual = caso.programa?.equipo || '';
+  const usados = {};
+  Object.entries(g.casos || {}).forEach(([k, c]) => { const e = c.programa?.equipo; if (e && k !== id) (usados[e] ??= []).push(`${c.codigo || c.codigoEnte}${c.programa?.fecha ? ` (Fecha ${c.programa.fecha})` : ''}`); });
+  const libres = equiposLibres();
+  const lista = [...(actual && !libres.some(e => e.serie === actual) ? [{ serie: actual }] : []), ...libres]
+    .sort((a, b) => Number(!!usados[a.serie]) - Number(!!usados[b.serie]) || a.serie.localeCompare(b.serie));
+  const q = e => esc([e.serie, e.modelo, e.vineta, e.sede, e.area].filter(Boolean).join(' ').toLowerCase());
+  let html = '<div class="modal-overlay" onclick="if (event.target === this) cerrarEquipoFecha()"><div class="modal hoja eqf-modal" role="dialog" aria-label="Elegir equipo">';
+  html += `<div class="modal-head"><div><div class="modal-titulo">Equipo para ${esc(caso.codigo || caso.codigoEnte)}</div><div class="page-sub">${esc(caso.nombre)} · ${libres.length} disponibles</div></div><button class="modal-cerrar" onclick="cerrarEquipoFecha()" title="Cerrar">✕</button></div>`;
+  html += '<div class="search-wrap eqf-buscar"><span class="search-icon"><i class="ic ic-buscar"></i></span><input id="eq-fecha-buscar" class="search-input" placeholder="Buscar serie, modelo, viñeta o sede" oninput="buscarEquipoFecha(this.value)" onkeydown="if (event.key === \'Enter\') { const b = document.querySelector(\'#eq-fecha-lista .eqf-op:not([hidden])\'); if (b) b.click(); }"></div>';
+  html += '<div id="eq-fecha-lista" class="eqf-lista">';
+  lista.forEach(e => {
+    const datos = [e.modelo, e.vineta ? 'Viñeta ' + e.vineta : '', e.sede, e.area].filter(Boolean).map(esc).join(' · ');
+    html += `<button class="eqf-op ${e.serie === actual ? 'activo' : ''} ${usados[e.serie] ? 'usado' : ''}" data-q="${q(e)}" onclick="elegirEquipoFecha('${esc(e.serie)}')">
+      <span class="eqf-op-tx"><b>${esc(e.serie)}</b>${datos ? `<small>${datos}</small>` : ''}${usados[e.serie] ? `<small class="txt-ambar">Ya asignado a ${usados[e.serie].map(esc).join(', ')}</small>` : ''}</span>${e.serie === actual ? '<i class="ic ic-check"></i>' : ''}</button>`;
+  });
+  html += `<div class="eqf-nada page-sub" ${lista.length ? 'hidden' : ''}>No hay equipos con esa búsqueda</div></div>`;
+  if (actual) html += `<button class="btn btn-secondary" onclick="elegirEquipoFecha('')">Quitar equipo (${esc(actual)})</button>`;
+  return html + '</div></div>';
 }
 
 // Vista previa de la programación importada

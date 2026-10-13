@@ -4,8 +4,11 @@
 // - Sin urbanidad o sin tipo de instalación la macro no calculaba el FebNoPer y dejaba la medición VÁLIDA con 0 %:
 //   aquí queda "por revisar" (ADVERTENCIA) con el dato que falta.
 // - Archivo vacío: la macro lo marcaba INVALIDA; en la app es fallida, igual que en MT.
-// Funciones puras: reciben el texto del TXT y los datos del caso.
+// - Si en campo la instalación es otra, se corrige en la app y se recalcula con los registros guardados
+//   (series/{campaña}/{caso}), sin volver a subir el TXT (`analizarSeriesBT`).
+// Funciones puras: reciben el texto del TXT (o los registros guardados) y los datos del caso.
 import { leerTXT, minutosDeFecha } from './analisis.js';
+import { completar } from './series.js';
 
 export const NOMINAL_BT = 120;
 const UMBRAL_ACTIVA_V = 18; // una fase tiene tensión si pasa de 18 V (15 % de 120 V)…
@@ -26,8 +29,39 @@ const DIGITO_SISTEMA = { 1: 'MONOFASICO', 2: 'BIFASICO', 3: 'TRIFASICO' };
 const sinTildes = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
 const numero = v => (v !== undefined && v !== '' && !Number.isNaN(Number(v)) ? Number(v) : 0);
 
+// Tipos de instalación que se pueden corregir en campo (el dígito es el del código de las DA/DF)
+export const INSTALACIONES_BT = { 1: 'MONOFÁSICO', 2: 'BIFÁSICO', 3: 'TRIFÁSICO' };
+export const digitoInstalacion = tipo => Number(Object.keys(DIGITO_SISTEMA).find(k => sinTildes(tipo).includes(DIGITO_SISTEMA[k]))) || null;
+
 // nombre: nombre del archivo; texto: contenido; datos: { tipoInstalacion, urbanidad } del caso
 export function analizarMedicionBT(nombre, texto, datos = {}) {
+  const filas = leerTXT(texto);
+  if (filas.length <= 1) return analizarRegistrosBT(nombre, null, datos);
+  const enc = filas[0];
+  const datosF = filas.slice(1);
+  const formatoViejo = enc[0] === 'X-Data';
+  const cols = COLUMNAS_U[formatoViejo ? 'viejo' : 'nuevo'].map(n => enc.indexOf(n));
+  return analizarRegistrosBT(nombre, {
+    columnas: enc.length, formatoViejo, inicio: datosF[0][0] || '', fin: datosF[datosF.length - 1][0] || '',
+    // m: minutos de la fecha (null si la celda está vacía); u: tensión por fase (0 si no es número)
+    filas: datosF.map(f => ({ m: f[0] ? minutosDeFecha(f[0]) : null, u: cols.map(c => (c >= 0 ? numero(f[c]) : 0)) })),
+  }, datos);
+}
+
+// Mismo análisis con los registros guardados al analizar el TXT (los de las gráficas): serie = { inicio, fin, t, U };
+// `previo`: el análisis anterior (de ahí sale el número de columnas del TXT)
+export function analizarSeriesBT(nombre, serie, previo = {}, datos = {}) {
+  const base = minutosDeFecha(serie.inicio); const n = serie.t?.length || 0;
+  const fase = p => completar(serie.U?.[p]?.v, n);
+  const [u1, u2, u3] = ['1', '2', '3'].map(fase);
+  return analizarRegistrosBT(nombre, {
+    columnas: previo.columnas || 0, formatoViejo: false, inicio: previo.inicio || serie.inicio, fin: previo.fin || serie.fin,
+    filas: Array.from({ length: n }, (_, i) => ({ m: base + (serie.t[i] ?? 0), u: [u1[i] ?? 0, u2[i] ?? 0, u3[i] ?? 0] })),
+  }, datos);
+}
+
+// medicion: { columnas, formatoViejo, inicio, fin, filas: [{ m, u: [v1, v2, v3] }] } o null si el archivo está vacío
+function analizarRegistrosBT(nombre, medicion, datos) {
   const nombreSinExt = String(nombre).replace(/\.[^.]*$/, '');
   const mayus = nombreSinExt.toUpperCase();
   const esPerturb = !mayus.startsWith('CR') && mayus.startsWith('D');
@@ -39,32 +73,27 @@ export function analizarMedicionBT(nombre, texto, datos = {}) {
     urbanidad, febNoPer: 'N/D', estado: '', detalle: '', inicio: '', fin: '',
   };
 
-  const filas = leerTXT(texto);
-  if (filas.length <= 1) return { ...r, estado: 'FALLIDA', detalle: 'Archivo TXT vacío o sin datos' };
+  if (!medicion || !medicion.filas.length) return { ...r, estado: 'FALLIDA', detalle: 'Archivo TXT vacío o sin datos' };
 
-  const enc = filas[0];
-  const datosF = filas.slice(1);
-  r.columnas = enc.length;
+  const datosF = medicion.filas;
+  const { formatoViejo } = medicion;
+  r.columnas = medicion.columnas;
   r.registros = datosF.length;
-  r.inicio = datosF[0][0] || '';
-  r.fin = datosF[datosF.length - 1][0] || '';
-  const formatoViejo = enc[0] === 'X-Data';
-  const [c1, c2, c3] = COLUMNAS_U[formatoViejo ? 'viejo' : 'nuevo'].map(n => enc.indexOf(n));
-  const tension = f => [c1, c2, c3].map(c => (c >= 0 ? numero(f[c]) : 0));
+  r.inicio = medicion.inicio;
+  r.fin = medicion.fin;
+  const tension = f => f.u;
 
   // ── Intervalos y fases con tensión ──
-  let enIntervalo = 0; let totalIntervalos = 0; let anterior = '';
+  let enIntervalo = 0; let totalIntervalos = 0; let anterior = null;
   const activos = [0, 0, 0];
   for (const f of datosF) {
-    const actual = f[0] || '';
-    if (anterior && actual) {
-      const a = minutosDeFecha(anterior); const b = minutosDeFecha(actual);
-      if (a > 0 && b > 0) {
-        if (b - a === reglas.intervalo) enIntervalo++;
+    if (anterior !== null && f.m !== null) {
+      if (anterior > 0 && f.m > 0) {
+        if (f.m - anterior === reglas.intervalo) enIntervalo++;
         totalIntervalos++;
       }
     }
-    if (actual) anterior = actual;
+    if (f.m !== null) anterior = f.m;
     tension(f).forEach((v, i) => { if (v > UMBRAL_ACTIVA_V) activos[i]++; });
   }
   const predominante = totalIntervalos > 0 && enIntervalo / totalIntervalos >= PREDOMINANTE;

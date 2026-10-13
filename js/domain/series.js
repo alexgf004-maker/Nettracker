@@ -19,7 +19,7 @@ export function extraerSeries(texto) {
   const serie = (c, dec) => (c < 0 ? null : datos.map(f => redondear(numero(f[c]), dec)));
   const out = { inicio: datos[0][0], fin: datos[datos.length - 1][0], t: datos.map(f => minutosDeFecha(f[0]) - t0), U: {}, I: {} };
   FASES.forEach(p => {
-    const v = serie(col(`U${p} [V]`), 1);
+    const v = serie(col(`U${p} [V]`), 2); // 2 decimales: con estos registros se recalcula BT sin el TXT
     if (v) out.U[p] = { v, min: serie(col(`U${p}Min [V]`), 1) || v, max: serie(col(`U${p}Max [V]`), 1) || v };
     const i = serie(col(`I${p} [A]`), 2);
     if (i) out.I[p] = { v: i, max: serie(col(`I${p}Max [A]`), 2) || i };
