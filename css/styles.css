@@ -1383,6 +1383,7 @@ button.aviso-inicio-fila { cursor: pointer; }
 .lev-flotante { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 500; font-size: 17px; padding: 14px 28px; border-radius: 999px; box-shadow: 0 8px 22px -6px rgba(15,23,42,.55); }
 .lev-barra .dib-chip, .lev-barra .segmento, .lev-barra .tg, .lev-barra .insp-check { flex: none; }
 .lev-mapa { height: 62vh; min-height: 340px; border-radius: 14px; overflow: hidden; border: 1px solid var(--border); background: #e5e7eb; position: relative; z-index: 0; }
+.lev-app .lev-mapa { height: 100%; min-height: 0; border: 0; border-radius: 0; }
 .lev-sin-mapa { padding: 24px; color: var(--text2); font-size: 14px; }
 .lev-icono { background: none; border: 0; }
 .lev-punto { position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
@@ -1400,13 +1401,11 @@ button.aviso-inicio-fila { cursor: pointer; }
 .lev-vano input { width: 170px; }
 .lev-salidas { margin-top: 12px; }
 @media (max-width: 700px) {
-  .lev-mapa { height: 62vh; }
   /* Cada fila de opciones en una sola línea que se desliza, para que el mapa quede a la vista */
   .lev-desliza { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; scrollbar-width: none; }
   .lev-desliza::-webkit-scrollbar { display: none; }
   .lev-cabecera .lev-ref { flex: 1 1 100%; }
   /* En celular el botón queda fijo sobre la barra de navegación, siempre a mano */
-  .lev-flotante { position: fixed; bottom: calc(78px + env(safe-area-inset-bottom)); }
 }
 
 /* Dibujar: proyecto guardado */
@@ -1540,3 +1539,68 @@ button.aviso-inicio-fila { cursor: pointer; }
 .dib-opacidad { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
 .dib-opacidad input { width: 100%; }
 .dib-svg.herr-encajar { cursor: move; }
+
+/* ── Levantamiento: app de campo (mapa a pantalla completa y hoja con pestañas) ── */
+.lev-app { position: fixed; top: var(--dib-top, 64px); left: var(--dib-left, 0px); right: 0; bottom: var(--dib-bottom, 0px); z-index: 40; display: flex; flex-direction: column; background: var(--bg); }
+.lev-top { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--white); border-bottom: 1px solid var(--border); }
+.lev-top-btn { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 12px; border: 1px solid var(--border); background: var(--white); color: var(--text); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.lev-top-btn:disabled { opacity: .35; }
+.lev-top-nombre { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+.lev-top-nombre b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lev-top-nombre small { font-size: 11.5px; color: var(--text3); }
+.lev-top .tg { flex: 0 0 auto; }
+.lev-cuerpo { flex: 1; min-height: 0; display: flex; }
+.lev-app .lev-mapa-caja { position: relative; flex: 1; min-width: 0; min-height: 0; }
+.lev-mapa-ctrl { position: absolute; top: 10px; right: 10px; z-index: 500; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.lev-mapa-ctrl .segmento { background: var(--white); box-shadow: 0 2px 8px rgba(15,23,42,.2); }
+.lev-redondo { width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--border); background: var(--white); color: var(--text2); display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(15,23,42,.25); cursor: pointer; }
+.lev-redondo.activo { color: #2563eb; border-color: #93c5fd; }
+.lev-aviso { position: absolute; top: 10px; left: 56px; right: 70px; z-index: 500; margin: 0; }
+.lev-app .lev-flotante { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 500; }
+.lev-flotante-info { background: rgba(15,23,42,.8); color: #fff; font-size: 14px; font-weight: 700; padding: 10px 18px; border-radius: 999px; white-space: nowrap; }
+.lev-hoja { width: 380px; flex: 0 0 380px; background: var(--white); border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+.lev-tabs { display: flex; gap: 2px; padding: 6px 6px 0; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; flex: 0 0 auto; }
+.lev-tab { flex: 1 0 auto; border: 0; background: none; padding: 10px 10px; font: inherit; font-size: 14px; font-weight: 700; color: var(--text3); border-bottom: 3px solid transparent; cursor: pointer; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lev-tab.activo { color: var(--primary); border-bottom-color: var(--primary); }
+.lev-tab:disabled { opacity: .4; cursor: default; }
+.lev-tab-cerrar { border: 0; background: none; font-size: 18px; padding: 0 12px; cursor: pointer; color: var(--text2); }
+.lev-hoja-cuerpo { flex: 1; overflow-y: auto; padding: 8px 12px 12px; -webkit-overflow-scrolling: touch; }
+.lev-fila { display: flex; align-items: center; gap: 6px 10px; margin-bottom: 4px; flex-wrap: wrap; }
+.lev-unir { margin: 0; white-space: nowrap; }
+.lev-hoja .lev-accion { margin: 2px 0 8px; font-size: 12.5px; }
+.lev-hoja .lev-barra { margin-bottom: 8px; }
+.lev-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.lev-dos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.lev-hoja .field { margin-bottom: 8px; }
+.lev-hoja .field input, .lev-hoja .field select, .lev-hoja .field textarea { width: 100%; min-width: 0; }
+.lev-panel-info { margin-bottom: 4px; display: inline-block; }
+/* Acometidas compactas */
+.lev-acom { margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--border); }
+.lev-acom-cab { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; }
+.lev-acom-cab select { flex: 1; min-width: 0; height: 36px; padding: 2px 8px; font-size: 13px; }
+.lev-acom-botones { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.lev-acom-tipo { display: flex; gap: 4px; }
+.lev-acom-menos { flex: 0 0 34px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--white); font-size: 20px; color: var(--text2); cursor: pointer; }
+.lev-acom-mas { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0; padding: 6px 4px; line-height: 1.15; min-width: 0; }
+.lev-acom-mas span { font-size: 13px; font-weight: 700; white-space: nowrap; }
+.lev-acom-mas .lev-acom-n { font-size: 20px; font-weight: 800; }
+.lev-acom-total { margin-top: 8px; font-size: 12.5px; }
+/* Vanos */
+.lev-hoja .lev-vano { display: block; padding: 10px 0; border-top: 1px solid var(--border); }
+.lev-hoja .lev-vano:first-child { border-top: 0; }
+.lev-vano-nombre { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; }
+.lev-vano-quitar { margin-left: auto; border: 0; background: none; color: var(--text3); font-size: 16px; cursor: pointer; padding: 4px 6px; }
+.lev-vano-campos { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.lev-vano-campos label { display: flex; flex-direction: column; gap: 2px; font-size: 11px; font-weight: 700; color: var(--text3); min-width: 0; }
+.lev-vano-campos input, .lev-vano-campos select { width: 100%; min-width: 0; height: 38px; padding: 4px 10px; font-size: 14px; }
+@media (max-width: 900px) {
+  .lev-cuerpo { flex-direction: column; }
+  .lev-hoja { width: auto; flex: 0 0 auto; border-left: 0; border-top: 1px solid var(--border); border-radius: 16px 16px 0 0; box-shadow: 0 -8px 24px -12px rgba(15,23,42,.35); max-height: 54%; }
+  .lev-fila { flex-wrap: nowrap; }
+  .lev-hoja .dib-chip { padding: 5px 9px; font-size: 12px; }
+  .lev-hoja .lev-barra { margin-bottom: 6px; }
+  .lev-app.hoja-abierta .lev-hoja { max-height: 64%; }
+  .lev-hoja .lev-barra { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .lev-fila { overflow-x: auto; scrollbar-width: none; }
+  .lev-app .lev-flotante { bottom: 12px; }
+}

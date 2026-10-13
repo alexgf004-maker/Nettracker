@@ -250,6 +250,12 @@ function alTocarPunto(id) {
 }
 
 // ── Barra y panel ──
+// Pestañas de la hoja de abajo (Marcar, Punto, Vanos, Más); volver a Marcar suelta el punto seleccionado
+export function setHojaLev(k) {
+  const u = ui(); if (!u) return;
+  u.hoja = k; if (k === 'marcar') u.sel = null;
+  render();
+}
 export function setLev(campo, valor) {
   const u = ui(); if (!u) return;
   u[campo] = valor;

@@ -166,7 +166,7 @@ export function zoomDib(f) { zoomA(f); }
 // El editor ocupa el espacio libre entre el encabezado, el menú lateral (compu) o la barra de abajo (celular)
 export function instalarAltoDib() {
   alRedibujar(() => {
-    if (!document.querySelector('.dib-pagina')) return;
+    if (!document.querySelector('.dib-pagina, .lev-app')) return;
     const raiz = document.documentElement.style; const hd = document.querySelector('header'); const nav = document.querySelector('.bottom-nav');
     raiz.setProperty('--dib-top', `${hd?.getBoundingClientRect().bottom || 0}px`);
     // En el celular la barra de menú va abajo; en la compu es el menú lateral

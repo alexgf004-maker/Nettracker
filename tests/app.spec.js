@@ -12,6 +12,9 @@ async function nav(page, texto) {
   await page.locator('.mas-item', { hasText: texto }).click();
 }
 
+// Levantamiento: pestañas de la hoja de abajo (Marcar, Punto, Vanos, Más)
+const pestana = (page, t) => page.locator('.lev-tab', { hasText: t }).first().click();
+
 // Cada prueba termina verificando que no hubo errores de JavaScript
 let app;
 test.afterEach(async () => {
@@ -3079,6 +3082,7 @@ test.describe('Levantamiento en campo', () => {
     const vano = esc.find(([op, ruta]) => op === 'push' && /^levantamientos\/[^/]+\/vanos$/.test(ruta))[2];
     expect(vano.tramo).toBe('bt');
     // Medido a mano: manda sobre el GPS
+    await pestana(page, 'Vanos');
     const inp = page.locator('.lev-vano input[aria-label="Metros medidos"]');
     await inp.fill('32'); await inp.press('Tab');
     // Conductor del vano: calibre y tipo
@@ -3087,6 +3091,7 @@ test.describe('Levantamiento en campo', () => {
     await expect(page.locator('.lev-dist', { hasText: '32.0 m' })).toHaveCount(1);
     await expect(page.locator('.lev-vano')).toContainText('32.0 m medido');
     // Con precisión baja pide confirmar; transformador como tipo de punto
+    await pestana(page, 'Marcar');
     await page.locator('.lev-barra .dib-chip', { hasText: 'Transformador existente' }).click();
     await context.setGeolocation({ latitude: 13.50027, longitude: -88.86975, accuracy: 30 });
     await expect(page.locator('#lev-gps')).toHaveText('GPS ±30 m');
@@ -3109,9 +3114,11 @@ test.describe('Levantamiento en campo', () => {
     const caja = await page.locator('#lev-mapa').boundingBox();
     await page.mouse.click(caja.x + caja.width * 0.2, caja.y + caja.height * 0.8);
     await expect(page.locator('.leaflet-marker-icon', { hasText: 'P4' })).toHaveCount(1);
+    await pestana(page, 'Vanos');
     await expect(page.locator('.lev-vano')).toHaveCount(3);
     await expect(page.locator('.lev-vano', { hasText: 'P1 – P4' })).toHaveCount(1);
     // KML
+    await pestana(page, 'Más');
     const kml = page.waitForEvent('download');
     await page.getByRole('button', { name: 'KML para Google Earth' }).click();
     const k = require('fs').readFileSync(await (await kml).path(), 'utf8');
@@ -3162,16 +3169,21 @@ test.describe('Levantamiento en campo', () => {
     await poste.click();
     expect((await page.evaluate(() => window.__preguntas)).join(' ')).toContain('Estás a 2.0 m de P1. ¿Es el mismo poste?');
     await expect(page.locator('.leaflet-marker-icon')).toHaveCount(2); // no se creó otro poste
+    await pestana(page, 'Vanos');
     await expect(page.locator('.lev-vano')).toHaveCount(1); // P1 – P2 ya existía: no se duplica el vano
+    await pestana(page, 'Marcar');
     await expect(page.locator('.lev-accion')).toContainText('Se une a P1.');
     await context.setGeolocation({ latitude: 13.5, longitude: -88.86973, accuracy: 5 });
     await expect(page.locator('#lev-gps')).toHaveText('GPS ±5 m');
     await poste.click(); // P3 unido a P1
+    await pestana(page, 'Vanos');
     await expect(page.locator('.lev-vano', { hasText: 'P1 – P3' })).toHaveCount(1);
     // Tocando el mapa cerca (no encima) de P2 con "unir al anterior": cierra la red P3 – P2 sin crear un punto
+    await pestana(page, 'Marcar');
     await page.getByRole('button', { name: 'Tocando el mapa' }).click();
     const p2 = await page.locator('.leaflet-marker-icon', { hasText: 'P2' }).boundingBox();
     await page.mouse.click(p2.x + p2.width / 2 + 26, p2.y + p2.height / 2 + 10);
+    await pestana(page, 'Vanos');
     await expect(page.locator('.lev-vano', { hasText: 'P3 – P2' })).toHaveCount(1);
     await expect(page.locator('.leaflet-marker-icon')).toHaveCount(3);
     expect(errores).toEqual([]);
@@ -3201,12 +3213,13 @@ test.describe('Levantamiento en campo', () => {
     await expect(page.locator('#lev-gps')).toHaveText('GPS ±4 m');
     await poste.click();
     // Pasaron al vano P1 – P2; el contador vuelve a cero para el próximo vano
+    await pestana(page, 'Vanos');
     await expect(page.locator('.lev-vano', { hasText: 'P1 – P2' })).toContainText('Acom. A:2 240:1');
+    await pestana(page, 'Marcar');
     await expect(page.locator('#lev-acom-a')).toHaveText('0');
     // Corregir en el vano P1 – P2: una de 120 en B
     await page.locator('#lev-acom-vano').selectOption({ label: 'P1 – P2' });
     await page.getByRole('button', { name: 'Sumar acometida 120 B' }).click();
-    await expect(page.locator('.lev-vano', { hasText: 'P1 – P2' })).toContainText('Acom. A:2 B:1 240:1');
     await expect(page.locator('.lev-acom-total')).toContainText('fase A 3, fase B 2');
     await expect(page.locator('.lev-acom-total')).toContainText('diferencia 1 (más en A)');
     // Restar no baja de cero
@@ -3214,7 +3227,10 @@ test.describe('Levantamiento en campo', () => {
     await page.getByRole('button', { name: 'Restar acometida 120 B' }).click();
     await expect(page.locator('#lev-acom-b')).toHaveText('0');
     await page.getByRole('button', { name: 'Sumar acometida 120 B' }).click();
+    await pestana(page, 'Vanos');
+    await expect(page.locator('.lev-vano', { hasText: 'P1 – P2' })).toContainText('Acom. A:2 B:1 240:1');
     // KML y lámina
+    await pestana(page, 'Más');
     const kml = page.waitForEvent('download');
     await page.getByRole('button', { name: 'KML para Google Earth' }).click();
     expect(require('fs').readFileSync(await (await kml).path(), 'utf8')).toContain('Acom. A:2 B:1 240:1');
@@ -3263,10 +3279,11 @@ test.describe('Levantamiento en campo', () => {
     await page.mouse.click((a[0] + b[0]) / 2 + 10, (a[1] + b[1]) / 2 + 8);
     expect((await page.evaluate(() => window.__preguntas)).join(' ')).toContain('en medio del vano P1 – P2');
     await expect(page.locator('.leaflet-marker-icon')).toHaveCount(3);
+    await expect(page.locator('.lev-tab.activo')).toHaveText('P3'); // queda seleccionado
+    await pestana(page, 'Vanos');
     await expect(page.locator('.lev-vano')).toHaveCount(2);
     await expect(page.locator('.lev-vano', { hasText: 'P1 – P3' })).toHaveCount(1);
     await expect(page.locator('.lev-vano', { hasText: 'P3 – P2' })).toHaveCount(1);
-    await expect(page.locator('.lev-panel')).toContainText('P3'); // queda seleccionado
     const p3 = await pos('P3');
     expect(Math.abs(p3.lat - 13.5)).toBeLessThan(0.00002); // sobre la línea
     expect(errores).toEqual([]);
