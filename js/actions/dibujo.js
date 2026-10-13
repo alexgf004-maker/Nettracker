@@ -2,7 +2,7 @@
 // (localStorage) y, para poder modificarlo después, se guarda como proyecto en la base para el equipo:
 // dibujos/{id} = { nombre, referencia, creado, editado } (liviano, para la lista) y dibujosDatos/{id} = { fondo, datos }
 // (la imagen en JPG y el dibujo en JSON, que se baja solo al abrirlo). Mientras se arrastra se repinta solo el SVG.
-import { altoCajetin, caja, COLORES, coloresTramos, GROSORES, leerFilasTabla, medidaEtiqueta, medidaReducida, mover, nuevoId, redimensionar, siguienteEtiqueta, SIMBOLOS, svgExportable, svgLamina, tamano, TAM_TEXTO } from '../domain/dibujo.js';
+import { altoCajetin, caja, transformar, COLORES, coloresTramos, GROSORES, leerFilasTabla, medidaEtiqueta, medidaReducida, mover, nuevoId, redimensionar, siguienteEtiqueta, SIMBOLOS, svgExportable, svgLamina, tamano, TAM_TEXTO } from '../domain/dibujo.js';
 import { anclas, escalaDe, ESTILOS_ETIQUETA, fmtMetros, imanar, metrosTramo, nombrePunto, segmentosTramos } from '../domain/plano.js';
 import { db, get, push, ref, remove, set } from '../firebase.js';
 import { leerAltura } from '../domain/red.js';
@@ -36,7 +36,7 @@ export function cargarBorrador() {
   const d = nuevoDibujo();
   try {
     const g = JSON.parse(localStorage.getItem(CLAVE) || 'null');
-    if (g && Array.isArray(g.elementos)) Object.assign(d, { fondo: g.fondo || null, elementos: g.elementos, escala: g.escala || null, lamina: { ...d.lamina, ...(g.lamina || {}) }, proyecto: g.proyecto || null, sinGuardar: !!g.sinGuardar });
+    if (g && Array.isArray(g.elementos)) Object.assign(d, { fondo: g.fondo || null, fondoOpacidad: g.fondoOpacidad || 1, elementos: g.elementos, escala: g.escala || null, lamina: { ...d.lamina, ...(g.lamina || {}) }, proyecto: g.proyecto || null, sinGuardar: !!g.sinGuardar });
   } catch { /* sin borrador */ }
   return d;
 }
@@ -45,7 +45,7 @@ let avisoEspacio = false;
 function guardarBorrador(cambio = true) {
   const d = state.dibujo; if (!d) return;
   if (cambio && d.proyecto) d.sinGuardar = true;
-  try { localStorage.setItem(CLAVE, JSON.stringify({ fondo: d.fondo, elementos: d.elementos, escala: d.escala, lamina: d.lamina, proyecto: d.proyecto, sinGuardar: d.sinGuardar })); avisoEspacio = false; } catch {
+  try { localStorage.setItem(CLAVE, JSON.stringify({ fondo: d.fondo, fondoOpacidad: d.fondoOpacidad, elementos: d.elementos, escala: d.escala, lamina: d.lamina, proyecto: d.proyecto, sinGuardar: d.sinGuardar })); avisoEspacio = false; } catch {
     if (!avisoEspacio) showToast('El dibujo es muy grande para guardarse como borrador en este navegador; descárgalo antes de cerrar');
     avisoEspacio = true;
   }
@@ -254,6 +254,12 @@ export function dibPointerDown(ev) {
     } else render();
     return;
   }
+  // Encajar: arrastrar mueve todo el dibujo sobre la imagen
+  if (h === 'encajar') {
+    memorizar();
+    arrastre = { modo: 'todo', ultimo: [x, y], cambio: false };
+    return;
+  }
   // Calibrar la escala: se traza una línea sobre una distancia conocida
   if (h === 'calibrar') {
     d.calibracion = { x1: x, y1: y, x2: x, y2: y };
@@ -356,7 +362,10 @@ export function dibPointerMove(ev) {
   }
   let [x, y] = punto(ev);
   arrastre.cambio = true;
-  if (arrastre.modo === 'calibrar') {
+  if (arrastre.modo === 'todo') {
+    const d = dib(); const dx = x - arrastre.ultimo[0]; const dy = y - arrastre.ultimo[1]; arrastre.ultimo = [x, y];
+    d.elementos = d.elementos.map(e => transformar(e, 1, dx, dy));
+  } else if (arrastre.modo === 'calibrar') {
     Object.assign(dib().calibracion, { x2: x, y2: y });
   } else {
     const el = seleccionado(); if (!el) return;
@@ -587,6 +596,25 @@ export function setCalibreVanoDib(i, v) {
   cambiarSel(el => { const calibres = { ...(el.calibres || {}) }; if (val) calibres[i] = val; else delete calibres[i]; const { calibres: _c, ...resto } = el; return Object.keys(calibres).length ? { ...resto, calibres } : resto; });
 }
 
+// Encajar: agrandar o achicar todo el dibujo desde su centro; la escala se ajusta para que los metros no cambien
+export function escalarTodoDib(f) {
+  const d = dib(); if (!d?.elementos.length) return;
+  const cajas = d.elementos.map(caja).filter(b => b.w || b.h);
+  const x0 = Math.min(...cajas.map(b => b.x)); const y0 = Math.min(...cajas.map(b => b.y));
+  const x1 = Math.max(...cajas.map(b => b.x + b.w)); const y1 = Math.max(...cajas.map(b => b.y + b.h));
+  const cx = (x0 + x1) / 2; const cy = (y0 + y1) / 2;
+  memorizar();
+  d.elementos = d.elementos.map(e => transformar(e, f, cx * (1 - f), cy * (1 - f)));
+  if (d.escala) d.escala /= f;
+  guardarBorrador(); render();
+}
+export function setOpacidadFondoDib(v) {
+  const d = dib(); if (!d) return;
+  d.fondoOpacidad = Math.max(0.2, Math.min(1, Number(v) || 1));
+  guardarBorrador(); repintarFondo();
+}
+function repintarFondo() { const img = document.querySelector('#dib-svg > image'); if (img) { if (dib().fondoOpacidad < 1) img.setAttribute('opacity', dib().fondoOpacidad); else img.removeAttribute('opacity'); } }
+
 // Devuelve los metros movidos del tramo o la cota seleccionada a su lugar (el centro del vano)
 export function metrosASuLugarDib() {
   const el = seleccionado(); if (!el) return;
@@ -642,12 +670,22 @@ export function subirFondoDib(files) {
       c.getContext('2d').drawImage(img, 0, 0, w, h);
       const d = dib();
       const habia = d.elementos.length > 0;
-      const cambiaTamano = !d.fondo || d.fondo.w !== w || d.fondo.h !== h;
+      const antes = tamano(d);
+      const cambiaTamano = antes.w !== w || antes.h !== h;
       // Las fotos van en JPG (pesan mucho menos); las capturas con transparencia quedan en PNG
       d.fondo = { src: f.type === 'image/png' && f.size < 1.5e6 ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.9), w, h };
-      if (cambiaTamano) { d.escala = null; vista = null; } // otra imagen, otra escala
-      guardarBorrador(); render();
-      if (habia) showToast(cambiaTamano ? 'Imagen cambiada; vuelve a calibrar la escala' : 'Imagen cambiada; los dibujos se conservan');
+      // Con otro tamaño, el dibujo se lleva a la nueva hoja con la misma proporción (y la escala se ajusta: los metros no cambian)
+      if (cambiaTamano && habia) {
+        memorizar();
+        const k = Math.min(w / antes.w, h / antes.h);
+        d.elementos = d.elementos.map(e => transformar(e, k, (w - antes.w * k) / 2, (h - antes.h * k) / 2));
+        if (d.escala) d.escala /= k;
+      }
+      if (cambiaTamano) vista = null;
+      guardarBorrador();
+      if (habia) { d.herramienta = 'encajar'; d.sel = null; }
+      render();
+      if (habia) showToast('Imagen puesta. Arrastra y agranda el dibujo hasta que calce con las calles; luego "Listo"');
     };
     img.onerror = () => showToast('No se pudo leer la imagen');
     img.src = lector.result;
@@ -718,7 +756,7 @@ async function escribirProyecto(id, meta) {
   const d = dib();
   const fondo = await fondoJpg(d.fondo);
   if (fondo) d.fondo = fondo;
-  await set(ref(db, `dibujosDatos/${id}`), { fondo: fondo || null, datos: JSON.stringify({ elementos: d.elementos, escala: d.escala, lamina: d.lamina }) });
+  await set(ref(db, `dibujosDatos/${id}`), { fondo: fondo || null, datos: JSON.stringify({ elementos: d.elementos, escala: d.escala, lamina: d.lamina, fondoOpacidad: d.fondoOpacidad || 1 }) });
   await set(ref(db, `dibujos/${id}`), meta);
   d.proyecto = { id, nombre: meta.nombre, referencia: meta.referencia || '' }; d.sinGuardar = false;
   guardarBorrador(false);
@@ -756,7 +794,7 @@ export async function abrirProyectoDib(id) {
     const snap = await get(ref(db, `dibujosDatos/${id}`));
     const g = snap.exists() ? snap.val() : null;
     const datos = g?.datos ? JSON.parse(g.datos) : {};
-    state.dibujo = { ...nuevoDibujo(), fondo: g?.fondo || null, elementos: datos.elementos || [], escala: datos.escala || null, lamina: { ...nuevaLamina(), ...(datos.lamina || {}) }, proyecto: { id, nombre: meta.nombre, referencia: meta.referencia || '' } };
+    state.dibujo = { ...nuevoDibujo(), fondo: g?.fondo || null, elementos: datos.elementos || [], escala: datos.escala || null, fondoOpacidad: datos.fondoOpacidad || 1, lamina: { ...nuevaLamina(), ...(datos.lamina || {}) }, proyecto: { id, nombre: meta.nombre, referencia: meta.referencia || '' } };
     state.dibProyectos = null; vista = null;
     guardarBorrador(false);
   } catch { showToast('No se pudo abrir el proyecto'); }

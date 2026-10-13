@@ -2907,6 +2907,49 @@ test.describe('Herramienta Dibujar', () => {
     expect(errores).toEqual([]);
   });
 
+  test('imagen del croquis encima de un levantamiento: el dibujo se ajusta a la imagen sin perder los metros y se encaja a mano', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    await page.setViewportSize({ width: 1280, height: 900 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await page.evaluate(() => localStorage.removeItem('nettracker_dibujo'));
+    await nav(page, 'Dibujar');
+    // Lámina de un levantamiento: 1600 × 1000 sin imagen, escala 0.1 m/px, un vano de 400 px = 40 m
+    await page.evaluate(async () => {
+      const a = await import('/js/actions/dibujo.js');
+      a.cargarEnDibujo({ elementos: [{ id: 't', tipo: 'polilinea', tramo: 'bt', color: '#000', grosor: 6, puntos: [[600, 500], [1000, 500]], metros: {} }, { id: 's', tipo: 'simbolo', simbolo: 'poste', color: '#111827', grosor: 3, escala: 0.6, rot: 0, x: 982, y: 482 }], escala: 0.1 });
+      (await import('/js/views/render.js')).render();
+    });
+    await expect(page.locator('#dib-capa text', { hasText: /^40\.0 m$/ })).toHaveCount(1);
+    // Croquis de 800 × 500: el dibujo pasa a la mitad, los metros siguen en 40 m y queda en "Encajar"
+    await subirImagen(page, 800, 500);
+    const estado = () => page.evaluate(async () => { const d = (await import('/js/state.js')).state.dibujo; return { t: d.elementos.find(e => e.tipo === 'polilinea'), s: d.elementos.find(e => e.tipo === 'simbolo'), escala: d.escala, h: d.herramienta }; });
+    let e = await estado();
+    expect(e.t.puntos).toEqual([[300, 250], [500, 250]]);
+    expect(e.t.grosor).toBe(3);
+    expect(e.s.escala).toBeCloseTo(0.3, 5);
+    expect(e.escala).toBeCloseTo(0.2, 5);
+    expect(e.h).toBe('encajar');
+    await expect(page.locator('#dib-capa text', { hasText: /^40\.0 m$/ })).toHaveCount(1);
+    await expect(page.locator('.dib-panel-cab')).toContainText('Encajar el dibujo sobre la imagen');
+    // Arrastrar mueve todo el dibujo
+    await arrastrar(page, [400, 250], [450, 300]);
+    e = await estado();
+    expect(e.t.puntos.map(p => p.map(Math.round))).toEqual([[350, 300], [550, 300]]);
+    expect(Math.round(e.s.x + 30 * e.s.escala)).toBe(550);
+    // Agrandar: el vano mide más px pero sigue siendo 40 m
+    await page.getByRole('button', { name: 'Agrandar mucho el dibujo' }).click();
+    e = await estado();
+    expect(e.t.puntos[1][0] - e.t.puntos[0][0]).toBeCloseTo(250, 3);
+    await expect(page.locator('#dib-capa text', { hasText: /^40\.0 m$/ })).toHaveCount(1);
+    // Imagen más tenue y listo
+    await page.locator('#dib-opacidad').fill('0.5');
+    await expect(page.locator('#dib-svg > image')).toHaveAttribute('opacity', '0.5');
+    await page.getByRole('button', { name: 'Listo' }).click();
+    await expect(page.locator('.dib-panel-cab')).toContainText('Lámina');
+    expect(errores).toEqual([]);
+  });
+
   test('proyectos: se guardan en la base para el equipo, se marcan los cambios sin guardar y se vuelven a abrir', async ({ page }) => {
     const errores = []; page.on('pageerror', e => errores.push(e.message));
     await page.setViewportSize({ width: 1280, height: 1100 });
