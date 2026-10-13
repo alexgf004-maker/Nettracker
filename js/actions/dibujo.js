@@ -701,12 +701,15 @@ export function quitarFondoDib() {
 // ── Exportar ──
 function pngDelDibujo() {
   return new Promise((resolve, reject) => {
-    const d = dib(); const p = svgLamina(d); const svg = svgExportable(d);
+    const d = dib(); const p = svgLamina(d);
+    // Al triple de resolución (el dibujo es vectorial): nítido al pegarlo en Word o al acercarse; tope de 8000 px por lado
+    const k = Math.max(1, Math.min(3, 8000 / Math.max(p.w, p.H)));
+    const svg = svgExportable(d, k);
     const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
     const img = new Image();
     img.onload = () => {
-      const c = document.createElement('canvas'); c.width = p.w; c.height = p.H;
-      const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, p.w, p.H); ctx.drawImage(img, 0, 0, p.w, p.H);
+      const c = document.createElement('canvas'); c.width = Math.round(p.w * k); c.height = Math.round(p.H * k);
+      const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(img, 0, 0, c.width, c.height);
       URL.revokeObjectURL(url);
       c.toBlob(b => (b ? resolve(b) : reject(new Error('sin imagen'))), 'image/png');
     };

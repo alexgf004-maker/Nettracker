@@ -95,7 +95,7 @@ export function aDibujo(lev, { ancho = 1600, alto = 1000, margen = 140 } = {}) {
     const texto = [p.nombre, p.nota].filter(Boolean).join('\n');
     if (!texto) return;
     const proyectado = p.tipo === 'poste_nuevo' || p.tipo === 'trafo_nuevo';
-    const tam = 19; const m = medidaEtiqueta({ texto, tam }, textoPoste(p));
+    const tam = 22; const m = medidaEtiqueta({ texto, tam }, textoPoste(p));
     const angs = (vecinos[p.id] || []).map(([vx, vy]) => Math.atan2(vy - y, vx - x));
     // Puntaje: lo más lejos posible de los vanos, mejor arriba (abajo van los metros) y sin salirse de la lámina
     const caja = a => { const ux = Math.cos(a); const uy = Math.sin(a); const dist = 34 + Math.abs(ux) * m.w / 2 + Math.abs(uy) * m.h / 2; return [x + ux * dist - m.w / 2, y + uy * dist - m.h / 2]; };

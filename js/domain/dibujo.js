@@ -52,7 +52,7 @@ const ANCHO_LETRA = 0.68; // mayúsculas en negrita (P1, USUARIO) caben con holg
 // sub: datos del poste al que apunta (altura y estructuras), en una franja blanca debajo del nombre
 export function medidaEtiqueta(el, sub = '') {
   const lineas = String(el.texto || '').split('\n'); const pad = el.tam * 0.45;
-  const ts = el.tam * 0.8; const altoSub = sub ? ts * 1.45 : 0;
+  const ts = el.tam * 0.84; const altoSub = sub ? ts * 1.45 : 0;
   const w = Math.max(Math.max(1, ...lineas.map(l => l.length)) * el.tam * ANCHO_LETRA, sub ? sub.length * ts * ANCHO_LETRA : 0) + pad * 2;
   return { w, h: lineas.length * el.tam * 1.2 + pad * 0.8 + altoSub, hNombre: lineas.length * el.tam * 1.2 + pad * 0.8, pad, lineas, sub, ts };
 }
@@ -147,9 +147,9 @@ function chipMovible(k, cx, cy, off, texto, tam, color, base = null) {
   const [l1, l2] = Array.isArray(texto) ? texto : [texto, ''];
   return `${guia}<g data-chip="${k}">${l2 ? chipDoble(px, py, l1, l2, tam, color) : chipTexto(px, py, l1, tam, color)}</g>`;
 }
-export const medidaChip = (l1, l2, tam) => ({ w: Math.max(String(l1).length * tam * 0.6, String(l2 || '').length * tam * 0.8 * 0.6) + tam, h: l2 ? tam * 1.3 + tam * 0.8 * 1.2 : tam * 1.5 });
+export const medidaChip = (l1, l2, tam) => ({ w: Math.max(String(l1).length * tam * 0.6, String(l2 || '').length * tam * 0.84 * 0.6) + tam, h: l2 ? tam * 1.3 + tam * 0.84 * 1.2 : tam * 1.5 });
 function chipDoble(cx, cy, l1, l2, tam, color) {
-  const { w, h } = medidaChip(l1, l2, tam); const t2 = tam * 0.8;
+  const { w, h } = medidaChip(l1, l2, tam); const t2 = tam * 0.84;
   return `<rect x="${r1(cx - w / 2)}" y="${r1(cy - h / 2)}" width="${r1(w)}" height="${r1(h)}" rx="${r1(tam * 0.55)}" fill="#ffffff" stroke="${color}" stroke-width="${r1(Math.max(1, tam * 0.12))}"/>`
     + `<text x="${r1(cx)}" y="${r1(cy - h / 2 + tam * 1.05)}" text-anchor="middle" font-size="${r1(tam)}" font-weight="800" font-family="${FUENTE}" fill="${NEGRO}">${esc(l1)}</text>`
     + `<text x="${r1(cx)}" y="${r1(cy - h / 2 + tam * 1.3 + t2 * 0.95)}" text-anchor="middle" font-size="${r1(t2)}" font-weight="600" font-family="${FUENTE}" fill="#334155">${esc(l2)}</text>`;
@@ -204,7 +204,7 @@ export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias
           const largo = Math.hypot(x1 - x0, y1 - y0);
           if (!texto[0] || largo < ancho * 10) continue;
           // Al lado de la línea (no encima): abajo en los vanos acostados, a la izquierda en los parados
-          const tam = Math.max(15, ancho * 2.8); const mc = medidaChip(texto[0], texto[1], tam);
+          const tam = Math.max(17, ancho * 3); const mc = medidaChip(texto[0], texto[1], tam);
           let nx = -(y1 - y0) / largo; let ny = (x1 - x0) / largo;
           if (Math.abs(ny) >= 0.45 ? ny < 0 : nx > 0) { nx = -nx; ny = -ny; }
           const sep = Math.abs(ny) * mc.h / 2 + Math.abs(nx) * mc.w / 2 + ancho * 0.8 + tam * 0.25;
@@ -346,29 +346,29 @@ export function altoCajetin(d) {
   const filasSimb = Math.ceil(simbologiaUsada(d.elementos).length / 2);
   const acom = filasAcometidas(d).length;
   const filasDist = filasDistancias(d).length + totalesCajetin(d).length + (acom ? acom + 2 : 0);
-  return Math.round(k * Math.max(230, 92 + Math.max(filasSimb * 34, (filasDist + 1) * 22)));
+  return Math.round(k * Math.max(270, 100 + Math.max(filasSimb * 42, (filasDist + 1) * 28)));
 }
 
 function svgCajetin(d, y0) {
   const { w } = tamano(d); const k = w / 1600; const H = altoCajetin(d);
   const l = d.lamina || {};
-  const pad = 22 * k; const f = 15 * k;
+  const pad = 24 * k; const f = 18.5 * k; // letras del cajetín a buen tamaño para leerse impresas o en Word
   const col = [0, 0.3, 0.64, 0.86, 1].map(p => p * w);
   let s = `<rect x="0" y="${r1(y0)}" width="${r1(w)}" height="${r1(H)}" fill="#ffffff"/><rect x="0" y="${r1(y0)}" width="${r1(w)}" height="${r1(5 * k)}" fill="#0f2a43"/>`;
   col.slice(1, -1).forEach(x => { s += `<line x1="${r1(x)}" y1="${r1(y0 + 18 * k)}" x2="${r1(x)}" y2="${r1(y0 + H - 18 * k)}" stroke="#cbd5e1" stroke-width="${r1(1.5 * k)}"/>`; });
-  const tit = (x, texto) => `<text x="${r1(x + pad)}" y="${r1(y0 + 36 * k)}" font-size="${r1(f * 0.82)}" font-weight="700" letter-spacing="${r1(1.5 * k)}" font-family="${FUENTE}" fill="#64748b">${esc(texto)}</text>`;
+  const tit = (x, texto) => `<text x="${r1(x + pad)}" y="${r1(y0 + 38 * k)}" font-size="${r1(f * 0.78)}" font-weight="700" letter-spacing="${r1(1.5 * k)}" font-family="${FUENTE}" fill="#64748b">${esc(texto)}</text>`;
   // 1. Título y datos
-  s += `<text x="${r1(pad)}" y="${r1(y0 + 52 * k)}" font-size="${r1(f * 1.9)}" font-weight="800" font-family="${FUENTE}" fill="#0f2a43">${esc((l.titulo || 'Plano de red').toUpperCase())}</text>`;
-  if (l.subtitulo) s += `<text x="${r1(pad)}" y="${r1(y0 + 80 * k)}" font-size="${r1(f * 1.05)}" font-weight="600" font-family="${FUENTE}" fill="#334155">${esc(l.subtitulo)}</text>`;
+  s += `<text x="${r1(pad)}" y="${r1(y0 + 58 * k)}" font-size="${r1(f * 1.75)}" font-weight="800" font-family="${FUENTE}" fill="#0f2a43">${esc((l.titulo || 'Plano de red').toUpperCase())}</text>`;
+  if (l.subtitulo) s += `<text x="${r1(pad)}" y="${r1(y0 + 88 * k)}" font-size="${r1(f * 1.05)}" font-weight="600" font-family="${FUENTE}" fill="#334155">${esc(l.subtitulo)}</text>`;
   [['Proyecto / WO', l.proyecto], ['Fecha', l.fecha], ['Elaboró', l.elaboro]].forEach(([e, v], i) => {
-    const y = y0 + (112 + i * 34) * k;
-    s += `<text x="${r1(pad)}" y="${r1(y)}" font-size="${r1(f * 0.75)}" font-weight="700" letter-spacing="${r1(1 * k)}" font-family="${FUENTE}" fill="#64748b">${esc(e.toUpperCase())}</text><text x="${r1(pad)}" y="${r1(y + 17 * k)}" font-size="${r1(f)}" font-weight="700" font-family="${FUENTE}" fill="${NEGRO}">${esc(v || '—')}</text>`;
+    const y = y0 + (124 + i * 42) * k;
+    s += `<text x="${r1(pad)}" y="${r1(y)}" font-size="${r1(f * 0.75)}" font-weight="700" letter-spacing="${r1(1 * k)}" font-family="${FUENTE}" fill="#64748b">${esc(e.toUpperCase())}</text><text x="${r1(pad)}" y="${r1(y + 21 * k)}" font-size="${r1(f)}" font-weight="700" font-family="${FUENTE}" fill="${NEGRO}">${esc(v || '—')}</text>`;
   });
   // 2. Simbología a dos columnas
   s += tit(col[1], 'SIMBOLOGÍA');
   const simb = simbologiaUsada(d.elementos); const anchoCol = (col[2] - col[1] - pad * 2) / 2;
   simb.forEach((it, i) => {
-    const x = col[1] + pad + (i % 2) * anchoCol; const cy = y0 + (62 + Math.floor(i / 2) * 34) * k;
+    const x = col[1] + pad + (i % 2) * anchoCol; const cy = y0 + (70 + Math.floor(i / 2) * 42) * k;
     if (it.clase === 'tramo') {
       const tp = TIPOS_TRAMO[it.clave];
       s += trazosTramo(`M${r1(x)} ${r1(cy)} L${r1(x + 44 * k)} ${r1(cy)}`, it.color || tp.color, 6 * k * tp.ancho, tp.dash);
@@ -386,15 +386,16 @@ function svgCajetin(d, y0) {
   s += tit(col[2], 'DISTANCIAS');
   const tabla = [...filasDistancias(d), ...totalesCajetin(d)];
   if (tabla.length) {
-    const tam = 12.5 * k;
+    const tam = 16 * k;
     const mt = medidaTabla({ tam, encabezado: ['Tramo', 'Metros'], filas: tabla });
     const esc2 = Math.min(1, (col[3] - col[2] - pad * 2) / mt.w);
-    s += `<g transform="translate(${r1(col[2] + pad)} ${r1(y0 + 50 * k)}) scale(${r1(esc2 * 1000) / 1000})">${svgTabla(0, 0, tam, ['Tramo', 'Metros'], tabla)}</g>`;
+    s += `<g transform="translate(${r1(col[2] + pad)} ${r1(y0 + 54 * k)}) scale(${r1(esc2 * 1000) / 1000})">${svgTabla(0, 0, tam, ['Tramo', 'Metros'], tabla)}</g>`;
   }
   // Acometidas (debajo de las distancias)
   const acom = filasAcometidas(d);
   if (acom.length) {
-    const tam = 12.5 * k; const yA = y0 + 50 * k + (tabla.length ? (tabla.length + 1) * medidaTabla({ tam, encabezado: ['Tramo', 'Metros'], filas: tabla }).alto + 8 * k : 0);
+    const tam = 16 * k; const mt0 = tabla.length ? medidaTabla({ tam, encabezado: ['Tramo', 'Metros'], filas: tabla }) : null;
+    const yA = y0 + 54 * k + (mt0 ? (tabla.length + 1) * mt0.alto * Math.min(1, (col[3] - col[2] - pad * 2) / mt0.w) + 10 * k : 0);
     const ma = medidaTabla({ tam, encabezado: ['Acometidas', 'Cant.'], filas: acom });
     const escA = Math.min(1, (col[3] - col[2] - pad * 2) / ma.w);
     s += `<g transform="translate(${r1(col[2] + pad)} ${r1(yA)}) scale(${r1(escA * 1000) / 1000})">${svgTabla(0, 0, tam, ['Acometidas', 'Cant.'], acom)}</g>`;
@@ -440,9 +441,10 @@ export function svgLamina(d, { pantalla = false, ui = 1 } = {}) {
   const marco = `<rect x="0" y="0" width="${w}" height="${h}" fill="none" stroke="#0f2a43" stroke-width="${r1(3 * w / 1600)}"/>`;
   return { w, h, H, fondo, capa, cajetin: conCajetin ? `<g pointer-events="none">${svgCajetin(d, h)}${marco}</g>` : '' };
 }
-export function svgExportable(d) {
+// k: tamaño en píxeles × k (para exportar con más resolución; el dibujo es vectorial)
+export function svgExportable(d, k = 1) {
   const { w, H, fondo, capa, cajetin } = svgLamina(d);
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${H}" viewBox="0 0 ${w} ${H}"><rect width="${w}" height="${H}" fill="#ffffff"/>${fondo}${capa}${cajetin}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.round(w * k)}" height="${Math.round(H * k)}" viewBox="0 0 ${w} ${H}"><rect width="${w}" height="${H}" fill="#ffffff"/>${fondo}${capa}${cajetin}</svg>`;
 }
 
 // Cambia el tamaño arrastrando un tirador (esquina, extremos de línea o cota, vértices de tramo, punto de etiqueta)

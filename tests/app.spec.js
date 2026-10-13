@@ -2606,7 +2606,7 @@ test.describe('Herramienta Dibujar', () => {
     await page.getByRole('button', { name: 'Descargar PNG' }).click();
     const buf = require('fs').readFileSync(await (await descarga).path());
     expect(buf.slice(1, 4).toString()).toBe('PNG');
-    expect([buf.readUInt32BE(16), buf.readUInt32BE(20)]).toEqual([800, 400]);
+    expect([buf.readUInt32BE(16), buf.readUInt32BE(20)]).toEqual([2400, 1200]); // al triple de resolución
     page.once('dialog', dl => dl.accept());
     await page.getByRole('button', { name: 'Nuevo' }).click();
     await expect(page.locator('#dib-capa [data-id]')).toHaveCount(0);
@@ -2682,8 +2682,8 @@ test.describe('Herramienta Dibujar', () => {
     const dl = await descarga;
     expect(dl.suggestedFilename()).toMatch(/^referencia_electrica-\d{4}-\d{2}-\d{2}\.png$/);
     const buf = require('fs').readFileSync(await dl.path());
-    expect(buf.readUInt32BE(16)).toBe(1600);
-    expect(buf.readUInt32BE(20)).toBeGreaterThan(900);
+    expect(buf.readUInt32BE(16)).toBe(4800); // 1600 × 3
+    expect(buf.readUInt32BE(20)).toBeGreaterThan(2700);
     const filas = await page.evaluate(async () => (await import('/js/domain/dibujo.js')).leerFilasTabla('A 1\nB C, 2\n\nD'));
     expect(filas).toEqual([['A', '1'], ['B C', '2'], ['D', '']]);
     expect(errores).toEqual([]);
