@@ -3,7 +3,8 @@ import { db, get, ref, set, update } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { analizarMedicion, filasResumenAnalisis, resultadoDeAnalisis } from '../domain/analisis.js';
-import { analizarMedicionBT } from '../domain/analisis-bt.js';
+import { analizarMedicionBT, analizarSeriesBT, INSTALACIONES_BT } from '../domain/analisis-bt.js';
+import { codigoConSistema } from '../domain/listados.js';
 import { corteSubida, CR_OBLIGATORIOS, cuadroResumen, ESTADOS_CUADRO } from '../domain/resultados.js';
 import { hojaConEstilo } from '../excel.js';
 import { extraerSeries, fechaDePunto } from '../domain/series.js';
@@ -172,13 +173,87 @@ export async function analizarTXT(clave, files) {
   }
 }
 
-// Vuelve a analizar los TXT ya subidos con los datos actuales de los casos
+// Vuelve a analizar los TXT ya subidos con los datos actuales de los casos. En BT, si ya no están en memoria,
+// se recalcula con los registros guardados (series/{campaña}/{caso}) sin volver a subirlos.
 export function recalcularTXT(clave) {
   const archivos = Object.values(txtEnMemoria[clave] || {});
-  if (!archivos.length) return showToast('Primero sube los TXT');
-  analizarArchivos(clave, archivos);
+  if (archivos.length) return analizarArchivos(clave, archivos);
+  if (flujoBT(state.campanas?.[clave]?.area)) return recalcularDesdeSeries(clave);
+  showToast('Primero sube los TXT');
 }
 export const hayTXTEnMemoria = clave => Object.keys(txtEnMemoria[clave] || {}).length > 0;
+// Casos de BT que se pueden recalcular sin el TXT (se analizaron y se guardaron sus registros)
+export const recalculablesBT = clave => Object.entries(state.campanas?.[clave]?.casos || {}).filter(([, c]) => c.resultado?.origen === 'txt' && c.resultado.graficas);
+
+// ── BT: RECALCULAR SIN EL TXT Y CORREGIR LA INSTALACIÓN ──
+
+const datosBT = c => ({ tipoInstalacion: c.tipoInstalacion, urbanidad: c.urbanidad });
+// Análisis de un caso de BT con su TXT en memoria o, si no está, con los registros guardados (null si no hay)
+async function analisisBT(clave, id, c) {
+  const archivo = txtEnMemoria[clave]?.[id];
+  if (archivo) return analizarMedicionBT(archivo.nombre, archivo.texto, datosBT(c));
+  if (!c.resultado?.graficas) return null;
+  const snap = await get(ref(db, `series/${clave}/${id}`));
+  if (!snap.exists()) return null;
+  const previo = c.resultado.analisis || {};
+  return analizarSeriesBT(previo.archivo || c.codigo || c.codigoEnte, snap.val(), previo, datosBT(c));
+}
+
+export async function recalcularDesdeSeries(clave) {
+  const lista = recalculablesBT(clave);
+  if (!lista.length) return showToast('Primero sube los TXT');
+  const filas = []; const sinCaso = [];
+  for (const [id, c] of lista) {
+    const analisis = await analisisBT(clave, id, c);
+    if (!analisis) { sinCaso.push(c.codigo || c.codigoEnte); continue; }
+    filas.push({ id, codigo: c.codigo || c.codigoEnte, analisis, resultado: resultadoDeAnalisis(analisis), manual: false, seriesMeta: { nominal: analisis.nominal ?? null, tolerancia: analisis.tolerancia ?? null } });
+  }
+  filas.sort((x, y) => x.codigo.localeCompare(y.codigo));
+  state.analisisTXT = { clave, filas, sinCaso, desdeSeries: true };
+  render();
+}
+
+// La instalación verificada en campo (1 monofásico, 2 bifásico, 3 trifásico) se pone a todos los casos del usuario en la
+// campaña (su CR y sus DA/DF, por NC), queda como dato corregido a mano y en las DA/DF cambia el dígito del código.
+// Lo que ya estaba analizado se recalcula al momento.
+export async function corregirInstalacionBT(clave, id, digito) {
+  const g = state.campanas?.[clave];
+  const caso = g?.casos?.[id]; const tipo = INSTALACIONES_BT[digito];
+  if (!caso || !tipo) return;
+  const delUsuario = Object.entries(g.casos).filter(([k, c]) => k === id || (caso.nc && c.nc === caso.nc));
+  const datos = {}; const series = {};
+  const firma = { por: state.sesionUsuario?.nombre || '', fecha: hoyLocal() };
+  for (const [k, c] of delUsuario) {
+    // Se copia también en la memoria para recalcular ya, sin esperar a la base
+    c.tipoInstalacion = tipo; c.manual = { ...(c.manual || {}), tipoInstalacion: true };
+    datos[`casos/${k}/tipoInstalacion`] = tipo; datos[`casos/${k}/manual/tipoInstalacion`] = true;
+    if (c.tipo === 'DA' || c.tipo === 'DF') {
+      const antes = c.codigo || c.codigoEnte; const nuevo = codigoConSistema(antes, digito);
+      if (nuevo !== antes) { c.codigo = nuevo; c.manual.codigo = true; datos[`casos/${k}/codigo`] = nuevo; datos[`casos/${k}/manual/codigo`] = true; }
+    }
+  }
+  let recalculados = 0;
+  for (const [k, c] of delUsuario) {
+    if (c.resultado?.origen !== 'txt') continue;
+    const a = await analisisBT(clave, k, c);
+    if (!a) continue;
+    recalculados++;
+    const res = { ...resultadoDeAnalisis(a), analisis: a, origen: 'txt', ...firma, ...(c.resultado.graficas ? { graficas: true } : {}) };
+    c.resultado = res; datos[`casos/${k}/resultado`] = res;
+    if (c.resultado.graficas) { series[`${k}/nominal`] = a.nominal ?? null; series[`${k}/tolerancia`] = a.tolerancia ?? null; }
+  }
+  if (Object.keys(series).length) update(ref(db, 'series/' + clave), series);
+  await update(ref(db, 'campanas/' + clave), datos);
+  showToast(`Instalación ${tipo.toLowerCase()}${delUsuario.length > 1 ? ` en ${delUsuario.length} casos del usuario` : ''}${recalculados ? ` · ${recalculados} ${recalculados === 1 ? 'medición recalculada' : 'mediciones recalculadas'}` : ''}`);
+  // Si está abierta la vista previa del análisis, se recalcula con la instalación nueva
+  const imp = state.analisisTXT;
+  if (imp?.clave === clave) {
+    if (imp.desdeSeries) return recalcularDesdeSeries(clave);
+    const archivos = imp.filas.map(f => txtEnMemoria[clave]?.[f.id]).filter(Boolean);
+    if (archivos.length) return analizarArchivos(clave, archivos);
+  }
+  render();
+}
 
 export function cerrarAnalisis() { state.analisisTXT = null; render(); }
 
@@ -188,8 +263,10 @@ export function guardarAnalisis() {
   const datos = {};
   const firma = { por: state.sesionUsuario?.nombre || '', fecha: hoyLocal() };
   imp.filas.forEach(f => {
-    datos[`casos/${f.id}/resultado`] = { ...f.resultado, analisis: f.analisis, origen: 'txt', ...firma, ...(f.series ? { graficas: true } : {}) };
+    datos[`casos/${f.id}/resultado`] = { ...f.resultado, analisis: f.analisis, origen: 'txt', ...firma, ...(f.series || f.seriesMeta ? { graficas: true } : {}) };
   });
+  // Recalculado con los registros guardados: solo cambian la nominal y la tolerancia de la banda
+  imp.filas.filter(f => f.seriesMeta).forEach(f => update(ref(db, `series/${imp.clave}/${f.id}`), f.seriesMeta));
   // Las series van aparte (series/{campaña}/{caso}) para no cargarlas con la campaña; se leen al abrir las gráficas
   const series = {};
   imp.filas.forEach(f => { if (f.series) series[f.id] = { ...f.series, nominal: f.analisis.nominal ?? null, tolerancia: f.analisis.tolerancia ?? null, codigo: f.codigo }; });

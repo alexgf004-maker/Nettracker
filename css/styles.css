@@ -1703,3 +1703,4 @@ button.aviso-inicio-fila { cursor: pointer; }
 .eqf-op-tx { display: flex; flex-direction: column; min-width: 0; }
 .eqf-op-tx small { color: var(--text3); font-size: 12px; }
 .eqf-op .ic-check { color: var(--primary); }
+.sel-instalacion { font-size: 12px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 7px; background: var(--white); color: var(--text); max-width: 140px; }

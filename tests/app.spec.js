@@ -1854,6 +1854,79 @@ test.describe('Precampaña', () => {
     expect(valor['casos/CR1O2026001/resultado']).toMatchObject({ medicion: 'valida', febNoPer: 10, tolerancia: 'fuera', origen: 'txt', analisis: { tipoCaso: 'Regulatorio BT', nivelTension: 120 } });
   });
 
+  test('BT: con los registros guardados se recalcula igual que con el TXT', async ({ page }) => {
+    app = await abrirApp(page);
+    const txt = hacerTXT({ v: i => (i % 10 === 0 ? [130, 121.37, 0] : [120.04, 119.96, 0]) });
+    const r = await page.evaluate(async t => {
+      const { analizarMedicionBT, analizarSeriesBT } = await import('/js/domain/analisis-bt.js');
+      const { extraerSeries } = await import('/js/domain/series.js');
+      const datos = { tipoInstalacion: 'BIFÁSICO', urbanidad: 'U' };
+      const conTXT = analizarMedicionBT('CR1O2026001.txt', t, datos);
+      const serie = JSON.parse(JSON.stringify(extraerSeries(t))); // como vuelve de la base
+      const conSerie = analizarSeriesBT('CR1O2026001', serie, conTXT, datos);
+      return { conTXT, conSerie, decimales: serie.U['2'].v[0] };
+    }, txt);
+    expect(r.conSerie).toEqual(r.conTXT);
+    expect(r.conTXT.febNoPer).toBeCloseTo(0.1, 4);
+    expect(r.decimales).toBe(121.37); // se guardan con 2 decimales
+  });
+
+  test('BT: corregir la instalación verificada en campo recalcula sin volver a subir el TXT', async ({ page }) => {
+    // Listado: monofásico; en campo es bifásico (el TXT trae dos fases)
+    const txt = hacerTXT({ v: () => [120, 120, 0] });
+    app = await abrirApp(page);
+    const { serie, analisis } = await page.evaluate(async t => {
+      const { analizarMedicionBT } = await import('/js/domain/analisis-bt.js');
+      const { extraerSeries } = await import('/js/domain/series.js');
+      return { serie: extraerSeries(t), analisis: analizarMedicionBT('CR1O2026001.txt', t, { tipoInstalacion: 'MONOFÁSICO', urbanidad: 'U' }) };
+    }, txt);
+    expect(analisis.estado).toBe('ADVERTENCIA');
+    const datos = conCampanaBT();
+    const casos = datos.campanas['2026-10_CPT-BT'].casos;
+    Object.assign(casos.CR1O2026001, { tipoInstalacion: 'MONOFÁSICO', urbanidad: 'U', resultado: { medicion: 'revisar', analisis, origen: 'txt', graficas: true } });
+    casos.DA1O2026021O00 = caso('DA1O2026021O00', '901', { crRelacionado: 'CR1O2026001', tipoInstalacion: 'MONOFÁSICO', urbanidad: 'U' });
+    datos.series = { '2026-10_CPT-BT': { CR1O2026001: { ...serie, nominal: 120, tolerancia: 0.07, codigo: 'CR1O2026001' } } };
+    app = await abrirApp(page, { usuario: 'Francisco Chulo', datos });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-BT'); setCampanaVista('resultados'); });
+    // Sin TXT en memoria igual se puede recalcular
+    await expect(page.getByRole('button', { name: 'Recalcular con los datos actuales' })).toBeVisible();
+    await page.locator('.tabla-casos:not(.tabla-pert) tr', { hasText: 'CR1O2026001' }).click();
+    await expect(page.locator('.modal')).toContainText('Ahora: MONOFÁSICO (control de puntos)');
+    await page.locator('.modal').getByRole('button', { name: 'Bifásico' }).click();
+    await expect(page.locator('.modal')).toHaveCount(0);
+    await expect(page.locator('.toast')).toContainText('Instalación bifásico en 2 casos del usuario · 1 medición recalculada');
+    const escritura = (await app.escrituras()).findLast(([, ruta]) => ruta === 'campanas/2026-10_CPT-BT')[2];
+    expect(escritura).toMatchObject({
+      'casos/CR1O2026001/tipoInstalacion': 'BIFÁSICO', 'casos/CR1O2026001/manual/tipoInstalacion': true,
+      'casos/DA1O2026021O00/tipoInstalacion': 'BIFÁSICO', 'casos/DA1O2026021O00/codigo': 'DA1O2026022O00', 'casos/DA1O2026021O00/manual/codigo': true,
+      'casos/CR1O2026001/resultado': { medicion: 'valida', febNoPer: 0, tolerancia: 'dentro', origen: 'txt', graficas: true, analisis: { estado: 'VALIDA', tipoInstalacion: 'BIFÁSICO' } },
+    });
+    expect(await app.escrituras()).toContainEqual(['update', 'series/2026-10_CPT-BT', { 'CR1O2026001/nominal': 120, 'CR1O2026001/tolerancia': 0.07 }]);
+
+    // Recalcular todo sin TXT: vista previa con los registros guardados
+    await page.getByRole('button', { name: 'Recalcular con los datos actuales' }).click();
+    const modal = page.locator('.modal');
+    await expect(modal).toContainText('Recalculado con los registros guardados');
+    await expect(modal).toContainText('1 válidas');
+    await expect(modal.getByLabel('Instalación de CR1O2026001')).toHaveValue('2');
+  });
+
+  test('BT: en la vista previa del análisis se corrige la instalación y se recalcula', async ({ page }) => {
+    const datos = conCampanaBT();
+    Object.assign(datos.campanas['2026-10_CPT-BT'].casos.CR1O2026001, { tipoInstalacion: 'MONOFÁSICO', urbanidad: 'U' });
+    app = await abrirApp(page, { usuario: 'Francisco Chulo', datos });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-BT'); setCampanaVista('resultados'); });
+    await page.locator('label', { hasText: 'Analizar TXT' }).locator('input').setInputFiles([{ name: 'CR1O2026001.txt', mimeType: 'text/plain', buffer: Buffer.from(hacerTXT({ v: () => [120, 120, 0] })) }]);
+    const modal = page.locator('.modal');
+    await expect(modal).toContainText('1 por revisar');
+    await expect(modal).toContainText('Verificar con planilla física');
+    await modal.getByLabel('Instalación de CR1O2026001').selectOption('2');
+    await expect(modal).toContainText('1 válidas');
+    await expect(modal).toContainText('0 por revisar');
+  });
+
   test('análisis de TXT: misma lógica que la macro CalidadEnergia', async ({ page }) => {
     app = await abrirApp(page);
     const txts = {
