@@ -88,6 +88,26 @@ export function caja(el) {
   }
 }
 
+// Escala (× f, desde el origen) y corre (dx, dy) un elemento con sus tamaños: para encajar todo el dibujo sobre una imagen
+export function transformar(el, f, dx = 0, dy = 0) {
+  const X = x => x * f + dx; const Y = y => y * f + dy; const P = ([x, y]) => [X(x), Y(y)];
+  const off = o => (o ? [o[0] * f, o[1] * f] : o);
+  const offs = o => (o ? Object.fromEntries(Object.entries(o).map(([k, v]) => [k, off(v)])) : o);
+  const r = { ...el };
+  if (el.grosor) r.grosor = el.grosor * f;
+  if (el.tam) r.tam = el.tam * f;
+  if (el.desfase) r.desfase = off(el.desfase);
+  if (el.desfases) r.desfases = offs(el.desfases);
+  switch (el.tipo) {
+    case 'linea': case 'flecha': case 'cota': return { ...r, x1: X(el.x1), y1: Y(el.y1), x2: X(el.x2), y2: Y(el.y2) };
+    case 'trazo': case 'polilinea': return { ...r, puntos: el.puntos.map(P) };
+    case 'rect': case 'elipse': return { ...r, x: X(el.x), y: Y(el.y), w: el.w * f, h: el.h * f };
+    case 'simbolo': return { ...r, x: X(el.x), y: Y(el.y), escala: el.escala * f };
+    case 'etiqueta': return { ...r, x: X(el.x), y: Y(el.y), tx: X(el.tx), ty: Y(el.ty) };
+    default: return { ...r, x: X(el.x), y: Y(el.y) };
+  }
+}
+
 // Mueve un elemento dx, dy (la etiqueta mueve su cuadro; la punta de la línea guía se queda en el punto)
 export function mover(el, dx, dy) {
   switch (el.tipo) {
@@ -403,7 +423,9 @@ export function svgLamina(d, { pantalla = false, ui = 1 } = {}) {
   const { w, h } = tamano(d);
   const conCajetin = d.lamina?.activa !== false;
   const H = h + (conCajetin ? altoCajetin(d) : 0);
-  const fondo = d.fondo ? `<image href="${d.fondo.src}" x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="none"/>` : `<rect width="${w}" height="${h}" fill="#ffffff"/>`;
+  // La imagen de fondo puede ir más tenue para que la red se lea encima (fondoOpacidad, 0.2 a 1)
+  const op = d.fondoOpacidad && d.fondoOpacidad < 1 ? ` opacity="${d.fondoOpacidad}"` : '';
+  const fondo = d.fondo ? `<rect width="${w}" height="${h}" fill="#ffffff"/><image href="${d.fondo.src}" x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="none"${op}/>` : `<rect width="${w}" height="${h}" fill="#ffffff"/>`;
   const l = d.lamina || {};
   const ver = { calibre: l.verCalibre !== false, altura: l.verAltura !== false, estructuras: l.verEstructuras !== false, acometidas: l.verAcometidas !== false };
   // Un poste con etiqueta lleva sus datos dentro de la etiqueta (un solo rótulo por poste, sin encimarse)

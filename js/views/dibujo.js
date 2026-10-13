@@ -48,6 +48,7 @@ const AYUDA = {
   texto: 'Toca donde va el texto y escríbelo en el panel.', flecha: 'Arrastra desde el inicio hasta donde apunta la flecha.',
   linea: 'Arrastra para trazar la línea.', rect: 'Arrastra para dibujar el rectángulo.', elipse: 'Arrastra para dibujar el círculo.', trazo: 'Dibuja a mano alzada.',
   calibrar: 'Traza una línea sobre algo cuya medida conozcas y escribe cuántos metros mide.',
+  encajar: 'Arrastra el dibujo hasta que calce con las calles de la imagen; agrándalo o achícalo con − / +. Los metros no cambian.',
 };
 
 export function renderDibujar() {
@@ -117,6 +118,7 @@ function barraHerramientas(d, h) {
 
 function tituloPanel(d, sel, h) {
   if (h === 'calibrar') return 'Calibrar la escala';
+  if (h === 'encajar') return 'Encajar el dibujo sobre la imagen';
   if (sel) return sel.tipo === 'simbolo' ? SIMBOLOS[sel.simbolo]?.nombre || 'Símbolo' : sel.tipo === 'polilinea' ? (d.tramo === sel.id ? 'Trazando tramo' : nombreRed(sel)) : NOMBRE_TIPO[sel.tipo] || 'Elemento';
   if (h === 'simbolo') return SIMBOLOS[d.simbolo]?.nombre || 'Símbolo';
   if (h === 'tramo') return 'Tramo de red';
@@ -155,6 +157,14 @@ function panel(d, sel, h, p) {
   const acciones = (extra = '') => seccion('', `<div class="dib-acciones-el">${extra}<button class="b b-g" onclick="duplicarDib()">Duplicar</button><button class="b b-g" onclick="alFrenteDib()">Al frente</button><button class="b b-l dib-borrar" onclick="borrarDib()">Borrar</button></div>`);
   const nota = t => `<div class="page-sub">${t}</div>`;
 
+  const opacidad = () => `<label class="dib-opacidad">Imagen de fondo más tenue<input id="dib-opacidad" type="range" min="0.2" max="1" step="0.05" value="${d.fondoOpacidad || 1}" oninput="setOpacidadFondoDib(this.value)"></label>`;
+  // Encajar todo el dibujo sobre la imagen de fondo
+  if (h === 'encajar') {
+    return seccion('', `${nota(AYUDA.encajar)}`)
+      + seccion('Tamaño del dibujo', `<div class="dib-acciones-el"><button class="b b-g" onclick="escalarTodoDib(0.8)" aria-label="Achicar mucho el dibujo">−−</button><button class="b b-g" onclick="escalarTodoDib(0.96)" aria-label="Achicar el dibujo">−</button><button class="b b-g" onclick="escalarTodoDib(1.04)" aria-label="Agrandar el dibujo">+</button><button class="b b-g" onclick="escalarTodoDib(1.25)" aria-label="Agrandar mucho el dibujo">++</button></div>`)
+      + (d.fondo ? seccion('Imagen', opacidad()) : '')
+      + seccion('', `<button class="b b-p" onclick="setHerramientaDib('seleccionar')"><i class="ic ic-check"></i> Listo</button>`);
+  }
   // Calibrar
   if (h === 'calibrar') {
     const lista = d.calibracion && Math.hypot(d.calibracion.x2 - d.calibracion.x1, d.calibracion.y2 - d.calibracion.y1) > 10;
@@ -253,7 +263,8 @@ function panelLamina(d) {
       <div class="field"><label>Tabla de distancias</label><select id="dib-lam-distancias" onchange="setLaminaDib('distancias', this.value)"><option value="auto" ${l.distancias !== 'manual' ? 'selected' : ''}>Automática (entre puntos etiquetados)</option><option value="manual" ${l.distancias === 'manual' ? 'selected' : ''}>Manual</option></select></div>
       ${l.distancias === 'manual' ? `<div class="field"><label>Filas: tramo y metros, una por línea (o pegadas de Excel)</label><textarea id="dib-lam-filas" rows="3" placeholder="P1 – W1, 50" onchange="setLaminaDib('filas', this.value)">${esc((l.filas || []).map(f => f.join(', ')).join('\n'))}</textarea></div>` : ''}
       <div class="page-sub">${l.distancias === 'manual' ? 'Escribe las distancias a mano.' : 'La tabla se arma sola entre los puntos etiquetados que están sobre cada tramo, con los metros de los vanos.'}</div>` : ''}`);
-  if (d.fondo) html += seccion('Imagen de fondo', '<button class="b b-l" onclick="quitarFondoDib()">Quitar imagen</button>');
+  if (d.fondo) html += seccion('Imagen de fondo', `<label class="dib-opacidad">Más tenue para que la red se lea encima<input id="dib-opacidad" type="range" min="0.2" max="1" step="0.05" value="${d.fondoOpacidad || 1}" oninput="setOpacidadFondoDib(this.value)"></label>
+    <div class="dib-acciones-el">${d.elementos.length ? `<button class="b b-g" onclick="setHerramientaDib('encajar')">Encajar el dibujo sobre la imagen</button>` : ''}<button class="b b-l" onclick="quitarFondoDib()">Quitar imagen</button></div>`);
   html += seccion('Atajos', '<div class="page-sub">V seleccionar · Supr borrar · Ctrl+Z deshacer · + / − zoom · 0 ajustar · barra espaciadora + arrastrar para moverte · Ctrl + rueda zoom · Esc soltar</div>');
   return html;
 }
