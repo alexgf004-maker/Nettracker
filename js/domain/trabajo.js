@@ -126,6 +126,10 @@ export const ETAPAS = {
 // Agrupa las instalaciones de campaña por mes/año y área, junto con las campañas importadas
 // de los listados del ente (guardadas en campanas/{clave} con sus casos).
 // La clave (p. ej. 2026-09_CPT-MT) sirve también como llave en Firebase (campanas/{clave}).
+// CPT BT lleva otro flujo de campaña: sin precampaña (no hay visita previa del contratista) ni multiplicadores;
+// se programan las fechas desde el listado y las cartas se entregan al instalar (se generan por fecha)
+export const flujoBT = area => area === 'CPT BT';
+
 export function agruparCampanas(registros, hoy, guardadas = {}) {
   const campanas = new Map();
   const nueva = (clave, periodo, area) => {

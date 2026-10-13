@@ -237,6 +237,16 @@ En el detalle de la campaña:
 - Resumen de válidas, fallidas, FT y sin resultado; en CPT MT, CR válidas contra 38.
 - Exportar cuadro resumen con todos los casos del mes (también los no medidos). Formato provisional hasta tener uno ya entregado.
 
+## Campaña de CPT BT (otro flujo)
+`flujoBT(area)` en `js/domain/trabajo.js` (confirmado con el equipo):
+- No hay precampaña (el contratista no hace visita previa con fotos) ni multiplicadores. Pestañas: Casos · Fechas · Resultados · Mediciones. Los pasos de la tarjeta son Listado (datos completos), Fechas, Resultados y Entrega; en lugar de "Listos para medir" se cuentan los programados.
+- Casos: se suben los listados, se completan con el control de puntos y se sacan el listado y el mapa, igual que MT.
+- Fechas: con el mismo Excel "Usuarios seleccionados"; todos los casos se programan (no hay estado de multiplicador). La tabla muestra CT/DS y medidor; el Excel de cada Fecha lleva Transformador y Medidor en lugar de Multiplicador, Corrientes y Conexión (`COLUMNAS_FECHA_BT`) y al enviar a Despachos el transformador va en las notas y el medidor en su columna, como el formato de despacho de BT.
+- Cartas por Fecha: se entregan al instalar, así que cada Fecha tiene "Cartas" (solo sus casos, mismo texto, la visita dice "el {día de instalación}"); se marca en `campanas/{clave}/fechas/{n}/cartas`.
+- Resultados: se suben 105 CR (`CR_OBLIGATORIOS` en `domain/resultados.js`: MT 38, BT 105), con el mismo corte "Hasta aquí se sube" y en el cuadro resumen. El análisis de los TXT de BT se cambiará por la macro de BT (pendiente de recibirla).
+
+**Perturbaciones del mes (MT y BT)**: el ente manda 12 DA y 12 DF por mes para MT y BT juntas (normalmente 9 de BT y 3 de MT) y se suben 9 de cada tipo: en orden de código, las primeras 9 válidas sin importar el área; si una falla o no se mide, entra la siguiente (`subidaPerturbaciones`). En Resultados de cualquier área, el bloque "Perturbaciones del mes · MT y BT" muestra las DA y DF de las dos campañas del mes con área, equipo, situación y si se sube, no entra, está pendiente o ya no se sube; cuántas sube cada área, hasta cuál se sube y, si faltan, hasta cuál se subiría si las pendientes salen válidas.
+
 ## Excel que genera la app
 
 - Librería: **xlsx-js-style** (SheetJS con estilos) desde jsDelivr; lee y escribe igual que SheetJS y además guarda formato. En las pruebas se carga desde `node_modules/xlsx-js-style`.

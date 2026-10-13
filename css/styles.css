@@ -846,6 +846,7 @@ label.b { cursor: pointer; }
 .boleto-campos label { color: var(--text3); }
 .boleto-campos input { background: var(--bg); border: 1px solid var(--border); color: var(--text); color-scheme: light; }
 .boleto-avisos { background: var(--yellow-light); border-color: #fde68a; color: #92400e; }
+.boleto-nota { margin: 8px 14px 12px; font-size: 12px; color: #047857; display: flex; align-items: center; gap: 6px; }
 .boleto-acciones .hero-btn { color: var(--text2); background: var(--white); border-color: var(--border); }
 .boleto-acciones .hero-btn.blanco { background: var(--degradado); border-color: transparent; color: #fff; }
 .camp-card-top.entregada { background-image: var(--onda), linear-gradient(120deg, #065f46, #10b981); }
@@ -1680,3 +1681,10 @@ button.aviso-inicio-fila { cursor: pointer; }
   .lev-elegir .dib-estr-lista { max-height: 38vh; }
 }
 .lev-acom > .lev-op .lev-op-v { white-space: normal; text-align: right; }
+
+/* Perturbaciones del mes (DA y DF de MT y BT juntas) */
+.pert-tipo { margin-top: 12px; }
+.pert-tipo .meta { margin-bottom: 8px; }
+.pert-tipo .meta-tx small + small { margin-top: 2px; }
+.pert-n { display: inline-block; min-width: 22px; color: var(--text3); font-weight: 600; }
+.tabla-r tr.fila-otra-area td { background: var(--bg); }

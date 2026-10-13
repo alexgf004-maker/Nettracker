@@ -3,8 +3,7 @@ import { db, get, ref, set, update } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { analizarMedicion, filasResumenAnalisis, resultadoDeAnalisis } from '../domain/analisis.js';
-import { corteSubida, cuadroResumen, ESTADOS_CUADRO } from '../domain/resultados.js';
-import { CR_OBLIGATORIOS_MT } from '../domain/multiplicadores.js';
+import { corteSubida, CR_OBLIGATORIOS, cuadroResumen, ESTADOS_CUADRO } from '../domain/resultados.js';
 import { hojaConEstilo } from '../excel.js';
 import { extraerSeries, fechaDePunto } from '../domain/series.js';
 import { agruparCampanas, hoyLocal, MESES } from '../domain/trabajo.js';
@@ -43,14 +42,14 @@ export function guardarResultado() {
 }
 
 // Cuadro resumen con el formato que entrega el equipo: CR a la izquierda (CASO, ESTADO, COMENTARIO), DA/DF a la
-// derecha, conteos con fórmulas y, en MT, el caso hasta el que se cargan las 38 mediciones.
+// derecha, conteos con fórmulas y el caso hasta el que se cargan las mediciones (38 en MT, 105 en BT).
 export function exportarCuadroResumen(clave) {
   const c = agruparCampanas(state.records, hoyLocal(), state.campanas).find(x => x.clave === clave);
   if (!c) return;
   const filas = filasResultados(c);
   const { cr, otros } = cuadroResumen(filas);
-  const esMT = c.area === 'CPT MT';
-  const corte = esMT ? corteSubida(filas, CR_OBLIGATORIOS_MT) : null;
+  const obligatorios = CR_OBLIGATORIOS[c.area];
+  const corte = obligatorios ? corteSubida(filas, obligatorios) : null;
   const ws = {};
   const AZUL = '002060';
   const fin = Math.max(2, cr.length + 1); // última fila de CR
@@ -71,7 +70,7 @@ export function exportarCuadroResumen(clave) {
     const [c1, c2, c3] = col === 'A' ? ['A', 'B', 'C'] : ['H', 'I', 'J'];
     pon(c1 + '1', 'CASO', titulo); pon(c2 + '1', 'ESTADO', titulo); pon(c3 + '1', 'COMENTARIO', titulo);
   });
-  // CR, con la columna K que acumula las válidas (DT o FT) para encontrar el caso 38
+  // CR, con la columna K que acumula las válidas (DT o FT) para encontrar el caso hasta el que se sube
   let acumulado = 0;
   cr.forEach((x, i) => {
     const r = i + 2;
@@ -89,9 +88,9 @@ export function exportarCuadroResumen(clave) {
   pon('E7', 'No instalada', { ...colorEstado('No instalada'), font: { bold: true, color: { rgb: 'FF0000' } } }); pon('F7', n('No instalada'), { font: { color: { rgb: AZUL } } }, `COUNTIFS(${rango('B')},"No instalada")`);
   pon('E8', 'NO VÁLIDAS', { ...titulo, border: borde, font: { bold: true, sz: 12, color: { rgb: 'FFFFFF' } } }); pon('F8', n('Fallida') + n('No instalada'), { ...titulo, font: { bold: true, sz: 12, color: { rgb: 'FF4747' } } }, 'SUM(F6:F7)');
   const merges = [];
-  if (esMT) {
+  if (obligatorios) {
     pon('E11', 'Número de mediciones a subir', titulo); merges.push({ s: { r: 10, c: 4 }, e: { r: 10, c: 5 } });
-    pon('G11', CR_OBLIGATORIOS_MT, { fill: { patternType: 'solid', fgColor: { rgb: '00B050' } }, font: { bold: true, color: { rgb: 'FFFF00' } } });
+    pon('G11', obligatorios, { fill: { patternType: 'solid', fgColor: { rgb: '00B050' } }, font: { bold: true, color: { rgb: 'FFFF00' } } });
     pon('E12', 'Número de caso hasta que se cargará', { fill: { patternType: 'solid', fgColor: { rgb: '8497B0' } }, font: { bold: true, color: { rgb: 'FFFFFF' } } }); merges.push({ s: { r: 11, c: 4 }, e: { r: 12, c: 4 } });
     pon('F12', corte.codigo || `Faltan ${corte.faltan}`, { fill: { patternType: 'solid', fgColor: { rgb: '000000' } }, font: { bold: true, sz: 14, color: { rgb: 'FFFF00' } } },
       `IFERROR(INDEX(${rango('A')},MATCH(G11,${rango('K')},0)),"Faltan "&(G11-MAX(${rango('K')})))`);
@@ -116,7 +115,7 @@ export function exportarCuadroResumen(clave) {
     pon('I' + (base + 3), 'TOTAL', { ...titulo, border: borde, font: { bold: true, sz: 12, color: { rgb: 'FFFFFF' } } });
     pon('J' + (base + 3), m('Válida') + m('Fallida') + m('No instalada'), { ...titulo, font: { bold: true, sz: 12, color: { rgb: 'FFFF00' } } }, `SUM(J${base}:J${base + 2})`);
   }
-  const ultima = Math.max(fin, otros.length + 1, otros.length ? Math.max(9, otros.length + 3) + 3 : 0, esMT ? 13 : 8);
+  const ultima = Math.max(fin, otros.length + 1, otros.length ? Math.max(9, otros.length + 3) + 3 : 0, obligatorios ? 13 : 8);
   ws['!ref'] = `A1:K${ultima}`;
   ws['!merges'] = merges;
   ws['!cols'] = [17.3, 15.7, 44.6, 11.9, 28.4, 19.9, 11.4, 17.4, 15, 30.7, 11.7].map(wch => ({ wch }));
