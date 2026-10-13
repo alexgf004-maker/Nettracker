@@ -2606,7 +2606,7 @@ test.describe('Herramienta Dibujar', () => {
     await page.getByRole('button', { name: 'Descargar PNG' }).click();
     const buf = require('fs').readFileSync(await (await descarga).path());
     expect(buf.slice(1, 4).toString()).toBe('PNG');
-    expect([buf.readUInt32BE(16), buf.readUInt32BE(20)]).toEqual([800, 400]);
+    expect([buf.readUInt32BE(16), buf.readUInt32BE(20)]).toEqual([2400, 1200]); // al triple de resolución
     page.once('dialog', dl => dl.accept());
     await page.getByRole('button', { name: 'Nuevo' }).click();
     await expect(page.locator('#dib-capa [data-id]')).toHaveCount(0);
@@ -2682,8 +2682,8 @@ test.describe('Herramienta Dibujar', () => {
     const dl = await descarga;
     expect(dl.suggestedFilename()).toMatch(/^referencia_electrica-\d{4}-\d{2}-\d{2}\.png$/);
     const buf = require('fs').readFileSync(await dl.path());
-    expect(buf.readUInt32BE(16)).toBe(1600);
-    expect(buf.readUInt32BE(20)).toBeGreaterThan(900);
+    expect(buf.readUInt32BE(16)).toBe(4800); // 1600 × 3
+    expect(buf.readUInt32BE(20)).toBeGreaterThan(2700);
     const filas = await page.evaluate(async () => (await import('/js/domain/dibujo.js')).leerFilasTabla('A 1\nB C, 2\n\nD'));
     expect(filas).toEqual([['A', '1'], ['B C', '2'], ['D', '']]);
     expect(errores).toEqual([]);
@@ -3219,6 +3219,20 @@ test.describe('Levantamiento en campo', () => {
     await page.getByRole('button', { name: 'Sumar acometida 120 A' }).click();
     await page.getByRole('button', { name: 'Sumar acometida 240' }).click();
     await expect(page.locator('#lev-acom-a')).toHaveText('2');
+    // Al sumar, la hoja se queda donde estaba (no vuelve arriba)
+    const hojaScroll = () => page.locator('.lev-hoja-cuerpo').evaluate(e => e.scrollTop);
+    await page.setViewportSize({ width: 412, height: 760 });
+    await page.locator('.lev-hoja-cuerpo').evaluate(e => { e.scrollTop = e.scrollHeight; e.dispatchEvent(new Event('scroll')); });
+    const abajo = await hojaScroll();
+    expect(abajo).toBeGreaterThan(0);
+    await page.getByRole('button', { name: 'Sumar acometida 120 B' }).click();
+    await expect(page.locator('#lev-acom-b')).toHaveText('1');
+    const [top, alto, vis] = await page.locator('.lev-hoja-cuerpo').evaluate(e => [e.scrollTop, e.scrollHeight, e.clientHeight]);
+    expect(top).toBe(Math.min(abajo, alto - vis)); // sigue abajo, no volvió arriba
+    expect(top).toBeGreaterThan(0);
+    await page.getByRole('button', { name: 'Restar acometida 120 B' }).click();
+    await expect(page.locator('#lev-acom-b')).toHaveText('0');
+    await page.setViewportSize({ width: 1280, height: 1100 });
     await expect(page.locator('#lev-acom-d')).toHaveText('1');
     await context.setGeolocation({ latitude: 13.50027, longitude: -88.87, accuracy: 4 });
     await expect(page.locator('#lev-gps')).toHaveText('GPS ±4 m');

@@ -75,7 +75,7 @@ function renderDetalle(id, l) {
   const pest = (k, t, dis = false) => `<button class="lev-tab ${hoja === k ? 'activo' : ''}" ${dis ? 'disabled' : ''} onclick="setHojaLev('${k}')">${t}</button>`;
   html += `<section class="lev-hoja" aria-label="Controles del levantamiento"><div class="lev-tabs">${pest('marcar', 'Marcar')}${pest('punto', sel ? esc(sel.nombre || 'Punto') : 'Punto', !sel)}${pest('vanos', `Vanos (${vanos.length})`)}${pest('mas', 'Más')}
       ${abierta ? '<button class="lev-tab-cerrar" aria-label="Cerrar" onclick="setHojaLev(\'marcar\')">✕</button>' : ''}</div>
-    <div class="lev-hoja-cuerpo">${hoja === 'punto' ? hojaPunto(sel, l) : hoja === 'vanos' ? hojaVanos(l, vanos) : hoja === 'mas' ? hojaMas(l, u) : hojaMarcar(l, u, vanos, actual)}</div></section>`;
+    <div class="lev-hoja-cuerpo" data-hoja="${hoja}${hoja === 'punto' ? u.sel : ''}" onscroll="guardarScrollLev(this)">${hoja === 'punto' ? hojaPunto(sel, l) : hoja === 'vanos' ? hojaVanos(l, vanos) : hoja === 'mas' ? hojaMas(l, u) : hojaMarcar(l, u, vanos, actual)}</div></section>`;
   html += '</div>' + ventanaElegir(l, u, sel, vanos, actual);
   return html + '</div>';
 }

@@ -117,7 +117,13 @@ function encuadrar() {
   if (puntos.length) { mapa.fitBounds(puntos.map(p => [p.lat, p.lng]), { padding: [40, 40], maxZoom: 19 }); if (ui()) ui().seguir = false; }
 }
 // Se registra desde handlers/levantamiento.js (cuando todos los módulos ya cargaron)
-export function instalarMapaLev() { alRedibujar(() => { montarMapa(); }); }
+export function instalarMapaLev() { alRedibujar(() => { montarMapa(); restaurarScrollLev(); }); }
+// La hoja de abajo se vuelve a dibujar con cada cambio (p. ej. al sumar una acometida): se queda donde estaba
+export function guardarScrollLev(el) { const u = ui(); if (u) u.scroll = { hoja: el.dataset.hoja, top: el.scrollTop }; }
+function restaurarScrollLev() {
+  const u = ui(); const el = document.querySelector('.lev-hoja-cuerpo');
+  if (el && u?.scroll && u.scroll.hoja === el.dataset.hoja) el.scrollTop = u.scroll.top;
+}
 
 const COLOR_PUNTO = { puente: '#0f766e', poste: '#111827', poste_nuevo: '#2563eb', trafo: '#15803d', trafo_nuevo: '#2563eb', banco: '#15803d', usuario: '#dc2626', medidor_red: '#0f172a', seccionador: '#ea580c', medicion: '#f59e0b' };
 function icono(p, { actual, sel }) {
