@@ -2,7 +2,7 @@
 import { configCartasRef, db, ref, remove, set } from '../firebase.js';
 import { state } from '../state.js';
 import { abrirDoc, showToast } from '../ui.js';
-import { CONFIG_CARTAS_VACIA, htmlCartas, htmlHojasInspeccion, periodoInstalacion } from '../domain/documentos.js';
+import { casosDocumento, CONFIG_CARTAS_VACIA, fechaEnLetras, htmlCartas, htmlHojasInspeccion, periodoInstalacion } from '../domain/documentos.js';
 import { ordenarCasos } from '../domain/listados.js';
 import { hoyLocal, nombreCampana } from '../domain/trabajo.js';
 import { render } from '../views/render.js';
@@ -12,15 +12,17 @@ export const configCartas = () => ({ ...CONFIG_CARTAS_VACIA, ...(state.configCar
 
 // ── GENERAR ──
 
-export function abrirDocumentos(clave, tipo) {
+// `fecha`: en BT las cartas se entregan al instalar y se generan por Fecha (solo sus casos, con su día de instalación)
+export function abrirDocumentos(clave, tipo, fecha = null) {
   const g = state.campanas?.[clave];
   if (!g?.casos) return;
   if (tipo === 'cartas' && !configCartas().firmante) {
     showToast('Primero completa los datos de las cartas');
     return abrirConfigCartas();
   }
-  state.docsModal = { clave, tipo };
-  state.docsForm = { fecha: hoyLocal(), periodo: periodoInstalacion(g.anio, g.mes), excluidos: {} };
+  state.docsModal = { clave, tipo, fecha };
+  const instalacion = fecha && g.fechas?.[fecha]?.instalacion;
+  state.docsForm = { fecha: hoyLocal(), periodo: fecha ? (instalacion ? `el ${fechaEnLetras(instalacion)}` : '') : periodoInstalacion(g.anio, g.mes), excluidos: {} };
   render();
 }
 export function cerrarDocumentos() { state.docsModal = null; render(); }
@@ -32,23 +34,23 @@ export function toggleExcluirCaso(id) {
 }
 export function excluirTodos(todos) {
   const g = state.campanas?.[state.docsModal?.clave];
-  state.docsForm.excluidos = todos ? Object.fromEntries(Object.keys(g?.casos || {}).map(id => [id, true])) : {};
+  state.docsForm.excluidos = todos ? Object.fromEntries(casosDocumento(g, state.docsModal?.fecha).map(c => [c.id, true])) : {};
   render();
 }
 
 export function generarDocumentos() {
-  const { clave, tipo } = state.docsModal || {};
+  const { clave, tipo, fecha } = state.docsModal || {};
   const g = state.campanas?.[clave];
   if (!g) return;
-  const casos = ordenarCasos(Object.entries(g.casos || {}).filter(([id]) => !state.docsForm.excluidos[id]).map(([id, c]) => ({ id, ...c, codigo: c.codigo || c.codigoEnte })));
+  const casos = ordenarCasos(casosDocumento(g, fecha).filter(c => !state.docsForm.excluidos[c.id]).map(c => ({ ...c, codigo: c.codigo || c.codigoEnte })));
   if (!casos.length) return showToast('No hay casos seleccionados');
-  const titulo = `${nombreCampana(g)} · ${g.area}`;
+  const titulo = `${nombreCampana(g)} · ${g.area}${fecha ? ` · Fecha ${fecha}` : ''}`;
   const cfg = configCartas();
   const html = tipo === 'cartas'
     ? htmlCartas(casos, { ...cfg, fecha: state.docsForm.fecha, periodo: state.docsForm.periodo, titulo })
     : htmlHojasInspeccion(casos, { logo: cfg.logo, distribuidora: cfg.distribuidora, titulo });
   abrirDoc(html, `${tipo === 'cartas' ? 'Cartas' : 'Hojas_inspeccion'}_${titulo.replace(/[^\wÁÉÍÓÚáéíóúñÑ]+/g, '_')}.html`);
-  set(ref(db, `campanas/${clave}/precampana/${tipo}`), firma({ total: casos.length }));
+  set(ref(db, fecha ? `campanas/${clave}/fechas/${fecha}/cartas` : `campanas/${clave}/precampana/${tipo}`), firma({ total: casos.length }));
   state.docsModal = null;
   render();
 }

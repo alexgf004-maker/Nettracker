@@ -1439,7 +1439,7 @@ test.describe('Precampaña', () => {
     app = await abrirApp(page, { excel: true, datos });
     await cerrarAlerta(page);
     await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('resultados'); });
-    const fila = codigo => page.locator('.tabla-casos tr', { hasText: codigo });
+    const fila = codigo => page.locator('.tabla-casos:not(.tabla-pert) tr', { hasText: codigo });
     await expect(fila('CR1O2026201')).toContainText('Descargado');
     await expect(fila('CR1O2026201')).toContainText('Válida');
     await expect(fila('CR1O2026201')).toContainText('según la descarga');
@@ -1488,6 +1488,109 @@ test.describe('Precampaña', () => {
     });
     expect(r[0]).toEqual({ codigo: 'CR039', contados: 38, faltan: 0 }); // CR005 fallida no cuenta
     expect(r[1]).toEqual({ codigo: null, contados: 8, faltan: 30 });
+  });
+
+  // Campaña de BT: sin precampaña ni multiplicadores; cartas por Fecha
+  const conCampanaBT = () => {
+    const datos = conCampana();
+    datos.config = { ...datos.config, cartas: { firmante: 'Persona Firmante', distribuidora: 'DELSUR', ciudad: 'La Libertad', acuerdo: 'N°38-E-2015' } };
+    datos.campanas['2026-10_CPT-BT'] = { anio: 2026, mes: 10, area: 'CPT BT', fechas: { 1: { instalacion: '2026-10-05', retiro: '2026-10-13' } }, casos: {
+      CR1O2026001: caso('CR1O2026001', '901', { ct: 'CT9', medidor: 'M-9', lat: 13.7, lng: -89.2, programa: { fecha: '1', equipo: 'SN-105' } }),
+      CR1O2026002: caso('CR1O2026002', '902', { programa: { fecha: '2' } }),
+      CR1O2026003: caso('CR1O2026003', '903'),
+    } };
+    return datos;
+  };
+
+  test('campaña de BT: sin precampaña ni multiplicadores, fechas con transformador y medidor', async ({ page }) => {
+    app = await abrirApp(page, { usuario: 'Francisco Chulo', excel: true, datos: conCampanaBT() });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => abrirCampanaTrabajo('2026-10_CPT-BT'));
+    const tabs = page.locator('.paso-tab');
+    await expect(tabs).toHaveText([/Casos/, /Fechas/, /Resultados/, /Mediciones/]);
+    await expect(page.locator('.hero-kpi').nth(1)).toContainText('2Programados');
+
+    await app.ejecutar(() => setCampanaVista('fechas'));
+    await expect(page.locator('.tabla-fechas thead')).toContainText('CT/DS');
+    await expect(page.locator('.tabla-fechas thead')).not.toContainText('Multiplicador');
+    await expect(page.locator('.bloque').first()).toContainText('1 caso no tiene fecha');
+    const tarjeta = page.locator('.fecha-card').first();
+    await expect(tarjeta.locator('.boleto-avisos')).toHaveCount(0); // sin aviso de multiplicador
+
+    const descarga = page.waitForEvent('download');
+    await tarjeta.getByRole('button', { name: 'Exportar Excel' }).click();
+    const archivo = await descarga;
+    const filas = XLSX.utils.sheet_to_json(XLSX.readFile(await archivo.path()).Sheets.Fecha1, { header: 1, defval: '', blankrows: true });
+    expect(filas[2]).toEqual(['Número SIGET', 'Equipo', 'Nombre del Usuario', 'Id del Usuario', 'Dirección', 'Transformador', 'Medidor', 'Fecha instalación', 'Fecha retiro', 'Latitud', 'Longitud', 'Accesorios']);
+    expect(filas[3].slice(0, 9)).toEqual(['CR1O2026001', 'SN-105', 'USUARIO 901', '901', 'COLONIA X, CALLE 1, 12, SANTA TECLA, LA LIBERTAD', 'CT9', 'M-9', '2026-10-05', '2026-10-13']);
+
+    await tarjeta.getByRole('button', { name: 'Enviar a Despachos' }).click();
+    await app.ejecutar(() => confirmarCarga());
+    const push = (await app.escrituras()).find(([op, ruta]) => op === 'push' && ruta === 'analizadores');
+    expect(push[2]).toMatchObject({ caso: 'CR1O2026001', serie: 'SN-105', notas: 'CT9', areaBeneficiaria: 'CPT BT' });
+  });
+
+  test('campaña de BT: las cartas se generan por Fecha con el día de instalación', async ({ page }) => {
+    app = await abrirApp(page, { usuario: 'Francisco Chulo', datos: conCampanaBT() });
+    await cerrarAlerta(page);
+    const docs = await capturarDocsPrecampana(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-BT'); setCampanaVista('fechas'); });
+    const tarjeta = page.locator('.fecha-card').first();
+    await tarjeta.getByRole('button', { name: 'Cartas' }).click();
+    await expect(page.locator('.modal-titulo')).toHaveText('Generar cartas · Fecha 1');
+    await expect(page.locator('.caso-check')).toHaveCount(1);
+    await expect(page.locator('.modal input:not([type])').first()).toHaveValue('el 5 de octubre de 2026');
+    await page.getByRole('button', { name: 'Generar 1 carta' }).click();
+    await expect.poll(async () => (await docs()).length).toBe(1);
+    const html = (await docs())[0];
+    expect(html.match(/class="pagina"/g)).toHaveLength(1);
+    expect(html).toContain('realizar la visita para la instalación del mismo el 5 de octubre de 2026');
+    expect(html).toContain('CR1O2026001');
+    expect((await app.escrituras()).at(-1)).toEqual(['set', 'campanas/2026-10_CPT-BT/fechas/1/cartas', { fecha: '2026-09-23', por: 'Francisco Chulo', total: 1 }]);
+  });
+
+  test('DA y DF del mes: se suben las primeras 9 válidas en orden de código, MT y BT juntas', async ({ page }) => {
+    app = await abrirApp(page);
+    const r = await page.evaluate(async () => {
+      const { subidaPerturbaciones } = await import('/js/domain/resultados.js');
+      const cod = i => 'DA1O2026' + String(i).padStart(2, '0') + '1O00';
+      const fila = (i, area, medicion) => ({ caso: { codigo: cod(i), codigoEnte: cod(i), tipo: 'DA' }, area, resultado: { medicion }, situacion: { clave: 'descargado' } });
+      // MT tiene la 1, la 2 y la 12; BT de la 3 a la 11
+      const filas = [fila(12, 'CPT MT', ''), fila(1, 'CPT MT', 'valida'), fila(2, 'CPT MT', 'valida')];
+      for (let i = 3; i <= 11; i++) filas.push(fila(i, 'CPT BT', i <= 9 ? 'valida' : ''));
+      const todas = subidaPerturbaciones(filas);
+      filas.find(f => f.caso.codigo === cod(4)).resultado.medicion = 'fallida'; // la 4 falla: entra la 10
+      const falla = subidaPerturbaciones(filas);
+      filas.find(f => f.caso.codigo === cod(10)).resultado.medicion = 'valida';
+      const conDiez = subidaPerturbaciones(filas);
+      return { todas: [todas.corte, todas.porArea, todas.estado[cod(12)]], falla: [falla.corte, falla.proyectado, falla.faltan, falla.estado[cod(4)]], conDiez: [conDiez.corte, conDiez.porArea['CPT BT'].sube] };
+    });
+    expect(r.todas).toEqual(['DA1O2026091O00', { 'CPT MT': { total: 3, sube: 2, pendiente: 0 }, 'CPT BT': { total: 9, sube: 7, pendiente: 0 } }, 'no_sube']);
+    expect(r.falla).toEqual([null, 'DA1O2026101O00', 1, 'no_entra']);
+    expect(r.conDiez).toEqual(['DA1O2026101O00', 7]);
+  });
+
+  test('resultados: BT sube 105 CR y el apartado de DA/DF muestra las de MT y BT juntas', async ({ page }) => {
+    const datos = conCampanaBT();
+    datos.campanas['2026-10_CPT-MT'].casos.DA1O2026011O00.resultado = { medicion: 'valida' };
+    datos.campanas['2026-10_CPT-BT'].casos.DA1O2026021O00 = caso('DA1O2026021O00', '901', { crRelacionado: 'CR1O2026001', resultado: { medicion: 'fallida' }, programa: { fecha: '1', equipo: 'SN-106' } });
+    datos.campanas['2026-10_CPT-BT'].casos.DA1O2026031O00 = caso('DA1O2026031O00', '902', { crRelacionado: 'CR1O2026002' });
+    app = await abrirApp(page, { usuario: 'Francisco Chulo', datos });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-BT'); setCampanaVista('resultados'); });
+    await expect(page.locator('.meta', { hasText: 'CR obligatorios' })).toContainText('0 / 105');
+    const bloque = page.locator('.bloque-pert');
+    await expect(bloque).toContainText('Armónicos (DA): 1 de 9 válidas');
+    await expect(bloque).toContainText('BT sube 0 · 1 pendiente (2 en el listado) · MT sube 1 (1 en el listado)');
+    const filas = bloque.locator('tbody tr');
+    await expect(filas).toHaveCount(3);
+    await expect(filas.nth(0)).toContainText('DA1O2026011O00');
+    await expect(filas.nth(0)).toHaveClass(/fila-otra-area/);
+    await expect(filas.nth(0)).toContainText('Se sube');
+    await expect(filas.nth(1)).toContainText('SN-106');
+    await expect(filas.nth(1)).toContainText('No entra');
+    await expect(filas.nth(2)).toContainText('Pendiente');
+    await expect(bloque).not.toContainText('Flicker'); // no hay DF en el mes
   });
 
   test('seguimiento FT: plazo de 90 días desde la instalación, aviso, bitácora y cierre con remedición', async ({ page }) => {
@@ -1651,6 +1754,90 @@ test.describe('Precampaña', () => {
     }
     return lineas.join('\r\n');
   };
+
+  test('análisis de TXT en BT: misma lógica que la macro de BT (120 V, 7 % urbano, 8 % rural)', async ({ page }) => {
+    app = await abrirApp(page);
+    const viejo = ['X-Data,AVrmsAvg[Volts],BVrmsAvg[Volts],CVrmsAvg[Volts]'];
+    for (let i = 0; i < 700; i++) { const m = 8 * 60 + i * 15; viejo.push(`${String(1 + Math.floor(m / 1440)).padStart(2, '0')}/10/2026 ${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}:00,120,120,120`); }
+    const txts = {
+      valida: hacerTXT({ v: () => [120, 120, 120] }),
+      ft: hacerTXT({ v: i => (i % 10 === 0 ? [130, 120, 120] : [120, 120, 120]) }),
+      rural: hacerTXT({ v: i => (i % 10 === 0 ? [129, 120, 120] : [120, 120, 120]) }),
+      bi: hacerTXT({ v: () => [120, 120, 0] }),
+      pocos: hacerTXT({ n: 500, v: () => [120, 120, 120] }),
+      pocosColumnas: hacerTXT({ n: 500, columnas: 73, v: () => [120, 120, 120] }),
+      intervalo: hacerTXT({ paso: 30, v: () => [120, 120, 120] }),
+      saltos: hacerTXT({ saltos: [100, 200], v: () => [120, 120, 120] }),
+      alim: hacerTXT({ v: () => [50, 50, 50] }),
+      perturb: hacerTXT({ n: 1100, paso: 10, columnas: 197, v: () => [120, 0, 0] }),
+      viejo: viejo.join('\r\n'),
+      vacio: '',
+    };
+    const r = await page.evaluate(async t => {
+      const m = await import('/js/domain/analisis-bt.js');
+      const { resultadoDeAnalisis } = await import('/js/domain/analisis.js');
+      const tri = { tipoInstalacion: 'TRIFÁSICO', urbanidad: 'U' };
+      const a = (n, x, d = tri) => { const z = m.analizarMedicionBT(n, x, d); return [z.estado, z.detalle, typeof z.febNoPer === 'number' ? Math.round(z.febNoPer * 10000) / 10000 : z.febNoPer]; };
+      return {
+        valida: a('CR1O2026001.txt', t.valida),
+        ft: a('CR1O2026001.txt', t.ft),
+        ruralR: a('CR1O2026001.txt', t.rural, { tipoInstalacion: 'TRIFÁSICO', urbanidad: 'R' }),
+        ruralU: a('CR1O2026001.txt', t.rural),
+        bi: a('CR1O2026001.txt', t.bi, { tipoInstalacion: 'BIFÁSICO', urbanidad: 'U' }),
+        fases: a('CR1O2026001.txt', t.ft, { tipoInstalacion: 'MONOFÁSICO', urbanidad: 'U' }),
+        sinUrbanidad: a('CR1O2026001.txt', t.valida, { tipoInstalacion: 'TRIFÁSICO' }),
+        sinTipo: a('CR1O2026001.txt', t.valida, { urbanidad: 'U' }),
+        pocos: a('CR1O2026001.txt', t.pocos),
+        pocosColumnas: a('CR1O2026001.txt', t.pocosColumnas),
+        intervalo: a('CR1O2026001.txt', t.intervalo),
+        saltos: a('CR1O2026001.txt', t.saltos),
+        alim: a('CR1O2026001.txt', t.alim),
+        perturb: a('DA1O2026013O00.txt', t.perturb, { tipoInstalacion: 'MONOFÁSICO', urbanidad: 'U' }),
+        viejo: a('CR1O2026001.txt', t.viejo),
+        vacio: a('CR1O2026001.txt', t.vacio),
+        resultadoFT: resultadoDeAnalisis(m.analizarMedicionBT('CR1O2026001.txt', t.ft, tri)),
+        banda: (({ nominal, tolerancia }) => [nominal, tolerancia])(m.analizarMedicionBT('CR1O2026001.txt', t.valida, { tipoInstalacion: 'TRIFÁSICO', urbanidad: 'R' })),
+      };
+    }, txts);
+    expect(r.valida).toEqual(['VALIDA', '', 0]);
+    expect(r.ft).toEqual(['VALIDA', '', 0.1]); // 130 V pasa de 120 + 7 %
+    expect(r.ruralR).toEqual(['VALIDA', '', 0]); // 129 V está dentro de 120 + 8 %
+    expect(r.ruralU).toEqual(['VALIDA', '', 0.1]);
+    expect(r.bi).toEqual(['VALIDA', '', 0]);
+    // Fases que no coinciden: por revisar y el FebNoPer con las fases del TXT
+    expect(r.fases).toEqual(['ADVERTENCIA', 'Verificar con planilla física: listado=MONOFÁSICO (1 fase(s)) pero TXT tiene 3 fase(s) activa(s)', 0.1]);
+    expect(r.sinUrbanidad).toEqual(['ADVERTENCIA', 'Falta la urbanidad del caso: no se calculó el FebNoPer', 'N/D']);
+    expect(r.sinTipo).toEqual(['ADVERTENCIA', 'Falta el tipo de instalación del caso: no se calculó el FebNoPer', 'N/D']);
+    expect(r.pocos).toEqual(['FALLIDA', 'Insuficientes registros válidos: 500 (mínimo 576)', 0]);
+    expect(r.pocosColumnas).toEqual(['FALLIDA', 'Número de columnas incorrecto: 73 (se esperan 74) | Insuficientes registros válidos: 500 (mínimo 576)', 0]);
+    expect(r.intervalo).toEqual(['FALLIDA', 'Intervalo predominante NO es de 15 min. Registros: 700', 0]);
+    expect(r.saltos).toEqual(['VALIDA', '', 0]); // más del 80 % de los intervalos son de 15 min
+    expect(r.alim).toEqual(['FALLIDA', 'Insuficientes registros válidos: 0 (mínimo 576) | ERROR ALIM. - Todos los registros son inválidos', 'N/A']);
+    expect(r.perturb).toEqual(['ADVERTENCIA', 'Tipo en nombre archivo (TRIFASICO) no coincide con listado (MONOFÁSICO)', 0]);
+    expect(r.viejo).toEqual(['VALIDA', '', 0]); // formato viejo: no se revisan las columnas
+    expect(r.vacio).toEqual(['FALLIDA', 'Archivo TXT vacío o sin datos', 'N/D']);
+    expect(r.resultadoFT).toEqual({ medicion: 'valida', febNoPer: 10, tolerancia: 'fuera' });
+    expect(r.banda).toEqual([120, 0.08]);
+  });
+
+  test('en una campaña de BT "Analizar TXT" usa la macro de BT con los datos del control de puntos', async ({ page }) => {
+    const datos = conCampanaBT();
+    Object.assign(datos.campanas['2026-10_CPT-BT'].casos.CR1O2026001, { tipoInstalacion: 'TRIFÁSICO', urbanidad: 'U' });
+    app = await abrirApp(page, { usuario: 'Francisco Chulo', datos });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-BT'); setCampanaVista('resultados'); });
+    await expect(page.locator('details.ayuda', { hasText: 'macro de BT' })).toHaveCount(1);
+    const txt = hacerTXT({ v: i => (i % 10 === 0 ? [130, 120, 120] : [120, 120, 120]) });
+    await page.locator('label', { hasText: 'Analizar TXT' }).locator('input').setInputFiles([{ name: 'CR1O2026001.txt', mimeType: 'text/plain', buffer: Buffer.from(txt) }]);
+    const modal = page.locator('.modal');
+    await expect(modal).toContainText('1 válidas');
+    await expect(modal).toContainText('1 fuera de tolerancia');
+    await expect(modal).toContainText('120 V · U');
+    await page.getByRole('button', { name: 'Guardar resultados' }).click();
+    const [op, ruta, valor] = (await app.escrituras()).find(([, r]) => r === 'campanas/2026-10_CPT-BT');
+    expect([op, ruta]).toEqual(['update', 'campanas/2026-10_CPT-BT']);
+    expect(valor['casos/CR1O2026001/resultado']).toMatchObject({ medicion: 'valida', febNoPer: 10, tolerancia: 'fuera', origen: 'txt', analisis: { tipoCaso: 'Regulatorio BT', nivelTension: 120 } });
+  });
 
   test('análisis de TXT: misma lógica que la macro CalidadEnergia', async ({ page }) => {
     app = await abrirApp(page);

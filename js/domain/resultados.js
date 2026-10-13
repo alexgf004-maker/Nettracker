@@ -78,6 +78,9 @@ export function comentarioCuadro(f, estado) {
   return '';
 }
 
+// CR que se suben al sistema por área
+export const CR_OBLIGATORIOS = { 'CPT MT': 38, 'CPT BT': 105 };
+
 // Hasta qué medición se sube al sistema: en orden de código, se cuentan los CR con medición válida
 // (DT o FT) hasta completar los obligatorios. Devuelve { codigo, contados, faltan }.
 export function corteSubida(filas, obligatorios) {
@@ -94,4 +97,39 @@ export function corteSubida(filas, obligatorios) {
 export function cuadroResumen(filas) {
   const fila = f => { const estado = estadoCuadro(f); return { codigo: f.caso.codigo || f.caso.codigoEnte, estado, comentario: comentarioCuadro(f, estado) }; };
   return { cr: filas.filter(f => f.caso.tipo === 'CR').map(fila), otros: filas.filter(f => f.caso.tipo !== 'CR').map(fila) };
+}
+
+// ── PERTURBACIONES (DA y DF) ──
+// El ente manda 12 DA y 12 DF por mes para MT y BT juntas y se suben 9 de cada tipo: en orden de código (MT y BT
+// revueltas), las primeras 9 válidas. Si una falla, entra la siguiente (la 10, la 11…). `filas` son las de
+// filasResultados de las dos campañas del mes, cada una con su `area`.
+export const PERTURBACIONES_A_SUBIR = 9;
+const codigoFila = f => f.caso.codigo || f.caso.codigoEnte;
+const noSeMide = f => f.resultado.medicion === 'fallida' || f.resultado.medicion === 'no_medida' || f.situacion.clave === 'sin_medir';
+
+// Por cada fila: 'sube' (válida dentro de las 9), 'pendiente' (sin resultado; puede entrar), 'no_entra' (fallida o no
+// medida) o 'no_sube' (después de la última que se sube). `corte`: código de la 9.ª válida; `proyectado`: hasta cuál se
+// subiría si todas las pendientes salen válidas. `porArea`: cuántas sube y cuántas tiene pendientes cada área.
+export function subidaPerturbaciones(filas, aSubir = PERTURBACIONES_A_SUBIR) {
+  const orden = [...filas].sort((a, b) => (a.caso.codigoEnte || a.caso.codigo).localeCompare(b.caso.codigoEnte || b.caso.codigo));
+  let validas = 0; let posibles = 0; let corte = null; let proyectado = null;
+  const estado = {};
+  for (const f of orden) {
+    const id = codigoFila(f);
+    if (corte) { estado[id] = 'no_sube'; continue; }
+    if (f.resultado.medicion === 'valida') {
+      validas++; posibles++; estado[id] = 'sube';
+      if (validas === aSubir) corte = id;
+    } else if (noSeMide(f)) estado[id] = 'no_entra';
+    else { posibles++; estado[id] = 'pendiente'; }
+    if (!proyectado && posibles === aSubir) proyectado = id;
+  }
+  const porArea = {};
+  orden.forEach(f => {
+    const a = (porArea[f.area] ??= { total: 0, sube: 0, pendiente: 0 });
+    a.total++;
+    if (estado[codigoFila(f)] === 'sube') a.sube++;
+    if (estado[codigoFila(f)] === 'pendiente') a.pendiente++;
+  });
+  return { filas: orden, estado, corte, proyectado, validas, faltan: Math.max(0, aSubir - validas), porArea };
 }

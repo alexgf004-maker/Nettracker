@@ -1,8 +1,7 @@
 // Pestaña Resultados de una campaña (cuadro resumen) y su editor
 import { ordenarCasos } from '../domain/listados.js';
-import { CR_OBLIGATORIOS_MT } from '../domain/multiplicadores.js';
-import { corteSubida, instalacionDeCaso, MEDICION, resultadoCaso, resumenResultados, situacionCaso } from '../domain/resultados.js';
-import { hoyLocal } from '../domain/trabajo.js';
+import { corteSubida, CR_OBLIGATORIOS, instalacionDeCaso, MEDICION, PERTURBACIONES_A_SUBIR, resultadoCaso, resumenResultados, situacionCaso, subidaPerturbaciones } from '../domain/resultados.js';
+import { agruparCampanas, flujoBT, hoyLocal } from '../domain/trabajo.js';
 import { casosFT, DIAS_SOLUCION_FT } from '../domain/ft.js';
 import { state } from '../state.js';
 import { hayTXTEnMemoria } from '../actions/resultados.js';
@@ -81,11 +80,12 @@ export function renderResultados(c) {
     + tile('fallida', n.fallida, 'Fallidas', 't-morado', 'x')
     + tile('revisar', n.revisar, 'Por revisar', 't-ambar', 'alerta')
     + tile('pendiente', n.pendiente, 'Sin resultado', 't-azul', 'reloj') + '</div>';
-  const corte = c.area === 'CPT MT' ? corteSubida(filas, CR_OBLIGATORIOS_MT) : null;
-  if (c.area === 'CPT MT') {
-    const ok = n.crValidas >= CR_OBLIGATORIOS_MT;
+  const obligatorios = CR_OBLIGATORIOS[c.area];
+  const corte = obligatorios ? corteSubida(filas, obligatorios) : null;
+  if (obligatorios) {
+    const ok = n.crValidas >= obligatorios;
     html += `<div class="meta ${ok ? 'ok' : ''}"><div class="meta-tx">CR obligatorios con medición válida<small>${corte.codigo ? `<b class="txt-corte">Se sube al sistema hasta ${esc(corte.codigo)}</b> · ` : `Faltan ${corte.faltan} CR válidas para saber hasta cuál se sube · `}${n.daValidas} DA y ${n.dfValidas} DF válidas${n.sinMedir ? ` · ${n.sinMedir} no se medirán` : ''}</small></div>
-      <div class="meta-barra"><i style="width:${Math.min(100, Math.round(n.crValidas * 100 / CR_OBLIGATORIOS_MT))}%"></i></div><div class="meta-num">${n.crValidas}<small> / ${CR_OBLIGATORIOS_MT}</small></div></div>`;
+      <div class="meta-barra"><i style="width:${Math.min(100, Math.round(n.crValidas * 100 / obligatorios))}%"></i></div><div class="meta-num">${n.crValidas}<small> / ${obligatorios}</small></div></div>`;
   }
   html += `<div class="barra-acciones">
     <label class="b b-p"><i class="ic ic-subir"></i> Analizar TXT<input type="file" accept=".txt" multiple hidden onchange="analizarTXT('${c.clave}', this.files)"></label>
@@ -94,8 +94,11 @@ export function renderResultados(c) {
     <button class="b b-g" onclick="exportarCuadroResumen('${c.clave}')"><i class="ic ic-excel"></i> Exportar cuadro resumen</button>
     <button class="b b-g" onclick="exportarAnalisis('${c.clave}')"><i class="ic ic-grafica"></i> Exportar análisis (Resumen de la macro)</button>
   </div>`;
-  html += `<details class="ayuda"><summary><i class="ic ic-ayuda"></i> ¿Cómo se calculan?</summary><p>Sube los TXT de ECAMEC (el nombre del archivo es el código del caso): se validan y se calcula el FebNoPer como en la macro. Más de ${UMBRAL_FT * 100} % es fuera de tolerancia. Las advertencias quedan "por revisar": corrige el dato del caso (suele ser el nivel de tensión) y recalcula. También se puede anotar el resultado a mano tocando el caso.</p></details>`;
+  html += flujoBT(c.area)
+    ? `<details class="ayuda"><summary><i class="ic ic-ayuda"></i> ¿Cómo se calculan?</summary><p>Sube los TXT de ECAMEC (el nombre del archivo es el código del caso): se validan y se calcula el FebNoPer como en la macro de BT, sobre 120 V con ±7 % urbano y ±8 % rural, usando el tipo de instalación y la urbanidad del control de puntos. Más de ${UMBRAL_FT * 100} % es fuera de tolerancia. Las advertencias quedan "por revisar" (fases que no coinciden con el tipo de instalación, columnas o un dato que falta): corrige el dato del caso y recalcula. También se puede anotar el resultado a mano tocando el caso.</p></details>`
+    : `<details class="ayuda"><summary><i class="ic ic-ayuda"></i> ¿Cómo se calculan?</summary><p>Sube los TXT de ECAMEC (el nombre del archivo es el código del caso): se validan y se calcula el FebNoPer como en la macro. Más de ${UMBRAL_FT * 100} % es fuera de tolerancia. Las advertencias quedan "por revisar": corrige el dato del caso (suele ser el nivel de tensión) y recalcula. También se puede anotar el resultado a mano tocando el caso.</p></details>`;
   html += '</div>';
+  html += bloquePerturbaciones(c);
 
   if (filtro !== 'todos') html += `<div class="filtros"><span class="pildora active">${{ valida: 'Válidas', ft: 'Fuera de tolerancia', fallida: 'Fallidas', revisar: 'Por revisar', pendiente: 'Sin resultado' }[filtro]} <b>${visibles.length}</b></span><button class="b b-l" onclick="setResultadosFiltro('todos')">Ver todos</button></div>`;
 
@@ -118,6 +121,60 @@ export function renderResultados(c) {
   });
   if (!visibles.length) html += '<tr><td colspan="5" class="vacia">No hay casos con ese filtro</td></tr>';
   return html + '</tbody></table></div></div>';
+}
+
+// ── DA y DF del mes (MT y BT juntas) ──
+
+// Filas DA/DF de las campañas del mismo mes de todas las áreas, cada una con su área y su campaña
+export function filasPerturbacionesMes(c) {
+  return agruparCampanas(state.records, hoyLocal(), state.campanas)
+    .filter(x => x.anio === c.anio && x.mes === c.mes && x.casos.length)
+    .flatMap(x => filasResultados(x).filter(f => f.caso.tipo === 'DA' || f.caso.tipo === 'DF').map(f => ({ ...f, area: x.area, clave: x.clave })));
+}
+
+const AREA_CORTA = a => String(a || '').replace('CPT ', '');
+const TAG_SUBIDA = {
+  sube: '<span class="tg verde"><i class="ic ic-check"></i> Se sube</span>',
+  pendiente: '<span class="tg azul"><i class="ic ic-reloj"></i> Pendiente</span>',
+  no_entra: '<span class="tg morado"><i class="ic ic-x"></i> No entra</span>',
+  no_sube: '<span class="tg gris">No se sube</span>',
+};
+
+function bloquePerturbaciones(c) {
+  const todas = filasPerturbacionesMes(c);
+  if (!todas.length) return '';
+  let html = '<div class="bloque bloque-pert">';
+  html += `<div class="bloque-head"><div class="bloque-titulo">Perturbaciones del mes · MT y BT</div></div>`;
+  html += `<details class="ayuda"><summary><i class="ic ic-ayuda"></i> ¿Cómo se reparten?</summary><p>El ente manda las DA y DF de MT y BT juntas y se suben ${PERTURBACIONES_A_SUBIR} de cada tipo: en orden de código, las primeras ${PERTURBACIONES_A_SUBIR} válidas, sin importar el área. Si una sale fallida o no se mide, entra la siguiente.</p></details>`;
+  ['DA', 'DF'].forEach(tipo => {
+    const filas = todas.filter(f => f.caso.tipo === tipo);
+    if (!filas.length) return;
+    const s = subidaPerturbaciones(filas);
+    const areas = Object.entries(s.porArea).sort(([a], [b]) => a.localeCompare(b));
+    const pie = s.corte
+      ? `<b class="txt-corte">Se sube hasta ${esc(s.corte)}</b>`
+      : `Faltan ${s.faltan} válidas${s.proyectado ? ` · si las pendientes salen válidas, se sube hasta ${esc(s.proyectado)}` : ' · no alcanzan las que quedan'}`;
+    html += `<div class="pert-tipo"><div class="meta ${s.corte ? 'ok' : ''}"><div class="meta-tx">${tipo === 'DA' ? 'Armónicos (DA)' : 'Flicker (DF)'}: ${s.validas >= PERTURBACIONES_A_SUBIR ? PERTURBACIONES_A_SUBIR : s.validas} de ${PERTURBACIONES_A_SUBIR} válidas
+      <small>${pie}</small><small>${areas.map(([a, x]) => `${esc(AREA_CORTA(a))} sube ${x.sube}${x.pendiente ? ` · ${x.pendiente} ${x.pendiente === 1 ? 'pendiente' : 'pendientes'}` : ''} (${x.total} en el listado)`).join(' · ')}</small></div>
+      <div class="meta-barra"><i style="width:${Math.min(100, Math.round(s.validas * 100 / PERTURBACIONES_A_SUBIR))}%"></i></div><div class="meta-num">${Math.min(s.validas, PERTURBACIONES_A_SUBIR)}<small> / ${PERTURBACIONES_A_SUBIR}</small></div></div>`;
+    html += '<div class="tabla-caja"><div class="tabla-scroll"><table class="tabla-r tabla-casos tabla-pert"><thead><tr><th>Código</th><th>Área</th><th>Equipo</th><th>Situación</th><th>Subida</th></tr></thead><tbody>';
+    s.filas.forEach((f, i) => {
+      const cod = f.caso.codigo || f.caso.codigoEnte;
+      const est = s.estado[cod];
+      const propia = f.area === c.area;
+      const marca = cod === s.corte ? '<span class="tg azul tg-corte"><i class="ic ic-bandera"></i> Hasta aquí se sube</span>' : !s.corte && cod === s.proyectado ? '<span class="tg ambar tg-corte">Hasta aquí si las pendientes salen válidas</span>' : '';
+      const equipo = f.inst?.serie || f.caso.programa?.equipo || '';
+      html += `<tr class="${propia ? '' : 'fila-otra-area'} ${cod === s.corte ? 'fila-corte' : ''} ${est === 'no_sube' ? 'fila-no-sube' : ''}" onclick="abrirResultado('${f.clave}', '${f.caso.id}')">
+        <td class="cod"><b><span class="pert-n">${i + 1}</span> ${esc(cod)}</b><small>${esc(f.caso.nombre)}</small>${marca}</td>
+        <td data-l="Área"><span class="tg ${propia ? 'azul' : 'gris'}">${esc(AREA_CORTA(f.area))}</span></td>
+        <td data-l="Equipo" class="${equipo ? 'num' : 'vacio-m'}">${esc(equipo) || '—'}</td>
+        <td data-l="Situación">${f.resultado.medicion ? tagMedicion(f.resultado) : `<span class="tag ${CLASE_SITUACION[f.situacion.clave]}">${esc(f.situacion.texto)}</span>`}</td>
+        <td data-l="Subida">${TAG_SUBIDA[est] || ''}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div></div></div>';
+  });
+  return html + '</div>';
 }
 
 export function renderResultadoModal() {

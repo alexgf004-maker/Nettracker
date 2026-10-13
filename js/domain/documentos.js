@@ -19,6 +19,11 @@ export function fechaEnLetras(fecha) {
 // Texto por defecto del periodo de instalación según el mes de la campaña
 export const periodoInstalacion = (anio, mes) => `la primera semana del mes de ${MESES[mes - 1].toLowerCase()} del ${anio}`;
 
+// Casos que entran en el documento: todos los de la campaña o, si se genera por Fecha, los de esa Fecha
+export function casosDocumento(g, fecha) {
+  return Object.entries(g?.casos || {}).filter(([, c]) => !fecha || String(c.programa?.fecha || '') === String(fecha)).map(([id, c]) => ({ id, ...c }));
+}
+
 const direccionDe = c => c.direccion || c.direccionEnte || '';
 const coord = v => (typeof v === 'number' ? String(Number(v.toFixed(7))) : String(v));
 const ubicacionDe = c => (c.lat != null && c.lat !== '' && c.lng != null ? `${coord(c.lat)}, ${coord(c.lng)}` : '');

@@ -1,6 +1,7 @@
 // Precampaña: tabla de casos de una campaña, importación de listados y edición de un caso
 import { contarTipos, faltantes, ordenarCasos, SISTEMAS, sistemaDeCodigo } from '../domain/listados.js';
 import { MESES } from '../domain/trabajo.js';
+import { casosDocumento } from '../domain/documentos.js';
 import { state } from '../state.js';
 import { escapeHtml, fmtDate } from '../utils.js';
 
@@ -168,13 +169,13 @@ export function renderPrecampana(c) {
 // ── GENERAR CARTAS U HOJAS ──
 
 export function renderDocsModal() {
-  const { clave, tipo } = state.docsModal;
+  const { clave, tipo, fecha } = state.docsModal;
   const g = state.campanas?.[clave] || {};
-  const casos = ordenarCasos(Object.entries(g.casos || {}).map(([id, c]) => ({ id, ...c })));
+  const casos = ordenarCasos(casosDocumento(g, fecha));
   const f = state.docsForm;
   const incluidos = casos.filter(c => !f.excluidos[c.id]).length;
   let html = '<div class="modal-overlay"><div class="modal hoja">';
-  html += `<div class="modal-head"><div class="modal-titulo">${tipo === 'cartas' ? 'Generar cartas' : 'Generar hojas de inspección'}</div><button class="modal-cerrar" onclick="cerrarDocumentos()" title="Cerrar">✕</button></div>`;
+  html += `<div class="modal-head"><div class="modal-titulo">${tipo === 'cartas' ? 'Generar cartas' : 'Generar hojas de inspección'}${fecha ? ` · Fecha ${esc(fecha)}` : ''}</div><button class="modal-cerrar" onclick="cerrarDocumentos()" title="Cerrar">✕</button></div>`;
   if (tipo === 'cartas') {
     html += `<div class="field"><label>Fecha de la carta</label><input type="date" value="${esc(f.fecha)}" onchange="setDocsField('fecha', this.value)"></div>`;
     html += `<div class="field"><label>Visita de instalación (completa la frase "realizar la visita para la instalación del mismo …")</label><input value="${esc(f.periodo)}" oninput="setDocsField('periodo', this.value)"></div>`;

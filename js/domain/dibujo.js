@@ -204,7 +204,7 @@ export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias
           const largo = Math.hypot(x1 - x0, y1 - y0);
           if (!texto[0] || largo < ancho * 10) continue;
           // Al lado de la línea (no encima): abajo en los vanos acostados, a la izquierda en los parados
-          const tam = Math.max(17, ancho * 3); const mc = medidaChip(texto[0], texto[1], tam);
+          const tam = Math.max(14, ancho * 2.5); const mc = medidaChip(texto[0], texto[1], tam);
           let nx = -(y1 - y0) / largo; let ny = (x1 - x0) / largo;
           if (Math.abs(ny) >= 0.45 ? ny < 0 : nx > 0) { nx = -nx; ny = -ny; }
           const sep = Math.abs(ny) * mc.h / 2 + Math.abs(nx) * mc.w / 2 + ancho * 0.8 + tam * 0.25;

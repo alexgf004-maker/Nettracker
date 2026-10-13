@@ -2,7 +2,7 @@
 // Todo se arma a partir de las instalaciones según el código del caso.
 import { userArea } from '../config.js';
 import {
-  agruparCampanas, areaDeInstalacion, diasEntre, ETAPAS, etapaInstalacion, hoyLocal,
+  agruparCampanas, areaDeInstalacion, diasEntre, ETAPAS, etapaInstalacion, flujoBT, hoyLocal,
   registrosDeTipo, subtipoCampana, urgencia,
 } from '../domain/trabajo.js';
 import { state } from '../state.js';
@@ -62,7 +62,9 @@ export function avanceCampana(c) {
   const casos = c.casos;
   const pre = avancePrecampana(c);
   const mult = resumenMultiplicadores(casos);
-  const listos = casos.filter(x => grupoDeEstado(x.mult?.estado) === 'listos');
+  const bt = flujoBT(c.area);
+  // En BT no hay multiplicadores: todos los casos del listado se programan
+  const listos = bt ? casos : casos.filter(x => grupoDeEstado(x.mult?.estado) === 'listos');
   const conFecha = casos.filter(x => x.programa?.fecha).length;
   const fechas = new Set(casos.map(x => x.programa?.fecha).filter(Boolean)).size;
   const filas = casos.length ? filasResultados(c) : [];
@@ -70,13 +72,15 @@ export function avanceCampana(c) {
   const ft = filas.filter(f => f.resultado.medicion === 'valida' && f.resultado.tolerancia === 'fuera');
   const ftSinAviso = ft.filter(f => !f.caso.ft?.aviso).length;
   const pasos = [
-    ['precampana', 'Precampaña', pre.hechos === pre.total],
-    ['multiplicadores', 'Multiplicadores', casos.length > 0 && mult.porGrupo.por_resolver === 0],
+    ...(bt ? [['casos', 'Listado', casos.length > 0 && !casos.some(x => faltantes(x).length)]] : [
+      ['precampana', 'Precampaña', pre.hechos === pre.total],
+      ['multiplicadores', 'Multiplicadores', casos.length > 0 && mult.porGrupo.por_resolver === 0],
+    ]),
     ['fechas', 'Fechas', listos.length > 0 && listos.every(x => x.programa?.fecha)],
     ['resultados', 'Resultados', res.valida > 0 && res.pendiente === 0 && res.revisar === 0],
     ['entrega', 'Entrega', !!g.entrega],
   ];
-  return { pre, mult, listos: listos.length, conFecha, fechas, res, ft, ftSinAviso, pasos, entrega: g.entrega };
+  return { bt, pre, mult, listos: listos.length, conFecha, fechas, res, ft, ftSinAviso, pasos, entrega: g.entrega };
 }
 
 const CLASE_CHIP_PLAZO = { vencido: 'rojo', hoy: 'rojo', proximo: 'ambar', ok: '' };
@@ -106,7 +110,7 @@ export function renderCampanas() {
         <div class="camp-pasos-l"><span>${actual < 0 ? 'Todo listo' : 'Paso actual: ' + a.pasos[actual][1]}</span><span>Entrega ${fmtDate(c.fechaEntrega)}</span></div>` : `<div class="camp-pasos-l" style="margin-top:4px"><span>${r.total} ${r.total === 1 ? 'medición registrada' : 'mediciones registradas'}</span><span>Entrega ${fmtDate(c.fechaEntrega)}</span></div>`}
         <div class="camp-datos">
           <div class="camp-dato"><b>${total}</b> <span>${total === 1 ? 'caso' : 'casos'}</span></div>
-          <div class="camp-dato"><b>${a.listos}</b> <span>listos</span></div>
+          ${a.bt ? `<div class="camp-dato"><b>${a.conFecha}</b> <span>programados</span></div>` : `<div class="camp-dato"><b>${a.listos}</b> <span>listos</span></div>`}
           <div class="camp-dato"><b>${a.res.valida}</b> <span>válidas</span></div>
           <div class="camp-dato ${a.ft.length ? 'rojo' : ''}"><b>${a.ft.length}</b> <span>FT</span></div>
         </div>
@@ -144,7 +148,7 @@ function renderCampanaDetalle(c, hoy) {
   if (c.casos.length) {
     html += `<div class="hero-kpis">
       <button class="hero-kpi" onclick="setCampanaVista('casos')"><b>${c.casos.length}</b><span>Casos</span></button>
-      <button class="hero-kpi" onclick="setCampanaVista('multiplicadores')"><b>${a.listos}</b><span>Listos para medir</span></button>
+      ${a.bt ? `<button class="hero-kpi" onclick="setCampanaVista('fechas')"><b>${a.conFecha}</b><span>Programados</span></button>` : `<button class="hero-kpi" onclick="setCampanaVista('multiplicadores')"><b>${a.listos}</b><span>Listos para medir</span></button>`}
       <button class="hero-kpi" onclick="setCampanaVista('resultados')"><b>${a.res.valida}</b><span>Mediciones válidas</span></button>
       <button class="hero-kpi ${a.ft.length ? 'alerta' : ''}" onclick="verFTCampana()"><b>${a.ft.length}</b><span>${a.ft.length ? (a.ftSinAviso ? `FT · ${a.ftSinAviso} sin avisar` : 'Fuera de tolerancia') : 'Fuera de tolerancia'}</span></button>
     </div>`;
@@ -164,7 +168,7 @@ function renderCampanaDetalle(c, hoy) {
     ['fechas', 'Fechas', 'calendario-dias', a.fechas ? `${a.fechas} ${a.fechas === 1 ? 'fecha' : 'fechas'} · ${a.conFecha} casos` : 'Sin programar'],
     ['resultados', 'Resultados', 'grafica', `${a.res.valida} válidas · ${a.res.pendiente} pendientes`],
     ['mediciones', 'Mediciones', 'instalaciones', `${c.registros.length} en la app`],
-  ].filter(([k]) => c.casos.length || k === 'mediciones');
+  ].filter(([k]) => (c.casos.length || k === 'mediciones') && !(a.bt && (k === 'precampana' || k === 'multiplicadores')));
   const vista = secciones.some(([k]) => k === state.campanaVista) ? state.campanaVista : secciones[0][0];
   if (secciones.length > 1) {
     html += '<div class="pasos-tabs" role="tablist">' + secciones.map(([k, label, icono, estado]) => {
