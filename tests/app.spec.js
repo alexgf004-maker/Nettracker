@@ -3219,6 +3219,20 @@ test.describe('Levantamiento en campo', () => {
     await page.getByRole('button', { name: 'Sumar acometida 120 A' }).click();
     await page.getByRole('button', { name: 'Sumar acometida 240' }).click();
     await expect(page.locator('#lev-acom-a')).toHaveText('2');
+    // Al sumar, la hoja se queda donde estaba (no vuelve arriba)
+    const hojaScroll = () => page.locator('.lev-hoja-cuerpo').evaluate(e => e.scrollTop);
+    await page.setViewportSize({ width: 412, height: 760 });
+    await page.locator('.lev-hoja-cuerpo').evaluate(e => { e.scrollTop = e.scrollHeight; e.dispatchEvent(new Event('scroll')); });
+    const abajo = await hojaScroll();
+    expect(abajo).toBeGreaterThan(0);
+    await page.getByRole('button', { name: 'Sumar acometida 120 B' }).click();
+    await expect(page.locator('#lev-acom-b')).toHaveText('1');
+    const [top, alto, vis] = await page.locator('.lev-hoja-cuerpo').evaluate(e => [e.scrollTop, e.scrollHeight, e.clientHeight]);
+    expect(top).toBe(Math.min(abajo, alto - vis)); // sigue abajo, no volvió arriba
+    expect(top).toBeGreaterThan(0);
+    await page.getByRole('button', { name: 'Restar acometida 120 B' }).click();
+    await expect(page.locator('#lev-acom-b')).toHaveText('0');
+    await page.setViewportSize({ width: 1280, height: 1100 });
     await expect(page.locator('#lev-acom-d')).toHaveText('1');
     await context.setGeolocation({ latitude: 13.50027, longitude: -88.87, accuracy: 4 });
     await expect(page.locator('#lev-gps')).toHaveText('GPS ±4 m');
