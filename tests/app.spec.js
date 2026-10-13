@@ -2886,7 +2886,8 @@ test.describe('Herramienta Dibujar', () => {
     await page.getByRole('button', { name: 'Poste existente' }).click();
     await tocar(page, 400, 400);
     await page.locator('#dib-poste-altura').fill('40'); await page.locator('#dib-poste-altura').press('Tab');
-    await page.locator('#dib-poste-estructura').selectOption('RS3');
+    // Sin tramos llegando al poste se abre Secundaria; un toque agrega la estructura
+    await page.locator('#dib-poste-lista .dib-estr-op[data-q^="rs3 "]').click();
     await expect(page.locator('#dib-capa text', { hasText: "40' · RS3" })).toHaveCount(1);
     await page.locator('.dib-estr button').click(); // quitar RS3
     await expect(page.locator('#dib-capa text', { hasText: /^40'$/ })).toHaveCount(1);
@@ -2894,8 +2895,8 @@ test.describe('Herramienta Dibujar', () => {
     await page.getByRole('button', { name: 'Tramo de red' }).click();
     await tocar(page, 400, 400); await tocar(page, 900, 400); await tocar(page, 900, 800);
     await page.getByRole('button', { name: 'Terminar tramo' }).click();
-    await page.locator('#dib-cond-calibre').fill('#1/0'); await page.locator('#dib-cond-calibre').press('Tab');
-    await page.locator('#dib-cond-tipo').selectOption('Triplex');
+    await page.locator('.dib-panel .dib-op', { hasText: /^#1\/0$/ }).click();
+    await page.locator('.dib-panel .dib-op', { hasText: /^Triplex$/ }).click();
     await page.locator('#dib-vano-cal-2').selectOption('#2');
     await expect(page.locator('#dib-capa text', { hasText: /^#1\/0 Tpx$/ })).toHaveCount(1);
     await expect(page.locator('#dib-capa text', { hasText: /^#2 Tpx$/ })).toHaveCount(1);
@@ -2906,7 +2907,7 @@ test.describe('Herramienta Dibujar', () => {
     await page.getByRole('button', { name: 'Tramo de red' }).click();
     await tocar(page, 200, 700); await tocar(page, 600, 700);
     await page.getByRole('button', { name: 'Terminar tramo' }).click();
-    await expect(page.locator('#dib-cond-calibre')).toHaveValue('#1/0');
+    await expect(page.locator('.dib-panel .dib-op.activo', { hasText: /^#1\/0$/ })).toHaveCount(1);
     expect(errores).toEqual([]);
   });
 
@@ -3086,8 +3087,8 @@ test.describe('Levantamiento en campo', () => {
     const inp = page.locator('.lev-vano input[aria-label="Metros medidos"]');
     await inp.fill('32'); await inp.press('Tab');
     // Conductor del vano: calibre y tipo
-    await page.locator('.lev-vano input[aria-label="Calibre"]').fill('#2'); await page.locator('.lev-vano input[aria-label="Calibre"]').press('Tab');
-    await page.locator('.lev-vano select[aria-label="Tipo de conductor"]').selectOption('ACSR');
+    await page.locator('.lev-vano .dib-op', { hasText: /^#2$/ }).click();
+    await page.locator('.lev-vano .dib-op', { hasText: /^ACSR$/ }).click();
     await expect(page.locator('.lev-dist', { hasText: '32.0 m' })).toHaveCount(1);
     await expect(page.locator('.lev-vano')).toContainText('32.0 m medido');
     // Con precisión baja pide confirmar; transformador como tipo de punto
@@ -3103,8 +3104,12 @@ test.describe('Levantamiento en campo', () => {
     await expect(page.locator('.lev-panel')).toContainText('GPS ±5 m');
     await page.locator('#lev-p-nota').fill('Poste de madera deteriorado'); await page.locator('#lev-p-nota').press('Tab');
     // Altura y estructuras del poste: de la lista y una escrita
-    await page.locator('#lev-poste-altura').fill('35'); await page.locator('#lev-poste-altura').press('Tab');
-    await page.locator('#lev-poste-estructura').selectOption('23TS3');
+    await page.locator('.lev-panel .dib-op', { hasText: /^35'$/ }).click();
+    // Llega red BT: se abre Secundaria; con el buscador se encuentra una primaria
+    await expect(page.locator('.lev-panel .dib-estr-grupos .active')).toHaveText('Secundaria');
+    await page.locator('#lev-poste-buscar').fill('23ts3');
+    await expect(page.locator('#lev-poste-lista .dib-estr-op:visible')).toHaveCount(1);
+    await page.locator('#lev-poste-lista .dib-estr-op:visible').click();
     await page.locator('#lev-poste-estr-otra').fill('ts3'); await page.getByRole('button', { name: 'Agregar', exact: true }).click();
     await expect(page.locator('.lev-panel .dib-estr')).toHaveText(['23TS3✕', 'TS3✕']);
     await expect(page.locator('.lev-panel .tg')).toContainText("35' · 23TS3 / TS3");

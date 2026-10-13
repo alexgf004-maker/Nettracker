@@ -10,7 +10,7 @@ const ABREV_CONDUCTOR = { ACSR: 'ACSR', Triplex: 'Tpx', Cuádruplex: 'Cpx', 'Alu
 // Pliegos de estructuras. El sufijo 1/2/3 sale tal cual del pliego (no se interpreta).
 const serie = (base, nombre, sufijos = [1, 2, 3]) => sufijos.map(n => ({ codigo: `${base}${n}`, nombre }));
 export const ESTRUCTURAS = [
-  { grupo: 'Primaria (MT)', items: [
+  { k: 'pri', grupo: 'Primaria (MT)', corto: 'Primaria', items: [
     ...serie('23TS', 'Tangente sencilla'), ...serie('23TD', 'Tangente doble'), ...serie('23TA', 'Tangente asimétrica'),
     ...serie('23TDA', 'Tangente doble asimétrica'), ...serie('23VS', 'Volada sencilla'), ...serie('23VD', 'Volada doble'),
     ...serie('23CH', 'Corte horizontal'), ...serie('23RH', 'Remate horizontal'), ...serie('23PF', 'Prolongación de fases'),
@@ -18,17 +18,17 @@ export const ESTRUCTURAS = [
     ...serie('23DH', 'Derivación horizontal'), ...serie('23DC', 'Derivación con cortacircuitos'), ...serie('23DS', 'Derivación con seccionadores', [2, 3]),
     ...serie('23PL', 'Pararrayos de línea'),
   ] },
-  { grupo: 'Secundaria (BT)', items: [
+  { k: 'sec', grupo: 'Secundaria (BT)', corto: 'Secundaria', items: [
     ...serie('TS', 'Tangente secundaria'), ...serie('TD', 'Tangente secundaria con derivación', [1, 2]), ...serie('CS', 'Corte secundario'),
     ...serie('CD', 'Corte secundario con derivación'), ...serie('CE', 'Corte secundario empuentado'), ...serie('RS', 'Remate secundario'),
     ...serie('PS', 'Prolongación secundaria'), ...serie('CR', 'Cruce doble remate secundario', [1, 2]), ...serie('DS', 'Derivación secundaria'),
   ] },
-  { grupo: 'Neutro', items: [
+  { k: 'neu', grupo: 'Neutro', corto: 'Neutro', items: [
     { codigo: 'TN', nombre: 'Tangente para neutro' }, { codigo: 'TD', nombre: 'Tangente con derivación para neutro' }, { codigo: 'CN', nombre: 'Corte para neutro' },
     { codigo: 'RN', nombre: 'Remate para neutro' }, { codigo: 'PN', nombre: 'Prolongación para neutro' }, { codigo: 'CV', nombre: 'Cruce vertical sencillo para neutro' },
     { codigo: 'CR', nombre: 'Cruce doble remate para neutro' }, { codigo: 'DN', nombre: 'Derivación para neutro' },
   ] },
-  { grupo: 'Anclas', items: [{ codigo: 'PS', nombre: 'Ancla primaria sencilla' }, { codigo: 'PD', nombre: 'Ancla primaria doble' }] },
+  { k: 'anc', grupo: 'Anclas', corto: 'Anclas', items: [{ codigo: 'PS', nombre: 'Ancla primaria sencilla' }, { codigo: 'PD', nombre: 'Ancla primaria doble' }] },
 ];
 export const nombreEstructura = codigo => ESTRUCTURAS.flatMap(g => g.items).find(i => i.codigo === codigo)?.nombre || '';
 
@@ -68,4 +68,11 @@ export function textoAcometidas(c) {
 export function balanceAcometidas(c) {
   const a = Number(c?.a) || 0; const b = Number(c?.b) || 0; const d = Number(c?.d) || 0;
   return { faseA: a + d, faseB: b + d, dif: Math.abs(a - b), mayor: a > b ? 'A' : b > a ? 'B' : null, total: a + b + d };
+}
+
+// Grupo de estructuras que se muestra primero según la red que llega al poste: BT → secundaria, solo MT → primaria
+export function grupoEstructurasDe(tramos) {
+  const t = (tramos || []).filter(Boolean);
+  if (t.some(k => !/^mt/.test(k))) return 'sec';
+  return t.length ? 'pri' : 'sec';
 }

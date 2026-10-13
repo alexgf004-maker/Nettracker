@@ -830,3 +830,13 @@ document.addEventListener('keydown', ev => {
 });
 
 document.addEventListener('keyup', ev => { if (ev.key === ' ') espacio = false; });
+
+// Estructuras: grupo elegido (por punto) y buscador que filtra la lista sin redibujar (no se pierde el teclado)
+export function grupoEstructurasUI(clave, g) { state.estrGrupo = { clave, g }; render(); }
+export function buscarEstructuras(id, q) {
+  const caja = document.getElementById(`${id}-lista`); if (!caja) return;
+  const t = String(q || '').trim().toLowerCase(); const g = caja.dataset.g; let n = 0;
+  // Al buscar se ve todo lo que coincide, primero lo del grupo elegido
+  caja.querySelectorAll('.dib-estr-op').forEach(b => { const ver = t ? b.dataset.q.includes(t) : b.dataset.g === g; b.hidden = !ver; b.style.order = b.dataset.g === g ? 0 : 1; if (ver) n++; });
+  caja.querySelector('.dib-estr-nada').hidden = n > 0;
+}

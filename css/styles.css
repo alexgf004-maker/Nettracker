@@ -1604,3 +1604,23 @@ button.aviso-inicio-fila { cursor: pointer; }
   .lev-fila { overflow-x: auto; scrollbar-width: none; }
   .lev-app .lev-flotante { bottom: 12px; }
 }
+
+/* Selección con un toque: altura, calibre, conductor y estructuras */
+.dib-opciones { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.dib-op { min-width: 48px; height: 40px; padding: 0 12px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--white); font: inherit; font-size: 14px; font-weight: 700; color: var(--text); cursor: pointer; }
+.dib-op.activo { border-color: var(--primary); background: var(--primary); color: #fff; }
+.dib-op-otra { width: 84px !important; height: 40px; padding: 4px 10px; }
+.dib-estr-grupos { display: flex; width: 100%; margin: 6px 0; }
+.dib-estr-grupos button { flex: 1; font-size: 12.5px; padding: 8px 4px; }
+.dib-estr-buscar { width: 100%; margin-bottom: 6px; }
+.dib-estr-lista { display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; padding: 4px; }
+.dib-estr-op { display: flex; align-items: center; gap: 10px; text-align: left; padding: 9px 10px; border: 0; border-radius: 8px; background: var(--white); font: inherit; font-size: 13px; color: var(--text); cursor: pointer; }
+.dib-estr-op:hover { background: var(--bg); }
+.dib-estr-op b { min-width: 60px; font-weight: 800; color: var(--primary); }
+.dib-estr-op.puesta { background: var(--primary-light); }
+.dib-estr-op[hidden], .dib-estr-nada[hidden] { display: none; }
+.lev-vano-cond { margin-top: 6px; }
+.lev-vano-cond .field { margin-bottom: 6px; }
+.lev-vano-cond .dib-opciones { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.lev-vano-cond .dib-op { flex: 0 0 auto; height: 36px; }
+.dib-estr-nada { order: 2; }

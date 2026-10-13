@@ -2,9 +2,9 @@
 import { SIMBOLOS } from '../domain/dibujo.js';
 import { acometidasLevantamiento, listaPuntos, listaVanos, metrosDeVano, nuevaPantallaLev, resumenLevantamiento, TIPOS_PUNTO } from '../domain/levantamiento.js';
 import { fmtMetros, TIPOS_TRAMO } from '../domain/plano.js';
-import { balanceAcometidas, CALIBRES, textoAcometidas, textoAltura, textoEstructuras, TIPOS_ACOMETIDA, TIPOS_CONDUCTOR } from '../domain/red.js';
+import { balanceAcometidas, CALIBRES, grupoEstructurasDe, textoAcometidas, textoAltura, textoEstructuras, TIPOS_ACOMETIDA, TIPOS_CONDUCTOR } from '../domain/red.js';
 import { state } from '../state.js';
-import { controlesPoste } from './dibujo.js';
+import { controlesConductor, controlesPoste } from './dibujo.js';
 import { escapeHtml, fmtDate } from '../utils.js';
 import { heroSeccion } from './componentes.js';
 
@@ -75,7 +75,7 @@ function renderDetalle(id, l) {
   const pest = (k, t, dis = false) => `<button class="lev-tab ${hoja === k ? 'activo' : ''}" ${dis ? 'disabled' : ''} onclick="setHojaLev('${k}')">${t}</button>`;
   html += `<section class="lev-hoja" aria-label="Controles del levantamiento"><div class="lev-tabs">${pest('marcar', 'Marcar')}${pest('punto', sel ? esc(sel.nombre || 'Punto') : 'Punto', !sel)}${pest('vanos', `Vanos (${vanos.length})`)}${pest('mas', 'Más')}
       ${abierta ? '<button class="lev-tab-cerrar" aria-label="Cerrar" onclick="setHojaLev(\'marcar\')">✕</button>' : ''}</div>
-    <div class="lev-hoja-cuerpo">${hoja === 'punto' ? hojaPunto(sel) : hoja === 'vanos' ? hojaVanos(l, vanos) : hoja === 'mas' ? hojaMas(l, u) : hojaMarcar(l, u, vanos, actual)}</div></section>`;
+    <div class="lev-hoja-cuerpo">${hoja === 'punto' ? hojaPunto(sel, l) : hoja === 'vanos' ? hojaVanos(l, vanos) : hoja === 'mas' ? hojaMas(l, u) : hojaMarcar(l, u, vanos, actual)}</div></section>`;
   return html + '</div></div>';
 }
 
@@ -89,15 +89,16 @@ function hojaMarcar(l, u, vanos, actual) {
   return html;
 }
 
-function hojaPunto(sel) {
+function hojaPunto(sel, l) {
   if (!sel) return '';
+  const tramos = listaVanos(l).filter(v => v.a === sel.id || v.b === sel.id).map(v => v.tramo);
   const info = [sel.manual ? 'Marcado en el mapa' : sel.acc ? `GPS ±${Math.round(sel.acc)} m` : '', sel.movido ? 'ajustado' : '', textoAltura(sel.altura), textoEstructuras(sel.estructuras)].filter(Boolean).join(' · ');
   return `<div class="lev-panel">${info ? `<div class="lev-panel-info tg gris">${esc(info)}</div>` : ''}
     <div class="lev-acciones"><button class="b b-p" onclick="seguirDesdeLev()">Seguir desde aquí</button><button class="b b-g" onclick="unirConLev()">Unir con otro punto</button><button class="b b-g" onclick="moverAGpsLev()">Mover a mi ubicación</button><button class="b b-l dib-borrar" onclick="borrarPuntoLev()">Borrar</button></div>
     <div class="lev-dos"><div class="field"><label>Nombre</label><input id="lev-p-nombre" value="${esc(sel.nombre || '')}" onchange="datoPuntoLev('nombre', this.value)"></div>
       <div class="field"><label>Tipo</label><select id="lev-p-tipo" onchange="datoPuntoLev('tipo', this.value)">${TIPOS_PUNTO.map(k => `<option value="${k}" ${sel.tipo === k ? 'selected' : ''}>${esc(SIMBOLOS[k].nombre)}</option>`).join('')}</select></div></div>
     <div class="field"><label>Nota</label><input id="lev-p-nota" value="${esc(sel.nota || '')}" placeholder="Ej. poste de madera deteriorado, retenida…" onchange="datoPuntoLev('nota', this.value)"></div>
-    ${controlesPoste(sel, { id: 'lev-poste', altura: 'alturaPuntoLev', agregar: 'agregarEstructuraLev', quitar: 'quitarEstructuraLev', escrita: 'agregarEstructuraEscritaLev' })}
+    ${controlesPoste(sel, { id: 'lev-poste', altura: 'alturaPuntoLev', agregar: 'agregarEstructuraLev', quitar: 'quitarEstructuraLev', escrita: 'agregarEstructuraEscritaLev', clave: sel.id, grupo: grupoEstructurasDe(tramos) })}
     <div class="page-sub">Para corregir la posición, arrastra el punto en el mapa.</div></div>`;
 }
 
@@ -111,9 +112,8 @@ function hojaVanos(l, vanos) {
         <button class="lev-vano-quitar" aria-label="Quitar vano" title="Quitar vano" onclick="borrarVanoLev('${v.id}')">✕</button></div>
       <div class="lev-vano-campos">
         <label><span>Metros medidos</span><input id="lev-v-${v.id}" inputmode="decimal" value="${v.metros ?? ''}" placeholder="${gps !== null ? `GPS ${gps.toFixed(1)}` : 'm'}" onchange="datoVanoLev('${v.id}', 'metros', this.value)" aria-label="Metros medidos"></label>
-        <label><span>Calibre</span><input id="lev-v-cal-${v.id}" list="lev-calibres" value="${esc(v.calibre || '')}" placeholder="#2" aria-label="Calibre" onchange="conductorVanoLev('${v.id}', 'calibre', this.value)"></label>
-        <label><span>Conductor</span><select aria-label="Tipo de conductor" onchange="conductorVanoLev('${v.id}', 'tipo', this.value)"><option value="">—</option>${TIPOS_CONDUCTOR.map(t => `<option ${v.conductor === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-        <label><span>Tipo de vano</span><select onchange="datoVanoLev('${v.id}', 'tramo', this.value)" aria-label="Tipo de vano">${Object.entries(TIPOS_TRAMO).map(([k, t]) => `<option value="${k}" ${v.tramo === k ? 'selected' : ''}>${esc(t.nombre)}</option>`).join('')}</select></label></div></div>`;
+        <label><span>Tipo de vano</span><select onchange="datoVanoLev('${v.id}', 'tramo', this.value)" aria-label="Tipo de vano">${Object.entries(TIPOS_TRAMO).map(([k, t]) => `<option value="${k}" ${v.tramo === k ? 'selected' : ''}>${esc(t.nombre)}</option>`).join('')}</select></label></div>
+      <div class="lev-vano-cond">${controlesConductor({ calibre: v.calibre, tipo: v.conductor }, { id: `lev-v-${v.id}`, fn: (c, val) => `conductorVanoLev('${v.id}', '${c}', ${val})` })}</div></div>`;
   }).join('')}
     <datalist id="lev-calibres">${CALIBRES.map(c => `<option value="${c}">`).join('')}</datalist>
     <div class="page-sub">La distancia sale del GPS (3 a 10 m de precisión con buena señal). Si mediste el vano con cinta o telémetro, escríbelo: manda sobre el GPS.</div>`;

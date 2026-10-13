@@ -9,6 +9,7 @@ const NOMBRES = [
   'tablaFilasDib', 'terminarTramoDib', 'textoDib',
   'setAlturaDib', 'agregarEstructuraDib', 'agregarEstructuraEscritaDib', 'quitarEstructuraDib', 'setConductorDib', 'setCalibreVanoDib',
   'escalarTodoDib', 'setOpacidadFondoDib',
+  'grupoEstructurasUI', 'buscarEstructuras',
   'metrosASuLugarDib', 'setColorRedDib', 'setNombreRedDib', 'setTamanoDib', 'setTamNuevosDib', 'togglePanelDib', 'abrirPanelMovilDib', 'zoomDib', 'ajustarVistaDib', 'ampliarDib', 'dibRueda',
   'setVistaProyectosDib', 'guardarProyectoDib', 'guardarComoProyectoDib', 'abrirProyectoDib', 'eliminarProyectoDib', 'soltarProyectoDib',
 ];
