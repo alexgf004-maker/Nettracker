@@ -1624,3 +1624,59 @@ button.aviso-inicio-fila { cursor: pointer; }
 .lev-vano-cond .dib-opciones { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
 .lev-vano-cond .dib-op { flex: 0 0 auto; height: 36px; }
 .dib-estr-nada { order: 2; }
+
+/* Levantamiento: filas tipo "ajustes" y ventanas para elegir */
+.lev-lista { border: 1px solid var(--border); border-radius: 14px; overflow: hidden; background: var(--white); margin: 4px 0 8px; }
+.lev-op { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 50px; padding: 8px 12px; border: 0; border-top: 1px solid var(--border); background: var(--white); font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+.lev-lista > .lev-op:first-child { border-top: 0; }
+.lev-op:active { background: var(--bg); }
+.lev-op-k { flex: 0 0 auto; font-size: 14px; font-weight: 600; color: var(--text2); }
+.lev-op-v { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 6px; font-size: 14px; font-weight: 700; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lev-op-v svg { flex: 0 0 auto; }
+.lev-op-f { flex: 0 0 auto; font-size: 22px; line-height: 1; color: var(--text3); }
+.lev-op-nada { font-style: normal; font-weight: 500; color: var(--text3); }
+.lev-op-sin { cursor: default; }
+.lev-op-sin .segmento { margin-left: auto; }
+.lev-seg button { padding: 6px 12px; font-size: 13px; }
+.lev-switch { margin-left: auto; width: 44px; height: 26px; accent-color: var(--primary); }
+.lev-punto-cab { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 2px 0 8px; }
+.lev-punto-cab > div { display: flex; flex-direction: column; line-height: 1.2; }
+.lev-punto-cab b { font-size: 17px; }
+.lev-punto-cab > div span { font-size: 12.5px; color: var(--text3); }
+.lev-punto-cab .tg { margin-left: auto; }
+.lev-acciones-punto { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.lev-acciones-punto .b { justify-content: center; text-align: center; }
+/* Acometidas: tres botones grandes que suman, con su cuenta adentro */
+.lev-acom { margin-top: 4px; padding-top: 0; border-top: 0; }
+.lev-acom-titulo { font-size: 11px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; color: var(--text3); margin: 6px 2px 4px; }
+.lev-acom > .lev-op { border: 1px solid var(--border); border-radius: 14px; margin-bottom: 8px; }
+.lev-acom-botones { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.lev-acom-tipo { display: flex; flex-direction: column; gap: 4px; }
+.lev-acom-mas { display: flex; flex-direction: column; align-items: center; gap: 0; padding: 8px 4px 6px; border: 0; border-radius: 14px; background: linear-gradient(135deg, var(--primary-dark, #0b2e3b), var(--primary, #0e7490)); color: #fff; font: inherit; cursor: pointer; box-shadow: 0 4px 10px -4px rgba(15,23,42,.5); }
+.lev-acom-mas:active { transform: scale(.97); }
+.lev-acom-mas span { font-size: 13px; font-weight: 800; opacity: .95; }
+.lev-acom-mas .lev-acom-n { font-size: 26px; font-weight: 800; line-height: 1.1; }
+.lev-acom-mas small { font-size: 10px; opacity: .75; }
+.lev-acom-menos { flex: 0 0 auto; height: 32px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--white); font: inherit; font-size: 13px; font-weight: 700; color: var(--text2); cursor: pointer; }
+.lev-acom-total { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 10px; margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: var(--bg); font-size: 12.5px; }
+.lev-acom-ok { color: #15803d; font-weight: 700; }
+/* Ventana para elegir */
+.lev-elegir-fondo { position: absolute; inset: 0; z-index: 900; background: rgba(15,23,42,.35); display: flex; align-items: flex-end; justify-content: flex-end; }
+.lev-elegir { width: 380px; max-width: 100%; height: 100%; background: var(--white); display: flex; flex-direction: column; box-shadow: -10px 0 30px -12px rgba(15,23,42,.4); }
+.lev-elegir-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 15px; }
+.lev-elegir-x { border: 0; background: none; font-size: 18px; color: var(--text2); cursor: pointer; padding: 4px 8px; }
+.lev-elegir-cuerpo { flex: 1; overflow-y: auto; padding: 12px 14px 16px; -webkit-overflow-scrolling: touch; }
+.lev-elegir-lista { padding: 4px 0; }
+.lev-elegir-op { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 8px 16px; border: 0; border-bottom: 1px solid var(--border); background: var(--white); font: inherit; font-size: 15px; color: var(--text); text-align: left; cursor: pointer; }
+.lev-elegir-op span { flex: 1; display: flex; flex-direction: column; }
+.lev-elegir-op small { font-size: 12px; color: var(--text3); font-weight: 500; }
+.lev-elegir-op.activo { background: var(--primary-light); font-weight: 700; }
+.lev-elegir-ok { flex: 0 0 auto !important; color: var(--primary); font-weight: 800; }
+.lev-elegir-texto { width: 100%; height: 46px; font-size: 16px; }
+.lev-elegir .dib-estr-lista { max-height: none; }
+@media (max-width: 900px) {
+  .lev-elegir-fondo { justify-content: stretch; }
+  .lev-elegir { width: 100%; height: auto; max-height: 82%; border-radius: 18px 18px 0 0; box-shadow: 0 -10px 30px -10px rgba(15,23,42,.45); }
+  .lev-elegir .dib-estr-lista { max-height: 38vh; }
+}
+.lev-acom > .lev-op .lev-op-v { white-space: normal; text-align: right; }
