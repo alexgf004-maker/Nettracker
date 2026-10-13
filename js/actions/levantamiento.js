@@ -250,10 +250,20 @@ function alTocarPunto(id) {
 }
 
 // ── Barra y panel ──
+// Ventanas para elegir un dato (tipo de punto, de vano, vano de las acometidas, altura, estructuras, tipo, nombre, nota)
+export function abrirPickerLev(t) { const u = ui(); if (!u) return; u.picker = t; render(); }
+export function cerrarPickerLev() { const u = ui(); if (!u) return; u.picker = null; render(); }
+export function elegirLev(campo, valor) {
+  const u = ui(); if (!u) return;
+  if (campo === 'vanoAcom') u.vanoAcom = valor || null; else u[campo] = valor;
+  u.picker = null; render();
+}
+export function elegirPuntoLev(campo, valor) { datoPuntoLev(campo, valor); const u = ui(); if (u) { u.picker = null; render(); } }
+export function alturaYCerrarLev(v) { alturaPuntoLev(v); const u = ui(); if (u) { u.picker = null; render(); } }
 // Pestañas de la hoja de abajo (Marcar, Punto, Vanos, Más); volver a Marcar suelta el punto seleccionado
 export function setHojaLev(k) {
   const u = ui(); if (!u) return;
-  u.hoja = k; if (k === 'marcar') u.sel = null;
+  u.hoja = k; u.picker = null; if (k === 'marcar') u.sel = null;
   render();
 }
 export function setLev(campo, valor) {

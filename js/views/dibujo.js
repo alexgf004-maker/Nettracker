@@ -132,19 +132,24 @@ const opcion = (v, t, sel) => `<option value="${esc(v)}" ${String(sel ?? '') ===
 // Altura y estructuras de un poste (los mismos controles en Dibujar y en Levantamiento). Todo se elige con un toque:
 // altura en botones (u otra escrita), estructuras por grupo (el de la red que llega al poste) o con el buscador.
 // acc: { id, altura, agregar, quitar, escrita, clave (punto), grupo (por defecto) }
-export function controlesPoste({ altura, estructuras }, acc) {
+export function controlesPoste(p, acc) {
+  return `<div class="field"><label>Altura del poste</label>${selectorAltura(p.altura, acc)}</div>
+    <div class="field"><label>Estructuras</label>${selectorEstructuras(p.estructuras, acc)}</div>`;
+}
+export function selectorAltura(altura, acc) {
+  const otraAltura = altura && !ALTURAS_POSTE.includes(Number(altura));
+  return `<div class="dib-opciones">${ALTURAS_POSTE.map(a => `<button class="dib-op ${Number(altura) === a ? 'activo' : ''}" onclick="${acc.altura}('${Number(altura) === a ? '' : a}')">${a}'</button>`).join('')}
+      <input id="${acc.id}-altura" class="dib-op-otra" inputmode="numeric" value="${otraAltura ? esc(altura) : ''}" placeholder="Otra" aria-label="Otra altura en pies" onchange="${acc.altura}(this.value)"></div>`;
+}
+export function selectorEstructuras(estructuras, acc) {
   const lista = estructuras || [];
   const g = state.estrGrupo?.clave === acc.clave ? state.estrGrupo.g : acc.grupo || 'sec';
-  const otraAltura = altura && !ALTURAS_POSTE.includes(Number(altura));
-  return `<div class="field"><label>Altura del poste</label><div class="dib-opciones">${ALTURAS_POSTE.map(a => `<button class="dib-op ${Number(altura) === a ? 'activo' : ''}" onclick="${acc.altura}('${Number(altura) === a ? '' : a}')">${a}'</button>`).join('')}
-      <input id="${acc.id}-altura" class="dib-op-otra" inputmode="numeric" value="${otraAltura ? esc(altura) : ''}" placeholder="Otra" aria-label="Otra altura en pies" onchange="${acc.altura}(this.value)"></div></div>
-    <div class="field"><label>Estructuras</label>
-      <div class="dib-estructuras">${lista.map((c, i) => `<span class="dib-estr" title="${esc(nombreEstructura(c))}">${esc(c)}<button aria-label="Quitar ${esc(c)}" onclick="${acc.quitar}(${i})">✕</button></span>`).join('') || '<span class="page-sub">Ninguna todavía</span>'}</div>
+  return `<div class="dib-estructuras">${lista.map((c, i) => `<span class="dib-estr" title="${esc(nombreEstructura(c))}">${esc(c)}<button aria-label="Quitar ${esc(c)}" onclick="${acc.quitar}(${i})">✕</button></span>`).join('') || '<span class="page-sub">Ninguna todavía</span>'}</div>
       <div class="dib-estr-grupos segmento">${ESTRUCTURAS.map(x => `<button class="${g === x.k ? 'active' : ''}" onclick="grupoEstructurasUI('${acc.clave}', '${x.k}')">${x.corto}</button>`).join('')}</div>
       <input id="${acc.id}-buscar" class="dib-estr-buscar" type="search" placeholder="Buscar código o nombre (ej. remate, RS)" aria-label="Buscar estructura" oninput="buscarEstructuras('${acc.id}', this.value)">
       <div class="dib-estr-lista" id="${acc.id}-lista" data-g="${g}">${ESTRUCTURAS.map(x => x.items.map(it => `<button class="dib-estr-op ${lista.includes(it.codigo) ? 'puesta' : ''}" data-g="${x.k}" data-q="${esc((it.codigo + ' ' + it.nombre + ' ' + x.corto).toLowerCase())}" ${x.k === g ? '' : 'hidden'} onclick="${acc.agregar}('${it.codigo}')"><b>${it.codigo}</b><span>${esc(it.nombre)}</span></button>`).join('')).join('')}
         <div class="page-sub dib-estr-nada" hidden>Ninguna coincide; puedes escribir el código abajo.</div></div>
-      <div class="dib-estr-otra"><input id="${acc.id}-estr-otra" placeholder="Otro código" onkeydown="if (event.key === 'Enter') ${acc.escrita}()"><button class="b b-g" onclick="${acc.escrita}()">Agregar</button></div></div>`;
+      <div class="dib-estr-otra"><input id="${acc.id}-estr-otra" placeholder="Otro código" onkeydown="if (event.key === 'Enter') ${acc.escrita}()"><button class="b b-g" onclick="${acc.escrita}()">Agregar</button></div>`;
 }
 // Calibre y tipo de conductor con un toque (otro calibre se escribe). fn(campo, valorJs) arma la llamada
 export function controlesConductor(c, acc) {

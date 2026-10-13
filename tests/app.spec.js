@@ -3093,7 +3093,8 @@ test.describe('Levantamiento en campo', () => {
     await expect(page.locator('.lev-vano')).toContainText('32.0 m medido');
     // Con precisión baja pide confirmar; transformador como tipo de punto
     await pestana(page, 'Marcar');
-    await page.locator('.lev-barra .dib-chip', { hasText: 'Transformador existente' }).click();
+    await page.getByRole('button', { name: 'Tipo de punto' }).click();
+    await page.locator('.lev-elegir-op', { hasText: 'Transformador existente' }).click();
     await context.setGeolocation({ latitude: 13.50027, longitude: -88.86975, accuracy: 30 });
     await expect(page.locator('#lev-gps')).toHaveText('GPS ±30 m');
     page.once('dialog', dl => dl.accept());
@@ -3102,16 +3103,21 @@ test.describe('Levantamiento en campo', () => {
     // Seleccionar P1, nota y ramal desde ahí tocando el mapa
     await page.locator('.leaflet-marker-icon', { hasText: 'P1' }).click();
     await expect(page.locator('.lev-panel')).toContainText('GPS ±5 m');
-    await page.locator('#lev-p-nota').fill('Poste de madera deteriorado'); await page.locator('#lev-p-nota').press('Tab');
+    await page.getByRole('button', { name: 'Nota del punto' }).click();
+    await page.locator('#lev-p-nota').fill('Poste de madera deteriorado'); await page.locator('#lev-p-nota').press('Enter');
     // Altura y estructuras del poste: de la lista y una escrita
-    await page.locator('.lev-panel .dib-op', { hasText: /^35'$/ }).click();
+    await page.getByRole('button', { name: 'Altura del poste' }).click();
+    await page.locator('.lev-elegir .dib-op', { hasText: /^35'$/ }).click(); // se cierra sola
+    await expect(page.locator('.lev-elegir')).toHaveCount(0);
     // Llega red BT: se abre Secundaria; con el buscador se encuentra una primaria
-    await expect(page.locator('.lev-panel .dib-estr-grupos .active')).toHaveText('Secundaria');
+    await page.getByRole('button', { name: 'Estructuras del poste' }).click();
+    await expect(page.locator('.lev-elegir .dib-estr-grupos .active')).toHaveText('Secundaria');
     await page.locator('#lev-poste-buscar').fill('23ts3');
     await expect(page.locator('#lev-poste-lista .dib-estr-op:visible')).toHaveCount(1);
     await page.locator('#lev-poste-lista .dib-estr-op:visible').click();
     await page.locator('#lev-poste-estr-otra').fill('ts3'); await page.getByRole('button', { name: 'Agregar', exact: true }).click();
-    await expect(page.locator('.lev-panel .dib-estr')).toHaveText(['23TS3✕', 'TS3✕']);
+    await expect(page.locator('.lev-elegir .dib-estr')).toHaveText(['23TS3✕', 'TS3✕']);
+    await page.getByRole('button', { name: 'Listo' }).click();
     await expect(page.locator('.lev-panel .tg')).toContainText("35' · 23TS3 / TS3");
     await page.getByRole('button', { name: 'Seguir desde aquí' }).click();
     await page.getByRole('button', { name: 'Tocando el mapa' }).click();
@@ -3223,10 +3229,11 @@ test.describe('Levantamiento en campo', () => {
     await pestana(page, 'Marcar');
     await expect(page.locator('#lev-acom-a')).toHaveText('0');
     // Corregir en el vano P1 – P2: una de 120 en B
-    await page.locator('#lev-acom-vano').selectOption({ label: 'P1 – P2' });
+    await page.getByRole('button', { name: 'Vano donde se cuentan' }).click();
+    await page.locator('.lev-elegir-op', { hasText: 'P1 – P2' }).click();
     await page.getByRole('button', { name: 'Sumar acometida 120 B' }).click();
-    await expect(page.locator('.lev-acom-total')).toContainText('fase A 3, fase B 2');
-    await expect(page.locator('.lev-acom-total')).toContainText('diferencia 1 (más en A)');
+    await expect(page.locator('.lev-acom-total')).toContainText('fase A 3 · fase B 2');
+    await expect(page.locator('.lev-acom-total')).toContainText('Diferencia 1 (más en A)');
     // Restar no baja de cero
     await page.getByRole('button', { name: 'Restar acometida 120 B' }).click();
     await page.getByRole('button', { name: 'Restar acometida 120 B' }).click();
