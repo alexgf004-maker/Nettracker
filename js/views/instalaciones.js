@@ -6,6 +6,7 @@ import { calcSt, daysUntil, fmtDate, today } from '../utils.js';
 import { heroSeccion } from './componentes.js';
 import { avisoRemedicionHTML } from './ft.js';
 import { descargable } from '../actions/descargas.js';
+import { planillaDisponible } from '../actions/planilla.js';
 
 export function renderInstalaciones() {
   let html = '';
@@ -167,8 +168,9 @@ export function renderInstalaciones() {
           <div class="form-section-title">Fechas</div>
           <div class="row">
             <div class="field"><label>Instalaciones</label><input type="date" value="${state.form.fechaInstalacion}" oninput="setField('fechaInstalacion',this.value)"></div>
-            <div class="field"><label>Retiro *</label><input type="date" value="${state.form.fechaRetiro}" oninput="setField('fechaRetiro',this.value)"></div>
+            <div class="field"><label>Hora de instalación</label><input type="time" value="${state.form.horaInstalacion || ''}" oninput="setField('horaInstalacion',this.value)"></div>
           </div>
+          <div class="field"><label>Retiro *</label><input type="date" value="${state.form.fechaRetiro}" oninput="setField('fechaRetiro',this.value)"></div>
         </div>
         <div class="form-section">
           <div class="form-section-title">Área que instala</div>
@@ -194,7 +196,8 @@ export function renderInstalaciones() {
           <div class="field"><textarea placeholder="Observaciones, acceso al sitio, contacto..." oninput="setField('notas',this.value)">${state.form.notas}</textarea></div>
         </div>
         ${state.form.areaInstalacion !== 'Campos y Servicios' ? (() => {
-        let eHtml = '<div class="form-section"><div class="form-section-title">Lecturas de energía (instalación)</div>';
+        let eHtml = '<div class="form-section"><div class="form-section-title">Servicio del usuario</div><div class="field"><label>Tensión de servicio (V)</label><input inputmode="decimal" placeholder="Ej. 120/240" value="'+(state.form.tensionServicio||'')+'" oninput="setField(\'tensionServicio\',this.value)"></div></div>';
+        eHtml += '<div class="form-section"><div class="form-section-title">Lecturas de energía (instalación)</div>';
         eHtml += '<div style="display:flex;gap:6px;margin-bottom:10px">';
         [['ninguna','Sin lectura'],['una','Una lectura'],['tres','P / R / V']].forEach(([t,l]) => {
           const sel = state.form.energiaTipoInst === t;
@@ -209,6 +212,8 @@ export function renderInstalaciones() {
           });
           eHtml += '</div>';
         }
+        // X del medidor: la planilla lleva (lectura o P + R + V) × X
+        if (state.form.energiaTipoInst !== 'ninguna') eHtml += '<div class="field" style="margin-top:8px"><label>X del medidor</label><input inputmode="decimal" placeholder="1" value="'+(state.form.xMedidor||'')+'" oninput="setField(\'xMedidor\',this.value)"><div class="page-sub" style="margin-top:4px">En la planilla la energía va como '+(state.form.energiaTipoInst==='tres'?'(punta + resto + valle)':'la lectura')+' × X.</div></div>';
         eHtml += '</div>';
         return eHtml;
       })() : ''}
@@ -240,6 +245,9 @@ export function renderInstalaciones() {
           <div class="detail-row"><div class="detail-label">Retiro programado</div><div class="detail-value">${fmtDate(r.fechaRetiro)}${dias!==null?` <span style="font-size:12px;color:${dias<=0?'var(--red)':dias<=3?'var(--yellow)':'var(--text3)'}">(${dias===0?'hoy':dias>0?`en ${dias}d`:`${Math.abs(dias)}d vencido`})</span>`:''}</div></div>
           ${r.fechaRetiroReal ? `<div class="detail-row"><div class="detail-label">Retirado el</div><div class="detail-value">${fmtDate(r.fechaRetiroReal)}</div></div>` : ''}
           ${r.notas ? `<div class="detail-row"><div class="detail-label">Notas</div><div class="detail-value">${r.notas}</div></div>` : ''}
+          ${r.horaInstalacion || r.horaRetiro ? `<div class="detail-row"><div class="detail-label">Horas</div><div class="detail-value">${r.horaInstalacion ? 'Instalado ' + r.horaInstalacion : ''}${r.horaInstalacion && r.horaRetiro ? ' · ' : ''}${r.horaRetiro ? 'retirado ' + r.horaRetiro : ''}</div></div>` : ''}
+          ${r.tensionServicio ? `<div class="detail-row"><div class="detail-label">Tensión de servicio</div><div class="detail-value">${r.tensionServicio} V</div></div>` : ''}
+          ${r.xMedidor ? `<div class="detail-row"><div class="detail-label">X del medidor</div><div class="detail-value" style="font-family:var(--mono)">${r.xMedidor}</div></div>` : ''}
           ${r.energiaInstalacion && r.energiaInstalacion.tipo !== 'ninguna' ? `<div class="detail-row"><div class="detail-label">Energía instalación</div><div class="detail-value" style="font-family:var(--mono)">${r.energiaInstalacion.tipo==='una' ? r.energiaInstalacion.una+' kWh' : 'P:'+r.energiaInstalacion.punta+' R:'+r.energiaInstalacion.resto+' V:'+r.energiaInstalacion.valle+' kWh'}</div></div>` : ''}
           ${r.energiaRetiro && r.energiaRetiro.tipo !== 'ninguna' ? `<div class="detail-row"><div class="detail-label">Energía retiro</div><div class="detail-value" style="font-family:var(--mono)">${r.energiaRetiro.tipo==='una' ? r.energiaRetiro.una+' kWh' : 'P:'+r.energiaRetiro.punta+' R:'+r.energiaRetiro.resto+' V:'+r.energiaRetiro.valle+' kWh'}</div></div>` : ''}
           ${r.creadoPor ? `<div class="detail-row"><div class="detail-label">Registrado por</div><div class="detail-value" style="color:var(--text3);font-size:13px">${r.creadoPor}</div></div>` : ''}
@@ -260,6 +268,7 @@ export function renderInstalaciones() {
                 </div>
               </div>`).join('')}
           </div>` : ''}
+        ${planillaDisponible(r) ? `<button class="btn btn-secondary" style="margin-bottom:10px" onclick="abrirPlanilla('${r.id}')"><i class="ic ic-imprimir"></i> Planilla de instalación y retiro (PDF)</button>` : ''}
         ${r.lat || !r.retirado ? `
           <div style="display:flex;gap:8px;margin-bottom:10px">
             ${r.lat ? `<a href="https://maps.google.com/?q=${r.lat},${r.lng}" target="_blank" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;background:var(--primary-light);border:1px solid var(--primary);border-radius:10px;text-decoration:none;font-size:12px;font-weight:700;color:var(--primary)"><i class=ic-mapa></i> Google Maps</a>` : ''}

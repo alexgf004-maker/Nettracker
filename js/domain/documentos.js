@@ -28,7 +28,7 @@ const direccionDe = c => c.direccion || c.direccionEnte || '';
 const coord = v => (typeof v === 'number' ? String(Number(v.toFixed(7))) : String(v));
 const ubicacionDe = c => (c.lat != null && c.lat !== '' && c.lng != null ? `${coord(c.lat)}, ${coord(c.lng)}` : '');
 
-const BASE = `
+export const BASE = `
   * { margin: 0; padding: 0; box-sizing: border-box; }
   @page { size: letter; margin: 0; }
   html, body { background: #e9edf2; }
@@ -40,7 +40,7 @@ const BASE = `
   @media print { html, body { background: #fff; } .pagina { margin: 0; box-shadow: none; } .barra-acciones { display: none; } }
 `;
 
-function documento(titulo, estilos, paginas, total) {
+export function documento(titulo, estilos, paginas, total) {
   return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${esc(titulo)}</title><style>${BASE}${estilos}</style></head><body>
 <div class="barra-acciones"><span>${esc(titulo)} · ${total} ${total === 1 ? 'página' : 'páginas'}</span><button onclick="window.print()">Imprimir o guardar como PDF</button></div>
 ${paginas}

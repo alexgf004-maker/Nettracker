@@ -1,5 +1,6 @@
 // Handlers (onclick) de instalaciones, retiro y descarga
 import { addToGoogleCalendar, closeDescargaModal, closeRetiroModal, getGPS, handleDelInstall, handleDescarga, handleRetiro, handleSave, openDescargaModal, openRetiroModal, toggleFalla, toggleSinProblema } from '../actions/instalaciones.js';
+import { abrirPlanilla } from '../actions/planilla.js';
 import { abrirDescargaFecha, abrirDescargaInstalaciones, cerrarDescargaBloque, datoDescargaBloque, falloDescargaBloque, guardarDescargaBloque, todosDescargaBloque, toggleDescargaBloque } from '../actions/descargas.js';
 import { isAdmin } from '../config.js';
 import { state } from '../state.js';
@@ -53,7 +54,11 @@ window.openDetail = id => { state.editId = id; state.view = 'detalle'; render();
 window.editInstall = id => {
   if (!isAdmin()) return showToast('Solo el administrador puede editar instalaciones');
   const r = state.records.find(x => x.id === id); if (!r) return;
-  state.form = { equipoId: r.equipoId, serie: r.serie, modelo: r.modelo||'', caso: r.caso, lugar: r.lugar||'', lat: r.lat||null, lng: r.lng||null, fechaInstalacion: r.fechaInstalacion, fechaRetiro: r.fechaRetiro, notas: r.notas||'' };
+  // Se cargan también el área, la sede, la energía de instalación, la hora, la X y la tensión (antes se perdían al guardar)
+  const e = r.energiaInstalacion || {};
+  state.form = { equipoId: r.equipoId, serie: r.serie, modelo: r.modelo||'', caso: r.caso, lugar: r.lugar||'', lat: r.lat||null, lng: r.lng||null, fechaInstalacion: r.fechaInstalacion, fechaRetiro: r.fechaRetiro, notas: r.notas||'',
+    areaInstalacion: r.areaInstalacion || 'CPT MT', sede: r.sede || 'Plantel Central', energiaTipoInst: e.tipo || 'ninguna', energiaInstUna: e.una || '', energiaInstPunta: e.punta || '', energiaInstResto: e.resto || '', energiaInstValle: e.valle || '',
+    horaInstalacion: r.horaInstalacion || '', xMedidor: r.xMedidor || '', tensionServicio: r.tensionServicio || '' };
   state.editId = id; state.view = 'form'; render();
 };
 
@@ -88,11 +93,12 @@ window.pickEquipo = id => {
 
 window.setRetiroSede = s => { state.retiroForm.sede = s; render(); };
 window.setRetiroEnergia = t => { state.retiroForm.energiaTipo = t; render(); };
+window.setRetiroCampo = (k, v) => { state.retiroForm[k] = v; };
 window.setRetiroEnergiaVal = (k, v) => { if(k==='una') state.retiroForm.energiaUna=v; else if(k==='punta') state.retiroForm.energiaPunta=v; else if(k==='resto') state.retiroForm.energiaResto=v; else if(k==='valle') state.retiroForm.energiaValle=v; };
 window.openDescargaModal = openDescargaModal;
 window.closeDescargaModal = closeDescargaModal;
 window.doDescarga = handleDescarga;
-Object.assign(window, { abrirDescargaFecha, abrirDescargaInstalaciones, cerrarDescargaBloque, toggleDescargaBloque, todosDescargaBloque, falloDescargaBloque, datoDescargaBloque, guardarDescargaBloque });
+Object.assign(window, { abrirPlanilla, abrirDescargaFecha, abrirDescargaInstalaciones, cerrarDescargaBloque, toggleDescargaBloque, todosDescargaBloque, falloDescargaBloque, datoDescargaBloque, guardarDescargaBloque });
 window.setDescargaTecnico = t => { state.descargaForm.tecnico = t; render(); };
 window.setDescargaNotas = v => { state.descargaForm.notas = v; };
 window.setDescargaMedicion = v => { state.descargaForm.medicionOk = v; if (!v) {} else { state.descargaForm.fallasMedicion = []; state.descargaForm.descripcionFalla = ''; } render(); };

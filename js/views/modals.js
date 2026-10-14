@@ -51,7 +51,8 @@ export function renderRetiroModal() {
           ${(()=>{
           const recR = state.records.find(x => x.id === state.retiroId);
           if (!recR || (recR.areaInstalacion||'CPT MT') === 'Campos y Servicios') return '';
-          let eHtml = '<div style="margin-bottom:16px"><div style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:8px">LECTURAS DE ENERGÍA (RETIRO)</div>';
+          let eHtml = '<div class="field" style="margin-bottom:14px"><label>Hora de retiro</label><input type="time" value="'+(state.retiroForm.horaRetiro||'')+'" oninput="setRetiroCampo(\'horaRetiro\',this.value)"></div>';
+          eHtml += '<div style="margin-bottom:16px"><div style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:8px">LECTURAS DE ENERGÍA (RETIRO)</div>';
           eHtml += '<div style="display:flex;gap:6px;margin-bottom:10px">';
           ['ninguna','una','tres'].forEach(t => {
             const sel = state.retiroForm.energiaTipo === t;
@@ -67,6 +68,8 @@ export function renderRetiroModal() {
             });
             eHtml += '</div>';
           }
+          // X del medidor (la misma de la instalación; se puede corregir)
+          if (state.retiroForm.energiaTipo !== 'ninguna') eHtml += '<div class="field"><label>X del medidor</label><input inputmode="decimal" placeholder="1" value="'+(state.retiroForm.xMedidor||'')+'" oninput="setRetiroCampo(\'xMedidor\',this.value)"></div>';
           eHtml += '</div>';
           return eHtml;
         })()}
