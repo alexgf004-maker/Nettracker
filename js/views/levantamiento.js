@@ -54,7 +54,7 @@ function renderDetalle(id, l) {
   // Pestaña activa: con un punto seleccionado se abre "Punto"
   const hoja = sel && u.hoja !== 'vanos' && u.hoja !== 'mas' ? 'punto' : u.hoja === 'punto' || !u.hoja ? 'marcar' : u.hoja;
   const abierta = hoja !== 'marcar';
-  let html = `<div class="lev-app ${abierta ? 'hoja-abierta' : ''}">`;
+  let html = `<div class="lev-app ${abierta ? 'hoja-abierta' : ''} ${u.hojaMin ? 'hoja-min' : ''}">`;
 
   // Barra de arriba: volver, nombre, GPS y quitar el último
   html += `<div class="lev-top"><button class="lev-top-btn" aria-label="Volver a los levantamientos" title="Levantamientos" onclick="cerrarLevantamiento()">${ICONO.atras}</button>
@@ -73,7 +73,8 @@ function renderDetalle(id, l) {
 
   // Hoja con pestañas
   const pest = (k, t, dis = false) => `<button class="lev-tab ${hoja === k ? 'activo' : ''}" ${dis ? 'disabled' : ''} onclick="setHojaLev('${k}')">${t}</button>`;
-  html += `<section class="lev-hoja" aria-label="Controles del levantamiento"><div class="lev-tabs">${pest('marcar', 'Marcar')}${pest('punto', sel ? esc(sel.nombre || 'Punto') : 'Punto', !sel)}${pest('vanos', `Vanos (${vanos.length})`)}${pest('mas', 'Más')}
+  // En el celular la hoja se baja con el asa para dejar casi todo el mapa (quedan las pestañas)
+  html += `<section class="lev-hoja" aria-label="Controles del levantamiento"><button class="lev-asa" aria-label="${u.hojaMin ? 'Subir la hoja' : 'Bajar la hoja'}" onclick="setLev('hojaMin', ${!u.hojaMin})"><i></i></button><div class="lev-tabs">${pest('marcar', 'Marcar')}${pest('punto', sel ? esc(sel.nombre || 'Punto') : 'Punto', !sel)}${pest('vanos', `Vanos (${vanos.length})`)}${pest('mas', 'Más')}
       ${abierta ? '<button class="lev-tab-cerrar" aria-label="Cerrar" onclick="setHojaLev(\'marcar\')">✕</button>' : ''}</div>
     <div class="lev-hoja-cuerpo" data-hoja="${hoja}${hoja === 'punto' ? u.sel : ''}" onscroll="guardarScrollLev(this)">${hoja === 'punto' ? hojaPunto(sel, l) : hoja === 'vanos' ? hojaVanos(l, vanos) : hoja === 'mas' ? hojaMas(l, u) : hojaMarcar(l, u, vanos, actual)}</div></section>`;
   html += '</div>' + ventanaElegir(l, u, sel, vanos, actual);
