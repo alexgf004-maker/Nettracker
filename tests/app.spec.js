@@ -1018,9 +1018,11 @@ test('planilla de instalación y retiro: reclamos y remediciones FT, con horas y
   await page.getByRole('button', { name: 'Planilla de instalación y retiro (PDF)' }).click();
   await expect.poll(async () => (await docs()).length).toBe(1);
   let html = (await docs())[0];
-  expect(html.match(/class="copia"/g)).toHaveLength(2); // copia de la Distribuidora y de DS
-  for (const t of ['RE192026456', 'CT10001', '900100', 'USUARIO DE PRUEBA', 'CALLE PRUEBA 1, SANTA TECLA', 'MED-1', '13200 V', 'Septiembre 2026',
-    '(P 10 + R 20 + V 5) × 80', '50 × 80', '01/09/2026 08:15', '16/09/2026 14:30', 'Medidor en poste', 'DISTRIBUIDORA', '>DS<']) expect(html).toContain(t);
+  expect(html.match(/class="copia"/g)).toHaveLength(2); // las dos copias del formato (la de arriba y la de DS)
+  // Mismo formato que la hoja del Excel: A4 horizontal, textos del formato y pie
+  for (const t of ['size: A4 landscape', 'CAMPAÑA DE CONTROL DEL PRODUCTO TECNICO', 'NumeroSIGET', 'Número  SIGET', '>DS<', 'Reporte: Formato_A2_Reemplazo', '- 1 -',
+    'RE192026456', 'CT10001', '900100', 'USUARIO DE PRUEBA', 'CALLE PRUEBA 1, SANTA TECLA', 'MED-1', '13200 V', 'Septiembre 2026',
+    '01/09/2026 08:15', '16/09/2026 14:30', 'Medidor en poste']) expect(html).toContain(t);
   expect(html).toMatch(/2[.,]?800 kWh/); // (10 + 20 + 5) × 80
   expect(html).toMatch(/4[.,]?000 kWh/); // 50 × 80
 
@@ -1029,7 +1031,7 @@ test('planilla de instalación y retiro: reclamos y remediciones FT, con horas y
   await page.getByRole('button', { name: 'Planilla de instalación y retiro (PDF)' }).click();
   await expect.poll(async () => (await docs()).length).toBe(2);
   html = (await docs())[1];
-  for (const t of ['CR282026201', 'CT-FT', '700700', 'USUARIO FT', 'CALLE FT 2', 'MED-FT', '<i>X</i>M<']) expect(html).toContain(t);
+  for (const t of ['CR282026201', 'CT-FT', '700700', 'USUARIO FT', 'CALLE FT 2', 'MED-FT', '>M</td><td class="bt bb bl br x">X</td>']) expect(html).toContain(t);
 
   // Un requerimiento cualquiera no lleva planilla
   await app.ejecutar(() => { switchTab('instalaciones'); openDetail('r31'); });
@@ -1079,7 +1081,7 @@ test('planilla en cualquier instalación: se completa sola si el código está e
   await page.getByRole('button', { name: 'Planilla de instalación y retiro (PDF)' }).click();
   await expect.poll(async () => (await docs()).length).toBe(1);
   const html = (await docs())[0];
-  for (const t of ['C-900', 'EMPRESA MANUAL', '555', 'KM 5 CARRETERA', 'MED-555', '<i>X</i>M<']) expect(html).toContain(t);
+  for (const t of ['C-900', 'EMPRESA MANUAL', '555', 'KM 5 CARRETERA', 'MED-555', '>M</td><td class="bt bb bl br x">X</td>']) expect(html).toContain(t);
 });
 
 test.describe('Firma de quien genera el memo', () => {
