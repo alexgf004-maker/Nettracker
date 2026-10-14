@@ -5,7 +5,7 @@ import { DIAS_INFORME_RECLAMO, sumarDias, tipoDeTrabajo } from '../domain/trabaj
 import { db, installsRef, push, ref, remove, update } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
-import { emptyForm, today } from '../utils.js';
+import { emptyForm, horaActual, today } from '../utils.js';
 import { render } from '../views/render.js';
 
 // ── GPS ──
@@ -49,7 +49,9 @@ export function handleSave() {
   if (state.editId) {
     const id = state.editId;
     state.editId = null; state.view = 'lista'; state.form = emptyForm();
-    update(ref(db, `analizadores/${id}`), { ...payload, editadoPor: usuario, fechaEdicion: today() }).then(() => showToast('Actualizado'));
+    // Al editar se conservan quién la registró y cuándo
+    const { fechaRegistro, creadoPor, ...cambios } = payload;
+    update(ref(db, `analizadores/${id}`), { ...cambios, editadoPor: usuario, fechaEdicion: today() }).then(() => showToast('Actualizado'));
   } else {
     const savedPayload = {...payload};
     state.view = 'lista'; state.form = emptyForm();
@@ -67,7 +69,7 @@ export function handleSave() {
 }
 
 // ── RETIRO ──
-export function openRetiroModal(id) { state.retiroId = id; state.retiroForm = { sinProblema: null, fallas: [], descripcion: '', sede: sedeRetorno(state.records.find(x => x.id === id)), energiaTipo: 'ninguna', energiaUna: '', energiaPunta: '', energiaResto: '', energiaValle: '', descargaConfirmada: null }; state.showRetiroModal = true; render(); }
+export function openRetiroModal(id) { state.retiroId = id; state.retiroForm = { sinProblema: null, fallas: [], descripcion: '', sede: sedeRetorno(state.records.find(x => x.id === id)), energiaTipo: 'ninguna', energiaUna: '', energiaPunta: '', energiaResto: '', energiaValle: '', descargaConfirmada: null, horaRetiro: horaActual(), xMedidor: state.records.find(x => x.id === id)?.xMedidor || '' }; state.showRetiroModal = true; render(); }
 
 export function closeRetiroModal() { state.showRetiroModal = false; state.retiroId = null; render(); }
 
@@ -92,7 +94,7 @@ export function handleRetiro() {
     : state.retiroForm.energiaTipo === 'tres'
     ? { tipo: 'tres', punta: state.retiroForm.energiaPunta, resto: state.retiroForm.energiaResto, valle: state.retiroForm.energiaValle }
     : { tipo: 'ninguna' };
-  const payload = { retirado: true, fechaRetiroReal: today(), sinProblema: state.retiroForm.sinProblema || false, fallas: state.retiroForm.fallas, descripcionFalla: state.retiroForm.descripcion, retiradoPor: state.sesionUsuario?.nombre || 'Desconocido', energiaRetiro: energiaRet, descargaConfirmada: state.retiroForm.descargaConfirmada === true, descargaPendiente: state.retiroForm.descargaConfirmada === false };
+  const payload = { retirado: true, fechaRetiroReal: today(), sinProblema: state.retiroForm.sinProblema || false, fallas: state.retiroForm.fallas, descripcionFalla: state.retiroForm.descripcion, retiradoPor: state.sesionUsuario?.nombre || 'Desconocido', energiaRetiro: energiaRet, descargaConfirmada: state.retiroForm.descargaConfirmada === true, descargaPendiente: state.retiroForm.descargaConfirmada === false, horaRetiro: state.retiroForm.horaRetiro || null, ...(String(state.retiroForm.xMedidor || '').trim() ? { xMedidor: String(state.retiroForm.xMedidor).trim() } : {}) };
   const id = state.retiroId;
   const sedeRetiro = state.retiroForm.sede;
   const deployRec = state.records.find(x => x.id === id);

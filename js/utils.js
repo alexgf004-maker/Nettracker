@@ -8,13 +8,15 @@ export function areaToSede(area) {
 }
 
 export function emptyForm() {
-  return { equipoId: null, serie: '', modelo: '', caso: '', lugar: '', lat: null, lng: null, fechaInstalacion: today(), fechaRetiro: '', notas: '', sede: 'Plantel Central', areaInstalacion: 'CPT MT', energiaTipoInst: 'ninguna', energiaInstUna: '', energiaInstPunta: '', energiaInstResto: '', energiaInstValle: '' };
+  return { equipoId: null, serie: '', modelo: '', caso: '', lugar: '', lat: null, lng: null, fechaInstalacion: today(), fechaRetiro: '', notas: '', sede: 'Plantel Central', areaInstalacion: 'CPT MT', energiaTipoInst: 'ninguna', energiaInstUna: '', energiaInstPunta: '', energiaInstResto: '', energiaInstValle: '', horaInstalacion: horaActual(), xMedidor: '', tensionServicio: '' };
 }
 
 export function emptyEF() {
   return { serie: '', modelo: '', notas: '', sede: 'Plantel Central', condicion: 'bueno', vineta: '', area: '' };
 }
 
+// Hora actual "HH:MM" (hora de instalación y de retiro de la planilla)
+export function horaActual() { const d = new Date(); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; }
 export function today() { return new Date().toISOString().split('T')[0]; }
 export function fmtDate(d) { if (!d) return '—'; const [y,m,dd] = d.split('-'); return `${dd}/${m}/${y}`; }
 export function daysUntil(d) { if (!d || typeof d !== 'string') return 999; const [y,m,dd] = d.split('-').map(Number); if (!y||!m||!dd) return 999; const r = new Date(y, m-1, dd); const n = new Date(); n.setHours(0,0,0,0); r.setHours(0,0,0,0); return Math.round((r-n)/86400000); }

@@ -293,6 +293,32 @@ test.describe('Instalaciones', () => {
     expect(push[2]).toMatchObject({ caso: 'C-999', serie: 'SN-105', fechaRetiro: '2026-10-30' });
   });
 
+  test('hora de instalación y de retiro, X del medidor y tensión de servicio', async ({ page }) => {
+    await page.getByRole('button', { name: 'Nuevo', exact: true }).click();
+    await expect(page.locator('input[type=time]')).toHaveValue(/^\d\d:\d\d$/); // la hora de ahora
+    await app.ejecutar(() => {
+      openSelector(); setSelectorSearch('105'); pickEquipo('e6');
+      setField('caso', 'RE192026777'); setField('lugar', 'Lugar X'); setField('fechaRetiro', '2026-10-30');
+      setField('horaInstalacion', '09:40'); setField('tensionServicio', '240'); setField('energiaTipoInst', 'tres');
+    });
+    await expect(page.locator('.form-section', { hasText: 'Lecturas de energía' })).toContainText('(punta + resto + valle) × X');
+    await app.ejecutar(() => { setField('energiaInstPunta', '1'); setField('energiaInstResto', '2'); setField('energiaInstValle', '3'); setField('xMedidor', '40'); saveInstall(); });
+    const push = (await app.escrituras()).find(([op, ruta]) => op === 'push' && ruta === 'analizadores');
+    expect(push[2]).toMatchObject({ horaInstalacion: '09:40', tensionServicio: '240', xMedidor: '40', energiaInstalacion: { tipo: 'tres', punta: '1', resto: '2', valle: '3' } });
+
+    // Al retirar: la hora y la misma X (se puede corregir)
+    await app.ejecutar(() => openRetiroModal('r2'));
+    await page.locator('.modal-overlay input[type=time]').fill('16:05');
+    await app.ejecutar(() => setRetiroEnergia('una'));
+    await page.locator('.modal-overlay input[placeholder="Energía (kWh)"]').fill('500');
+    await page.locator('.modal-overlay input[placeholder="1"]').fill('80');
+    await page.getByText('Sí, ya descargué').click();
+    await app.ejecutar(() => toggleSinProblema());
+    await page.getByText('Confirmar retiro').click();
+    const retiro = (await app.escrituras()).find(([op, ruta]) => op === 'update' && ruta === 'analizadores/r2');
+    expect(retiro[2]).toMatchObject({ horaRetiro: '16:05', xMedidor: '80', energiaRetiro: { tipo: 'una', una: '500' } });
+  });
+
   test('modales de retiro y descarga', async ({ page }) => {
     await app.ejecutar(() => { openRetiroModal('r2'); toggleFalla('LED intermitente'); });
     await expect(app$(page)).toContainText('Registrar retiro');
@@ -972,6 +998,41 @@ test('instalar la app: manifiesto con íconos PNG, aviso del navegador y pasos s
   await page.locator('.perfil-menu').getByRole('button', { name: 'Instalar app' }).click();
   expect(await page.evaluate(() => window.__avisoAbierto)).toBe(true);
   await expect(page.locator('.modal-titulo')).toHaveCount(0);
+});
+
+test('planilla de instalación y retiro: reclamos y remediciones FT, con horas y energía × X del medidor', async ({ page }) => {
+  const datos = JSON.parse(JSON.stringify(fixture));
+  Object.assign(datos.analizadores.r9, { horaInstalacion: '08:15', horaRetiro: '14:30', tensionServicio: '13200', xMedidor: '80', notas: 'Medidor en poste',
+    energiaInstalacion: { tipo: 'tres', punta: '10', resto: '20', valle: '5' }, energiaRetiro: { tipo: 'una', una: '50' } });
+  // Remedición (CR2…) de un caso FT de campaña (CR1…)
+  datos.campanas = { '2026-08_CPT-MT': { anio: 2026, mes: 8, area: 'CPT MT', casos: { CR182026201: { codigo: 'CR182026201', codigoEnte: 'CR182026201', tipo: 'CR', nc: '700700', nombre: 'USUARIO FT', direccionEnte: 'CALLE FT 2', ct: 'CT-FT', medidor: 'MED-FT', mult: { configuracion: 'Monofásico' }, resultado: { medicion: 'valida', tolerancia: 'fuera', febNoPer: 9 } } } } };
+  datos.analizadores.r30 = { serie: 'SN-105', caso: 'CR282026201', lugar: 'USUARIO FT', fechaInstalacion: '2026-09-20', fechaRetiro: '2026-09-28', areaInstalacion: 'CPT MT', fechaRegistro: '2026-09-20' };
+  datos.analizadores.r31 = { serie: 'SN-106', caso: 'C-777', lugar: 'X', fechaInstalacion: '2026-09-20', fechaRetiro: '2026-09-28', areaInstalacion: 'CPT MT', fechaRegistro: '2026-09-20' };
+  app = await abrirApp(page, { datos });
+  await cerrarAlerta(page);
+  await page.evaluate(() => { window.__docs = []; const crear = URL.createObjectURL.bind(URL); URL.createObjectURL = b => { b.text().then(t => window.__docs.push(t)); return crear(b); }; });
+  const docs = () => page.evaluate(() => window.__docs);
+
+  await app.ejecutar(() => { switchTab('instalaciones'); openDetail('r9'); });
+  await page.getByRole('button', { name: 'Planilla de instalación y retiro (PDF)' }).click();
+  await expect.poll(async () => (await docs()).length).toBe(1);
+  let html = (await docs())[0];
+  expect(html.match(/class="copia"/g)).toHaveLength(2); // copia de la Distribuidora y de DS
+  for (const t of ['RE192026456', 'CT10001', '900100', 'USUARIO DE PRUEBA', 'CALLE PRUEBA 1, SANTA TECLA', 'MED-1', '13200 V', 'Septiembre 2026',
+    '(P 10 + R 20 + V 5) × 80', '50 × 80', '01/09/2026 08:15', '16/09/2026 14:30', 'Medidor en poste', 'DISTRIBUIDORA', '>DS<']) expect(html).toContain(t);
+  expect(html).toMatch(/2[.,]?800 kWh/); // (10 + 20 + 5) × 80
+  expect(html).toMatch(/4[.,]?000 kWh/); // 50 × 80
+
+  // Remedición: los datos salen del caso FT de la campaña; monofásico → casilla M
+  await app.ejecutar(() => { switchTab('instalaciones'); openDetail('r30'); });
+  await page.getByRole('button', { name: 'Planilla de instalación y retiro (PDF)' }).click();
+  await expect.poll(async () => (await docs()).length).toBe(2);
+  html = (await docs())[1];
+  for (const t of ['CR282026201', 'CT-FT', '700700', 'USUARIO FT', 'CALLE FT 2', 'MED-FT', '<i>X</i>M<']) expect(html).toContain(t);
+
+  // Un requerimiento cualquiera no lleva planilla
+  await app.ejecutar(() => { switchTab('instalaciones'); openDetail('r31'); });
+  await expect(page.getByRole('button', { name: 'Planilla de instalación y retiro (PDF)' })).toHaveCount(0);
 });
 
 test.describe('Firma de quien genera el memo', () => {
