@@ -4,6 +4,7 @@
 // - Un caso es FT cuando el FebNoPer pasa de 5 % (la macro solo lo pintaba de rojo).
 // - ADVERTENCIA queda "por revisar" (suele ser un dato mal puesto, p. ej. el nivel de tensión).
 // - Los datos del caso (configuración, alimentador y urbanidad) vienen de la app y no del Excel del listado.
+// - Perturbaciones: nominal como en los CR (L-L si es trifásica, L-N si es mono o bi); la macro las calculaba siempre L-N.
 // Funciones puras: reciben el texto del TXT y los datos del caso.
 
 export const UMBRAL_FT = 0.05; // FebNoPer > 5 % → fuera de tolerancia
@@ -135,7 +136,8 @@ export function analizarMedicion(nombre, texto, datos = {}) {
   const conDatos = r.nivelTension > 0 && (r.urbanidad === 'U' || r.urbanidad === 'R');
   if (conDatos) {
     const tol = r.urbanidad === 'U' ? 0.06 : 0.07;
-    const nominal = esPerturb || fam === 'mono' || fam === 'bi' ? nominalLN(r.nivelTension) : r.nivelTension;
+    // Igual en CR y perturbaciones: L-N en mono y bi, L-L en tri (la macro usaba L-N en todas las perturbaciones)
+    const nominal = fam === 'mono' || fam === 'bi' ? nominalLN(r.nivelTension) : r.nivelTension;
     const sup = nominal * (1 + tol); const inf = nominal * (1 - tol); const minimo = nominal * LIMITE_INVALIDO;
     r.nominal = Math.round(nominal * 10) / 10; r.tolerancia = tol; // para dibujar la banda en las gráficas
     for (const f of datosF) {
