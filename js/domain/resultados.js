@@ -26,16 +26,14 @@ export function situacionCaso(caso, inst, hoy) {
   return { clave: 'descargado', texto: 'Descargado' };
 }
 
-// Resultado de la medición: lo anotado a mano o, si no hay, lo que se marcó al descargar
+// Resultado de la medición: solo el del análisis de los TXT o el anotado a mano. Lo que se marca al descargar el
+// equipo (medición correcta o con fallo) no es un resultado (confirmado): se muestra como aviso mientras no se analice.
 export function resultadoCaso(caso, inst) {
   const r = caso.resultado || {};
-  let medicion = r.medicion || '';
-  if (!medicion && inst?.descargas?.length) {
-    const ultima = inst.descargas[inst.descargas.length - 1];
-    if (ultima.medicionOk === true) medicion = 'valida';
-    if (ultima.medicionOk === false) medicion = 'fallida';
-  }
-  return { medicion, tolerancia: medicion === 'valida' ? r.tolerancia || '' : '', febNoPer: medicion === 'valida' ? r.febNoPer ?? '' : '', nota: r.nota || '', desdeDescarga: !r.medicion && !!medicion, analisis: r.origen === 'txt' ? r.analisis : null };
+  const medicion = r.medicion || '';
+  const ultima = inst?.descargas?.length ? inst.descargas[inst.descargas.length - 1] : null;
+  const falloDescarga = !medicion && ultima?.medicionOk === false ? (ultima.fallasMedicion || []).join(', ') || 'con fallo' : '';
+  return { medicion, tolerancia: medicion === 'valida' ? r.tolerancia || '' : '', febNoPer: medicion === 'valida' ? r.febNoPer ?? '' : '', nota: r.nota || '', falloDescarga, analisis: r.origen === 'txt' ? r.analisis : null };
 }
 
 export function resumenResultados(filas) {

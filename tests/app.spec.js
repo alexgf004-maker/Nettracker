@@ -1586,6 +1586,13 @@ test.describe('Precampaña', () => {
     expect(d1).toMatchObject({ descargaPendiente: false, descargas: [{ tecnico: 'David García', medicionOk: true, fallasMedicion: [], enBloque: true, registradoPor: 'David García' }] });
     expect(d2).toMatchObject({ descargaPendiente: false, descargas: [{ medicionOk: false, fallasMedicion: ['No midio (archivo vacio)'] }] });
     expect(esc.some(([, ruta]) => ruta === 'analizadores/d3')).toBe(false);
+    // Descargar no da resultado: eso solo sale del análisis de los TXT (o anotado a mano)
+    await app.ejecutar(() => setCampanaVista('resultados'));
+    const fila = codigo => page.locator('.tabla-casos tr', { hasText: codigo });
+    await expect(fila('CR1O2026201')).not.toContainText('Válida');
+    await expect(fila('CR1O2026202')).toContainText('Falta analizar el TXT');
+    await expect(fila('CR1O2026202')).toContainText('Al descargar: No midio (archivo vacio)');
+    await expect(page.locator('.meta', { hasText: 'CR obligatorios' })).toContainText('0 / 38');
   });
 
   test('importar la programación: cada día de instalación queda como una Fecha', async ({ page }) => {
@@ -1625,9 +1632,16 @@ test.describe('Precampaña', () => {
     await cerrarAlerta(page);
     await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('resultados'); });
     const fila = codigo => page.locator('.tabla-casos:not(.tabla-pert) tr', { hasText: codigo });
+    // Descargado pero sin analizar: marcar "medición correcta" al descargar no la da por válida
     await expect(fila('CR1O2026201')).toContainText('Descargado');
-    await expect(fila('CR1O2026201')).toContainText('Válida');
-    await expect(fila('CR1O2026201')).toContainText('según la descarga');
+    await expect(fila('CR1O2026201')).toContainText('Falta analizar el TXT');
+    await expect(fila('CR1O2026201')).not.toContainText('Válida');
+    await expect(page.locator('.meta', { hasText: 'CR obligatorios con medición válida' })).toContainText('0 / 38');
+    await fila('CR1O2026201').click();
+    await page.locator('.modal').getByRole('button', { name: 'Válida' }).click();
+    await page.locator('.modal').getByRole('button', { name: 'Dentro', exact: true }).click();
+    await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+    await expect(fila('CR1O2026201')).toContainText('Dentro de tolerancia');
     await expect(fila('CR1O2026202')).toContainText('Sin instalar');
     // La lista va por tipo: CR primero; las DA en su pestaña de la lista
     await expect(fila('DA1O2026011O00')).toHaveCount(0);
