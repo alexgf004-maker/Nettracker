@@ -1452,6 +1452,34 @@ test.describe('Precampaña', () => {
     expect(push[2]).toMatchObject({ caso: 'CR1O2026201', serie: 'SN-105', fechaInstalacion: '2026-10-05', fechaRetiro: '2026-10-13', areaInstalacion: 'Campos y Servicios', areaBeneficiaria: 'CPT MT', lat: '13.7' });
   });
 
+  test('descargas en bloque desde una Fecha: técnico para todos y fallo por equipo', async ({ page }) => {
+    const datos = conCampana();
+    const casos = datos.campanas['2026-10_CPT-MT'].casos;
+    ['CR1O2026201', 'CR1O2026202', 'DA1O2026011O00'].forEach(k => { casos[k].programa = { fecha: '1' }; });
+    datos.analizadores = { ...datos.analizadores,
+      d1: { serie: 'SN-401', caso: 'CR1O2026201', lugar: 'USUARIO 111', fechaInstalacion: '2026-09-15', fechaRetiro: '2026-09-25', areaInstalacion: 'Campos y Servicios', areaBeneficiaria: 'CPT MT', fechaRegistro: '2026-09-15' },
+      d2: { serie: 'SN-402', caso: 'CR1O2026202', lugar: 'USUARIO 222', fechaInstalacion: '2026-09-15', fechaRetiro: '2026-09-22', areaInstalacion: 'Campos y Servicios', areaBeneficiaria: 'CPT MT', retirado: true, fechaRetiroReal: '2026-09-22', descargaPendiente: true, fechaRegistro: '2026-09-15' },
+      d3: { serie: 'SN-403', caso: 'DA1O2026011O00', lugar: 'USUARIO 222', fechaInstalacion: '2026-10-05', fechaRetiro: '2026-10-13', areaInstalacion: 'Campos y Servicios', areaBeneficiaria: 'CPT MT', fechaRegistro: '2026-09-20' } };
+    app = await abrirApp(page, { datos });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('fechas'); });
+    // La programada a futuro (SN-403) no se puede descargar todavía
+    await page.locator('.fecha-card').first().getByRole('button', { name: 'Registrar descargas (2)' }).click();
+    const modal = page.locator('.desc-bloque');
+    await expect(modal.locator('.desc-fila')).toHaveCount(2);
+    await expect(modal.locator('.desc-fila', { hasText: 'SN-402' })).toContainText('descarga pendiente');
+    await expect(modal.locator('.segmento button.active')).toHaveText('David'); // quien tiene la sesión
+    await modal.getByLabel('Resultado de SN-402').selectOption('No midio (archivo vacio)');
+    await modal.getByRole('button', { name: 'Registrar 2 descargas' }).click();
+    await expect(page.locator('.toast')).toContainText('2 descargas registradas · 1 con fallo');
+    const esc = await app.escrituras();
+    const d1 = esc.find(([op, ruta]) => op === 'update' && ruta === 'analizadores/d1')[2];
+    const d2 = esc.find(([op, ruta]) => op === 'update' && ruta === 'analizadores/d2')[2];
+    expect(d1).toMatchObject({ descargaPendiente: false, descargas: [{ tecnico: 'David García', medicionOk: true, fallasMedicion: [], enBloque: true, registradoPor: 'David García' }] });
+    expect(d2).toMatchObject({ descargaPendiente: false, descargas: [{ medicionOk: false, fallasMedicion: ['No midio (archivo vacio)'] }] });
+    expect(esc.some(([, ruta]) => ruta === 'analizadores/d3')).toBe(false);
+  });
+
   test('importar la programación: cada día de instalación queda como una Fecha', async ({ page }) => {
     const datos = conCampana();
     datos.campanas['2026-10_CPT-MT'].casos.DA1O2026011O00.manual = undefined;

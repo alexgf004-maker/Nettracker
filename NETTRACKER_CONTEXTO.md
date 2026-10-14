@@ -470,7 +470,9 @@ Catálogo de equipos físicos del equipo.
 - Al confirmar se guarda el memo en `memosEquipos/{id}` (`tipo, de, a, fecha, hora, nota, registradoPor, equipos[{id, serie, modelo, vineta, condicion}]`), se registra el movimiento en cada equipo con `memoId` y se abre el memo: individual con un equipo, de lote con varios (con la condición de cada uno y la nota).
 - Pestaña **Memos**: todos los memos guardados para reimprimir. En Movimientos de la ficha, "Memo PDF" abre el memo guardado (de lote si eran varios); los movimientos de antes sacan el memo individual como siempre.
 
-**Otras funciones**: `doCondicion()` (condición), `guardarMant()` (mantenimiento), retiro y descarga en Instalaciones. Editar un equipo conserva su fecha de registro y quién lo creó.
+**Otras funciones**: `doCondicion()` (condición), `guardarMant()` (mantenimiento), retiro y descarga en Instalaciones.
+
+**Descargas en bloque** (`js/actions/descargas.js`, `js/views/descargas.js`): "Registrar descargas (n)" en cada Fecha de la campaña (los equipos de los casos de esa Fecha) y "Registrar descargas en bloque (n)" en Instalaciones (los de la pestaña y el filtro que se ven). Entran los equipos ya instalados (no los programados a futuro) y los retirados con la descarga pendiente. Se elige una vez quién hizo la descarga (por defecto quien tiene la sesión) y notas para todos; cada equipo se marca o desmarca y, si su medición tuvo fallo, se elige el tipo en su fila. Cada uno queda igual que la descarga de uno en uno (se agrega a `descargas` con `enBloque: true` y `descargaPendiente: false`). Editar un equipo conserva su fecha de registro y quién lo creó.
 
 **Envío a revisión (Cucumacayán)** (`js/actions/revision.js`):
 Cuando un equipo asignado falla, la Subestación Cucumacayán es el primer filtro que lo revisa.

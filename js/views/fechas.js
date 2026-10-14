@@ -5,6 +5,8 @@ import { fmtDate } from '../utils.js';
 import { ordenarCasos } from '../domain/listados.js';
 import { calcularMultiplicador, grupoDeEstado } from '../domain/multiplicadores.js';
 import { state } from '../state.js';
+import { descargable } from '../actions/descargas.js';
+import { instalacionDeCaso } from '../domain/resultados.js';
 import { eqEnCampo, escapeHtml } from '../utils.js';
 
 const esc = s => escapeHtml(s ?? '');
@@ -37,6 +39,8 @@ export function renderFechas(c) {
     const f = g.fechas?.[n] || {};
     const delGrupo = casosDeFecha(casos, n);
     const avisos = delGrupo.length ? revisarFecha(delGrupo, f, bt) : [];
+    // Equipos de la fecha que se pueden descargar (instalados o retirados con la descarga pendiente)
+    const porDescargar = delGrupo.map(x => instalacionDeCaso(x, state.records)).filter(descargable).length;
     html += `<div class="boleto fecha-card ${delGrupo.length ? '' : 'vacio'}">
       <div class="boleto-top"><div><div class="boleto-k">Fecha ${n}</div><div class="boleto-t">${f.instalacion ? fmtDate(f.instalacion) : 'Sin fecha'}${f.retiro ? ' al ' + fmtDate(f.retiro) : ''}</div></div>
         <div class="boleto-n"><b>${delGrupo.length}</b> <span>${delGrupo.length === 1 ? 'caso' : 'casos'}</span></div></div>
@@ -50,6 +54,7 @@ export function renderFechas(c) {
       <div class="boleto-acciones">
         <button class="hero-btn blanco" ${delGrupo.length ? '' : 'disabled'} onclick="exportarFecha('${c.clave}', '${n}')"><i class="ic ic-excel"></i> Exportar Excel</button>
         <button class="hero-btn" ${delGrupo.length ? '' : 'disabled'} onclick="enviarFechaADespachos('${c.clave}', '${n}')"><i class="ic ic-despachos"></i> Enviar a Despachos</button>
+        ${porDescargar ? `<button class="hero-btn" onclick="abrirDescargaFecha('${c.clave}', '${n}')"><i class="ic ic-descargar"></i> Registrar descargas (${porDescargar})</button>` : ''}
         ${bt ? `<button class="hero-btn" ${delGrupo.length ? '' : 'disabled'} onclick="abrirDocumentos('${c.clave}', 'cartas', '${n}')"><i class="ic ic-correo"></i> ${f.cartas ? 'Cartas de nuevo' : 'Cartas'}</button>` : ''}
       </div>
       ${bt && f.cartas ? `<div class="boleto-nota"><i class="ic ic-check"></i> Cartas generadas ${fmtDate(f.cartas.fecha)}${f.cartas.por ? ' · ' + esc(f.cartas.por) : ''}</div>` : ''}

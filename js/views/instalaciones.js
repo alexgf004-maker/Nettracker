@@ -5,6 +5,7 @@ import { badgeSt } from '../ui.js';
 import { calcSt, daysUntil, fmtDate, today } from '../utils.js';
 import { heroSeccion } from './componentes.js';
 import { avisoRemedicionHTML } from './ft.js';
+import { descargable } from '../actions/descargas.js';
 
 export function renderInstalaciones() {
   let html = '';
@@ -79,6 +80,9 @@ export function renderInstalaciones() {
         <div class="search-wrap"><span class="search-icon"><i class=ic-buscar></i></span>
           <input class="search-input" placeholder="Buscar serie, caso, lugar..." value="${state.search}" oninput="setSearch(this.value)" ${state.search?'data-active="true"':''}>
         </div>`;
+    // Descargas en bloque: los equipos de la lista que se ven y se pueden descargar
+    state.instDescargables = filtered.filter(descargable).map(r => r.id);
+    if (state.instDescargables.length) html += `<button class="b b-g inst-descargas" onclick="abrirDescargaInstalaciones()"><i class="ic ic-descargar"></i> Registrar descargas en bloque (${state.instDescargables.length})</button>`;
     if (filtered.length === 0) {
       html += `<div class="empty"><div class="empty-icon"><i class=ic-antena></i></div>
           <div class="empty-text">${state.records.length === 0 ? 'Sin instalaciones registrados' : 'Sin resultados'}</div>

@@ -1,5 +1,6 @@
 // Handlers (onclick) de instalaciones, retiro y descarga
 import { addToGoogleCalendar, closeDescargaModal, closeRetiroModal, getGPS, handleDelInstall, handleDescarga, handleRetiro, handleSave, openDescargaModal, openRetiroModal, toggleFalla, toggleSinProblema } from '../actions/instalaciones.js';
+import { abrirDescargaFecha, abrirDescargaInstalaciones, cerrarDescargaBloque, datoDescargaBloque, falloDescargaBloque, guardarDescargaBloque, todosDescargaBloque, toggleDescargaBloque } from '../actions/descargas.js';
 import { isAdmin } from '../config.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
@@ -91,6 +92,7 @@ window.setRetiroEnergiaVal = (k, v) => { if(k==='una') state.retiroForm.energiaU
 window.openDescargaModal = openDescargaModal;
 window.closeDescargaModal = closeDescargaModal;
 window.doDescarga = handleDescarga;
+Object.assign(window, { abrirDescargaFecha, abrirDescargaInstalaciones, cerrarDescargaBloque, toggleDescargaBloque, todosDescargaBloque, falloDescargaBloque, datoDescargaBloque, guardarDescargaBloque });
 window.setDescargaTecnico = t => { state.descargaForm.tecnico = t; render(); };
 window.setDescargaNotas = v => { state.descargaForm.notas = v; };
 window.setDescargaMedicion = v => { state.descargaForm.medicionOk = v; if (!v) {} else { state.descargaForm.fallasMedicion = []; state.descargaForm.descripcionFalla = ''; } render(); };
