@@ -1036,6 +1036,52 @@ test('planilla de instalación y retiro: reclamos y remediciones FT, con horas y
   await expect(page.getByRole('button', { name: 'Planilla de instalación y retiro (PDF)' })).toHaveCount(0);
 });
 
+test('planilla en cualquier instalación: se completa sola si el código está en la base y si no es opcional', async ({ page }) => {
+  const datos = JSON.parse(JSON.stringify(fixture));
+  datos.campanas = { '2026-10_CPT-BT': { anio: 2026, mes: 10, area: 'CPT BT', casos: { CR1O2026001: { codigo: 'CR1O2026001', codigoEnte: 'CR1O2026001', tipo: 'CR', nc: '901', nombre: 'USUARIO BT', direccionEnte: 'CALLE BT 9', ct: 'CT9', medidor: 'M-9', tipoInstalacion: 'TRIFÁSICO' } } } };
+  app = await abrirApp(page, { datos });
+  await cerrarAlerta(page);
+  await page.evaluate(() => { window.__docs = []; const crear = URL.createObjectURL.bind(URL); URL.createObjectURL = b => { b.text().then(t => window.__docs.push(t)); return crear(b); }; });
+  const docs = () => page.evaluate(() => window.__docs);
+  await app.ejecutar(() => { switchTab('instalaciones'); newInstall(); });
+  const seccion = page.locator('.form-section', { hasText: 'Planilla de instalación y retiro' });
+  const campo = l => seccion.locator('.field', { hasText: l }).locator('input');
+
+  // Código en la base (caso de campaña): se completa solo, con el tipo de instalación
+  const codigo = page.locator('input[placeholder="Ej: CR1D2025201"]');
+  await codigo.fill('CR1O2026001'); await codigo.blur();
+  await expect(seccion).toContainText('está en la base (caso de campaña)');
+  await expect(campo('Nombre del usuario')).toHaveValue('USUARIO BT');
+  await expect(campo('ID Usuario (NC)')).toHaveValue('901');
+  await expect(campo('Centro MT/BT ó Corte')).toHaveValue('CT9');
+  await expect(seccion.getByRole('button', { name: 'Trifásico' })).toHaveClass(/active/);
+  await expect(page.locator('input[placeholder*="Colonia"], input[oninput*="lugar"]').first()).toHaveValue('USUARIO BT');
+
+  // Código que no está: la planilla es opcional; al marcarla se llenan los datos a mano
+  await codigo.fill('C-900'); await codigo.blur();
+  await expect(seccion).toContainText('Generar planilla para esta instalación');
+  await expect(campo('Nombre del usuario')).toHaveCount(0);
+  await seccion.locator('.check-planilla input').check();
+  await campo('Nombre del usuario').fill('EMPRESA MANUAL');
+  await campo('ID Usuario (NC)').fill('555');
+  await campo('Dirección').fill('KM 5 CARRETERA');
+  await campo('Código del medidor').fill('MED-555');
+  await seccion.getByRole('button', { name: 'Monofásico' }).click();
+  await app.ejecutar(() => { openSelector(); setSelectorSearch('105'); pickEquipo('e6'); setField('lugar', 'Planta'); setField('fechaRetiro', '2026-10-30'); saveInstall(); });
+  const push = (await app.escrituras()).find(([op, ruta]) => op === 'push' && ruta === 'analizadores');
+  expect(push[2]).toMatchObject({ caso: 'C-900', conPlanilla: true, planilla: { nombre: 'EMPRESA MANUAL', nc: '555', direccion: 'KM 5 CARRETERA', medidor: 'MED-555', tipo: 'M' } });
+  expect(push[2]).not.toHaveProperty('planillaOrigen');
+  expect(push[2]).not.toHaveProperty('planillaCodigo');
+
+  // La instalación guardada lleva su planilla con esos datos
+  const id = await page.evaluate(async () => { const { state } = await import('/js/state.js'); return state.records.find(r => r.caso === 'C-900').id; });
+  await app.ejecutar(i => openDetail(i), id);
+  await page.getByRole('button', { name: 'Planilla de instalación y retiro (PDF)' }).click();
+  await expect.poll(async () => (await docs()).length).toBe(1);
+  const html = (await docs())[0];
+  for (const t of ['C-900', 'EMPRESA MANUAL', '555', 'KM 5 CARRETERA', 'MED-555', '<i>X</i>M<']) expect(html).toContain(t);
+});
+
 test.describe('Firma de quien genera el memo', () => {
   const conMemos = () => {
     const d = JSON.parse(JSON.stringify(fixture));

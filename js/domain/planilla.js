@@ -1,8 +1,8 @@
-// Planilla de instalación y retiro (formato "PLANILLAS_IR" del equipo) para reclamos y remediciones de casos FT:
+// Planilla de instalación y retiro (formato "PLANILLAS_IR" del equipo) de cualquier instalación que la lleve:
 // se llena con los datos de la app y se abre como página para imprimir o guardar como PDF. Lleva dos copias,
 // como el formato: la de la Distribuidora y la de DS. Confirmado con el equipo:
 // - Número SIGET = código del caso; ID Usuario = NC; nombre, dirección, centro MT/BT o corte y medidor del
-//   expediente del reclamo o del caso de campaña (remedición).
+//   expediente del reclamo o del caso de campaña (o FT que se remide), o escritos al instalar si no está en la base.
 // - Tipo de instalación: M monofásico, M2 bifásico, T trifásico. Tensión de servicio: la que se anota al instalar.
 // - Energía inicial y final: una lectura o punta + resto + valle, multiplicada por la "X" del medidor.
 // - Tipo de servicio, tarifa, número de contador, tipo de conexión, fase alta y medición de energía no se llenan.
@@ -38,14 +38,20 @@ export function tipoPlanilla(texto, fases) {
   return '';
 }
 
-// Datos de la planilla: rec (instalación) y fuente (expediente del reclamo o caso de campaña de la remedición)
+// Datos del usuario que lleva la planilla (se completan de la base o se escriben al instalar)
+export const CAMPOS_PLANILLA = ['nombre', 'nc', 'direccion', 'centro', 'medidor', 'tipo'];
+
+// Datos de la planilla: rec (instalación, con rec.planilla si se llenaron o corrigieron al instalar) y fuente (lo que
+// hay en la base para su código: { nc, nombre, direccion, centro, medidor, tipo })
 export function datosPlanilla(rec, fuente = {}) {
   const f = rec.fechaInstalacion ? rec.fechaInstalacion.split('-').map(Number) : null;
+  const p = rec.planilla || {};
+  const dato = k => p[k] || fuente[k] || '';
   return {
     codigo: rec.caso || '', periodo: f ? `${MESES[f[1] - 1]} ${f[0]}` : '',
-    centro: fuente.ct || fuente.corte || '', nc: fuente.nc || rec.idUsuario || '', nombre: fuente.nombre || rec.lugar || '',
-    direccion: fuente.direccion || fuente.direccionEnte || rec.direccion || '', medidor: fuente.medidor || rec.medidor || '',
-    tension: rec.tensionServicio || '', tipo: tipoPlanilla(fuente.tipoInstalacion || fuente.configuracion, fuente.fases),
+    centro: dato('centro'), nc: dato('nc') || rec.idUsuario || '', nombre: dato('nombre') || rec.lugar || '',
+    direccion: dato('direccion') || rec.direccion || '', medidor: dato('medidor') || rec.medidor || '',
+    tension: rec.tensionServicio || '', tipo: dato('tipo'),
     energiaInicial: energiaPlanilla(rec.energiaInstalacion, rec.xMedidor), detalleInicial: detalleEnergia(rec.energiaInstalacion, rec.xMedidor),
     energiaFinal: energiaPlanilla(rec.energiaRetiro, rec.xMedidor), detalleFinal: detalleEnergia(rec.energiaRetiro, rec.xMedidor),
     colocacion: [rec.fechaInstalacion ? rec.fechaInstalacion.split('-').reverse().join('/') : '', rec.horaInstalacion || ''].filter(Boolean).join(' '),
