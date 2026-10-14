@@ -2185,7 +2185,9 @@ test.describe('Precampaña', () => {
       monoSinV1: hacerTXT({ v: () => [0, 0, 0] }),
       monoConV2: hacerTXT({ v: () => [7620, 7620, 0] }),
       alim: hacerTXT({ v: () => [400, 400, 400] }),
-      perturb: hacerTXT({ n: 1100, paso: 10, columnas: 197, v: () => [7620, 7620, 7620] }),
+      perturb: hacerTXT({ n: 1100, paso: 10, columnas: 197, v: () => [13200, 13200, 13200] }),
+      perturbLN: hacerTXT({ n: 1100, paso: 10, columnas: 197, v: () => [7620, 7620, 7620] }),
+      perturbMono: hacerTXT({ n: 1100, paso: 10, columnas: 197, v: () => [7620, 0, 0] }),
       vacio: '',
     };
     const r = await page.evaluate(async t => {
@@ -2205,6 +2207,8 @@ test.describe('Precampaña', () => {
         alim: a('CR1O2026201.txt', t.alim),
         sinDatos: a('CR1O2026201.txt', t.valida, {}),
         perturb: a('DA1O2026013O00.txt', t.perturb, { configuracion: '', alimentador: 'AL013-13200', urbanidad: 'U' }),
+        perturbLN: a('DA1O2026013O00.txt', t.perturbLN, { configuracion: '', alimentador: 'AL013-13200', urbanidad: 'U' }),
+        perturbMono: a('DF1O2026011O00.txt', t.perturbMono, { configuracion: '', alimentador: 'AL013-13200', urbanidad: 'U' }),
         vacio: a('CR1O2026201.txt', t.vacio),
         resultadoFT: m.resultadoDeAnalisis(m.analizarMedicion('CR1O2026201.txt', t.ft, tri)),
         resultadoOk: m.resultadoDeAnalisis(m.analizarMedicion('CR1O2026201.txt', t.valida, tri)),
@@ -2221,7 +2225,10 @@ test.describe('Precampaña', () => {
     expect(r.monoConV2).toEqual(['FALLIDA', 'Monofásico con tensión en V2(100%) o V3(0%)', 0]);
     expect(r.alim).toEqual(['FALLIDA', 'Insuficientes registros válidos: 0 (mínimo 576)', 'ERROR ALIM.']);
     expect(r.sinDatos[0]).toBe('ADVERTENCIA');
+    // Perturbaciones como los CR: trifásica contra 13200 (L-L), monofásica contra 7620 (L-N)
     expect(r.perturb).toEqual(['VALIDA', 'Registros: 1100 | Trifásico | Fases OK', 0]);
+    expect(r.perturbLN).toEqual(['FALLIDA', 'Insuficientes registros válidos: 0 (mínimo 1008)', 'ERROR ALIM.']);
+    expect(r.perturbMono).toEqual(['VALIDA', 'Registros: 1100 | Monofásico | Fases OK', 0]);
     expect(r.vacio).toEqual(['FALLIDA', 'Archivo TXT vacío o sin datos', 'N/D']);
     expect(r.resultadoFT).toEqual({ medicion: 'valida', febNoPer: 10, tolerancia: 'fuera' });
     expect(r.resultadoOk).toEqual({ medicion: 'valida', febNoPer: 0, tolerancia: 'dentro' });
