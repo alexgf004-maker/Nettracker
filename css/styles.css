@@ -1716,3 +1716,27 @@ button.aviso-inicio-fila { cursor: pointer; }
 /* Instalar la app */
 .mas-instalar { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 14px; padding: 12px; border: 1.5px dashed var(--primary); border-radius: 12px; background: var(--white); color: var(--primary); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
 .pasos-instalar { margin: 0 0 14px 20px; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: 14.5px; line-height: 1.4; }
+.tabla-casos td .sel-instalacion { display: block; margin: 4px 0 2px; }
+.res-red { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px 8px; margin-bottom: 12px; background: var(--bg); }
+.res-red .field { margin-bottom: 6px; }
+.res-alim { display: flex; gap: 6px; }
+.res-alim input { flex: 1; min-width: 0; }
+.res-red-campos { display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; }
+@media (max-width: 600px) { .res-red-campos { grid-template-columns: 1fr; gap: 0; } }
+
+/* Descargas en bloque */
+.desc-tecnicos button { font-size: 13px; }
+.desc-cab { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text3); margin: 4px 0 8px; }
+.desc-todos { display: flex; gap: 10px; flex: 0 0 auto; }
+.desc-lista { display: flex; flex-direction: column; gap: 6px; max-height: min(48vh, 440px); overflow-y: auto; }
+.desc-fila { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--white); }
+.desc-fila.apagada { opacity: .5; }
+.desc-fila.con-fallo { border-color: #fca5a5; background: #fef2f2; }
+.desc-check { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; margin: 0; cursor: pointer; }
+.desc-check input { width: 20px; height: 20px; flex: 0 0 20px; }
+.desc-tx { display: flex; flex-direction: column; min-width: 0; }
+.desc-tx b { font-family: var(--mono); font-size: 14px; }
+.desc-tx small { font-size: 11.5px; color: var(--text3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.desc-fallo { flex: 0 0 170px; font-size: 12.5px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--white); }
+@media (max-width: 600px) { .desc-fila { flex-wrap: wrap; } .desc-fallo { flex: 1 1 100%; } }
+.inst-descargas { width: 100%; justify-content: center; margin: -4px 0 12px; }

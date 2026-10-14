@@ -1452,6 +1452,34 @@ test.describe('Precampaña', () => {
     expect(push[2]).toMatchObject({ caso: 'CR1O2026201', serie: 'SN-105', fechaInstalacion: '2026-10-05', fechaRetiro: '2026-10-13', areaInstalacion: 'Campos y Servicios', areaBeneficiaria: 'CPT MT', lat: '13.7' });
   });
 
+  test('descargas en bloque desde una Fecha: técnico para todos y fallo por equipo', async ({ page }) => {
+    const datos = conCampana();
+    const casos = datos.campanas['2026-10_CPT-MT'].casos;
+    ['CR1O2026201', 'CR1O2026202', 'DA1O2026011O00'].forEach(k => { casos[k].programa = { fecha: '1' }; });
+    datos.analizadores = { ...datos.analizadores,
+      d1: { serie: 'SN-401', caso: 'CR1O2026201', lugar: 'USUARIO 111', fechaInstalacion: '2026-09-15', fechaRetiro: '2026-09-25', areaInstalacion: 'Campos y Servicios', areaBeneficiaria: 'CPT MT', fechaRegistro: '2026-09-15' },
+      d2: { serie: 'SN-402', caso: 'CR1O2026202', lugar: 'USUARIO 222', fechaInstalacion: '2026-09-15', fechaRetiro: '2026-09-22', areaInstalacion: 'Campos y Servicios', areaBeneficiaria: 'CPT MT', retirado: true, fechaRetiroReal: '2026-09-22', descargaPendiente: true, fechaRegistro: '2026-09-15' },
+      d3: { serie: 'SN-403', caso: 'DA1O2026011O00', lugar: 'USUARIO 222', fechaInstalacion: '2026-10-05', fechaRetiro: '2026-10-13', areaInstalacion: 'Campos y Servicios', areaBeneficiaria: 'CPT MT', fechaRegistro: '2026-09-20' } };
+    app = await abrirApp(page, { datos });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('fechas'); });
+    // La programada a futuro (SN-403) no se puede descargar todavía
+    await page.locator('.fecha-card').first().getByRole('button', { name: 'Registrar descargas (2)' }).click();
+    const modal = page.locator('.desc-bloque');
+    await expect(modal.locator('.desc-fila')).toHaveCount(2);
+    await expect(modal.locator('.desc-fila', { hasText: 'SN-402' })).toContainText('descarga pendiente');
+    await expect(modal.locator('.segmento button.active')).toHaveText('David'); // quien tiene la sesión
+    await modal.getByLabel('Resultado de SN-402').selectOption('No midio (archivo vacio)');
+    await modal.getByRole('button', { name: 'Registrar 2 descargas' }).click();
+    await expect(page.locator('.toast')).toContainText('2 descargas registradas · 1 con fallo');
+    const esc = await app.escrituras();
+    const d1 = esc.find(([op, ruta]) => op === 'update' && ruta === 'analizadores/d1')[2];
+    const d2 = esc.find(([op, ruta]) => op === 'update' && ruta === 'analizadores/d2')[2];
+    expect(d1).toMatchObject({ descargaPendiente: false, descargas: [{ tecnico: 'David García', medicionOk: true, fallasMedicion: [], enBloque: true, registradoPor: 'David García' }] });
+    expect(d2).toMatchObject({ descargaPendiente: false, descargas: [{ medicionOk: false, fallasMedicion: ['No midio (archivo vacio)'] }] });
+    expect(esc.some(([, ruta]) => ruta === 'analizadores/d3')).toBe(false);
+  });
+
   test('importar la programación: cada día de instalación queda como una Fecha', async ({ page }) => {
     const datos = conCampana();
     datos.campanas['2026-10_CPT-MT'].casos.DA1O2026011O00.manual = undefined;
@@ -1967,6 +1995,60 @@ test.describe('Precampaña', () => {
     await modal.getByLabel('Instalación de CR1O2026001').selectOption('2');
     await expect(modal).toContainText('1 válidas');
     await expect(modal).toContainText('0 por revisar');
+  });
+
+  test('MT: corregir el alimentador desde el resultado recalcula sin volver a subir el TXT', async ({ page }) => {
+    // Medición en 23 kV, pero el caso dice 13.2 kV: sale 100 % FT
+    const txt = hacerTXT({ v: () => [23000, 23000, 23000] });
+    app = await abrirApp(page);
+    const r = await page.evaluate(async t => {
+      const { analizarMedicion } = await import('/js/domain/analisis.js');
+      const { extraerSeries, txtDesdeSerie } = await import('/js/domain/series.js');
+      const datos = { configuracion: 'Estrella', alimentador: 'AL013-13200', urbanidad: 'U' };
+      const conTXT = analizarMedicion('CR1O2026201.txt', t, datos);
+      const serie = JSON.parse(JSON.stringify(extraerSeries(t)));
+      const conSerie = analizarMedicion('CR1O2026201', txtDesdeSerie(serie, conTXT.columnas), datos);
+      return { conTXT, conSerie, serie };
+    }, txt);
+    const clave = a => [a.estado, a.detalle, a.febNoPer, a.registros, a.columnas, a.intervalo];
+    expect(clave(r.conSerie)).toEqual(clave(r.conTXT)); // los registros guardados dan lo mismo que el TXT
+    expect(r.conTXT.febNoPer).toBe(1);
+
+    const datos = conCampana();
+    Object.assign(datos.campanas['2026-10_CPT-MT'].casos.CR1O2026201, { alimentador: 'AL013-13200', urbanidad: 'U', mult: { configuracion: 'Estrella' },
+      resultado: { medicion: 'valida', tolerancia: 'fuera', febNoPer: 100, analisis: r.conTXT, origen: 'txt', graficas: true } });
+    datos.series = { '2026-10_CPT-MT': { CR1O2026201: { ...r.serie, nominal: 13200, tolerancia: 0.06, codigo: 'CR1O2026201' } } };
+    app = await abrirApp(page, { datos });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('resultados'); });
+    await page.locator('.tabla-casos tr', { hasText: 'CR1O2026201' }).click();
+    const modal = page.locator('.modal');
+    await expect(modal.locator('.res-red')).toContainText('Nivel de tensión: 13200 V. Ahora: válida, FebNoPer 100.00 %');
+    await page.locator('#res-alimentador').fill('AL013-23000');
+    await modal.getByRole('button', { name: 'Corregir' }).click();
+    await expect(modal).toHaveCount(0);
+    await expect(page.locator('.toast')).toContainText('Alimentador corregido · recalculada: válida (FebNoPer 0 %)');
+    const escritura = (await app.escrituras()).findLast(([, ruta]) => ruta === 'campanas/2026-10_CPT-MT')[2];
+    expect(escritura).toMatchObject({ 'casos/CR1O2026201/alimentador': 'AL013-23000', 'casos/CR1O2026201/manual/alimentador': true,
+      'casos/CR1O2026201/resultado': { medicion: 'valida', tolerancia: 'dentro', febNoPer: 0, origen: 'txt', graficas: true } });
+    expect(await app.escrituras()).toContainEqual(['update', 'series/2026-10_CPT-MT/CR1O2026201', { nominal: 23000, tolerancia: 0.06 }]);
+    await expect(page.locator('.tabla-casos tr', { hasText: 'CR1O2026201' })).toContainText('Dentro de tolerancia');
+  });
+
+  test('MT: en la vista previa del análisis se corrige el alimentador y se recalcula', async ({ page }) => {
+    const datos = conCampana();
+    Object.assign(datos.campanas['2026-10_CPT-MT'].casos.CR1O2026201, { alimentador: 'AL013-13200', urbanidad: 'U', mult: { configuracion: 'Estrella' } });
+    app = await abrirApp(page, { datos });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('resultados'); });
+    await page.locator('label', { hasText: 'Analizar TXT' }).locator('input').setInputFiles([{ name: 'CR1O2026201.txt', mimeType: 'text/plain', buffer: Buffer.from(hacerTXT({ v: () => [23000, 23000, 23000] })) }]);
+    const modal = page.locator('.modal');
+    await expect(modal).toContainText('1 fuera de tolerancia');
+    await modal.getByLabel('Alimentador de CR1O2026201').fill('AL013-23000');
+    await modal.getByLabel('Alimentador de CR1O2026201').press('Tab');
+    await expect(modal).toContainText('1 válidas');
+    await expect(modal).not.toContainText('fuera de tolerancia');
+    await expect(modal).toContainText('23000 V · U');
   });
 
   test('análisis de TXT: misma lógica que la macro CalidadEnergia', async ({ page }) => {

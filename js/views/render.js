@@ -4,6 +4,7 @@ import { renderCarga } from './carga.js';
 import { renderDashboard } from './dashboard.js';
 import { renderInstalaciones } from './instalaciones.js';
 import { renderInventario } from './inventario.js';
+import { renderDescargaBloque } from './descargas.js';
 import { renderAyudaInstalar, renderBottomNav, renderHeader } from './layout.js';
 import { renderLogin, renderMantenimiento } from './login.js';
 import { renderMapa } from './mapa.js';
@@ -70,6 +71,7 @@ export function render() {
   let html = renderHeader();
   if (state.showRetiroModal) html += renderRetiroModal();
   if (state.showDescargaModal) html += renderDescargaModal();
+  if (state.descargaBloque) html += renderDescargaBloque();
   if (state.showImportModal) html += renderImportModal();
   if (state.showMantModal) html += renderMantModal();
   if (state.showCondicionModal) html += renderCondicionModal();
