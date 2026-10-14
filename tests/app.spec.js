@@ -1969,6 +1969,60 @@ test.describe('Precampaña', () => {
     await expect(modal).toContainText('0 por revisar');
   });
 
+  test('MT: corregir el alimentador desde el resultado recalcula sin volver a subir el TXT', async ({ page }) => {
+    // Medición en 23 kV, pero el caso dice 13.2 kV: sale 100 % FT
+    const txt = hacerTXT({ v: () => [23000, 23000, 23000] });
+    app = await abrirApp(page);
+    const r = await page.evaluate(async t => {
+      const { analizarMedicion } = await import('/js/domain/analisis.js');
+      const { extraerSeries, txtDesdeSerie } = await import('/js/domain/series.js');
+      const datos = { configuracion: 'Estrella', alimentador: 'AL013-13200', urbanidad: 'U' };
+      const conTXT = analizarMedicion('CR1O2026201.txt', t, datos);
+      const serie = JSON.parse(JSON.stringify(extraerSeries(t)));
+      const conSerie = analizarMedicion('CR1O2026201', txtDesdeSerie(serie, conTXT.columnas), datos);
+      return { conTXT, conSerie, serie };
+    }, txt);
+    const clave = a => [a.estado, a.detalle, a.febNoPer, a.registros, a.columnas, a.intervalo];
+    expect(clave(r.conSerie)).toEqual(clave(r.conTXT)); // los registros guardados dan lo mismo que el TXT
+    expect(r.conTXT.febNoPer).toBe(1);
+
+    const datos = conCampana();
+    Object.assign(datos.campanas['2026-10_CPT-MT'].casos.CR1O2026201, { alimentador: 'AL013-13200', urbanidad: 'U', mult: { configuracion: 'Estrella' },
+      resultado: { medicion: 'valida', tolerancia: 'fuera', febNoPer: 100, analisis: r.conTXT, origen: 'txt', graficas: true } });
+    datos.series = { '2026-10_CPT-MT': { CR1O2026201: { ...r.serie, nominal: 13200, tolerancia: 0.06, codigo: 'CR1O2026201' } } };
+    app = await abrirApp(page, { datos });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('resultados'); });
+    await page.locator('.tabla-casos tr', { hasText: 'CR1O2026201' }).click();
+    const modal = page.locator('.modal');
+    await expect(modal.locator('.res-red')).toContainText('Nivel de tensión: 13200 V. Ahora: válida, FebNoPer 100.00 %');
+    await page.locator('#res-alimentador').fill('AL013-23000');
+    await modal.getByRole('button', { name: 'Corregir' }).click();
+    await expect(modal).toHaveCount(0);
+    await expect(page.locator('.toast')).toContainText('Alimentador corregido · recalculada: válida (FebNoPer 0 %)');
+    const escritura = (await app.escrituras()).findLast(([, ruta]) => ruta === 'campanas/2026-10_CPT-MT')[2];
+    expect(escritura).toMatchObject({ 'casos/CR1O2026201/alimentador': 'AL013-23000', 'casos/CR1O2026201/manual/alimentador': true,
+      'casos/CR1O2026201/resultado': { medicion: 'valida', tolerancia: 'dentro', febNoPer: 0, origen: 'txt', graficas: true } });
+    expect(await app.escrituras()).toContainEqual(['update', 'series/2026-10_CPT-MT/CR1O2026201', { nominal: 23000, tolerancia: 0.06 }]);
+    await expect(page.locator('.tabla-casos tr', { hasText: 'CR1O2026201' })).toContainText('Dentro de tolerancia');
+  });
+
+  test('MT: en la vista previa del análisis se corrige el alimentador y se recalcula', async ({ page }) => {
+    const datos = conCampana();
+    Object.assign(datos.campanas['2026-10_CPT-MT'].casos.CR1O2026201, { alimentador: 'AL013-13200', urbanidad: 'U', mult: { configuracion: 'Estrella' } });
+    app = await abrirApp(page, { datos });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('resultados'); });
+    await page.locator('label', { hasText: 'Analizar TXT' }).locator('input').setInputFiles([{ name: 'CR1O2026201.txt', mimeType: 'text/plain', buffer: Buffer.from(hacerTXT({ v: () => [23000, 23000, 23000] })) }]);
+    const modal = page.locator('.modal');
+    await expect(modal).toContainText('1 fuera de tolerancia');
+    await modal.getByLabel('Alimentador de CR1O2026201').fill('AL013-23000');
+    await modal.getByLabel('Alimentador de CR1O2026201').press('Tab');
+    await expect(modal).toContainText('1 válidas');
+    await expect(modal).not.toContainText('fuera de tolerancia');
+    await expect(modal).toContainText('23000 V · U');
+  });
+
   test('análisis de TXT: misma lógica que la macro CalidadEnergia', async ({ page }) => {
     app = await abrirApp(page);
     const txts = {

@@ -6,7 +6,7 @@ import { casosFT, DIAS_SOLUCION_FT } from '../domain/ft.js';
 import { state } from '../state.js';
 import { hayTXTEnMemoria, recalculablesBT } from '../actions/resultados.js';
 import { digitoInstalacion, INSTALACIONES_BT } from '../domain/analisis-bt.js';
-import { UMBRAL_FT } from '../domain/analisis.js';
+import { nivelDeAlimentador, UMBRAL_FT } from '../domain/analisis.js';
 import { escapeHtml, fmtDate } from '../utils.js';
 
 const esc = s => escapeHtml(s ?? '');
@@ -89,7 +89,7 @@ export function renderResultados(c) {
   }
   html += `<div class="barra-acciones">
     <label class="b b-p"><i class="ic ic-subir"></i> Analizar TXT<input type="file" accept=".txt" multiple hidden onchange="analizarTXT('${c.clave}', this.files)"></label>
-    ${hayTXTEnMemoria(c.clave) || (flujoBT(c.area) && recalculablesBT(c.clave).length) ? `<button class="b b-g" onclick="recalcularTXT('${c.clave}')"><i class="ic ic-repetir"></i> Recalcular con los datos actuales</button>` : ''}
+    ${hayTXTEnMemoria(c.clave) || recalculablesBT(c.clave).length ? `<button class="b b-g" onclick="recalcularTXT('${c.clave}')"><i class="ic ic-repetir"></i> Recalcular con los datos actuales</button>` : ''}
     <span class="sep"></span>
     <button class="b b-g" onclick="exportarCuadroResumen('${c.clave}')"><i class="ic ic-excel"></i> Exportar cuadro resumen</button>
     <button class="b b-g" onclick="exportarAnalisis('${c.clave}')"><i class="ic ic-grafica"></i> Exportar análisis (Resumen de la macro)</button>
@@ -202,6 +202,15 @@ export function renderResultadoModal() {
     html += `<div class="field"><label>Instalación verificada en campo</label><div class="segmento segmento-ancho">${Object.entries(INSTALACIONES_BT).map(([d, t]) => `<button class="${Number(d) === dig ? 'active' : ''}" onclick="corregirInstalacionBT('${clave}', '${id}', ${d}).then(cerrarResultado)">${esc(t.charAt(0) + t.slice(1).toLowerCase())}</button>`).join('')}</div>
       <small class="page-sub">${caso.resultado?.origen === 'txt' ? 'Al cambiarla se recalcula la medición sin volver a subir el TXT.' : 'Se usa al analizar el TXT.'}${caso.tipoInstalacion ? ` Ahora: ${esc(caso.tipoInstalacion)}${caso.manual?.tipoInstalacion ? ' (corregida en campo)' : ' (control de puntos)'}.` : ''}</small></div>`;
   }
+  if (!flujoBT(g.area)) {
+    // Alimentador y urbanidad: si están mal la medición sale 100 % FT o fallida; se corrigen aquí y se recalcula al momento
+    const a = caso.resultado?.origen === 'txt' ? caso.resultado.analisis : null;
+    const nivel = nivelDeAlimentador(caso.alimentador);
+    html += `<div class="res-red"><div class="res-red-campos">
+      <div class="field"><label>Alimentador</label><div class="res-alim"><input id="res-alimentador" value="${esc(caso.alimentador)}" placeholder="AL091-23000" onkeydown="if (event.key === 'Enter') this.nextElementSibling.click()"><button class="b b-p" onclick="corregirDatoMedicion('${clave}', '${id}', 'alimentador', document.getElementById('res-alimentador').value).then(cerrarResultado)">Corregir</button></div></div>
+      <div class="field"><label>Urbanidad</label><div class="segmento segmento-ancho">${['U', 'R'].map(u => `<button class="${caso.urbanidad === u ? 'active' : ''}" onclick="corregirDatoMedicion('${clave}', '${id}', 'urbanidad', '${u}').then(cerrarResultado)">${u === 'U' ? 'Urbano' : 'Rural'}</button>`).join('')}</div></div></div>
+      <small class="page-sub">${nivel ? `Nivel de tensión: ${nivel} V. ` : 'Sin nivel de tensión: falta el alimentador (p. ej. AL091-23000). '}${a ? `Ahora: ${esc(a.estado === 'VALIDA' ? (typeof a.febNoPer === 'number' ? `válida, FebNoPer ${(a.febNoPer * 100).toFixed(2)} %` : 'válida') : a.estado === 'FALLIDA' ? 'fallida' : 'por revisar')}. Al corregirlo se recalcula sin volver a subir el TXT.` : 'Se usa al analizar el TXT.'}</small></div>`;
+  }
   html += `<div class="field"><label>Medición</label>${seg('medicion', MEDICION)}</div>`;
   if (f.medicion === 'valida') {
     html += `<div class="field"><label>Tolerancia</label>${seg('tolerancia', { dentro: 'Dentro', fuera: 'Fuera (FT)' })}</div>`;
@@ -231,12 +240,12 @@ export function renderAnalisisModal() {
   if (manuales.length) html += `<div class="aviso aviso-azul avisos-lista"><i class="ic ic-info"></i><div>Reemplaza el resultado anotado a mano en: ${manuales.map(f => esc(f.codigo)).join(', ')}</div></div>`;
   const bt = flujoBT(state.campanas?.[imp.clave]?.area);
   if (imp.desdeSeries) html += '<div class="aviso aviso-azul"><i class="ic ic-info"></i> Recalculado con los registros guardados de cada medición, sin los TXT.</div>';
-  if (bt) html += '<div class="page-sub" style="margin:6px 0">Si en campo la instalación es otra, cámbiala en la columna Instalación: se corrige el caso y se recalcula.</div>';
+  html += `<div class="page-sub" style="margin:6px 0">${bt ? 'Si en campo la instalación es otra, cámbiala en la columna Instalación: se corrige el caso y se recalcula.' : 'Si una medición sale 100 % FT o fallida por el alimentador, corrígelo en la columna Instalación: se corrige el caso y se recalcula.'}</div>`;
   html += '<div class="tabla-wrap"><table class="tabla-casos"><thead><tr><th>Archivo</th><th>Estado</th><th>FebNoPer</th><th>Registros</th><th>Intervalo</th><th>Instalación</th><th>Detalle</th></tr></thead><tbody>';
   imp.filas.forEach(({ id, analisis: a }) => {
     const instalacion = bt
       ? `<select class="sel-instalacion" aria-label="Instalación de ${esc(a.archivo)}" onchange="corregirInstalacionBT('${imp.clave}', '${id}', this.value)">${digitoInstalacion(a.tipoInstalacion) ? '' : '<option value="">—</option>'}${Object.entries(INSTALACIONES_BT).map(([d, t]) => `<option value="${d}" ${Number(d) === digitoInstalacion(a.tipoInstalacion) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select><small>${a.nivelTension || '—'} V · ${esc(a.urbanidad || '—')}</small>`
-      : `${esc(a.tipoInstalacion)}<small>${a.nivelTension || '—'} V · ${esc(a.urbanidad || '—')}</small>`;
+      : `${esc(a.tipoInstalacion)}<input class="sel-instalacion" aria-label="Alimentador de ${esc(a.archivo)}" value="${esc(state.campanas?.[imp.clave]?.casos?.[id]?.alimentador)}" placeholder="Alimentador" onchange="corregirDatoMedicion('${imp.clave}', '${id}', 'alimentador', this.value)"><small>${a.nivelTension || '—'} V · ${esc(a.urbanidad || '—')}</small>`;
     html += `<tr><td class="mono"><b>${esc(a.archivo)}</b></td><td><span class="tag ${CLASE_ESTADO[a.estado]}">${a.estado === 'ADVERTENCIA' ? 'POR REVISAR' : a.estado}</span></td>
       <td class="mono ${typeof a.febNoPer === 'number' && a.febNoPer > UMBRAL_FT ? 'txt-rojo' : ''}">${fnp(a.febNoPer)}</td><td class="mono">${a.registros}</td><td>${esc(a.intervalo)}</td>
       <td>${instalacion}</td><td class="col-dir">${esc(a.detalle)}</td></tr>`;

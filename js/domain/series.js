@@ -55,3 +55,19 @@ export function fechaDePunto(inicio, minutos) {
   const dos = n => String(n).padStart(2, '0');
   return `${dos(d.getUTCDate())}/${dos(d.getUTCMonth() + 1)} ${dos(d.getUTCHours())}:${dos(d.getUTCMinutes())}`;
 }
+
+// TXT equivalente a partir de los registros guardados (fecha y U1/U2/U3), con el mismo número de columnas que el
+// original: sirve para volver a correr el análisis de MT sin el TXT (p. ej. después de corregir el alimentador)
+export function txtDesdeSerie(serie, columnas = 4) {
+  const n = serie.t?.length || 0;
+  const base = minutosDeFecha(serie.inicio);
+  const dos = x => String(x).padStart(2, '0');
+  const fecha = m => { const d = new Date(m * 60000); return `${dos(d.getUTCDate())}/${dos(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ${dos(d.getUTCHours())}:${dos(d.getUTCMinutes())}:00`; };
+  const relleno = Math.max(0, columnas - 4);
+  const enc = ['Fecha/Hora', 'U1 [V]', 'U2 [V]', 'U3 [V]', ...Array.from({ length: relleno }, (_, i) => 'C' + (i + 5))];
+  const U = FASES.map(p => completar(serie.U?.[p]?.v, n));
+  const lineas = [enc.join(',')];
+  const vacias = Array(relleno).fill('').join(',');
+  for (let i = 0; i < n; i++) lineas.push([fecha(base + (serie.t[i] ?? 0)), ...U.map(v => v[i] ?? ''), ...(relleno ? [vacias] : [])].join(','));
+  return lineas.join('\n');
+}

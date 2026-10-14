@@ -7,7 +7,7 @@ import { analizarMedicionBT, analizarSeriesBT, INSTALACIONES_BT } from '../domai
 import { codigoConSistema } from '../domain/listados.js';
 import { corteSubida, CR_OBLIGATORIOS, cuadroResumen, ESTADOS_CUADRO } from '../domain/resultados.js';
 import { hojaConEstilo } from '../excel.js';
-import { extraerSeries, fechaDePunto } from '../domain/series.js';
+import { extraerSeries, fechaDePunto, txtDesdeSerie } from '../domain/series.js';
 import { agruparCampanas, flujoBT, hoyLocal, MESES } from '../domain/trabajo.js';
 import { filasResultados } from '../views/resultados.js';
 import { render } from '../views/render.js';
@@ -178,25 +178,59 @@ export async function analizarTXT(clave, files) {
 export function recalcularTXT(clave) {
   const archivos = Object.values(txtEnMemoria[clave] || {});
   if (archivos.length) return analizarArchivos(clave, archivos);
-  if (flujoBT(state.campanas?.[clave]?.area)) return recalcularDesdeSeries(clave);
-  showToast('Primero sube los TXT');
+  return recalcularDesdeSeries(clave);
 }
 export const hayTXTEnMemoria = clave => Object.keys(txtEnMemoria[clave] || {}).length > 0;
-// Casos de BT que se pueden recalcular sin el TXT (se analizaron y se guardaron sus registros)
+// Casos que se pueden recalcular sin el TXT (se analizaron y se guardaron sus registros)
 export const recalculablesBT = clave => Object.entries(state.campanas?.[clave]?.casos || {}).filter(([, c]) => c.resultado?.origen === 'txt' && c.resultado.graficas);
 
 // ── BT: RECALCULAR SIN EL TXT Y CORREGIR LA INSTALACIÓN ──
 
 const datosBT = c => ({ tipoInstalacion: c.tipoInstalacion, urbanidad: c.urbanidad });
-// Análisis de un caso de BT con su TXT en memoria o, si no está, con los registros guardados (null si no hay)
-async function analisisBT(clave, id, c) {
+const datosMT = c => ({ configuracion: c.mult?.configuracion, alimentador: c.alimentador, urbanidad: c.urbanidad });
+// Análisis de un caso con su TXT en memoria o, si no está, con los registros guardados (null si no hay).
+// BT con su macro; MT con la de CalidadEnergia sobre un TXT armado con los registros (mismo número de columnas)
+async function analisisCaso(clave, id, c) {
+  const bt = flujoBT(state.campanas?.[clave]?.area);
   const archivo = txtEnMemoria[clave]?.[id];
-  if (archivo) return analizarMedicionBT(archivo.nombre, archivo.texto, datosBT(c));
+  if (archivo) return bt ? analizarMedicionBT(archivo.nombre, archivo.texto, datosBT(c)) : analizarMedicion(archivo.nombre, archivo.texto, datosMT(c));
   if (!c.resultado?.graficas) return null;
   const snap = await get(ref(db, `series/${clave}/${id}`));
   if (!snap.exists()) return null;
   const previo = c.resultado.analisis || {};
-  return analizarSeriesBT(previo.archivo || c.codigo || c.codigoEnte, snap.val(), previo, datosBT(c));
+  const nombre = previo.archivo || c.codigo || c.codigoEnte;
+  return bt ? analizarSeriesBT(nombre, snap.val(), previo, datosBT(c)) : analizarMedicion(nombre, txtDesdeSerie(snap.val(), previo.columnas), datosMT(c));
+}
+
+// Corrige el alimentador o la urbanidad de un caso desde el resultado (queda como dato corregido a mano, el control
+// de puntos ya no lo cambia) y recalcula la medición al momento, sin volver a subir el TXT
+export async function corregirDatoMedicion(clave, id, campo, valor) {
+  const c = state.campanas?.[clave]?.casos?.[id];
+  if (!c || !['alimentador', 'urbanidad'].includes(campo)) return;
+  const v = String(valor ?? '').trim().toUpperCase();
+  if ((c[campo] || '') === v) return;
+  c[campo] = v || null; c.manual = { ...(c.manual || {}), [campo]: true };
+  const datos = { [`casos/${id}/${campo}`]: v || null, [`casos/${id}/manual/${campo}`]: true };
+  let recalculada = null;
+  if (c.resultado?.origen === 'txt') {
+    const a = await analisisCaso(clave, id, c);
+    if (a) {
+      recalculada = { ...resultadoDeAnalisis(a), analisis: a, origen: 'txt', por: state.sesionUsuario?.nombre || '', fecha: hoyLocal(), ...(c.resultado.graficas ? { graficas: true } : {}) };
+      c.resultado = recalculada; datos[`casos/${id}/resultado`] = recalculada;
+      if (recalculada.graficas) update(ref(db, `series/${clave}/${id}`), { nominal: a.nominal ?? null, tolerancia: a.tolerancia ?? null });
+    }
+  }
+  await update(ref(db, 'campanas/' + clave), datos);
+  const txt = { valida: recalculada?.tolerancia === 'fuera' ? 'fuera de tolerancia' : 'válida', fallida: 'fallida', revisar: 'por revisar' }[recalculada?.medicion];
+  showToast(`${campo === 'alimentador' ? 'Alimentador' : 'Urbanidad'} corregido${recalculada ? ` · recalculada: ${txt}${typeof recalculada.febNoPer === 'number' ? ` (FebNoPer ${recalculada.febNoPer} %)` : ''}` : ''}`);
+  // Si está abierta la vista previa del análisis, se recalcula con el dato nuevo
+  const imp = state.analisisTXT;
+  if (imp?.clave === clave) {
+    if (imp.desdeSeries) return recalcularDesdeSeries(clave);
+    const archivos = imp.filas.map(f => txtEnMemoria[clave]?.[f.id]).filter(Boolean);
+    if (archivos.length) return analizarArchivos(clave, archivos);
+  }
+  render();
 }
 
 export async function recalcularDesdeSeries(clave) {
@@ -204,7 +238,7 @@ export async function recalcularDesdeSeries(clave) {
   if (!lista.length) return showToast('Primero sube los TXT');
   const filas = []; const sinCaso = [];
   for (const [id, c] of lista) {
-    const analisis = await analisisBT(clave, id, c);
+    const analisis = await analisisCaso(clave, id, c);
     if (!analisis) { sinCaso.push(c.codigo || c.codigoEnte); continue; }
     filas.push({ id, codigo: c.codigo || c.codigoEnte, analisis, resultado: resultadoDeAnalisis(analisis), manual: false, seriesMeta: { nominal: analisis.nominal ?? null, tolerancia: analisis.tolerancia ?? null } });
   }
@@ -235,7 +269,7 @@ export async function corregirInstalacionBT(clave, id, digito) {
   let recalculados = 0;
   for (const [k, c] of delUsuario) {
     if (c.resultado?.origen !== 'txt') continue;
-    const a = await analisisBT(clave, k, c);
+    const a = await analisisCaso(clave, k, c);
     if (!a) continue;
     recalculados++;
     const res = { ...resultadoDeAnalisis(a), analisis: a, origen: 'txt', ...firma, ...(c.resultado.graficas ? { graficas: true } : {}) };

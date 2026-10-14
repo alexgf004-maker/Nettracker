@@ -1716,3 +1716,10 @@ button.aviso-inicio-fila { cursor: pointer; }
 /* Instalar la app */
 .mas-instalar { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 14px; padding: 12px; border: 1.5px dashed var(--primary); border-radius: 12px; background: var(--white); color: var(--primary); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
 .pasos-instalar { margin: 0 0 14px 20px; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: 14.5px; line-height: 1.4; }
+.tabla-casos td .sel-instalacion { display: block; margin: 4px 0 2px; }
+.res-red { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px 8px; margin-bottom: 12px; background: var(--bg); }
+.res-red .field { margin-bottom: 6px; }
+.res-alim { display: flex; gap: 6px; }
+.res-alim input { flex: 1; min-width: 0; }
+.res-red-campos { display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; }
+@media (max-width: 600px) { .res-red-campos { grid-template-columns: 1fr; gap: 0; } }
