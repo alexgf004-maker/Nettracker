@@ -1493,7 +1493,11 @@ test.describe('Precampaña', () => {
     await expect(fila('CR1O2026201')).toContainText('Válida');
     await expect(fila('CR1O2026201')).toContainText('según la descarga');
     await expect(fila('CR1O2026202')).toContainText('Sin instalar');
+    // La lista va por tipo: CR primero; las DA en su pestaña de la lista
+    await expect(fila('DA1O2026011O00')).toHaveCount(0);
+    await page.locator('.res-casos .segmento').getByRole('button', { name: /^DA/ }).click();
     await expect(fila('DA1O2026011O00')).toContainText('Acceso denegado');
+    await page.locator('.res-casos .segmento').getByRole('button', { name: /^CR/ }).click();
     await expect(page.locator('.meta', { hasText: 'CR obligatorios con medición válida' })).toContainText('1 / 38');
 
     await fila('CR1O2026202').click();
@@ -1619,7 +1623,7 @@ test.describe('Precampaña', () => {
     expect(r.conDiez).toEqual(['DA1O2026101O00', 7]);
   });
 
-  test('resultados: BT sube 105 CR y el apartado de DA/DF muestra las de MT y BT juntas', async ({ page }) => {
+  test('resultados: BT sube 105 CR y la pestaña DA y DF muestra las de MT y BT juntas', async ({ page }) => {
     const datos = conCampanaBT();
     datos.campanas['2026-10_CPT-MT'].casos.DA1O2026011O00.resultado = { medicion: 'valida' };
     datos.campanas['2026-10_CPT-BT'].casos.DA1O2026021O00 = caso('DA1O2026021O00', '901', { crRelacionado: 'CR1O2026001', resultado: { medicion: 'fallida' }, programa: { fecha: '1', equipo: 'SN-106' } });
@@ -1628,6 +1632,10 @@ test.describe('Precampaña', () => {
     await cerrarAlerta(page);
     await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-BT'); setCampanaVista('resultados'); });
     await expect(page.locator('.meta', { hasText: 'CR obligatorios' })).toContainText('0 / 105');
+    // Las DA/DF del mes de MT y BT van en su propia pestaña, no en Resultados
+    await expect(page.locator('.bloque-pert')).toHaveCount(0);
+    await expect(page.locator('.paso-tab', { hasText: 'DA y DF' })).toContainText('1/9 DA');
+    await page.locator('.paso-tab', { hasText: 'DA y DF' }).click();
     const bloque = page.locator('.bloque-pert');
     await expect(bloque).toContainText('Armónicos (DA): 1 de 9 válidas');
     await expect(bloque).toContainText('BT sube 0 · 1 pendiente (2 en el listado) · MT sube 1 (1 en el listado)');

@@ -68,24 +68,23 @@ export function renderResultados(c) {
   const hoy = hoyLocal();
   const filas = filasResultados(c);
   const n = resumenResultados(filas);
+  // La lista va por tipo de caso (CR, DA o DF) para no mezclarlos; las DA/DF del mes de MT y BT tienen su pestaña
+  const tipos = ['CR', 'DA', 'DF'].filter(t => filas.some(f => f.caso.tipo === t));
+  const tipo = tipos.includes(state.resultadosTipo) ? state.resultadosTipo : tipos[0];
+  const delTipo = filas.filter(f => f.caso.tipo === tipo);
+  const nt = resumenResultados(delTipo);
   const filtro = FILTRO_RES[state.resultadosFiltro] ? state.resultadosFiltro : 'todos';
-  const visibles = filas.filter(FILTRO_RES[filtro]);
+  const visibles = delTipo.filter(FILTRO_RES[filtro]);
   let html = bloqueFT(c, hoy);
 
+  // 1. Resumen y acciones
   html += '<div class="bloque">';
   html += '<div class="bloque-head"><div class="bloque-titulo">Resultados de la campaña</div></div>';
-  const tile = (k, v, l, clase, icono = '') => `<button class="tile ${clase} ${filtro === k ? 'sel' : ''} ${v ? '' : 'vacio'}" onclick="setResultadosFiltro('${filtro === k ? 'todos' : k}')">${icono ? `<i class="ic ic-${icono}"></i>` : ''}<span class="v">${v}</span><span class="l">${l}</span></button>`;
-  html += '<div class="tiles resumen-estado-lista">'
-    + tile('valida', n.valida, 'Válidas', 't-verde', 'check')
-    + tile('ft', n.ft, 'Fuera de tolerancia', n.ft ? 't-rojo pulso' : 't-gris', 'sirena')
-    + tile('fallida', n.fallida, 'Fallidas', 't-morado', 'x')
-    + tile('revisar', n.revisar, 'Por revisar', 't-ambar', 'alerta')
-    + tile('pendiente', n.pendiente, 'Sin resultado', 't-azul', 'reloj') + '</div>';
   const obligatorios = CR_OBLIGATORIOS[c.area];
   const corte = obligatorios ? corteSubida(filas, obligatorios) : null;
   if (obligatorios) {
     const ok = n.crValidas >= obligatorios;
-    html += `<div class="meta ${ok ? 'ok' : ''}"><div class="meta-tx">CR obligatorios con medición válida<small>${corte.codigo ? `<b class="txt-corte">Se sube al sistema hasta ${esc(corte.codigo)}</b> · ` : `Faltan ${corte.faltan} CR válidas para saber hasta cuál se sube · `}${n.daValidas} DA y ${n.dfValidas} DF válidas${n.sinMedir ? ` · ${n.sinMedir} no se medirán` : ''}</small></div>
+    html += `<div class="meta ${ok ? 'ok' : ''}"><div class="meta-tx">CR obligatorios con medición válida<small>${corte.codigo ? `<b class="txt-corte">Se sube al sistema hasta ${esc(corte.codigo)}</b> · ` : `Faltan ${corte.faltan} CR válidas para saber hasta cuál se sube`}${n.sinMedir ? ` · ${n.sinMedir} no se medirán` : ''}</small></div>
       <div class="meta-barra"><i style="width:${Math.min(100, Math.round(n.crValidas * 100 / obligatorios))}%"></i></div><div class="meta-num">${n.crValidas}<small> / ${obligatorios}</small></div></div>`;
   }
   html += `<div class="barra-acciones">
@@ -99,9 +98,19 @@ export function renderResultados(c) {
     ? `<details class="ayuda"><summary><i class="ic ic-ayuda"></i> ¿Cómo se calculan?</summary><p>Sube los TXT de ECAMEC (el nombre del archivo es el código del caso): se validan y se calcula el FebNoPer como en la macro de BT, sobre 120 V con ±7 % urbano y ±8 % rural, usando el tipo de instalación y la urbanidad del control de puntos. Más de ${UMBRAL_FT * 100} % es fuera de tolerancia. Las advertencias quedan "por revisar" (fases que no coinciden con el tipo de instalación, columnas o un dato que falta): corrige el dato del caso y recalcula. También se puede anotar el resultado a mano tocando el caso.</p></details>`
     : `<details class="ayuda"><summary><i class="ic ic-ayuda"></i> ¿Cómo se calculan?</summary><p>Sube los TXT de ECAMEC (el nombre del archivo es el código del caso): se validan y se calcula el FebNoPer como en la macro. Más de ${UMBRAL_FT * 100} % es fuera de tolerancia. Las advertencias quedan "por revisar": corrige el dato del caso (suele ser el nivel de tensión) y recalcula. También se puede anotar el resultado a mano tocando el caso.</p></details>`;
   html += '</div>';
-  html += bloquePerturbaciones(c);
 
+  // 2. Casos del tipo elegido, con sus filtros por resultado
+  html += '<div class="bloque res-casos">';
+  html += `<div class="bloque-head"><div class="bloque-titulo">Casos</div>${tipos.length > 1 ? `<div class="segmento">${tipos.map(t => `<button class="${t === tipo ? 'active' : ''}" onclick="setResultadosTipo('${t}')">${t} <b>${filas.filter(f => f.caso.tipo === t).length}</b></button>`).join('')}</div>` : ''}</div>`;
+  const tile = (k, v, l, clase, icono = '') => `<button class="tile ${clase} ${filtro === k ? 'sel' : ''} ${v ? '' : 'vacio'}" onclick="setResultadosFiltro('${filtro === k ? 'todos' : k}')">${icono ? `<i class="ic ic-${icono}"></i>` : ''}<span class="v">${v}</span><span class="l">${l}</span></button>`;
+  html += '<div class="tiles resumen-estado-lista">'
+    + tile('valida', nt.valida, 'Válidas', 't-verde', 'check')
+    + (tipo === 'CR' ? tile('ft', nt.ft, 'Fuera de tolerancia', nt.ft ? 't-rojo pulso' : 't-gris', 'sirena') : '')
+    + tile('fallida', nt.fallida, 'Fallidas', 't-morado', 'x')
+    + tile('revisar', nt.revisar, 'Por revisar', 't-ambar', 'alerta')
+    + tile('pendiente', nt.pendiente, 'Sin resultado', 't-azul', 'reloj') + '</div>';
   if (filtro !== 'todos') html += `<div class="filtros"><span class="pildora active">${{ valida: 'Válidas', ft: 'Fuera de tolerancia', fallida: 'Fallidas', revisar: 'Por revisar', pendiente: 'Sin resultado' }[filtro]} <b>${visibles.length}</b></span><button class="b b-l" onclick="setResultadosFiltro('todos')">Ver todos</button></div>`;
+  html += '</div>';
 
   html += '<div class="tabla-caja"><div class="tabla-scroll"><table class="tabla-r tabla-casos"><thead><tr><th>Código</th><th>Situación</th><th>Instalación</th><th>Resultado</th><th>FebNoPer</th></tr></thead><tbody>';
   // Después del corte, los CR ya no se suben al sistema
@@ -141,11 +150,12 @@ const TAG_SUBIDA = {
   no_sube: '<span class="tg gris">No se sube</span>',
 };
 
-function bloquePerturbaciones(c) {
+// Pestaña "DA y DF": las perturbaciones del mes de MT y BT juntas y cuáles se suben
+export function renderPerturbaciones(c) {
   const todas = filasPerturbacionesMes(c);
-  if (!todas.length) return '';
+  if (!todas.length) return '<div class="empty"><div class="empty-text">No hay DA ni DF este mes.</div></div>';
   let html = '<div class="bloque bloque-pert">';
-  html += `<div class="bloque-head"><div class="bloque-titulo">Perturbaciones del mes · MT y BT</div></div>`;
+  html += `<div class="bloque-head"><div class="bloque-titulo">DA y DF del mes · MT y BT</div></div>`;
   html += `<details class="ayuda"><summary><i class="ic ic-ayuda"></i> ¿Cómo se reparten?</summary><p>El ente manda las DA y DF de MT y BT juntas y se suben ${PERTURBACIONES_A_SUBIR} de cada tipo: en orden de código, las primeras ${PERTURBACIONES_A_SUBIR} válidas, sin importar el área. Si una sale fallida o no se mide, entra la siguiente.</p></details>`;
   ['DA', 'DF'].forEach(tipo => {
     const filas = todas.filter(f => f.caso.tipo === tipo);
