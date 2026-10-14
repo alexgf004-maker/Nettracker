@@ -296,6 +296,7 @@ test.describe('Instalaciones', () => {
   test('hora de instalación y de retiro, X del medidor y tensión de servicio', async ({ page }) => {
     await page.getByRole('button', { name: 'Nuevo', exact: true }).click();
     await expect(page.locator('input[type=time]')).toHaveValue(/^\d\d:\d\d$/); // la hora de ahora
+    await expect(app$(page)).toContainText('La hora de inicio se tomó al abrir este formulario');
     await app.ejecutar(() => {
       openSelector(); setSelectorSearch('105'); pickEquipo('e6');
       setField('caso', 'RE192026777'); setField('lugar', 'Lugar X'); setField('fechaRetiro', '2026-10-30');

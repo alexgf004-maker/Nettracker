@@ -168,8 +168,9 @@ export function renderInstalaciones() {
           <div class="form-section-title">Fechas</div>
           <div class="row">
             <div class="field"><label>Instalaciones</label><input type="date" value="${state.form.fechaInstalacion}" oninput="setField('fechaInstalacion',this.value)"></div>
-            <div class="field"><label>Hora de instalación</label><input type="time" value="${state.form.horaInstalacion || ''}" oninput="setField('horaInstalacion',this.value)"></div>
+            <div class="field"><label>Hora de inicio</label><input type="time" value="${state.form.horaInstalacion || ''}" oninput="setField('horaInstalacion',this.value)"></div>
           </div>
+          ${state.editId ? '' : '<div class="page-sub" style="margin:-4px 0 10px">La hora de inicio se tomó al abrir este formulario (cuando empezaste la instalación), no al tocar Registrar. Si empezaste antes, cámbiala.</div>'}
           <div class="field"><label>Retiro *</label><input type="date" value="${state.form.fechaRetiro}" oninput="setField('fechaRetiro',this.value)"></div>
         </div>
         <div class="form-section">
