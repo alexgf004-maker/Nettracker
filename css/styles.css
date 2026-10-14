@@ -1712,3 +1712,7 @@ button.aviso-inicio-fila { cursor: pointer; }
 .eqf-op-tx small { color: var(--text3); font-size: 12px; }
 .eqf-op .ic-check { color: var(--primary); }
 .sel-instalacion { font-size: 12px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 7px; background: var(--white); color: var(--text); max-width: 140px; }
+
+/* Instalar la app */
+.mas-instalar { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 14px; padding: 12px; border: 1.5px dashed var(--primary); border-radius: 12px; background: var(--white); color: var(--primary); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.pasos-instalar { margin: 0 0 14px 20px; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: 14.5px; line-height: 1.4; }

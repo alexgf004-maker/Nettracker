@@ -940,6 +940,40 @@ test('el selector de equipo se abre como ventana sobre el formulario', async ({ 
   await expect(page.locator('.modal-overlay')).toHaveCSS('position', 'fixed');
 });
 
+test('instalar la app: manifiesto con íconos PNG, aviso del navegador y pasos si no lo da', async ({ page }) => {
+  app = await abrirApp(page);
+  await cerrarAlerta(page);
+  // Manifiesto e íconos que pide Android y el iPhone
+  const r = await page.evaluate(async () => {
+    const m = await (await fetch('manifest.webmanifest')).json();
+    const estados = await Promise.all([...m.icons.map(i => i.src), 'icons/apple-touch-icon.png', 'sw.js'].map(async u => [u, (await fetch(u)).status]));
+    return { tipos: m.icons.map(i => `${i.sizes} ${i.purpose}`), estados, apple: document.querySelector('link[rel=apple-touch-icon]').getAttribute('href'), sw: (await navigator.serviceWorker?.getRegistrations?.())?.length ?? 0 };
+  });
+  expect(r.tipos).toEqual(['192x192 any', '512x512 any', '512x512 maskable', 'any any']);
+  expect(r.estados.every(([, e]) => e === 200)).toBe(true);
+  expect(r.apple).toBe('icons/apple-touch-icon.png');
+  expect(r.sw).toBe(0); // en local no se registra el service worker
+
+  // Sin aviso del navegador: se explican los pasos
+  await page.locator('.user-chip').click();
+  await page.locator('.perfil-menu').getByRole('button', { name: 'Instalar app' }).click();
+  await expect(page.locator('.modal-titulo')).toHaveText('Instalar CPT INNOVA');
+  await expect(page.locator('.pasos-instalar')).toContainText('Instalar app o Agregar a la pantalla principal');
+  await page.getByRole('button', { name: 'Entendido' }).click();
+
+  // Con el aviso del navegador (Android/Chrome): el botón lo abre
+  await page.evaluate(() => {
+    const e = new Event('beforeinstallprompt', { cancelable: true });
+    e.prompt = () => { window.__avisoAbierto = true; };
+    e.userChoice = Promise.resolve({ outcome: 'accepted' });
+    window.dispatchEvent(e);
+  });
+  await page.locator('.user-chip').click();
+  await page.locator('.perfil-menu').getByRole('button', { name: 'Instalar app' }).click();
+  expect(await page.evaluate(() => window.__avisoAbierto)).toBe(true);
+  await expect(page.locator('.modal-titulo')).toHaveCount(0);
+});
+
 test.describe('Firma de quien genera el memo', () => {
   const conMemos = () => {
     const d = JSON.parse(JSON.stringify(fixture));

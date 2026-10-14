@@ -12,13 +12,14 @@ Herramienta interna del equipo CPT INNOVA / DELSUR para gestión de analizadores
 - **Sin build**: HTML + CSS + JS con ES modules nativos. GitHub Pages sirve los archivos tal cual (no hay npm, bundler ni paso de compilación)
 - **Firebase Realtime Database**: proyecto `pqfind`, toda la data persiste ahí
 - **Sin frameworks**: JS puro, sin React ni Vue
-- **PWA**: `manifest.webmanifest` + `icons/icon.svg`
+- **PWA instalable**: `manifest.webmanifest` con íconos PNG 192, 512 y 512 maskable (más el SVG) y `icons/apple-touch-icon.png` para el iPhone; los PNG salen de `icons/icon.svg` con `node tools/gen-app-icons.js` (usa el Chromium de Playwright). `sw.js` (service worker): siempre busca primero en internet y solo usa lo guardado sin señal; Firebase, fuentes y librerías de otros sitios van directo a la red; solo se registra en el sitio publicado (no en localhost ni en las pruebas). Botón "Instalar app" en el menú del perfil y en la hoja "Más" del celular mientras la app no esté instalada (`js/actions/instalar.js`): con el aviso del navegador (Android, Chrome/Edge en la compu) lo abre; si no hay aviso, muestra los pasos (en iPhone: Safari → Compartir → Agregar a inicio).
 - **Librerías por CDN** (en `index.html`): `xlsx` (leer/escribir Excel) y `html2pdf.js`
 
 ### Estructura de archivos
 ```
 index.html               Solo el <head>, el <div id="app"> y la carga de js/main.js
 manifest.webmanifest     Manifest de la PWA
+sw.js                    Service worker (red primero, lo guardado solo sin señal)
 icons/icon.svg           Ícono de la app
 css/styles.css           Todos los estilos (variables de tema claro/oscuro incluidas)
 css/icons.css            Íconos de línea (Lucide), generado con `npm run icons` (tools/gen-icons.js)
