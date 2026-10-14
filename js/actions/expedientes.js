@@ -1,6 +1,7 @@
 // Expedientes de reclamo: crear desde el correo de DELSUR, editar datos, ubicar al usuario
 // y registrar la instalación de cada medición.
 import { db, ref, remove, set, update } from '../firebase.js';
+import { aplicarDatosPlanilla } from './planilla.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { userArea } from '../config.js';
@@ -88,6 +89,7 @@ export function registrarInstalacionReclamo(id, codigo, punto = null) {
     ...(punto ? { reclamo: { id, n: punto.n, punto: punto.nombre } } : {}),
     lat: e.lat ?? null, lng: e.lng ?? null, fechaInstalacion: hoy, fechaRetiro: sumarDias(hoy, DIAS_RETIRO_RECLAMO), areaInstalacion: e.area || userArea(),
   };
+  aplicarDatosPlanilla(state.form); // los datos del reclamo ya van a la planilla
   state.volverA = { tab: 'reclamos', expedienteId: id };
   state.tab = 'instalaciones'; state.instTab = e.area === 'CPT BT' ? 'cpt_bt' : 'cpt_mt';
   state.editId = null; state.view = 'form';

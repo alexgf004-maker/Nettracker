@@ -45,7 +45,9 @@ export function handleSave() {
     : state.form.energiaTipoInst === 'tres'
     ? { tipo: 'tres', punta: state.form.energiaInstPunta, resto: state.form.energiaInstResto, valle: state.form.energiaInstValle }
     : { tipo: 'ninguna' };
-  const payload = { ...state.form, energiaInstalacion: energiaInst, retirado: false, fechaRegistro: today(), creadoPor: usuario };
+  // Sin planilla no se guardan sus datos; el origen (si el código está en la base) es solo para el formulario
+  const { planillaOrigen, planillaCodigo, ...form } = state.form;
+  const payload = { ...form, conPlanilla: !!form.conPlanilla, planilla: form.conPlanilla ? form.planilla || {} : null, energiaInstalacion: energiaInst, retirado: false, fechaRegistro: today(), creadoPor: usuario };
   if (state.editId) {
     const id = state.editId;
     state.editId = null; state.view = 'lista'; state.form = emptyForm();

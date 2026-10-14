@@ -8,6 +8,24 @@ import { avisoRemedicionHTML } from './ft.js';
 import { descargable } from '../actions/descargas.js';
 import { planillaDisponible } from '../actions/planilla.js';
 
+// Datos para la planilla de instalación y retiro: si el código está en la base se completan solos (y se pueden
+// corregir); si no, son opcionales: se marcan "Generar planilla" y se escriben a mano
+function seccionPlanilla(f) {
+  const p = f.planilla || {};
+  const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  let html = '<div class="form-section"><div class="form-section-title">Planilla de instalación y retiro</div>';
+  if (f.planillaOrigen) html += `<div class="aviso aviso-verde" style="margin-bottom:10px"><i class="ic ic-check"></i> ${esc(f.caso)} está en la base (${esc(f.planillaOrigen)}): los datos se completaron solos. Revísalos y corrige si hace falta.</div>`;
+  else html += `<label class="check-planilla"><input type="checkbox" ${f.conPlanilla ? 'checked' : ''} onchange="setField('conPlanilla', this.checked)"> Generar planilla para esta instalación<small>El código no está en la base: marca si quieres la planilla y llena los datos del usuario.</small></label>`;
+  if (f.conPlanilla) {
+    const campo = (k, label, ph = '') => `<div class="field"><label>${label}</label><input value="${esc(p[k])}" placeholder="${ph}" oninput="setPlanillaCampo('${k}', this.value)"></div>`;
+    html += campo('nombre', 'Nombre del usuario') + '<div class="row">' + campo('nc', 'ID Usuario (NC)') + campo('medidor', 'Código del medidor') + '</div>';
+    html += campo('direccion', 'Dirección') + campo('centro', 'Centro MT/BT ó Corte', 'CT o DS');
+    html += `<div class="row"><div class="field"><label>Tipo de instalación</label><div class="segmento segmento-ancho">${[['M', 'Monofásico'], ['M2', 'Bifásico'], ['T', 'Trifásico']].map(([k, l]) => `<button type="button" class="${p.tipo === k ? 'active' : ''}" onclick="setPlanillaCampo('tipo', '${p.tipo === k ? '' : k}')">${l}</button>`).join('')}</div></div>`;
+    html += `<div class="field"><label>Tensión de servicio (V)</label><input inputmode="decimal" placeholder="Ej. 120/240" value="${esc(f.tensionServicio)}" oninput="setField('tensionServicio', this.value)"></div></div>`;
+  }
+  return html + '</div>';
+}
+
 export function renderInstalaciones() {
   let html = '';
   const counts = {
@@ -138,10 +156,11 @@ export function renderInstalaciones() {
         <div class="form-section">
           <div class="form-section-title">Caso</div>
           <div class="field"><label>Código de caso / campaña *</label>
-            <input placeholder="Ej: CR1D2025201" value="${state.form.caso}" oninput="setField('caso',this.value)">
+            <input placeholder="Ej: CR1D2025201" value="${state.form.caso}" oninput="setField('caso',this.value)" onchange="autocompletarPlanilla()">
           </div>
           <div id="aviso-remedicion">${avisoRemedicionHTML(state.form.caso)}</div>
         </div>
+        ${seccionPlanilla(state.form)}
         <div class="form-section">
           <div class="form-section-title">Ubicación</div>
           <div class="loc-toggle">
@@ -197,8 +216,7 @@ export function renderInstalaciones() {
           <div class="field"><textarea placeholder="Observaciones, acceso al sitio, contacto..." oninput="setField('notas',this.value)">${state.form.notas}</textarea></div>
         </div>
         ${state.form.areaInstalacion !== 'Campos y Servicios' ? (() => {
-        let eHtml = '<div class="form-section"><div class="form-section-title">Servicio del usuario</div><div class="field"><label>Tensión de servicio (V)</label><input inputmode="decimal" placeholder="Ej. 120/240" value="'+(state.form.tensionServicio||'')+'" oninput="setField(\'tensionServicio\',this.value)"></div></div>';
-        eHtml += '<div class="form-section"><div class="form-section-title">Lecturas de energía (instalación)</div>';
+        let eHtml = '<div class="form-section"><div class="form-section-title">Lecturas de energía (instalación)</div>';
         eHtml += '<div style="display:flex;gap:6px;margin-bottom:10px">';
         [['ninguna','Sin lectura'],['una','Una lectura'],['tres','P / R / V']].forEach(([t,l]) => {
           const sel = state.form.energiaTipoInst === t;

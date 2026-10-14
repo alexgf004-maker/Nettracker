@@ -1,6 +1,6 @@
 // Handlers (onclick) de instalaciones, retiro y descarga
 import { addToGoogleCalendar, closeDescargaModal, closeRetiroModal, getGPS, handleDelInstall, handleDescarga, handleRetiro, handleSave, openDescargaModal, openRetiroModal, toggleFalla, toggleSinProblema } from '../actions/instalaciones.js';
-import { abrirPlanilla } from '../actions/planilla.js';
+import { abrirPlanilla, autocompletarPlanilla, setPlanillaCampo } from '../actions/planilla.js';
 import { abrirDescargaFecha, abrirDescargaInstalaciones, cerrarDescargaBloque, datoDescargaBloque, falloDescargaBloque, guardarDescargaBloque, todosDescargaBloque, toggleDescargaBloque } from '../actions/descargas.js';
 import { isAdmin } from '../config.js';
 import { state } from '../state.js';
@@ -27,7 +27,7 @@ window.setSearch = v => {
 
 window.setField = (k, v) => {
   state.form[k] = v;
-  if (k === 'energiaTipoInst' || k === 'areaInstalacion' || k === 'locMode') render();
+  if (k === 'energiaTipoInst' || k === 'areaInstalacion' || k === 'locMode' || k === 'conPlanilla') render();
   // Remedición de un caso FT: el recordatorio de las fotos aparece mientras se escribe el código (sin redibujar el formulario)
   if (k === 'caso') { const el = document.getElementById('aviso-remedicion'); if (el) el.innerHTML = avisoRemedicionHTML(v); }
 };
@@ -58,7 +58,8 @@ window.editInstall = id => {
   const e = r.energiaInstalacion || {};
   state.form = { equipoId: r.equipoId, serie: r.serie, modelo: r.modelo||'', caso: r.caso, lugar: r.lugar||'', lat: r.lat||null, lng: r.lng||null, fechaInstalacion: r.fechaInstalacion, fechaRetiro: r.fechaRetiro, notas: r.notas||'',
     areaInstalacion: r.areaInstalacion || 'CPT MT', sede: r.sede || 'Plantel Central', energiaTipoInst: e.tipo || 'ninguna', energiaInstUna: e.una || '', energiaInstPunta: e.punta || '', energiaInstResto: e.resto || '', energiaInstValle: e.valle || '',
-    horaInstalacion: r.horaInstalacion || '', xMedidor: r.xMedidor || '', tensionServicio: r.tensionServicio || '' };
+    horaInstalacion: r.horaInstalacion || '', xMedidor: r.xMedidor || '', tensionServicio: r.tensionServicio || '',
+    conPlanilla: !!r.conPlanilla, planilla: { ...(r.planilla || {}) }, planillaOrigen: null };
   state.editId = id; state.view = 'form'; render();
 };
 
@@ -98,7 +99,7 @@ window.setRetiroEnergiaVal = (k, v) => { if(k==='una') state.retiroForm.energiaU
 window.openDescargaModal = openDescargaModal;
 window.closeDescargaModal = closeDescargaModal;
 window.doDescarga = handleDescarga;
-Object.assign(window, { abrirPlanilla, abrirDescargaFecha, abrirDescargaInstalaciones, cerrarDescargaBloque, toggleDescargaBloque, todosDescargaBloque, falloDescargaBloque, datoDescargaBloque, guardarDescargaBloque });
+Object.assign(window, { abrirPlanilla, autocompletarPlanilla, setPlanillaCampo, abrirDescargaFecha, abrirDescargaInstalaciones, cerrarDescargaBloque, toggleDescargaBloque, todosDescargaBloque, falloDescargaBloque, datoDescargaBloque, guardarDescargaBloque });
 window.setDescargaTecnico = t => { state.descargaForm.tecnico = t; render(); };
 window.setDescargaNotas = v => { state.descargaForm.notas = v; };
 window.setDescargaMedicion = v => { state.descargaForm.medicionOk = v; if (!v) {} else { state.descargaForm.fallasMedicion = []; state.descargaForm.descripcionFalla = ''; } render(); };

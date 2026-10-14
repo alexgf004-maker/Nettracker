@@ -8,7 +8,7 @@ export function areaToSede(area) {
 }
 
 export function emptyForm() {
-  return { equipoId: null, serie: '', modelo: '', caso: '', lugar: '', lat: null, lng: null, fechaInstalacion: today(), fechaRetiro: '', notas: '', sede: 'Plantel Central', areaInstalacion: 'CPT MT', energiaTipoInst: 'ninguna', energiaInstUna: '', energiaInstPunta: '', energiaInstResto: '', energiaInstValle: '', horaInstalacion: horaActual(), xMedidor: '', tensionServicio: '' };
+  return { equipoId: null, serie: '', modelo: '', caso: '', lugar: '', lat: null, lng: null, fechaInstalacion: today(), fechaRetiro: '', notas: '', sede: 'Plantel Central', areaInstalacion: 'CPT MT', energiaTipoInst: 'ninguna', energiaInstUna: '', energiaInstPunta: '', energiaInstResto: '', energiaInstValle: '', horaInstalacion: horaActual(), xMedidor: '', tensionServicio: '', conPlanilla: false, planilla: {}, planillaOrigen: null };
 }
 
 export function emptyEF() {
