@@ -46,7 +46,8 @@ Object.assign(window, { abrirMultiplicador, cerrarMultiplicador, guardarMultipli
 window.setCampanaVista = v => { state.campanaVista = v; render(); };
 window.setMultFiltro = f => { state.multFiltro = f; render(); };
 window.setResultadosFiltro = f => { state.resultadosFiltro = f; render(); };
-window.verFTCampana = () => { state.campanaVista = 'resultados'; state.resultadosFiltro = 'ft'; render(); };
+window.setResultadosTipo = t => { state.resultadosTipo = t; state.resultadosFiltro = 'todos'; render(); };
+window.verFTCampana = () => { state.campanaVista = 'resultados'; state.resultadosTipo = 'CR'; state.resultadosFiltro = 'ft'; render(); };
 window.setMultSelect = (k, v) => { state.multForm[k] = v; render(); };
 // Mientras se escribe solo se actualiza el cálculo, para no perder el foco
 window.setMultField = (k, v) => {

@@ -4,7 +4,7 @@ import { renderCarga } from './carga.js';
 import { renderDashboard } from './dashboard.js';
 import { renderInstalaciones } from './instalaciones.js';
 import { renderInventario } from './inventario.js';
-import { renderBottomNav, renderHeader } from './layout.js';
+import { renderAyudaInstalar, renderBottomNav, renderHeader } from './layout.js';
 import { renderLogin, renderMantenimiento } from './login.js';
 import { renderMapa } from './mapa.js';
 import { ftParaAviso, retirosParaAviso, renderAlertaRetiros, renderCondicionModal, renderDescargaModal, renderGlobalSearch, renderImportModal, renderMantModal, renderDanioModal, renderRetiroModal, renderRevisionModal, renderSelectorModal } from './modals.js';
@@ -82,6 +82,7 @@ export function render() {
   if (state.docsModal) html += renderDocsModal();
   if (state.multEdit) html += renderMultModal();
   if (state.importProgramacion) html += renderProgramacionModal();
+  if (state.ayudaInstalar) html += renderAyudaInstalar();
   if (state.equipoFecha) html += renderEquipoFechaModal();
   if (state.importMult) html += renderImportMultModal();
   if (state.resultadoEdit) html += renderResultadoModal();

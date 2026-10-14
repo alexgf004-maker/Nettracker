@@ -2,6 +2,7 @@
 import { isAdmin, userArea, USUARIOS } from '../config.js';
 import { state } from '../state.js';
 import { iniciales } from './login.js';
+import { mostrarInstalar } from '../actions/instalar.js';
 
 // Secciones del menú: [pestaña, nombre, ícono]
 export const SECCIONES = [
@@ -46,6 +47,7 @@ export function renderHeader() {
         <span class="user-name">${nombre.split(' ')[0]}<small>${userArea()}</small></span>
       </button>
       ${state.menuPerfil ? `<div class="perfil-menu-fondo" onclick="toggleMenuPerfil()"></div><div class="perfil-menu">
+        ${mostrarInstalar() ? '<button onclick="instalarApp()"><i class="ic ic-descargar"></i> Instalar app</button>' : ''}
         <button onclick="cerrarSesion()"><i class="ic ic-chevron-left"></i> Cambiar de perfil</button>
         ${isAdmin() ? `<div class="perfil-menu-t">Borrar PIN (si alguien lo olvidó)</div>${USUARIOS.filter(u => u.nombre !== nombre).map(u => `<button onclick="borrarPin('${u.nombre}')">${u.nombre}</button>`).join('')}` : ''}
       </div>` : ''}
@@ -88,6 +90,20 @@ function renderMas() {
     });
     html += '</div>';
   });
+  if (mostrarInstalar()) html += '<button class="mas-instalar" onclick="instalarApp()"><i class="ic ic-descargar"></i> Instalar app en este celular</button>';
   html += '</div></div>';
   return html;
+}
+
+// Pasos para instalar cuando el navegador no da el aviso (en iPhone siempre es manual)
+export function renderAyudaInstalar() {
+  const iphone = state.ayudaInstalar === 'iphone';
+  const pasos = iphone
+    ? ['Abre esta página en <b>Safari</b>.', 'Toca el botón <b>Compartir</b> (el cuadrito con la flecha hacia arriba).', 'Elige <b>Agregar a inicio</b> y luego <b>Agregar</b>.']
+    : ['Abre el menú del navegador (los <b>tres puntos</b>).', 'Toca <b>Instalar app</b> o <b>Agregar a la pantalla principal</b>.', 'Confirma con <b>Instalar</b>.'];
+  return `<div class="modal-overlay" onclick="if (event.target === this) cerrarAyudaInstalar()"><div class="modal hoja" role="dialog" aria-label="Instalar app">
+    <div class="modal-head"><div class="modal-titulo">Instalar CPT INNOVA</div><button class="modal-cerrar" onclick="cerrarAyudaInstalar()" title="Cerrar">✕</button></div>
+    <div class="page-sub" style="margin-bottom:10px">Queda como una app más en el ${iphone ? 'iPhone' : 'celular'}, con su ícono y a pantalla completa.</div>
+    <ol class="pasos-instalar">${pasos.map(p => `<li>${p}</li>`).join('')}</ol>
+    <button class="btn btn-primary" onclick="cerrarAyudaInstalar()">Entendido</button></div></div>`;
 }

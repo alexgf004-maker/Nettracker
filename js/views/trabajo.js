@@ -11,10 +11,10 @@ import { escapeHtml, fmtDate } from '../utils.js';
 import { avancePrecampana, renderCasosCampana, renderPrecampana } from './casos.js';
 import { contarTipos, faltantes } from '../domain/listados.js';
 import { grupoDeEstado, resumenMultiplicadores } from '../domain/multiplicadores.js';
-import { resumenResultados } from '../domain/resultados.js';
+import { PERTURBACIONES_A_SUBIR, resumenResultados, subidaPerturbaciones } from '../domain/resultados.js';
 import { renderFechas } from './fechas.js';
 import { renderMultiplicadores } from './multiplicadores.js';
-import { filasResultados, renderResultados } from './resultados.js';
+import { filasPerturbacionesMes, filasResultados, renderPerturbaciones, renderResultados } from './resultados.js';
 
 const esc = s => escapeHtml(s ?? '');
 
@@ -81,6 +81,15 @@ export function avanceCampana(c) {
     ['entrega', 'Entrega', !!g.entrega],
   ];
   return { bt, pre, mult, listos: listos.length, conFecha, fechas, res, ft, ftSinAviso, pasos, entrega: g.entrega };
+}
+
+// Pestaña "DA y DF" (las del mes de MT y BT juntas): cuántas válidas van de las que se suben
+function pestanaPerturbaciones(c) {
+  if (!c.casos.some(x => x.tipo === 'DA' || x.tipo === 'DF')) return [];
+  const todas = filasPerturbacionesMes(c);
+  const estado = ['DA', 'DF'].filter(t => todas.some(f => f.caso.tipo === t))
+    .map(t => `${Math.min(subidaPerturbaciones(todas.filter(f => f.caso.tipo === t)).validas, PERTURBACIONES_A_SUBIR)}/${PERTURBACIONES_A_SUBIR} ${t}`).join(' · ');
+  return [['perturbaciones', 'DA y DF', 'antena', estado]];
 }
 
 const CLASE_CHIP_PLAZO = { vencido: 'rojo', hoy: 'rojo', proximo: 'ambar', ok: '' };
@@ -167,6 +176,7 @@ function renderCampanaDetalle(c, hoy) {
     ['multiplicadores', 'Multiplicadores', 'sliders', `${a.listos} listos · ${a.mult.porGrupo.por_resolver} por resolver`],
     ['fechas', 'Fechas', 'calendario-dias', a.fechas ? `${a.fechas} ${a.fechas === 1 ? 'fecha' : 'fechas'} · ${a.conFecha} casos` : 'Sin programar'],
     ['resultados', 'Resultados', 'grafica', `${a.res.valida} válidas · ${a.res.pendiente} pendientes`],
+    ...pestanaPerturbaciones(c),
     ['mediciones', 'Mediciones', 'instalaciones', `${c.registros.length} en la app`],
   ].filter(([k]) => (c.casos.length || k === 'mediciones') && !(a.bt && (k === 'precampana' || k === 'multiplicadores')));
   const vista = secciones.some(([k]) => k === state.campanaVista) ? state.campanaVista : secciones[0][0];
@@ -184,6 +194,7 @@ function renderCampanaDetalle(c, hoy) {
   if (vista === 'multiplicadores') html += renderMultiplicadores(c);
   if (vista === 'fechas') html += renderFechas(c);
   if (vista === 'resultados') html += renderResultados(c, a);
+  if (vista === 'perturbaciones') html += renderPerturbaciones(c);
   if (vista === 'mediciones') {
     if (!c.registros.length) return html + vacio('instalaciones', 'Todavía no hay instalaciones registradas con códigos de esta campaña.') + '</div>';
     html += `<div class="bloque"><div class="bloque-head"><div class="bloque-titulo">Mediciones en la app <span class="cuenta">${c.registros.length}</span></div></div>${barraEtapas(c.resumen)}</div>`;

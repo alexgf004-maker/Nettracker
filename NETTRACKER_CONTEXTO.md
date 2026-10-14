@@ -12,13 +12,14 @@ Herramienta interna del equipo CPT INNOVA / DELSUR para gestión de analizadores
 - **Sin build**: HTML + CSS + JS con ES modules nativos. GitHub Pages sirve los archivos tal cual (no hay npm, bundler ni paso de compilación)
 - **Firebase Realtime Database**: proyecto `pqfind`, toda la data persiste ahí
 - **Sin frameworks**: JS puro, sin React ni Vue
-- **PWA**: `manifest.webmanifest` + `icons/icon.svg`
+- **PWA instalable**: `manifest.webmanifest` con íconos PNG 192, 512 y 512 maskable (más el SVG) y `icons/apple-touch-icon.png` para el iPhone; los PNG salen de `icons/icon.svg` con `node tools/gen-app-icons.js` (usa el Chromium de Playwright). `sw.js` (service worker): siempre busca primero en internet y solo usa lo guardado sin señal; Firebase, fuentes y librerías de otros sitios van directo a la red; solo se registra en el sitio publicado (no en localhost ni en las pruebas). Botón "Instalar app" en el menú del perfil y en la hoja "Más" del celular mientras la app no esté instalada (`js/actions/instalar.js`): con el aviso del navegador (Android, Chrome/Edge en la compu) lo abre; si no hay aviso, muestra los pasos (en iPhone: Safari → Compartir → Agregar a inicio).
 - **Librerías por CDN** (en `index.html`): `xlsx` (leer/escribir Excel) y `html2pdf.js`
 
 ### Estructura de archivos
 ```
 index.html               Solo el <head>, el <div id="app"> y la carga de js/main.js
 manifest.webmanifest     Manifest de la PWA
+sw.js                    Service worker (red primero, lo guardado solo sin señal)
 icons/icon.svg           Ícono de la app
 css/styles.css           Todos los estilos (variables de tema claro/oscuro incluidas)
 css/icons.css            Íconos de línea (Lucide), generado con `npm run icons` (tools/gen-icons.js)
@@ -234,7 +235,7 @@ En el detalle de la campaña:
 - **Analizar TXT**: se suben los TXT de ECAMEC (nombre del archivo = código del caso) y se calcula todo como la macro `CalidadEnergia_v1.bas` (ver abajo). El resultado se guarda en `casos/{id}/resultado` con `origen: 'txt'` y el `analisis` (estado, detalle, registros, intervalo, instalación, nivel, urbanidad, FebNoPer, inicio y fin). Los TXT quedan solo en memoria mientras la app está abierta: "Recalcular con los datos actuales" los vuelve a analizar después de corregir un dato del caso.
 - También se puede anotar a mano (válida, fallida, por revisar o no medida; tolerancia; FebNoPer). Si no hay nada, se toma lo marcado al descargar ("la medición salió bien").
 - "Exportar análisis" saca un Excel con las columnas de la hoja Resumen de la macro, para comparar.
-- Resumen de válidas, fallidas, FT y sin resultado; en CPT MT, CR válidas contra 38.
+- Orden de la pestaña: casos FT arriba; luego "Resultados de la campaña" (CR obligatorios con el corte, Analizar TXT, recalcular y exportar); luego "Casos", con la lista separada por tipo (CR / DA / DF, `state.resultadosTipo`) y los mosaicos de válidas, FT (solo CR), fallidas, por revisar y sin resultado de ese tipo.
 - Exportar cuadro resumen con todos los casos del mes (también los no medidos). Formato provisional hasta tener uno ya entregado.
 
 ## Campaña de CPT BT (otro flujo)
@@ -254,7 +255,7 @@ En el detalle de la campaña:
 - Instalación verificada en campo (solo BT, confirmado): en Resultados, al tocar un caso, "Instalación verificada en campo" (Monofásico / Bifásico / Trifásico); también en la columna Instalación de la vista previa del análisis. Se pone a todos los casos del usuario en la campaña (mismo NC: su CR y sus DA/DF) como dato corregido a mano (`manual/tipoInstalacion`, el control de puntos ya no lo cambia) y en las DA/DF cambia el dígito del tipo de sistema del código (confirmado). Lo ya analizado se recalcula al momento (`corregirInstalacionBT`).
 - Recalcular sin el TXT (BT): con los registros que se guardan al analizar (`series/{campaña}/{caso}`, los de las gráficas; la tensión con 2 decimales desde este cambio, antes 0.1 V) se vuelve a correr la macro (`analizarSeriesBT`, el número de columnas sale del análisis anterior). "Recalcular con los datos actuales" usa los TXT en memoria y, si ya no están, esos registros. Los TXT del formato viejo no guardan registros: esos se suben de nuevo.
 
-**Perturbaciones del mes (MT y BT)**: el ente manda 12 DA y 12 DF por mes para MT y BT juntas (normalmente 9 de BT y 3 de MT) y se suben 9 de cada tipo: en orden de código, las primeras 9 válidas sin importar el área; si una falla o no se mide, entra la siguiente (`subidaPerturbaciones`). En Resultados de cualquier área, el bloque "Perturbaciones del mes · MT y BT" muestra las DA y DF de las dos campañas del mes con área, equipo, situación y si se sube, no entra, está pendiente o ya no se sube; cuántas sube cada área, hasta cuál se sube y, si faltan, hasta cuál se subiría si las pendientes salen válidas.
+**Perturbaciones del mes (MT y BT)**: el ente manda 12 DA y 12 DF por mes para MT y BT juntas (normalmente 9 de BT y 3 de MT) y se suben 9 de cada tipo: en orden de código, las primeras 9 válidas sin importar el área; si una falla o no se mide, entra la siguiente (`subidaPerturbaciones`). En la pestaña "DA y DF" de la campaña (aparte de Resultados, en las dos áreas; muestra "n/9 DA · n/9 DF") se ven las DA y DF de las dos campañas del mes con área, equipo, situación y si se sube, no entra, está pendiente o ya no se sube; cuántas sube cada área, hasta cuál se sube y, si faltan, hasta cuál se subiría si las pendientes salen válidas.
 
 ## Excel que genera la app
 
