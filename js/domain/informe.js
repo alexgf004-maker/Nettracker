@@ -4,7 +4,7 @@
 // Redacción y artículos citados como en los informes CPT (SIGET, Acuerdo 38-E-2015).
 import { diagnosticarArmonicos } from './diagnostico.js';
 import { CARGAS, conexion, normalizarInspeccion, CONDICIONES_TABLERO, INSTALACION_GENERAL, kvasTrafos, kvaTotal, LIMITE_TIERRA, lista, marcados, PROTECCIONES, TIPOS_SUBESTACION, veredictoTierra, tensionVsEquipo } from './inspeccion.js';
-import { DATI_LIM, estadisticas, LIMITE_PST, P_UMBRAL, percentil, TIPOS_RED, UMBRAL_FT, VDAT_LIM } from './reclamo.js';
+import { DATI_LIM, estadisticas, LIMITE_PST, P_UMBRAL, percentil, textoP95Corriente, TIPOS_RED, UMBRAL_FT, VDAT_LIM } from './reclamo.js';
 
 export const COMPLETAR = '[completar]';
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -104,12 +104,12 @@ const fasesNo = lista => (lista.length === 3 ? '3 fases' : enumerar(lista.map(f 
 // "la Fase 1 y la Fase 3" o "las tres fases"
 const enFases = (lista, total) => (lista.length === total && total > 1 ? (total === 3 ? 'las tres fases' : 'las dos fases') : enumerar(lista.map(f => 'la Fase ' + f)));
 // Agrupa por orden: "H5 (F1 40.00%, F2 50.00%)"
-const porOrden = lista => [...new Set(lista.map(o => o.nombre))].map(nom => `${nom} (${lista.filter(o => o.nombre === nom).map(o => `F${o.fase} ${pct(o.p95)}`).join(', ')})`);
+const porOrden = lista => [...new Set(lista.map(o => o.nombre))].map(nom => `${nom} (${lista.filter(o => o.nombre === nom).map(o => `F${o.fase} ${o.texto || pct(o.p95)}`).join(', ')})`);
 
 // Armónicos que no cumplen (orden individual) de una lista del análisis: [{ orden, fase, p95, limite }]
 function ordenesFuera(lista, fases) {
   const out = [];
-  lista.slice(1).forEach(f => fases.forEach(p => { if (!f.fases[p].cumple) out.push({ nombre: f.nombre.split(' ')[0], fase: p, p95: f.fases[p].p95, limite: f.limite}); }));
+  lista.slice(1).forEach(f => fases.forEach(p => { if (!f.fases[p].cumple) out.push({ nombre: f.nombre.split(' ')[0], fase: p, p95: f.fases[p].p95, limite: f.limite, ...(f.fases[p].cargados !== undefined ? { texto: textoP95Corriente(f, f.fases[p], 2) } : {}) }); }));
   return out;
 }
 
@@ -353,20 +353,26 @@ export function borradorInforme({ exp = {}, inst = {}, params = {}, d = null, t 
     const sinCarga = af.filter(f => !arm.cargados[f]);
     h('5.2. Perfil de espectro armónico de corriente', 2);
     grafica('Espectro armónico de corriente, DAII percentil 95 con el límite SIGET (Excel de armónicos, hoja "Graficos")');
-    let ti = `El DATI, evaluado por su percentil 95 en los intervalos con potencia mayor o igual a ${P_UMBRAL} kW (Art. 49a), resultó en ${enumerar(af.map(f => pct(dati.fases[f].p95)))} frente al límite de ${DATI_LIM}%, por lo que ${af.every(f => dati.fases[f].cumple) ? 'cumple' : `no cumple en ${enFases(af.filter(f => !dati.fases[f].cumple), af.length)}`}.`;
+    // El DATI solo se evalúa en las fases con intervalos de P >= 3.5 kW (Art. 49a)
+    const conCarga = af.filter(f => arm.cargados[f]);
+    let ti = conCarga.length
+      ? `El DATI, evaluado por su percentil 95 en los intervalos con potencia mayor o igual a ${P_UMBRAL} kW (Art. 49a), resultó en ${enumerar(conCarga.map(f => pct(dati.fases[f].p95)))} frente al límite de ${DATI_LIM}%, por lo que ${conCarga.every(f => dati.fases[f].cumple) ? 'cumple' : `no cumple en ${enFases(conCarga.filter(f => !dati.fases[f].cumple), af.length)}`}.`
+      : `En todo el periodo la potencia fue menor a ${P_UMBRAL} kW, por lo que el DATI no se evalúa (Art. 49a) y cada armónico de corriente se evalúa en amperios (Tabla 5).`;
     if (af.every(f => arm.cargados[f] === arm.n)) ti += ` Todos los intervalos tuvieron una potencia mayor o igual a ${P_UMBRAL} kW.`;
     else ti += ` Hubo ${enumerar(af.map(f => `${arm.cargados[f]} de ${arm.n} intervalos con carga en la Fase ${f}`))}; en los intervalos por debajo de ${P_UMBRAL} kW cada armónico se evalúa en amperios (Tabla 5).`;
-    if (sinCarga.length) ti += ` En ${enumerar(sinCarga.map(f => 'la Fase ' + f))} no hubo intervalos con carga, por lo que el porcentaje no es representativo y la evaluación es en amperios.`;
+    if (sinCarga.length && conCarga.length) ti += ` En ${enumerar(sinCarga.map(f => 'la Fase ' + f))} no hubo intervalos con carga, por lo que el porcentaje no es representativo y la evaluación es en amperios.`;
     if (fueraI.length) ti += ` Incumplen su límite individual ${enumerar(porOrden(fueraI))}.`;
     // Órdenes con mayor contenido de corriente (promedio de las fases del P95)
-    const dominantes = arm.espectro.map(e => ({ n: e.n, v: af.reduce((s, f) => s + (e.daii[f] || 0), 0) / af.length })).sort((a, b) => b.v - a.v).slice(0, 3).filter(x => x.v > 0);
-    if (dominantes.length) ti += ` Los órdenes con mayor contenido armónico de corriente son ${enumerar(dominantes.map(x => `H${x.n} (${pct(x.v)})`))}.`;
+    // Sin carga en todo el periodo se comparan en amperios
+    const enA = arm.regimenCorriente === 'A';
+    const dominantes = arm.espectro.map(e => ({ n: e.n, v: af.reduce((s, f) => s + ((enA ? e.daiiA?.[f] : e.daii[f]) || 0), 0) / af.length })).sort((a, b) => b.v - a.v).slice(0, 3).filter(x => x.v > 0);
+    if (dominantes.length) ti += ` Los órdenes con mayor contenido armónico de corriente son ${enumerar(dominantes.map(x => `H${x.n} (${enA ? `${n(x.v, 2)} A` : pct(x.v)})`))}.`;
     p(ti);
     tabla(['Indicador', 'Límite', ...af.map(f => `P95 F${f}`), 'Veredicto'], [
       [vdat.nombre, vdat.limTxt, ...af.map(f => pct(vdat.fases[f].p95)), af.every(f => vdat.fases[f].cumple) ? 'CUMPLE' : 'NO CUMPLE'],
       ...[...new Set(fueraV.map(o => o.nombre))].map(nom => { const f = arm.tension.find(x => x.nombre.startsWith(nom + ' ')); return [f.nombre, f.limTxt, ...af.map(x => pct(f.fases[x].p95)), 'NO CUMPLE']; }),
-      [dati.nombre, dati.limTxt, ...af.map(f => pct(dati.fases[f].p95)), af.every(f => dati.fases[f].cumple) ? 'CUMPLE' : 'NO CUMPLE'],
-      ...[...new Set(fueraI.map(o => o.nombre))].map(nom => { const f = arm.corriente.find(x => x.nombre.startsWith(nom + ' ')); return [f.nombre, f.limTxt, ...af.map(x => pct(f.fases[x].p95)), 'NO CUMPLE']; }),
+      [dati.nombre, dati.limTxt, ...af.map(f => (dati.fases[f].cargados !== undefined ? textoP95Corriente(dati, dati.fases[f], 2) : pct(dati.fases[f].p95))), af.every(f => dati.fases[f].cumple) ? 'CUMPLE' : 'NO CUMPLE'],
+      ...[...new Set(fueraI.map(o => o.nombre))].map(nom => { const f = arm.corriente.find(x => x.nombre.startsWith(nom + ' ')); return [f.nombre, f.limTxt, ...af.map(x => (f.fases[x].cargados !== undefined ? textoP95Corriente(f, f.fases[x], 2) : pct(f.fases[x].p95))), 'NO CUMPLE']; }),
     ], { veredicto: true });
 
     // Diagnóstico (indicios con su evidencia)
@@ -375,7 +381,7 @@ export function borradorInforme({ exp = {}, inst = {}, params = {}, d = null, t 
       h('5.3. Diagnóstico', 2);
       dg.parrafos.forEach(t => p(t));
       const filasSev = [...dg.severidad.tension.map(x => ['Tensión', x]), ...dg.severidad.corriente.map(x => ['Corriente', x])];
-      if (filasSev.length) tabla(['Orden', 'Tipo', 'Límite', 'P95 (fase)', 'Veces el límite', '% del tiempo fuera'], filasSev.map(([tp, x]) => [`H${x.n}`, tp, pct(x.limite), `${pct(x.p95)} (F${x.fase})`, `${n(x.veces, 2)}×`, pct(x.pctTiempo, 1)]), { anchos: [12, 14, 16, 22, 18, 18] });
+      if (filasSev.length) tabla(['Orden', 'Tipo', 'Límite', 'P95 (fase)', 'Veces el límite', '% del tiempo fuera'], filasSev.map(([tp, x]) => [`H${x.n}`, tp, x.unidad === 'A' ? `${n(x.limite)} A` : pct(x.limite), `${x.unidad === 'A' ? `${n(x.p95)} A` : pct(x.p95)} (F${x.fase})`, `${n(x.veces, 2)}×`, pct(x.pctTiempo, 1)]), { anchos: [12, 14, 16, 22, 18, 18] });
       p(`${COMPLETAR} Revisar los indicios del diagnóstico y redactar la conclusión sobre el origen de la distorsión.`);
     }
 
@@ -383,11 +389,12 @@ export function borradorInforme({ exp = {}, inst = {}, params = {}, d = null, t 
       vdatCumple.length === af.length ? 'CUMPLE (VDAT total)' : `NO CUMPLE (${fasesNo(af.filter(f => !vdat.fases[f].cumple))})`]);
     if (fueraV.length) conclusiones.push(['Armónicos individuales de tensión', 'Tabla 4 (Art. 45)', porOrden(fueraV).join(' / '), 'NO CUMPLE']);
     const datiNo = af.filter(f => !dati.fases[f].cumple);
-    conclusiones.push(['Armónicos de corriente (DATI)', `${DATI_LIM}% (Art. 49-51/Tabla 5)`, af.map(f => pct(dati.fases[f].p95)).join(' / '),
-      datiNo.length ? `NO CUMPLE (${fasesNo(datiNo)})` : 'CUMPLE']);
+    const datiTxt = f => (dati.fases[f].cargados !== undefined ? textoP95Corriente(dati, dati.fases[f], 2) : pct(dati.fases[f].p95));
+    conclusiones.push(['Armónicos de corriente (DATI)', `${DATI_LIM}% (Art. 49-51/Tabla 5)`, af.map(datiTxt).join(' / '),
+      datiNo.length ? `NO CUMPLE (${fasesNo(datiNo)})` : conCarga.length ? 'CUMPLE' : 'NO APLICA']);
     if (fueraI.length) conclusiones.push(['Armónicos individuales de corriente', 'Tabla 5 (Art. 49-51)', [...new Set(fueraI.map(o => o.nombre))].join(', '), 'NO CUMPLE']);
     bullets.push(`Armónicos de tensión. ${tv}`);
-    bullets.push(`Armónicos de corriente. El DATI, evaluado por su percentil 95, ${datiNo.length ? `no cumple en ${enFases(datiNo, af.length)}` : 'cumple en todas las fases'} (${enumerar(af.map(f => pct(dati.fases[f].p95)))} frente al límite de ${DATI_LIM}%).${fueraI.length ? ` Incumplen su límite individual ${enumerar([...new Set(fueraI.map(o => o.nombre))])}.` : ''}${datiNo.length || fueraI.length ? ' La distorsión armónica de corriente le compete al usuario.' : ''}`);
+    bullets.push(`Armónicos de corriente. ${conCarga.length ? `El DATI, evaluado por su percentil 95, ${datiNo.length ? `no cumple en ${enFases(datiNo, af.length)}` : 'cumple en todas las fases'} (${enumerar(conCarga.map(f => pct(dati.fases[f].p95)))} frente al límite de ${DATI_LIM}%).` : `La potencia fue menor a ${P_UMBRAL} kW en todo el periodo: el DATI no aplica y los armónicos se evalúan en amperios.`}${fueraI.length ? ` Incumplen su límite individual ${enumerar([...new Set(fueraI.map(o => o.nombre))])}.` : ''}${datiNo.length || fueraI.length ? ' La distorsión armónica de corriente le compete al usuario.' : ''}`);
   }
 
   // 6 y 7: datos que la app no tiene

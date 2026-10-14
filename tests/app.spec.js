@@ -2129,7 +2129,7 @@ function txtArmonicos() {
 }
 
 // Armónicos a la medida: u(i, n, p) e iA(i, n, p) en V y A por orden (n = 1 fundamental), P(i, p) en kW
-function txtArmonicosCon({ u, iA, P, filas = 144 }) {
+function txtArmonicosCon({ u, iA, P, filas = 144, paso = 10 }) {
   const enc = ['Fecha y Hora', 'U1 [V]', 'U2 [V]', 'U3 [V]', 'I1 [A]', 'I2 [A]', 'I3 [A]', 'I4 [A]', 'P1 [kW]', 'P2 [kW]', 'P3 [kW]', 'PTotal [kW]', 'FP1', 'FP2', 'FP3', 'EA1 [kWh]', 'EA2 [kWh]', 'EA3 [kWh]', 'EATot [kWh]'];
   for (let n = 1; n <= 25; n++) for (let p = 1; p <= 3; p++) enc.push(`Uarm${n}-${p}`);
   for (let n = 1; n <= 25; n++) for (let p = 1; p <= 4; p++) enc.push(`Iarm${n}-${p}`);
@@ -2137,7 +2137,7 @@ function txtArmonicosCon({ u, iA, P, filas = 144 }) {
   const out = [enc.join(',')];
   for (let i = 0; i < filas; i++) {
     const ps = [1, 2, 3].map(p => P(i, p));
-    const f = [fechaTXT(i), 13200, 13200, 13200, 50, 50, 50, 1, ...ps, ps.reduce((a, b) => a + b, 0), 1, 1, 1, 0, 0, 0, 0];
+    const f = [fechaTXT(i * paso / 10), 13200, 13200, 13200, 50, 50, 50, 1, ...ps, ps.reduce((a, b) => a + b, 0), 1, 1, 1, 0, 0, 0, 0];
     for (let n = 1; n <= 25; n++) for (let p = 1; p <= 3; p++) f.push(u(i, n, p));
     for (let n = 1; n <= 25; n++) for (let p = 1; p <= 4; p++) f.push(p === 4 ? 0 : iA(i, n, p));
     f.push(0.5, 0.5, 0.5);
@@ -2147,6 +2147,60 @@ function txtArmonicosCon({ u, iA, P, filas = 144 }) {
 }
 
 test.describe('Análisis de reclamos', () => {
+  test('armónicos sin carga y cada 15 min: intervalo real, P95 de corriente en amperios y DATI que no aplica', async ({ page }) => {
+    const XLSX = require('xlsx');
+    app = await abrirApp(page, { excel: true });
+    // Monofásico de 1.2 kW: I1 = 9 A; H9 de 1 A en 1 de cada 4 intervalos (límite 0.8 A) y H3 de 1 A siempre
+    const txt = txtArmonicosCon({ filas: 200, paso: 15, P: (i, p) => (p === 1 ? 1.2 : 0), u: (i, n, p) => (p === 1 ? (n === 1 ? 120 : n === 3 ? 3 : 0.1) : 0),
+      iA: (i, n, p) => (p !== 1 ? 0 : n === 1 ? 9 : n === 3 ? 1 : n === 9 && i % 4 === 0 ? 1 : 0) });
+    const r = await page.evaluate(async t => {
+      const m = await import('/js/domain/reclamo.js');
+      const a = m.analizarArmonicos(t, 1);
+      const fila = nombre => a.corriente.find(f => f.nombre === nombre);
+      return {
+        intervalo: a.intervalo, regimen: a.regimenCorriente,
+        dati: m.textoP95Corriente(fila('DATI (Total)'), fila('DATI (Total)').fases['1']),
+        h3: [m.textoP95Corriente(fila('H3 - DAII'), fila('H3 - DAII').fases['1']), fila('H3 - DAII').fases['1'].cumple],
+        h9: [m.textoP95Corriente(fila('H9 - DAII'), fila('H9 - DAII').fases['1']), fila('H9 - DAII').fases['1'].pct, fila('H9 - DAII').fases['1'].cumple],
+        espectroH9: [a.espectro.find(e => e.n === 9).daiiA['1'], a.espectro.find(e => e.n === 9).limIiA],
+      };
+    }, txt);
+    expect(r.intervalo).toBe(15);
+    expect(r.regimen).toBe('A');
+    expect(r.dati).toBe('No aplica (P < 3.5 kW)');
+    expect(r.h3).toEqual(['1.000 A', true]);
+    expect(r.h9).toEqual(['1.000 A', 25, false]); // 1 A pasa de 0.8 A en el 25 % del tiempo
+    expect(r.espectroH9).toEqual([1, 0.8]);
+
+    // En la pantalla y en el Excel se ve el intervalo real, el aviso y la corriente en amperios
+    await cerrarAlerta(page);
+    await nav(page, 'Graficar');
+    await page.locator('.graf-pagina input[type=file]').setInputFiles({ name: 'RE192026999.txt', mimeType: 'text/plain', buffer: Buffer.from(txt) });
+    await expect(page.locator('.graf-periodo')).toContainText('200 intervalos de 15 minutos');
+    await expect(page.locator('.aviso', { hasText: 'cada 15 minutos' })).toBeVisible();
+    await expect(page.locator('.aviso', { hasText: 'la corriente se evalúa en amperios' })).toBeVisible();
+    const tablaI = page.locator('.bloque', { hasText: 'Armónicos de corriente · Tabla 5' });
+    await expect(tablaI.locator('tr', { hasText: 'DATI' })).toContainText('No aplica');
+    await expect(tablaI.locator('tr', { hasText: 'H9 - DAII' })).toContainText('1.000 A');
+    await expect(page.locator('.veredicto').first()).toContainText('Corriente: NO CUMPLE');
+    const descarga = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Excel de armónicos' }).click();
+    const libro = XLSX.readFile(await (await descarga).path());
+    const resumen = XLSX.utils.sheet_to_json(libro.Sheets.Resumen_Armonicos, { header: 1, defval: '' });
+    expect(resumen[1][0]).toContain('Intervalos: 200 (15 min c/u)');
+    expect(resumen[2][0]).toContain('los registros vienen cada 15 min');
+    const fila = nombre => resumen.find(f => f[0] === nombre);
+    expect(fila('DATI (Total)')[2]).toBe('No aplica (P < 3.5 kW)');
+    expect(fila('H9 - DAII').slice(2, 3).concat(fila('H9 - DAII').slice(11, 12))).toEqual(['1.000 A', 'NO CUMPLE']);
+    const graficos = XLSX.utils.sheet_to_json(libro.Sheets.Graficos, { header: 1, defval: '' });
+    // La pestaña rápida analiza como trifásico (por defecto): la fase 1 es la que tiene carga
+    expect(graficos[0].slice(5, 7)).toEqual(['Lim.Ii(A)', 'Ii P95 F1(A)']);
+    expect(graficos.find(f => f[0] === 'H9').slice(5, 7)).toEqual([0.8, 1]);
+    const detalle = XLSX.utils.sheet_to_json(libro.Sheets.Detalle_I, { header: 1 });
+    expect(detalle[0]).toContain('Ii H9 F1 (A)');
+    expect(detalle[0]).toContain('DAII H9 F1 (%)');
+  });
+
   test('calcula el FebNoPer y los armónicos como las macros', async ({ page }) => {
     app = await abrirApp(page);
     const r = await page.evaluate(async ([tt, ta, ts]) => {

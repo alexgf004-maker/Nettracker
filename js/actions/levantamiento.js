@@ -269,7 +269,7 @@ export function alturaYCerrarLev(v) { alturaPuntoLev(v); const u = ui(); if (u) 
 // Pestañas de la hoja de abajo (Marcar, Punto, Vanos, Más); volver a Marcar suelta el punto seleccionado
 export function setHojaLev(k) {
   const u = ui(); if (!u) return;
-  u.hoja = k; u.picker = null; if (k === 'marcar') u.sel = null;
+  u.hoja = k; u.picker = null; u.hojaMin = false; if (k === 'marcar') u.sel = null;
   render();
 }
 export function setLev(campo, valor) {

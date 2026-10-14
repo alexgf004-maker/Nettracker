@@ -131,8 +131,13 @@ export function diagnosticarArmonicos(arm, { enMT = false, subestacion = {}, car
   // ── 5. Severidad: veces el límite y % del tiempo fuera ──
   const severidad = (lista, lim) => lista.slice(1).filter(f => fases.some(p => !f.fases[p].cumple)).map(f => {
     const o = Number(f.nombre.match(/H(\d+)/)[1]);
-    const peor = fases.reduce((a, p) => (!a || (f.fases[p].p95 || 0) > (f.fases[a].p95 || 0) ? p : a), null);
-    return { n: o, limite: lim(o), fase: peor, p95: f.fases[peor].p95, veces: lim(o) ? f.fases[peor].p95 / lim(o) : null, pctTiempo: Math.max(...fases.map(p => f.fases[p].pct)) };
+    // Corriente de una fase sin intervalos con carga (P < 3.5 kW): se compara en amperios
+    const enA = p => f.limiteA && f.fases[p].cargados === 0;
+    const valor = p => (enA(p) ? f.fases[p].p95A / f.limiteA : (f.fases[p].p95 || 0) / (lim(o) || 1));
+    const peor = fases.reduce((a, p) => (!a || valor(p) > valor(a) ? p : a), null);
+    const x = f.fases[peor];
+    if (enA(peor)) return { n: o, limite: f.limiteA, unidad: 'A', fase: peor, p95: x.p95A, veces: x.p95A / f.limiteA, pctTiempo: Math.max(...fases.map(p => f.fases[p].pct)) };
+    return { n: o, limite: lim(o), unidad: '%', fase: peor, p95: x.p95, veces: lim(o) ? x.p95 / lim(o) : null, pctTiempo: Math.max(...fases.map(p => f.fases[p].pct)) };
   }).sort((a, b) => (b.veces || 0) - (a.veces || 0));
   const sev = { tension: severidad(arm.tension, limTDI), corriente: severidad(arm.corriente, limDAII) };
 

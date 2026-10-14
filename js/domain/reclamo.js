@@ -239,12 +239,22 @@ export function analizarArmonicos(texto, nf) {
   const t0 = minutosDeFecha(r.fechas[0]);
   r.t = r.fechas.map(f => minutosDeFecha(f) - t0);
   r.inicio = r.fechas[0]; r.fin = r.fechas[r.n - 1];
-  // P95 solo de los intervalos con carga (régimen en %), como P95Cargado
+  // Intervalo real de los registros (el más frecuente): la norma evalúa armónicos cada 10 minutos
+  const pasos = {};
+  for (let i = 1; i < r.t.length; i++) { const d = r.t[i] - r.t[i - 1]; if (d > 0) pasos[d] = (pasos[d] || 0) + 1; }
+  r.intervalo = Number(Object.entries(pasos).sort((a, b) => b[1] - a[1])[0]?.[0]) || null;
+  // P95 solo de los intervalos con carga (régimen en %), como P95Cargado; y en amperios de los intervalos sin carga
   const p95Cargado = (arr, p) => percentil(arr.filter((_, i) => r.P[p][i] >= P_UMBRAL), 0.95) ?? 0;
+  const p95SinCarga = (arr, p) => percentil(arr.filter((_, i) => r.P[p][i] < P_UMBRAL), 0.95) ?? 0;
   const pct = over => (over / r.n) * 100;
-  const fila = (nombre, limite, limTxt, p95, over) => {
-    const out = { nombre, limite, limTxt, fases: {} };
-    fases.forEach(p => { const x = pct(over[p]); out.fases[p] = { p95: p95[p], exc: over[p], pct: x, cumple: x <= PERC_MAX }; });
+  // extra (corriente): limiteA y p95A (P95 en amperios sin carga) para los armónicos; dati para el DATI
+  const fila = (nombre, limite, limTxt, p95, over, extra = {}) => {
+    const out = { nombre, limite, limTxt, fases: {}, ...(extra.limiteA ? { limiteA: extra.limiteA } : {}), ...(extra.dati ? { dati: true } : {}) };
+    fases.forEach(p => {
+      const x = pct(over[p]);
+      out.fases[p] = { p95: p95[p], exc: over[p], pct: x, cumple: x <= PERC_MAX };
+      if (extra.corriente) Object.assign(out.fases[p], { cargados: r.cargados[p], sinCarga: r.n - r.cargados[p], ...(extra.p95A ? { p95A: extra.p95A[p] } : {}) });
+    });
     return out;
   };
   const mapa = f => Object.fromEntries(fases.map(p => [p, f(p)]));
@@ -255,13 +265,17 @@ export function analizarArmonicos(texto, nf) {
     ...ARMONICAS.map(n => fila(`H${n} - TDI`, limTDI(n), fmtLim(limTDI(n)) + '%', mapa(p => percentil(r.TDI[n][p], 0.95)), r.tdiOver[n])),
   ];
   r.corriente = [
-    fila('DATI (Total)', DATI_LIM, '20.0%', mapa(p => p95Cargado(r.DATI[p], p)), r.datiOver),
-    ...ARMONICAS.map(n => fila(`H${n} - DAII`, limDAII(n), `${fmtLim(limDAII(n))}% / ${limIiA(n).toFixed(2)}A`, mapa(p => p95Cargado(r.DAII[n][p], p)), r.daiiOver[n])),
+    fila('DATI (Total)', DATI_LIM, '20.0%', mapa(p => p95Cargado(r.DATI[p], p)), r.datiOver, { corriente: true, dati: true }),
+    ...ARMONICAS.map(n => fila(`H${n} - DAII`, limDAII(n), `${fmtLim(limDAII(n))}% / ${limIiA(n).toFixed(2)}A`, mapa(p => p95Cargado(r.DAII[n][p], p)), r.daiiOver[n],
+      { corriente: true, limiteA: limIiA(n), p95A: mapa(p => p95SinCarga(r.IA[n][p], p)) })),
   ];
-  // Espectros (hoja Graficos de la macro): P95 de todos los intervalos, también en corriente
+  // Régimen de la corriente en el periodo: '%' si todos los intervalos tienen P >= 3.5 kW, 'A' si ninguno, 'mixto'
+  r.regimenCorriente = fases.every(p => !r.cargados[p]) ? 'A' : fases.every(p => r.cargados[p] === r.n) ? '%' : 'mixto';
+  // Espectros (hoja Graficos de la macro): P95 de todos los intervalos, también en corriente; si en todo el periodo
+  // la carga no llega a 3.5 kW, la corriente se compara en amperios (daiiA contra limIiA)
   r.espectro = ARMONICAS.map(n => ({
-    n, limTDI: limTDI(n), limDAII: limDAII(n),
-    tdi: mapa(p => percentil(r.TDI[n][p], 0.95)), daii: mapa(p => percentil(r.DAII[n][p], 0.95)),
+    n, limTDI: limTDI(n), limDAII: limDAII(n), limIiA: limIiA(n),
+    tdi: mapa(p => percentil(r.TDI[n][p], 0.95)), daii: mapa(p => percentil(r.DAII[n][p], 0.95)), daiiA: mapa(p => percentil(r.IA[n][p], 0.95)),
   }));
   // Veredicto por fase: no cumple si algún indicador pasa del 5 % del tiempo
   const veredicto = lista => mapa(p => lista.every(f => f.fases[p].cumple));
@@ -269,6 +283,18 @@ export function analizarArmonicos(texto, nf) {
   r.cumpleCorriente = veredicto(r.corriente);
   return r;
 }
+
+// P95 de corriente para mostrar según el régimen de la fase (f: fila de r.corriente, x: f.fases[p]):
+// con carga en %, sin carga en amperios, mixto ambos; el DATI sin carga no aplica (Art. 49a)
+export function textoP95Corriente(f, x, dec = 3) {
+  const enPct = `${(x.p95 ?? 0).toFixed(dec)} %`;
+  if (f.dati) return x.cargados ? enPct : `No aplica (P < ${P_UMBRAL} kW)`;
+  const enA = `${(x.p95A ?? 0).toFixed(dec)} A`;
+  if (!x.cargados) return enA;
+  return x.sinCarga ? `${enPct} / ${enA}` : enPct;
+}
+// El P95 que se muestra pasa del límite (en % con carga o en A sin carga)
+export const p95CorrienteFuera = (f, x) => (x.cargados && x.p95 > f.limite) || (!f.dati && x.sinCarga && x.p95A > f.limiteA);
 
 // Resumen corto que se guarda en el reclamo (para la lista y el Inicio)
 export function resumenGuardado(tension, arm) {
