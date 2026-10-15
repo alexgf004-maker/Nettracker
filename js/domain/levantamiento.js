@@ -9,6 +9,20 @@ import { hayAcometidas, sumaAcometidas, textoAcometidas, textoPoste } from './re
 // Tipos de punto que se marcan en campo (los mismos símbolos de red de Dibujar)
 export const TIPOS_PUNTO = ['poste', 'poste_nuevo', 'puente', 'trafo', 'trafo_nuevo', 'banco', 'usuario', 'medidor_red', 'seccionador', 'medicion'];
 export const PRECISION_BAJA = 15;
+// Transformadores sobre un poste: kVA de cada unidad (una = transformador, varias = banco); también se escriben
+export const KVA_TRAFO = ['5', '10', '15', '25', '37.5', '50', '75', '100', '167'];
+export function textoTrafos(trafos) {
+  const t = (trafos || []).filter(Boolean); if (!t.length) return '';
+  if (t.length === 1) return `Trafo ${t[0]} kVA`;
+  return `Banco ${t.every(k => k === t[0]) ? `${t.length} × ${t[0]}` : t.join(' + ')} kVA`;
+}
+// Símbolo con que se ve el punto: un poste con transformadores se ve como transformador (o banco si son varios)
+export function simboloPunto(p) {
+  const n = (p.trafos || []).filter(Boolean).length;
+  if (!n || !['poste', 'poste_nuevo', 'trafo', 'trafo_nuevo', 'banco'].includes(p.tipo || 'poste')) return p.tipo || 'poste';
+  if (p.tipo === 'poste_nuevo' || p.tipo === 'trafo_nuevo') return 'trafo_nuevo';
+  return n > 1 ? 'banco' : p.tipo === 'banco' ? 'banco' : 'trafo';
+}
 // Estado inicial de la pantalla: marcar con GPS, poste, BT existente, unir al anterior, calles, seguir la ubicación
 export const nuevaPantallaLev = () => ({ modo: 'gps', tipo: 'poste', tramo: 'bt', unir: true, actual: null, sel: null, unirDesde: null, movida: null, fondo: 'calles', seguir: true }); // m: se avisa antes de marcar con una precisión peor
 
@@ -60,7 +74,7 @@ export function proyectar(puntos) {
 }
 
 // Lámina de Dibujar: croquis en blanco con el norte arriba y la escala exacta (m por px), postes, vanos con sus metros
-// y una etiqueta por punto con su nombre y nota.
+// y una etiqueta por punto con su nombre, transformadores y nota.
 export function aDibujo(lev, { ancho = 1600, alto = 1000, margen = 140 } = {}) {
   const puntos = listaPuntos(lev);
   const pr = proyectar(puntos);
@@ -82,7 +96,8 @@ export function aDibujo(lev, { ancho = 1600, alto = 1000, margen = 140 } = {}) {
   });
   puntos.forEach(p => {
     const [x, y] = pos[p.id]; const escala = p.tipo === 'usuario' ? 0.8 : 0.6;
-    elementos.push({ id: id(), tipo: 'simbolo', simbolo: p.tipo || 'poste', color: SIMBOLO_COLOR[p.tipo] || '#111827', grosor: 3, escala, rot: 0, x: x - 30 * escala, y: y - 30 * escala,
+    const sim = simboloPunto(p);
+    elementos.push({ id: id(), tipo: 'simbolo', simbolo: sim, color: SIMBOLO_COLOR[sim] || '#111827', grosor: 3, escala, rot: 0, x: x - 30 * escala, y: y - 30 * escala,
       ...(p.altura ? { altura: Number(p.altura) } : {}), ...(p.estructuras?.length ? { estructuras: [...p.estructuras] } : {}) });
   });
   // Etiquetas: nombre y nota (en dos líneas) hacia el lado más libre de vanos, dentro de la lámina
@@ -92,7 +107,7 @@ export function aDibujo(lev, { ancho = 1600, alto = 1000, margen = 140 } = {}) {
   const difAng = (a, b) => { const d = Math.abs(a - b) % (2 * Math.PI); return d > Math.PI ? 2 * Math.PI - d : d; };
   puntos.forEach(p => {
     const [x, y] = pos[p.id];
-    const texto = [p.nombre, p.nota].filter(Boolean).join('\n');
+    const texto = [p.nombre, textoTrafos(p.trafos), p.nota].filter(Boolean).join('\n');
     if (!texto) return;
     const proyectado = p.tipo === 'poste_nuevo' || p.tipo === 'trafo_nuevo';
     const tam = 22; const m = medidaEtiqueta({ texto, tam }, textoPoste(p));
@@ -117,7 +132,7 @@ const SIMBOLO_COLOR = { puente: '#0f766e', poste: '#111827', poste_nuevo: '#2563
 export function kmlLevantamiento(lev, nombresTipo = {}) {
   const x = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const puntos = listaPuntos(lev);
-  const pm = puntos.map(p => `<Placemark><name>${x(p.nombre || '')}</name><description>${x([nombresTipo[p.tipo] || p.tipo, p.altura ? `${p.altura}'` : '', (p.estructuras || []).join(' / '), p.nota, p.acc ? `Precisión ±${Math.round(p.acc)} m` : ''].filter(Boolean).join(' · '))}</description><Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`).join('');
+  const pm = puntos.map(p => `<Placemark><name>${x(p.nombre || '')}</name><description>${x([nombresTipo[p.tipo] || p.tipo, textoTrafos(p.trafos), p.altura ? `${p.altura}'` : '', (p.estructuras || []).join(' / '), p.nota, p.acc ? `Precisión ±${Math.round(p.acc)} m` : ''].filter(Boolean).join(' · '))}</description><Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`).join('');
   const ln = listaVanos(lev).map(v => {
     const a = lev.puntos?.[v.a]; const b = lev.puntos?.[v.b]; if (!a || !b) return '';
     const m = metrosDeVano(lev, v);

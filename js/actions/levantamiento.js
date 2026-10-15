@@ -3,7 +3,7 @@
 // posición actual y lo une con el anterior. El mapa se crea una sola vez y se vuelve a colocar tras cada render().
 import { db, push, ref, remove, set, update } from '../firebase.js';
 import { SIMBOLOS } from '../domain/dibujo.js';
-import { aDibujo, cambiosPartirVano, distancia, kmlLevantamiento, listaPuntos, listaVanos, metrosDeVano, nuevaPantallaLev, PRECISION_BAJA, siguienteNombre } from '../domain/levantamiento.js';
+import { aDibujo, cambiosPartirVano, distancia, kmlLevantamiento, listaPuntos, listaVanos, metrosDeVano, nuevaPantallaLev, PRECISION_BAJA, siguienteNombre, simboloPunto, textoTrafos } from '../domain/levantamiento.js';
 import { TIPOS_TRAMO } from '../domain/plano.js';
 import { hayAcometidas, leerAltura } from '../domain/red.js';
 import { hoyLocal } from '../domain/trabajo.js';
@@ -14,8 +14,9 @@ import { cargarEnDibujo } from './dibujo.js';
 
 const LEAFLET = 'https://unpkg.com/leaflet@1.9.4/dist/';
 const CAPAS = {
-  calles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }],
-  satelite: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: '© Esri' }],
+  // Se puede acercar más allá de lo que da el mapa (se agranda la última imagen) para ver los vanos cortos y sus distancias
+  calles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxNativeZoom: 19, maxZoom: 22, attribution: '© OpenStreetMap' }],
+  satelite: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 19, maxZoom: 22, attribution: '© Esri' }],
 };
 const ruta = (id, sub = '') => `levantamientos/${id}${sub ? '/' + sub : ''}`;
 const lev = () => (state.levId ? state.levantamientos?.[state.levId] : null);
@@ -104,6 +105,7 @@ async function montarMapa() {
   mapa = L.map(contenedor, { zoomControl: true, attributionControl: true }).setView([13.7, -89.2], 9);
   capaRed = L.layerGroup().addTo(mapa);
   mapa.on('click', e => alTocarMapa(e.latlng));
+  mapa.on('zoomend', () => dibujarRed()); // al acercar o alejar se ve qué distancias caben
   mapa.on('dragstart', () => { if (ui()) { ui().seguir = false; actualizarSeguir(); } });
   encuadrar();
   dibujarRed(); pintarGPS(); actualizarSeguir();
@@ -127,10 +129,11 @@ function restaurarScrollLev() {
 
 const COLOR_PUNTO = { puente: '#0f766e', poste: '#111827', poste_nuevo: '#2563eb', trafo: '#15803d', trafo_nuevo: '#2563eb', banco: '#15803d', usuario: '#dc2626', medidor_red: '#0f172a', seccionador: '#ea580c', medicion: '#f59e0b' };
 function icono(p, { actual, sel }) {
-  const s = SIMBOLOS[p.tipo] || SIMBOLOS.poste; const c = COLOR_PUNTO[p.tipo] || '#111827';
+  const k = simboloPunto(p); const s = SIMBOLOS[k] || SIMBOLOS.poste; const c = COLOR_PUNTO[k] || '#111827';
+  const kva = textoTrafos(p.trafos).replace(/^Trafo |^Banco /, '');
   return L.divIcon({
     className: 'lev-icono', iconSize: [44, 44], iconAnchor: [22, 22], // zona táctil grande para el dedo
-    html: `<div class="lev-punto ${actual ? 'actual' : ''} ${sel ? 'sel' : ''}"><svg viewBox="-4 -4 68 68" width="26" height="26" color="${c}" stroke="${c}" stroke-width="3" fill="none">${s.svg}</svg><span>${String(p.nombre || '').replace(/</g, '&lt;')}</span></div>`,
+    html: `<div class="lev-punto ${actual ? 'actual' : ''} ${sel ? 'sel' : ''}"><svg viewBox="-4 -4 68 68" width="26" height="26" color="${c}" stroke="${c}" stroke-width="3" fill="none">${s.svg}</svg><span>${String(p.nombre || '').replace(/</g, '&lt;')}${kva ? `<em>${kva.replace(/</g, '&lt;')}</em>` : ''}</span></div>`,
   });
 }
 function dibujarRed() {
@@ -141,12 +144,19 @@ function dibujarRed() {
     capaFondo = L.tileLayer(CAPAS[u.fondo][0], CAPAS[u.fondo][1]).addTo(mapa); capaFondo.bringToBack(); fondoActual = u.fondo;
   }
   capaRed.clearLayers();
+  const conDistancia = u.distancias === false ? new Map() : distanciasQueCaben(l);
   listaVanos(l).forEach(v => {
     const a = l.puntos?.[v.a]; const b = l.puntos?.[v.b]; if (!a || !b) return;
     const t = TIPOS_TRAMO[v.tramo] || TIPOS_TRAMO.bt; const m = metrosDeVano(l, v);
     L.polyline([[a.lat, a.lng], [b.lat, b.lng]], { color: '#ffffff', weight: 9, opacity: 0.9, interactive: false }).addTo(capaRed);
-    L.polyline([[a.lat, a.lng], [b.lat, b.lng]], { color: t.color, weight: 5, dashArray: t.dash ? t.dash.split(' ').map(x => x * 5).join(' ') : null })
-      .bindTooltip(`${m.metros.toFixed(1)} m${m.origen === 'medido' ? '' : ' GPS'}`, { permanent: true, direction: 'center', className: 'lev-dist' }).addTo(capaRed);
+    L.polyline([[a.lat, a.lng], [b.lat, b.lng]], { color: t.color, weight: 5, dashArray: t.dash ? t.dash.split(' ').map(x => x * 5).join(' ') : null }).addTo(capaRed);
+    // Distancia: solo las que no tapan postes, nombres u otras distancias (al acercar aparecen las de los vanos cortos)
+    const texto = `${m.metros.toFixed(1)} m`;
+    if (conDistancia.has(v.id)) {
+      const t = conDistancia.get(v.id);
+      L.tooltip({ permanent: true, direction: 'center', className: `lev-dist ${m.origen === 'medido' ? 'medido' : ''}` })
+        .setLatLng([a.lat + (b.lat - a.lat) * t, a.lng + (b.lng - a.lng) * t]).setContent(texto).addTo(capaRed);
+    }
   });
   listaPuntos(l).forEach(p => {
     // Cualquier punto se arrastra directo (sin seleccionarlo antes); la última movida se puede deshacer
@@ -159,6 +169,32 @@ function dibujarRed() {
       render();
     });
   });
+}
+// Distancias que se pueden mostrar sin encimarse: la etiqueta va al centro del vano y no debe tapar el símbolo ni
+// el nombre de un punto ni otra distancia (se colocan primero las de los vanos más largos en pantalla)
+const HOLGURA = 3; // px que se pueden tocar los bordes
+function distanciasQueCaben(l) {
+  const pt = p => mapa.latLngToContainerPoint([p.lat, p.lng]);
+  const ocupado = [];
+  listaPuntos(l).forEach(p => {
+    const c = pt(p); const nombre = String(p.nombre || ''); const kva = textoTrafos(p.trafos) ? 12 : 0;
+    ocupado.push([c.x - 13, c.y - 13, c.x + 13, c.y + 13]); // símbolo
+    ocupado.push([c.x + 11, c.y - 21, c.x + 11 + nombre.length * 7 + 12, c.y - 5 + kva]); // nombre (y kVA)
+  });
+  const choca = (r, s) => r[0] + HOLGURA < s[2] && s[0] + HOLGURA < r[2] && r[1] + HOLGURA < s[3] && s[1] + HOLGURA < r[3];
+  const caben = new Map(); // vano → posición de la etiqueta a lo largo del vano (0.5 = al centro)
+  listaVanos(l).map(v => {
+    const a = l.puntos?.[v.a]; const b = l.puntos?.[v.b]; if (!a || !b) return null;
+    const p = pt(a); const q = pt(b); const w = `${metrosDeVano(l, v).metros.toFixed(1)} m`.length * 6.5 + 14;
+    // Al centro del vano o, si ahí tapa algo, un poco hacia una de las puntas
+    const cajas = [0.5, 0.4, 0.6, 0.32, 0.68].map(t => { const x = p.x + (q.x - p.x) * t; const y = p.y + (q.y - p.y) * t; return { t, caja: [x - w / 2, y - 9, x + w / 2, y + 9] }; });
+    return { id: v.id, largo: Math.hypot(q.x - p.x, q.y - p.y), cajas };
+  }).filter(Boolean).sort((r, s) => s.largo - r.largo).forEach(d => {
+    const libre = d.cajas.find(c => !ocupado.some(o => choca(c.caja, o)));
+    if (!libre) return;
+    ocupado.push(libre.caja); caben.set(d.id, libre.t);
+  });
+  return caben;
 }
 function actualizarSeguir() { const b = document.getElementById('lev-seguir'); if (b) b.classList.toggle('activo', !!ui()?.seguir); }
 
@@ -315,6 +351,19 @@ export function alturaPuntoLev(v) {
   const a = leerAltura(v);
   if (String(v ?? '').trim() && a === null) return showToast('Escribe la altura en pies (solo el número)');
   update(ref(db, ruta(state.levId, 'puntos/' + u.sel)), { altura: a });
+}
+// Transformadores sobre el punto seleccionado: kVA de cada unidad (varias = banco)
+function trafosSel() { const u = ui(); return [...(lev()?.puntos?.[u?.sel]?.trafos || [])]; }
+export function agregarTrafoLev(kva) {
+  const u = ui(); const k = String(kva ?? '').trim().replace(',', '.').replace(/\s*kva$/i, ''); if (!u?.sel || !k) return;
+  if (Number.isNaN(Number(k)) || Number(k) <= 0) return showToast('Escribe los kVA (solo el número)');
+  update(ref(db, ruta(state.levId, 'puntos/' + u.sel)), { trafos: [...trafosSel(), String(Number(k))] });
+}
+export function agregarTrafoEscritoLev() { const inp = document.getElementById('lev-trafo-otro'); if (inp?.value.trim()) { agregarTrafoLev(inp.value); inp.value = ''; } }
+export function quitarTrafoLev(i) {
+  const u = ui(); if (!u?.sel) return;
+  const lista = trafosSel().filter((_, k) => k !== i);
+  update(ref(db, ruta(state.levId, 'puntos/' + u.sel)), { trafos: lista.length ? lista : null });
 }
 function estructurasSel() { const u = ui(); return [...(lev()?.puntos?.[u?.sel]?.estructuras || [])]; }
 export function agregarEstructuraLev(codigo) {

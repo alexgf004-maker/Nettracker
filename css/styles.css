@@ -1743,3 +1743,13 @@ button.aviso-inicio-fila { cursor: pointer; }
 .check-planilla { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: var(--text); cursor: pointer; margin-bottom: 8px; }
 .check-planilla input { width: 20px; height: 20px; }
 .check-planilla small { flex: 1 1 100%; font-size: 12px; font-weight: 500; color: var(--text3); }
+/* Levantamiento: distancias (las medidas en negrita oscura; las del GPS más suaves) y transformadores sobre el poste */
+.lev-dist:not(.medido) { color: #475569; font-weight: 600; }
+.lev-dist.medido { border-color: #111827; }
+.lev-dist-btn { font: 800 15px Arial, sans-serif; }
+.lev-punto span em { display: block; font-style: normal; font-weight: 700; font-size: 10px; color: #bbf7d0; }
+.lev-trafo-texto { margin-top: 8px; font-weight: 700; color: #15803d; }
+.lev-trafo-sub { margin: 10px 0 6px; font-size: 12px; color: var(--text3); }
+.lev-kva { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; }
+.lev-kva .b { justify-content: center; padding: 10px 0; }
+.lev-trafo-otro { margin-top: 10px; }
