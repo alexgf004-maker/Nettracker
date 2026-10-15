@@ -1,6 +1,7 @@
 // Planilla de instalación y retiro (formato "PLANILLAS_IR" del equipo) de cualquier instalación que la lleve:
-// se llena con los datos de la app y se abre como página para imprimir o guardar como PDF. Lleva dos copias,
-// como el formato: la de la Distribuidora y la de DS. Confirmado con el equipo:
+// se llena con los datos de la app y se abre como página para imprimir o guardar como PDF. Es copia exacta de la
+// hoja del Excel (medidas, bordes, letras, logo y pie), con sus dos copias: se llena la de arriba y la de DS va
+// en blanco. Confirmado:
 // - Número SIGET = código del caso; ID Usuario = NC; nombre, dirección, centro MT/BT o corte y medidor del
 //   expediente del reclamo o del caso de campaña (o FT que se remide), o escritos al instalar si no está en la base.
 // - Tipo de instalación: M monofásico, M2 bifásico, T trifásico. Tensión de servicio: la que se anota al instalar.
@@ -21,12 +22,6 @@ export function energiaPlanilla(e, x) {
   if (vals.some(v => v === null)) return null;
   const total = vals.reduce((a, b) => a + b, 0) * (num(x) ?? 1);
   return Math.round(total * 1000) / 1000;
-}
-// Cómo se calculó, para dejarlo anotado debajo del valor
-export function detalleEnergia(e, x) {
-  if (!e || e.tipo === 'ninguna') return '';
-  const xs = num(x) ?? 1;
-  return e.tipo === 'tres' ? `(P ${e.punta} + R ${e.resto} + V ${e.valle}) × ${xs}` : `${e.una} × ${xs}`;
 }
 
 // Tipo de instalación (M, M2, T) a partir de lo que se sepa del caso
@@ -52,59 +47,108 @@ export function datosPlanilla(rec, fuente = {}) {
     centro: dato('centro'), nc: dato('nc') || rec.idUsuario || '', nombre: dato('nombre') || rec.lugar || '',
     direccion: dato('direccion') || rec.direccion || '', medidor: dato('medidor') || rec.medidor || '',
     tension: rec.tensionServicio || '', tipo: dato('tipo'),
-    energiaInicial: energiaPlanilla(rec.energiaInstalacion, rec.xMedidor), detalleInicial: detalleEnergia(rec.energiaInstalacion, rec.xMedidor),
-    energiaFinal: energiaPlanilla(rec.energiaRetiro, rec.xMedidor), detalleFinal: detalleEnergia(rec.energiaRetiro, rec.xMedidor),
+    energiaInicial: energiaPlanilla(rec.energiaInstalacion, rec.xMedidor), energiaFinal: energiaPlanilla(rec.energiaRetiro, rec.xMedidor),
     colocacion: [rec.fechaInstalacion ? rec.fechaInstalacion.split('-').reverse().join('/') : '', rec.horaInstalacion || ''].filter(Boolean).join(' '),
     retiro: [rec.fechaRetiroReal ? rec.fechaRetiroReal.split('-').reverse().join('/') : '', rec.horaRetiro || ''].filter(Boolean).join(' '),
     observacion: rec.notas || '',
   };
 }
 
+// ── Formato: copia exacta de la hoja PLANILLA del Excel (A4 horizontal, ajustado a una página, centrado) ──
+// Anchos de columna A–O en píxeles de Excel (ancho en caracteres de Calibri 11) y altos de fila 1–28 en puntos.
+const COLS_PX = [125, 173, 107, 27, 27, 27, 27, 27, 27, 111, 76, 67, 80, 88, 126];
+const BLOQUE_PT = Array(10).fill(21.9);
+const FILAS_PT = [13.2, 17.4, 17.4, 13.2, 13.8, 13.2, ...BLOQUE_PT, 13.2, 13.2, ...BLOQUE_PT];
+const ANCHO_PT = COLS_PX.reduce((a, b) => a + b, 0) * 0.75;
+const ALTO_PT = FILAS_PT.reduce((a, b) => a + b, 0);
+// A4 horizontal; márgenes 1 cm a los lados y arriba, 2.5 cm abajo; el pie va pegado al borde (margen 0)
+const PAGINA = { ancho: 841.89, alto: 595.28, izq: 28.35, der: 28.35, arriba: 28.35, abajo: 70.87 };
+const AREA = { ancho: PAGINA.ancho - PAGINA.izq - PAGINA.der, alto: PAGINA.alto - PAGINA.arriba - PAGINA.abajo };
+const ESCALA = Math.min(AREA.ancho / ANCHO_PT, AREA.alto / ALTO_PT);
+const POS = { x: PAGINA.izq + (AREA.ancho - ANCHO_PT * ESCALA) / 2, y: PAGINA.arriba + (AREA.alto - ALTO_PT * ESCALA) / 2 };
+
 const ESTILO = `
-  .pagina { padding: 0.35in 0.45in; display: flex; flex-direction: column; gap: 0.22in; }
-  .copia { border: 1.4px solid #14213d; border-radius: 6px; padding: 10px 12px 8px; flex: 1; display: flex; flex-direction: column; font-size: 9.5pt; }
-  .cab { text-align: center; line-height: 1.25; }
-  .cab b { display: block; font-size: 11pt; letter-spacing: .3px; }
-  .cab small { font-size: 9pt; font-weight: 700; color: #334155; }
-  .sub { display: flex; justify-content: space-between; align-items: center; margin: 6px 0 6px; font-size: 9pt; font-weight: 700; }
-  .copia-k { font-size: 8pt; font-weight: 800; letter-spacing: 1px; color: #fff; background: #14213d; border-radius: 4px; padding: 2px 8px; }
-  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  td { border: 0.8px solid #94a3b8; padding: 3px 6px; height: 21px; vertical-align: middle; overflow: hidden; }
-  td.l { background: #eef2f7; font-weight: 700; font-size: 8.3pt; color: #334155; }
-  td.v { font-size: 9.5pt; font-weight: 600; }
-  td.v small { display: block; font-size: 7pt; font-weight: 500; color: #64748b; line-height: 1.1; }
-  .cajas { display: inline-flex; gap: 8px; align-items: center; }
-  .caja { display: inline-flex; align-items: center; gap: 3px; font-size: 8.5pt; font-weight: 700; }
-  .caja i { width: 12px; height: 12px; border: 1px solid #14213d; display: inline-flex; align-items: center; justify-content: center; font-style: normal; font-size: 9pt; line-height: 1; }
-  .firmas { display: flex; gap: 30px; margin-top: auto; padding-top: 26px; }
-  .firma { flex: 1; border-top: 1px solid #14213d; padding-top: 3px; font-size: 8.5pt; font-weight: 700; text-align: center; color: #334155; }
+  @page { size: A4 landscape; margin: 0; }
+  .pagina { width: 297mm; height: 210mm; color: #000; }
+  .hoja { position: absolute; left: ${POS.x}pt; top: ${POS.y}pt; width: ${ANCHO_PT}pt; transform: scale(${ESCALA}); transform-origin: 0 0; }
+  .hoja table { border-collapse: collapse; table-layout: fixed; width: ${ANCHO_PT}pt; font-family: Arial, 'Liberation Sans', Helvetica, sans-serif; font-size: 9pt; }
+  .hoja td { padding: 0 2px; white-space: nowrap; overflow: hidden; vertical-align: middle; line-height: 1.1; }
+  .hoja .et { font-style: italic; }
+  .hoja .c { text-align: center; }
+  .hoja .arriba { vertical-align: top; padding-top: 1px; white-space: normal; }
+  .hoja .titulo { font-size: 14pt; font-weight: 700; text-align: center; }
+  .hoja .sub { font-size: 11pt; font-weight: 700; font-style: italic; }
+  .hoja .calibri { font-family: Calibri, Carlito, Arial, sans-serif; font-size: 11pt; text-align: center; }
+  .hoja .b { font-weight: 700; }
+  .hoja .ds { font-size: 10pt; font-style: italic; vertical-align: bottom; }
+  .hoja .x { font-weight: 700; text-align: center; }
+  .hoja .bt { border-top: 0.5pt solid #000; } .hoja .bb { border-bottom: 0.5pt solid #000; }
+  .hoja .bl { border-left: 0.5pt solid #000; } .hoja .br { border-right: 0.5pt solid #000; }
+  .hoja .caja { border: 1pt solid #000; }
+  .logo { position: absolute; left: 6pt; top: 2.25pt; width: 96pt; height: 46pt; }
+  .logo img { width: 100%; height: 100%; object-fit: contain; object-position: left center; }
+  .logo-texto { font: 700 20pt Arial, sans-serif; color: #1a3fa8; letter-spacing: 2px; line-height: 46pt; }
+  .pie { position: absolute; bottom: 3pt; font-family: 'Times New Roman', Times, serif; font-size: 10pt; }
 `;
 
-const caja = (letra, marcada) => `<span class="caja"><i>${marcada ? 'X' : ''}</i>${letra}</span>`;
-const kwh = (v, det) => (v === null ? '' : `${v.toLocaleString('es-SV', { maximumFractionDigits: 3 })} kWh${det ? `<small>${esc(det)}</small>` : ''}`);
+// Celda: texto ya escapado, columnas que abarca, clases (bordes: t/b/l/r) y filas que abarca
+const td = (html = '', cs = 1, cls = '', rs = 1) => `<td${cs > 1 ? ` colspan="${cs}"` : ''}${rs > 1 ? ` rowspan="${rs}"` : ''}${cls ? ` class="${cls}"` : ''}>${html}</td>`;
+const tr = (fila, celdas = '') => `<tr style="height:${FILAS_PT[fila - 1]}pt">${celdas}</tr>`;
+const kwh = v => (v === null ? '' : `${v.toLocaleString('es-SV', { maximumFractionDigits: 3 })} kWh`);
 
-function copia(d, etiqueta, o) {
-  return `<div class="copia">
-    <div class="cab"><b>CAMPAÑA DE CONTROL DEL PRODUCTO TÉCNICO</b><small>DATOS DE USUARIO SELECCIONADOS · PLANILLA DE INSTALACIÓN Y RETIRO</small></div>
-    <div class="sub"><span>Distribuidora de Electricidad ${esc(o.distribuidora)}</span><span>PERIODO: ${esc(d.periodo)}</span><span class="copia-k">${etiqueta}</span></div>
-    <table>
-      <colgroup><col style="width:15%"><col style="width:20%"><col style="width:13%"><col style="width:18%"><col style="width:15%"><col style="width:19%"></colgroup>
-      <tr><td class="l">Número SIGET</td><td class="v">${esc(d.codigo)}</td><td class="l">Centro MT/BT ó Corte</td><td class="v">${esc(d.centro)}</td><td class="l">ID Usuario</td><td class="v">${esc(d.nc)}</td></tr>
-      <tr><td class="l">Nombre del Usuario</td><td class="v" colspan="5">${esc(d.nombre)}</td></tr>
-      <tr><td class="l">Dirección</td><td class="v" colspan="5">${esc(d.direccion)}</td></tr>
-      <tr><td class="l">Tensión de Servicio</td><td class="v">${esc(d.tension)}${num(d.tension) !== null ? ' V' : ''}</td><td class="l">Tipo Instalación</td><td class="v"><span class="cajas">${caja('M', d.tipo === 'M')}${caja('M2', d.tipo === 'M2')}${caja('T', d.tipo === 'T')}</span></td><td class="l">Energía Inicial</td><td class="v">${kwh(d.energiaInicial, d.detalleInicial)}</td></tr>
-      <tr><td class="l">Tarifa</td><td class="v"></td><td class="l">Tipo Conexión</td><td class="v"></td><td class="l">Energía Final</td><td class="v">${kwh(d.energiaFinal, d.detalleFinal)}</td></tr>
-      <tr><td class="l">Número Contador</td><td class="v"></td><td class="l">Código Medidor</td><td class="v">${esc(d.medidor)}</td><td class="l">Fase Alta</td><td class="v"></td></tr>
-      <tr><td class="l">Medición Energía</td><td class="v"><span class="cajas">${caja('Sí', false)}${caja('No', false)}</span></td><td class="l">Fecha Colocación</td><td class="v">${esc(d.colocacion)}</td><td class="l">Fecha Retiro</td><td class="v">${esc(d.retiro)}</td></tr>
-      <tr><td class="l">Observación</td><td class="v" colspan="5">${esc(d.observacion)}</td></tr>
-    </table>
-    <div class="firmas"><div class="firma">Instalación · Firma Distribuidora</div><div class="firma">Retiro · Firma Distribuidora</div></div>
-  </div>`;
+// Filas 7–16 (Distribuidora) o 19–28 (DS) del formato
+function bloque(d, f, ds) {
+  const caja = marcada => td(marcada ? 'X' : '', 1, 'bt bb bl br x');
+  const letra = t => td(t, 1, 'et c bt bb bl br');
+  return `<tbody class="copia">
+    ${tr(f, td(ds ? 'Número  SIGET' : 'NumeroSIGET', 1, 'et bl bt bb') + td(esc(d.codigo), 1, 'calibri caja') + td('', 7, 'bt bb')
+      + td('Centro MT/BT ó Corte', 2, 'et c bt bb') + td(esc(d.centro), 4, 'bt bb br'))}
+    ${tr(f + 1, td('ID Usuario', 1, 'et bl bt bb') + td(esc(d.nc), 1, 'calibri caja') + td('', 5, 'bt bb')
+      + td('Nombre del Usuario', 3, 'et bt bb') + td(esc(d.nombre), 5, 'bt bb br'))}
+    ${tr(f + 2, td('Dirección', 1, 'et bl bt bb') + td(esc(d.direccion), 11, 'bt bb') + td('', 3, 'bt bb br'))}
+    ${tr(f + 3, td('Tensión de Servicio', 1, 'et bl bt bb') + td(esc(d.tension) + (num(d.tension) !== null ? ' V' : ''), 1, 'bt bb') + td('Tipo Instalación', 1, 'et bt bb br')
+      + letra('M') + caja(d.tipo === 'M') + letra('T') + caja(d.tipo === 'T') + letra('M2') + caja(d.tipo === 'M2')
+      + td('Tipo Conexión', 1, 'et bt bb') + td('', 1, 'bt bb') + td('Fase Alta', 1, 'et bt bb') + td('', 1, 'bt bb')
+      + td('Energía Inicial', 1, 'et bt bb') + td(kwh(d.energiaInicial), 1, 'bt bb br'))}
+    ${tr(f + 4, td('Tarifa', 1, 'et bl bt bb') + td('', 1, 'bt bb') + td('Tipo Servicio', 1, 'et bt bb br')
+      + (ds ? letra('U') + caja(false) + letra('R') + caja(false) + letra('A') + caja(false) : caja(false).repeat(6))
+      + td('Código Medidor', 1, 'et bt bb') + td(esc(d.medidor), 3, 'b bt bb') + td('Energía Final', 1, 'et bt bb') + td(kwh(d.energiaFinal), 1, 'bt bb br'))}
+    ${tr(f + 5, td('Número Contador', 1, 'et bl bt bb') + td('', 1, 'bt bb') + td('Medición Energía', 1, 'et bt bb br')
+      + letra('Si') + caja(false) + letra('No') + caja(false) + caja(false) + caja(false)
+      + td('Fecha Colocación', 1, 'et bt bb') + td(esc(d.colocacion), 3, 'bt bb') + td('Fecha Retiro', 1, 'et bt bb') + td(esc(d.retiro), 1, 'bt bb br'))}
+    ${tr(f + 6, td('Observación', 1, 'et arriba bl bt bb', 2) + td(esc(d.observacion), 14, 'b et bt br'))}
+    ${tr(f + 7, td('', 14, 'bb br'))}
+    ${tr(f + 8, td('Instalación &nbsp; Firma Distribuidora', 1, 'et arriba bl bt bb', 2) + td('', 6, 'bt bb br', 2)
+      + td('Retiro Firma Distribuidora', 3, 'et arriba bl bt bb', 2) + td('', 5, 'bt bb br', 2))}
+    ${tr(f + 9)}
+  </tbody>`;
 }
 
-// Una página por instalación, con las dos copias (Distribuidora y DS)
+function hoja(d, n, o) {
+  const logo = o.logo ? `<img src="${esc(o.logo)}" alt="">` : `<div class="logo-texto">${esc(o.distribuidora)}</div>`;
+  return `<section class="pagina">
+    <div class="hoja"><div class="logo">${logo}</div><table>
+      <colgroup>${COLS_PX.map(px => `<col style="width:${px * 0.75}pt">`).join('')}</colgroup>
+      <tbody>
+        ${tr(1)}
+        ${tr(2, td('CAMPAÑA DE CONTROL DEL PRODUCTO TECNICO', 15, 'titulo'))}
+        ${tr(3, td('DATOS DE USUARIO&nbsp; SELECCIONADOS PLANILLA DE INSTALACION Y RETIRO', 15, 'titulo'))}
+        ${tr(4)}
+        ${tr(5, td(`Distribuidora de Electricidad ${esc(o.distribuidora)}`, 13, 'sub') + td('PERIODO:', 1, 'sub c') + td(esc(d.periodo), 1, 'sub'))}
+        ${tr(6)}
+      </tbody>
+      ${bloque(d, 7, false)}
+      <tbody>${tr(17)}${tr(18, td('DS', 1, 'ds'))}</tbody>
+      ${bloque({ energiaInicial: null, energiaFinal: null }, 19, true)}
+    </table></div>
+    <div class="pie" style="left:10pt">Reporte: Formato_A2_Reemplazo</div>
+    <div class="pie" style="left:0;right:0;text-align:center">- ${n} -</div>
+  </section>`;
+}
+
+// Una página por instalación, con las dos copias del formato: solo se llena la de arriba; la de DS va en blanco (confirmado)
 export function htmlPlanillas(lista, o = {}) {
   const op = { distribuidora: 'DELSUR', ...o };
-  const paginas = lista.map(d => `<section class="pagina">${copia(d, 'DISTRIBUIDORA', op)}${copia(d, 'DS', op)}</section>`).join('');
+  const paginas = lista.map((d, i) => hoja(d, i + 1, op)).join('');
   return documento(op.titulo || 'Planilla de instalación y retiro', ESTILO, paginas, lista.length);
 }

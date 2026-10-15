@@ -3,6 +3,7 @@
 // escribirlo; si no, al marcar "Generar planilla" se llenan a mano. Sin planilla, la instalación queda como siempre.
 import { state } from '../state.js';
 import { abrirDoc, showToast } from '../ui.js';
+import { configCartas } from './documentos.js';
 import { claveExpediente, todosFT } from '../domain/expedientes.js';
 import { ftDeRemedicion } from '../domain/ft.js';
 import { CAMPOS_PLANILLA, datosPlanilla, htmlPlanillas, tipoPlanilla } from '../domain/planilla.js';
@@ -59,5 +60,5 @@ export function abrirPlanilla(id) {
   const rec = state.records.find(r => r.id === id);
   if (!planillaDisponible(rec)) return showToast('Esta instalación no tiene planilla');
   const d = datosPlanilla(rec, buscarDatosCaso(rec.caso, rec) || {});
-  abrirDoc(htmlPlanillas([d], { titulo: `Planilla de instalación y retiro · ${d.codigo}` }), `Planilla_${d.codigo || 'instalacion'}.html`);
+  abrirDoc(htmlPlanillas([d], { titulo: `Planilla de instalación y retiro · ${d.codigo}`, logo: configCartas().logo }), `Planilla_${d.codigo || 'instalacion'}.html`);
 }
