@@ -1020,9 +1020,11 @@ test('planilla de instalación y retiro: reclamos y remediciones FT, con horas y
   let html = (await docs())[0];
   expect(html.match(/class="copia"/g)).toHaveLength(2); // las dos copias del formato (la de arriba y la de DS)
   // Mismo formato que la hoja del Excel: A4 horizontal, textos del formato y pie
-  for (const t of ['size: A4 landscape', 'CAMPAÑA DE CONTROL DEL PRODUCTO TECNICO', 'NumeroSIGET', 'Número  SIGET', '>DS<', 'Reporte: Formato_A2_Reemplazo', '- 1 -',
+  for (const t of ['size: letter landscape', 'CAMPAÑA DE CONTROL DEL PRODUCTO TECNICO', 'NumeroSIGET', 'Número  SIGET', '>DS<', 'Analizador de redes</td><td class="v bt bb">SN-202<',
     'RE192026456', 'CT10001', '900100', 'USUARIO DE PRUEBA', 'CALLE PRUEBA 1, SANTA TECLA', 'MED-1', '13200 V', 'Septiembre 2026',
     '01/09/2026 08:15', '16/09/2026 14:30', 'Medidor en poste']) expect(html).toContain(t);
+  expect(html).not.toContain('Formato_A2_Reemplazo');
+  expect(html).not.toContain('Número Contador');
   // La copia de DS va en blanco
   const ds = html.slice(html.indexOf('>DS<'));
   for (const t of ['RE192026456', 'USUARIO DE PRUEBA', 'MED-1', 'kWh', '>X<']) expect(ds).not.toContain(t);
