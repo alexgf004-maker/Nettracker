@@ -1,6 +1,7 @@
 // Planilla de instalación y retiro (formato "PLANILLAS_IR" del equipo) de cualquier instalación que la lleve:
 // se llena con los datos de la app y se abre como página para imprimir o guardar como PDF. Es copia exacta de la
-// hoja del Excel (medidas, bordes, letras, logo y pie), con sus dos copias: la de arriba y la de DS. Confirmado:
+// hoja del Excel (medidas, bordes, letras, logo y pie), con sus dos copias: se llena la de arriba y la de DS va
+// en blanco. Confirmado:
 // - Número SIGET = código del caso; ID Usuario = NC; nombre, dirección, centro MT/BT o corte y medidor del
 //   expediente del reclamo o del caso de campaña (o FT que se remide), o escritos al instalar si no está en la base.
 // - Tipo de instalación: M monofásico, M2 bifásico, T trifásico. Tensión de servicio: la que se anota al instalar.
@@ -138,14 +139,14 @@ function hoja(d, n, o) {
       </tbody>
       ${bloque(d, 7, false)}
       <tbody>${tr(17)}${tr(18, td('DS', 1, 'ds'))}</tbody>
-      ${bloque(d, 19, true)}
+      ${bloque({ energiaInicial: null, energiaFinal: null }, 19, true)}
     </table></div>
     <div class="pie" style="left:10pt">Reporte: Formato_A2_Reemplazo</div>
     <div class="pie" style="left:0;right:0;text-align:center">- ${n} -</div>
   </section>`;
 }
 
-// Una página por instalación, con las dos copias del formato (la de arriba y la de DS)
+// Una página por instalación, con las dos copias del formato: solo se llena la de arriba; la de DS va en blanco (confirmado)
 export function htmlPlanillas(lista, o = {}) {
   const op = { distribuidora: 'DELSUR', ...o };
   const paginas = lista.map((d, i) => hoja(d, i + 1, op)).join('');

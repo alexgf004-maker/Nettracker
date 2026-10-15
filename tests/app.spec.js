@@ -1023,6 +1023,9 @@ test('planilla de instalación y retiro: reclamos y remediciones FT, con horas y
   for (const t of ['size: A4 landscape', 'CAMPAÑA DE CONTROL DEL PRODUCTO TECNICO', 'NumeroSIGET', 'Número  SIGET', '>DS<', 'Reporte: Formato_A2_Reemplazo', '- 1 -',
     'RE192026456', 'CT10001', '900100', 'USUARIO DE PRUEBA', 'CALLE PRUEBA 1, SANTA TECLA', 'MED-1', '13200 V', 'Septiembre 2026',
     '01/09/2026 08:15', '16/09/2026 14:30', 'Medidor en poste']) expect(html).toContain(t);
+  // La copia de DS va en blanco
+  const ds = html.slice(html.indexOf('>DS<'));
+  for (const t of ['RE192026456', 'USUARIO DE PRUEBA', 'MED-1', 'kWh', '>X<']) expect(ds).not.toContain(t);
   expect(html).toMatch(/2[.,]?800 kWh/); // (10 + 20 + 5) × 80
   expect(html).toMatch(/4[.,]?000 kWh/); // 50 × 80
 
