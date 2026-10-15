@@ -3667,7 +3667,7 @@ test.describe('Levantamiento en campo', () => {
     await expect(page.locator('#lev-gps')).toHaveText('GPS ±4 m');
     await page.getByRole('button', { name: 'Poste aquí' }).click();
     await expect(page.locator('.leaflet-marker-icon', { hasText: 'P2' })).toHaveCount(1);
-    await expect(page.locator('.lev-dist', { hasText: '30.0 m GPS' })).toHaveCount(1);
+    await expect(page.locator('.lev-dist:not(.medido)', { hasText: '30.0 m' })).toHaveCount(1);
     const esc = await app.escrituras();
     const vano = esc.find(([op, ruta]) => op === 'push' && /^levantamientos\/[^/]+\/vanos$/.test(ruta))[2];
     expect(vano.tramo).toBe('bt');
@@ -3678,7 +3678,7 @@ test.describe('Levantamiento en campo', () => {
     // Conductor del vano: calibre y tipo
     await page.locator('.lev-vano .dib-op', { hasText: /^#2$/ }).click();
     await page.locator('.lev-vano .dib-op', { hasText: /^ACSR$/ }).click();
-    await expect(page.locator('.lev-dist', { hasText: '32.0 m' })).toHaveCount(1);
+    await expect(page.locator('.lev-dist.medido', { hasText: '32.0 m' })).toHaveCount(1);
     await expect(page.locator('.lev-vano')).toContainText('32.0 m medido');
     // Con precisión baja pide confirmar; transformador como tipo de punto
     await pestana(page, 'Marcar');
@@ -3745,6 +3745,66 @@ test.describe('Levantamiento en campo', () => {
     await expect(page.locator('#dib-capa text', { hasText: /^32\.0 m$/ })).toHaveCount(1);
     expect(errores).toEqual([]);
   });
+  test('transformador sobre el poste con sus kVA y distancias que no se enciman en vanos cortos', async ({ page, context }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    app = await abrirApp(page, { leaflet: true });
+    // Dominio: texto, símbolo, lámina y KML
+    const dom = await page.evaluate(async () => {
+      const m = await import('/js/domain/levantamiento.js');
+      const lev = { nombre: 'X', puntos: { a: { lat: 13.5, lng: -88.87, nombre: 'P1', tipo: 'poste', trafos: ['25'], orden: 1 }, b: { lat: 13.5003, lng: -88.87, nombre: 'P2', tipo: 'poste', trafos: ['50', '50', '50'], orden: 2 } },
+        vanos: { v1: { a: 'a', b: 'b', tramo: 'bt', orden: 1 } } };
+      const d = m.aDibujo(lev);
+      return { textos: [m.textoTrafos(['25']), m.textoTrafos(['50', '50', '50']), m.textoTrafos(['25', '50']), m.textoTrafos([])],
+        simbolos: [m.simboloPunto({ tipo: 'poste', trafos: ['25'] }), m.simboloPunto({ tipo: 'poste', trafos: ['25', '25'] }), m.simboloPunto({ tipo: 'poste_nuevo', trafos: ['25'] }), m.simboloPunto({ tipo: 'poste' }), m.simboloPunto({ tipo: 'usuario', trafos: ['25'] })],
+        lamina: d.elementos.filter(e => e.tipo === 'simbolo').map(e => e.simbolo), etiquetas: d.elementos.filter(e => e.tipo === 'etiqueta').map(e => e.texto), kml: m.kmlLevantamiento(lev) };
+    });
+    expect(dom.textos).toEqual(['Trafo 25 kVA', 'Banco 3 × 50 kVA', 'Banco 25 + 50 kVA', '']);
+    expect(dom.simbolos).toEqual(['trafo', 'banco', 'trafo_nuevo', 'poste', 'usuario']);
+    expect(dom.lamina).toEqual(['trafo', 'banco']);
+    expect(dom.etiquetas).toEqual(['P1\nTrafo 25 kVA', 'P2\nBanco 3 × 50 kVA']);
+    expect(dom.kml).toContain('Trafo 25 kVA');
+
+    // En campo: varios vanos cortos de 6 m; las distancias que se enciman no se muestran
+    await context.grantPermissions(['geolocation']);
+    const datos = JSON.parse(JSON.stringify(fixture));
+    const puntos = {}; const vanos = {};
+    for (let i = 0; i < 6; i++) puntos['p' + i] = { lat: 13.5 + i * 0.000108, lng: -88.87, nombre: `P${i + 1}`, tipo: 'poste', orden: i + 1 };
+    for (let i = 0; i < 5; i++) vanos['v' + i] = { a: 'p' + i, b: 'p' + (i + 1), tramo: 'bt', orden: i + 1 };
+    puntos.p6 = { lat: 13.5, lng: -88.8693, nombre: 'P7', tipo: 'poste', orden: 7 }; vanos.v5 = { a: 'p0', b: 'p6', tramo: 'bt', orden: 6 }; // uno largo (~75 m)
+    datos.levantamientos = { L1: { nombre: 'Cortos', puntos, vanos, creado: { fecha: '2026-10-01', por: 'David García' } } };
+    await page.setViewportSize({ width: 1280, height: 1100 });
+    app = await abrirApp(page, { datos, leaflet: true });
+    await cerrarAlerta(page);
+    await nav(page, 'Levantamiento');
+    await page.locator('.lev-card', { hasText: 'Cortos' }).click();
+    await expect(page.locator('#lev-mapa.leaflet-container')).toHaveCount(1);
+    await page.evaluate(async () => { const { mapaLev } = await import('/js/actions/levantamiento.js'); mapaLev().setView([13.50013, -88.8697], 17, { animate: false }); });
+    await expect(page.locator('.lev-dist')).toHaveCount(1); // de lejos solo se ve la del vano largo
+    await expect(page.locator('.lev-dist')).toHaveText('75.7 m');
+    await page.evaluate(async () => { const { mapaLev } = await import('/js/actions/levantamiento.js'); mapaLev().setView([13.50027, -88.87], 21, { animate: false }); });
+    await expect.poll(() => page.locator('.lev-dist').count()).toBeGreaterThan(3); // al acercar aparecen las de los vanos cortos
+    // Botón para ocultarlas todas
+    await page.getByRole('button', { name: 'Ocultar distancias' }).click();
+    await expect(page.locator('.lev-dist')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Mostrar distancias' }).click();
+    await expect.poll(() => page.locator('.lev-dist').count()).toBeGreaterThan(3);
+
+    // Transformador sobre un poste: se elige en el punto con sus kVA
+    await page.locator('.leaflet-marker-icon', { hasText: 'P3' }).click();
+    await page.getByRole('button', { name: 'Transformador sobre el poste' }).click();
+    await page.locator('.lev-kva .b', { hasText: /^37\.5$/ }).click();
+    await expect(page.locator('.lev-elegir')).toContainText('Trafo 37.5 kVA');
+    await page.locator('#lev-trafo-otro').fill('37,5'); await page.locator('#lev-trafo-otro').press('Enter');
+    await expect(page.locator('.lev-elegir')).toContainText('Banco 2 × 37.5 kVA');
+    await page.getByRole('button', { name: 'Quitar 37.5 kVA' }).first().click();
+    await expect(page.locator('.lev-elegir')).toContainText('Trafo 37.5 kVA');
+    expect(await app.escrituras()).toContainEqual(['update', 'levantamientos/L1/puntos/p2', { trafos: ['37.5'] }]);
+    await page.getByRole('button', { name: 'Listo' }).click();
+    await expect(page.locator('.lev-op', { hasText: 'Transformador' })).toContainText('Trafo 37.5 kVA');
+    await expect(page.locator('.leaflet-marker-icon', { hasText: 'P3' })).toContainText('37.5 kVA');
+    expect(errores).toEqual([]);
+  });
+
   test('imán en campo: junto a un poste ya marcado pregunta si es el mismo, y tocar cerca de un punto lo une', async ({ page, context }) => {
     const errores = []; page.on('pageerror', e => errores.push(e.message));
     await context.grantPermissions(['geolocation']);

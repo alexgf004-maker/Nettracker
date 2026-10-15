@@ -1,6 +1,6 @@
 // Pestaña Levantamiento (Herramientas): levantamientos de red en campo con GPS, guardados en la base para el equipo.
 import { SIMBOLOS } from '../domain/dibujo.js';
-import { acometidasLevantamiento, listaPuntos, listaVanos, metrosDeVano, nuevaPantallaLev, resumenLevantamiento, TIPOS_PUNTO } from '../domain/levantamiento.js';
+import { acometidasLevantamiento, KVA_TRAFO, listaPuntos, listaVanos, metrosDeVano, nuevaPantallaLev, resumenLevantamiento, simboloPunto, textoTrafos, TIPOS_PUNTO } from '../domain/levantamiento.js';
 import { fmtMetros, TIPOS_TRAMO } from '../domain/plano.js';
 import { balanceAcometidas, CALIBRES, grupoEstructurasDe, textoAcometidas, textoAltura, textoEstructuras, TIPOS_ACOMETIDA, TIPOS_CONDUCTOR } from '../domain/red.js';
 import { state } from '../state.js';
@@ -66,6 +66,7 @@ function renderDetalle(id, l) {
   // Mapa con sus controles encima
   html += `<div class="lev-mapa-caja"><div id="lev-mapa" class="lev-mapa"></div>
     <div class="lev-mapa-ctrl"><div class="segmento"><button class="${u.fondo === 'calles' ? 'active' : ''}" onclick="setLev('fondo', 'calles')">Calles</button><button class="${u.fondo === 'satelite' ? 'active' : ''}" onclick="setLev('fondo', 'satelite')">Satélite</button></div>
+      <button class="lev-redondo lev-dist-btn ${u.distancias === false ? '' : 'activo'}" aria-label="${u.distancias === false ? 'Mostrar distancias' : 'Ocultar distancias'}" title="Distancias de los vanos" onclick="setLev('distancias', ${u.distancias === false})">m</button>
       <button id="lev-seguir" class="lev-redondo ${u.seguir ? 'activo' : ''}" aria-label="Seguir mi ubicación" title="Seguir mi ubicación" onclick="setLev('seguir', ${!u.seguir})">${ICONO.seguir}</button></div>
     ${u.movida && l.puntos?.[u.movida.id] ? `<div class="lev-aviso alert-banner alert-yellow">${esc(u.movida.nombre || 'Punto')} movido. <button class="b b-l" onclick="deshacerMovidaLev()">Deshacer</button></div>` : ''}
     ${u.unirDesde ? `<div class="lev-aviso alert-banner alert-yellow">Toca el punto con el que se une ${esc(l.puntos?.[u.unirDesde]?.nombre || '')}. <button class="b b-l" onclick="setLev('unirDesde', null)">Cancelar</button></div>` : ''}
@@ -98,12 +99,13 @@ function hojaMarcar(l, u, vanos, actual) {
 
 function hojaPunto(sel, l) {
   if (!sel) return '';
-  const info = [sel.manual ? 'Marcado en el mapa' : sel.acc ? `GPS ±${Math.round(sel.acc)} m` : '', sel.movido ? 'ajustado' : '', textoAltura(sel.altura), textoEstructuras(sel.estructuras)].filter(Boolean).join(' · ');
+  const info = [sel.manual ? 'Marcado en el mapa' : sel.acc ? `GPS ±${Math.round(sel.acc)} m` : '', sel.movido ? 'ajustado' : '', textoTrafos(sel.trafos), textoAltura(sel.altura), textoEstructuras(sel.estructuras)].filter(Boolean).join(' · ');
   const nada = '<i class="lev-op-nada">Sin dato</i>';
   return `<div class="lev-panel">
-    <div class="lev-punto-cab">${mini(sel.tipo, 28)}<div><b>${esc(sel.nombre || 'Punto')}</b><span>${esc(SIMBOLOS[sel.tipo]?.nombre || '')}</span></div>${info ? `<span class="tg gris">${esc(info)}</span>` : ''}</div>
+    <div class="lev-punto-cab">${mini(simboloPunto(sel), 28)}<div><b>${esc(sel.nombre || 'Punto')}</b><span>${esc(SIMBOLOS[sel.tipo]?.nombre || '')}</span></div>${info ? `<span class="tg gris">${esc(info)}</span>` : ''}</div>
     <div class="lev-acciones lev-acciones-punto"><button class="b b-p" onclick="seguirDesdeLev()">Seguir desde aquí</button><button class="b b-g" onclick="unirConLev()">Unir con otro punto</button><button class="b b-g" onclick="moverAGpsLev()">Mover a mi ubicación</button><button class="b b-l dib-borrar" onclick="borrarPuntoLev()">Borrar</button></div>
     <div class="lev-lista">
+      ${fila('Transformador', sel.trafos?.length ? esc(textoTrafos(sel.trafos)) : nada, 'trafos', 'aria-label="Transformador sobre el poste"')}
       ${fila('Altura', sel.altura ? esc(textoAltura(sel.altura)) : nada, 'altura', 'aria-label="Altura del poste"')}
       ${fila('Estructuras', sel.estructuras?.length ? esc(textoEstructuras(sel.estructuras).replace(/ \/ /g, ', ')) : nada, 'estructuras', 'aria-label="Estructuras del poste"')}
       ${fila('Tipo', `${mini(sel.tipo)}${esc(SIMBOLOS[sel.tipo]?.nombre || '')}`, 'tipoDelPunto', 'aria-label="Tipo del punto"')}
@@ -138,13 +140,22 @@ function ventanaElegir(l, u, sel, vanos, actual) {
     const tramos = listaVanos(l).filter(v => v.a === sel.id || v.b === sel.id).map(v => v.tramo);
     titulo = `Estructuras de ${esc(sel.nombre || 'poste')}`; listo = true;
     cuerpo = selectorEstructuras(sel.estructuras, { id: 'lev-poste', agregar: 'agregarEstructuraLev', quitar: 'quitarEstructuraLev', escrita: 'agregarEstructuraEscritaLev', clave: sel.id, grupo: grupoEstructurasDe(tramos) });
+  } else if (sel && p === 'trafos') {
+    // Uno o varios transformadores sobre el poste: cada toque agrega una unidad con esos kVA (varias = banco)
+    titulo = `Transformador en ${esc(sel.nombre || 'poste')}`; listo = true;
+    const lista = sel.trafos || [];
+    cuerpo = `<div class="dib-estructuras lev-trafos">${lista.length ? lista.map((k, i) => `<span class="dib-estr">${esc(k)} kVA<button aria-label="Quitar ${esc(k)} kVA" onclick="quitarTrafoLev(${i})">✕</button></span>`).join('') : '<span class="page-sub">Sin transformador</span>'}</div>
+      ${lista.length ? `<div class="lev-trafo-texto">${esc(textoTrafos(lista))}</div>` : ''}
+      <div class="lev-trafo-sub">Toca los kVA para agregar un transformador (para un banco, agrega uno por cada unidad)</div>
+      <div class="lev-kva">${KVA_TRAFO.map(k => `<button class="b b-g" onclick="agregarTrafoLev('${k}')">${k}</button>`).join('')}</div>
+      <div class="dib-estr-otra lev-trafo-otro"><input id="lev-trafo-otro" inputmode="decimal" placeholder="Otro (kVA)" onkeydown="if (event.key === 'Enter') agregarTrafoEscritoLev()"><button class="b b-g" onclick="agregarTrafoEscritoLev()">Agregar</button></div>`;
   } else if (sel && (p === 'nombre' || p === 'nota')) {
     titulo = p === 'nombre' ? 'Nombre del punto' : 'Nota del punto'; listo = true;
     cuerpo = `<input id="lev-p-${p}" class="lev-elegir-texto" value="${esc(sel[p] || '')}" placeholder="${p === 'nota' ? 'Ej. poste de madera deteriorado, retenida…' : 'Ej. P3'}" onchange="datoPuntoLev('${p}', this.value)" onkeydown="if (event.key === 'Enter') { datoPuntoLev('${p}', this.value); cerrarPickerLev(); }">`;
   } else return '';
   return `<div class="lev-elegir-fondo" onclick="if (event.target === this) cerrarPickerLev()"><div class="lev-elegir" role="dialog" aria-label="${titulo}">
     <div class="lev-elegir-cab"><b>${titulo}</b><button class="${listo ? 'b b-p' : 'lev-elegir-x'}" onclick="cerrarPickerLev()" aria-label="${listo ? 'Listo' : 'Cerrar'}">${listo ? 'Listo' : '✕'}</button></div>
-    <div class="lev-elegir-cuerpo ${p === 'altura' || p === 'estructuras' || p === 'nombre' || p === 'nota' ? '' : 'lev-elegir-lista'}">${cuerpo}</div></div></div>`;
+    <div class="lev-elegir-cuerpo ${p === 'altura' || p === 'estructuras' || p === 'trafos' || p === 'nombre' || p === 'nota' ? '' : 'lev-elegir-lista'}">${cuerpo}</div></div></div>`;
 }
 
 function hojaVanos(l, vanos) {
