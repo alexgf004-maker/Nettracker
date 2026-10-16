@@ -1,9 +1,26 @@
-// Base común de los memorándums: hoja A4 con la identidad de la app (degradado petróleo → turquesa).
+// Base común de los memorándums: hoja carta con la identidad de la app (degradado petróleo → turquesa). Al imprimir lleva
+// márgenes de 12 mm y el encabezado va dentro de ellos con esquinas redondeadas (antes iba a sangre y las impresoras y
+// el PDF del celular lo cortaban en los bordes).
 // Cada plantilla arma su cuerpo con estos bloques y los envuelve con docMemo().
 
 const LOGO = `<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="2" width="18" height="20" rx="2" stroke="white" stroke-width="1.8" fill="none"/><path d="M8 7h8M8 10h5" stroke="white" stroke-width="1.5" stroke-linecap="round"/><path d="M12 14l-2 4h4l-2 4" stroke="#7dd3fc" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 const ONDA = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='120' viewBox='0 0 240 120'%3E%3Cpath d='M0 60 Q30 10 60 60 T120 60 T180 60 T240 60' fill='none' stroke='%23ffffff' stroke-opacity='.16' stroke-width='2'/%3E%3Cpath d='M0 75 Q30 35 60 75 T120 75 T180 75 T240 75' fill='none' stroke='%23ffffff' stroke-opacity='.07' stroke-width='1.5'/%3E%3C/svg%3E")`;
+
+// Impresión: carta con márgenes. Va aparte para ponérsela también a los memos ya guardados como HTML (despachos)
+export const ESTILO_IMPRESION = `
+  @page { size: letter; margin: 12mm; }
+  @page apaisada { size: letter landscape; margin: 12mm; }
+  @media print {
+    body { background: #fff; }
+    .barra { display: none; }
+    .hoja { margin: 0; box-shadow: none; width: auto; min-height: 254mm; } /* carta (279.4 mm) menos los márgenes */
+    .hoja.apaisada { page: apaisada; min-height: 190mm; }
+    .enc { border-radius: 12px; padding: 22px 26px 18px; }
+    .meta > div { padding: 9px 26px; }
+    .cuerpo { padding: 22px 0 8px; }
+    .pie { margin: 0; }
+  }`;
 
 const ESTILO = `
   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
@@ -11,8 +28,8 @@ const ESTILO = `
   :root { --petroleo: #0b2e3b; --turq: #0e7490; --turq2: #06b6d4; --turq-claro: #ecfeff; --texto: #0f172a; --texto2: #475569; --texto3: #64748b; --borde: #d7e3e8; --fondo: #f4f8fa; }
   html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { font-family: 'Plus Jakarta Sans', 'Segoe UI', Arial, sans-serif; color: var(--texto); background: #e6edf0; font-size: 13px; line-height: 1.45; font-variant-numeric: tabular-nums; }
-  .hoja { width: 210mm; min-height: 297mm; margin: 24px auto; background: #fff; box-shadow: 0 10px 30px -12px rgba(11,46,59,.35); display: flex; flex-direction: column; }
-  .hoja.apaisada { width: 297mm; min-height: 210mm; }
+  .hoja { width: 215.9mm; min-height: 279.4mm; margin: 24px auto; background: #fff; box-shadow: 0 10px 30px -12px rgba(11,46,59,.35); display: flex; flex-direction: column; }
+  .hoja.apaisada { width: 279.4mm; min-height: 215.9mm; }
   .barra { position: sticky; top: 0; z-index: 2; display: flex; justify-content: center; gap: 10px; padding: 10px; background: rgba(230,237,240,.92); }
   .barra button { font: 700 13px 'Plus Jakarta Sans', Arial, sans-serif; color: #fff; background: linear-gradient(120deg, #0b2e3b, #0e7490 60%, #0891b2); border: 0; border-radius: 10px; padding: 10px 22px; cursor: pointer; }
 
@@ -115,13 +132,8 @@ const ESTILO = `
   .ffirma-nom { font-size: 12px; font-weight: 800; min-height: 16px; margin-top: 2px; }
   .ffirma-cargo { font-size: 10.5px; color: var(--texto2); min-height: 14px; }
 
-  @page { size: A4; margin: 0; }
-  @page apaisada { size: A4 landscape; margin: 0; }
+  ${ESTILO_IMPRESION}
   @media print {
-    body { background: #fff; }
-    .barra { display: none; }
-    .hoja { margin: 0; box-shadow: none; width: auto; min-height: 297mm; }
-    .hoja.apaisada { page: apaisada; min-height: 210mm; }
     .hoja.formal { min-height: 0; }
     .hoja.formal .sec-tit { break-after: avoid; }
   }
