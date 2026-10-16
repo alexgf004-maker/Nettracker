@@ -434,7 +434,7 @@ test.describe('Memos de préstamo y devolución', () => {
     app = await abrirApp(page, { datos: conAreas() });
     await cerrarAlerta(page);
     await nav(page, 'Equipos');
-    await expect(page.locator('.eq-grupo', { hasText: 'Con Campos y Servicios' })).toContainText('SN-108');
+    await expect(page.locator('.eq-grupo').filter({ has: page.locator('.eq-grupo-t', { hasText: 'Con Campos y Servicios' }) })).toContainText('SN-108');
     await expect(page.locator('.eq-grupo', { hasText: 'Prestados a otra área' })).toContainText('SN-103');
     await expect(page.locator('.eq-grupo', { hasText: 'En campo' })).toContainText('SN-104');
     // Buscar por viñeta
@@ -456,12 +456,13 @@ test.describe('Memos de préstamo y devolución', () => {
     await nav(page, 'Equipos');
     await page.getByRole('button', { name: 'Nuevo préstamo' }).click();
     await expect(page.locator('.memo-nuevo h2')).toHaveText('Nuevo memo');
-    // De CPT MT: disponibles SN-105 y SN-109 (Con detalles, se presta con aviso); los demás explican por qué no
-    await expect(page.locator('.memo-eq')).toHaveCount(2);
+    // De CPT MT: disponibles SN-105 y SN-109 (Con detalles, se presta con aviso) y los instalados (en campo también se
+    // prestan); los demás explican por qué no
+    await expect(page.locator('.memo-eq')).toHaveCount(4);
+    await expect(page.locator('.memo-eq', { hasText: 'En campo · #C-001' })).toHaveCount(1);
     await expect(page.locator('.memo-eq', { hasText: 'SN-109' })).toContainText('Con detalles');
     await page.locator('.memo-no summary').click();
     await expect(page.locator('.memo-no')).toContainText('Es de CPT BT');
-    await expect(page.locator('.memo-no')).toContainText('Instalado en #C-001');
     await expect(page.locator('.memo-no')).toContainText('Prestado a CPT BT');
     await page.locator('.memo-eq', { hasText: 'SN-105' }).click();
     await page.locator('.memo-eq', { hasText: 'SN-109' }).click();
@@ -472,8 +473,8 @@ test.describe('Memos de préstamo y devolución', () => {
     await expect(page.locator('.memo-sel-chip')).toHaveText(['SN-105×', 'SN-109×']);
     await page.getByRole('button', { name: /Ocultar equipos disponibles/ }).click();
     await expect(page.locator('.memo-eq')).toHaveCount(0);
-    await page.getByRole('button', { name: /Ver equipos disponibles \(3\)/ }).click(); // a Campos y Servicios también los de CPT BT
-    await expect(page.locator('.memo-eq')).toHaveCount(3);
+    await page.getByRole('button', { name: /Ver equipos disponibles \(6\)/ }).click(); // a Campos y Servicios también los de CPT BT (y los instalados)
+    await expect(page.locator('.memo-eq')).toHaveCount(6);
     await capturar(page);
     await page.getByRole('button', { name: 'Registrar y generar memo' }).click();
     const esc = await app.escrituras();
@@ -491,6 +492,29 @@ test.describe('Memos de préstamo y devolución', () => {
     await expect(page.locator('.memo-item')).toContainText('CPT MT → Campos y Servicios');
     await page.locator('.memo-item').getByRole('button', { name: 'Memo', exact: true }).click();
     await expect.poll(() => page.evaluate(() => window.__docs.length)).toBe(2);
+  });
+
+  test('un equipo instalado también se presta y se devuelve: queda el movimiento y no cambia su ubicación', async ({ page }) => {
+    app = await abrirApp(page);
+    const r = await page.evaluate(async () => {
+      const m = await import('/js/domain/inventario.js');
+      const regs = [{ equipoId: 'x', caso: 'C-9', retirado: false }];
+      const eq = { id: 'x', serie: 'S', area: 'CPT MT', sede: 'Plantel Central' };
+      const mov = { tipo: 'prestamo', de: 'CPT MT', a: 'CPT BT', fecha: '2026-10-16' };
+      const prestado = { ...eq, ...m.aplicarMovimiento(eq, mov, { instalado: true }) };
+      return {
+        puede: m.motivoNoPrestamo(eq, 'CPT MT', regs, 'CPT BT'), cambios: m.aplicarMovimiento(eq, mov, { instalado: true }),
+        otraVez: m.motivoNoPrestamo(prestado, 'CPT MT', regs, 'CPT BT'), devolver: m.motivoNoDevolucion(prestado, 'CPT BT', 'CPT MT', regs),
+        estado: m.estadoEquipo(prestado, regs).label, guardado: m.aplicarMovimiento(eq, mov).sede,
+      };
+    });
+    expect(r.puede).toBeNull();
+    expect(r.cambios).toMatchObject({ prestado: true, prestadoFecha: '2026-10-16' });
+    expect(r.cambios).not.toHaveProperty('sede');
+    expect(r.otraVez).toBe('Prestado a CPT BT');
+    expect(r.devolver).toBeNull();
+    expect(r.estado).toBe('En campo');
+    expect(r.guardado).toBeTruthy(); // sin instalar sí cambia de ubicación
   });
 
   test('a Campos y Servicios, CPT MT puede entregar equipos de la Cucumacayán (de CPT BT)', async ({ page }) => {

@@ -4,7 +4,7 @@
 // Con un equipo sale el memo individual; con varios, el memo de lote.
 import { isAdmin, userArea } from '../config.js';
 import { db, push, ref, update } from '../firebase.js';
-import { AREAS_DUENAS, aplicarMovimiento, CAMPOS, devolucionAlRetirar, motivoNoMovimiento, pendientesDevolverCampos, planOrdenar } from '../domain/inventario.js';
+import { AREAS_DUENAS, aplicarMovimiento, CAMPOS, devolucionAlRetirar, instalacionActiva, motivoNoMovimiento, pendientesDevolverCampos, planOrdenar } from '../domain/inventario.js';
 import { generateLotePDF, generateMemoPDF } from '../pdf/memos.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
@@ -86,7 +86,7 @@ export function confirmarMemoNuevo() {
     equipos: equipos.map(eq => ({ id: eq.id, serie: eq.serie, modelo: eq.modelo || '', vineta: eq.vineta || '', condicion: eq.condicion || 'bueno' })) };
   const { key: memoId } = push(ref(db, 'memosEquipos'), memo);
   const mov = { tipo: m.tipo, de: m.de, a: m.a, fecha, nota, registradoPor: por, memoId };
-  equipos.forEach(eq => update(ref(db, 'equipos/' + eq.id), aplicarMovimiento(eq, mov)));
+  equipos.forEach(eq => update(ref(db, 'equipos/' + eq.id), aplicarMovimiento(eq, mov, { instalado: !!instalacionActiva(eq, state.records) })));
   imprimirMemo(memo);
   showToast(`${m.tipo === 'prestamo' ? 'Préstamo' : 'Devolución'} registrado${equipos.length > 1 ? ` para ${equipos.length} equipos` : ''}`);
   state.memoNuevo = null; state.view = 'lista'; state.editEqId = null; state.invVista = 'memos';
