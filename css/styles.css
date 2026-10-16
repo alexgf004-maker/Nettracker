@@ -1753,3 +1753,11 @@ button.aviso-inicio-fila { cursor: pointer; }
 .lev-kva { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; }
 .lev-kva .b { justify-content: center; padding: 10px 0; }
 .lev-trafo-otro { margin-top: 10px; }
+/* Firmas en pantalla de los memos */
+.memo-item-btns { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+.btn-firmas.firmas-ok { color: #15803d; border-color: #86efac; }
+.firmas-memo { display: flex; flex-direction: column; gap: 14px; margin-bottom: 12px; }
+.firma-memo { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.firma-memo-k { display: flex; flex-direction: column; margin-bottom: 6px; }
+.firma-memo-k span { font-size: 12px; color: var(--text3); }
+.modal-firma { z-index: 1200; }

@@ -185,8 +185,20 @@ export const movimiento = (origen, destino, claseDestino = 'dest') => {
 
 export const texto = (contenido, falla = false) => `<div class="texto${falla ? ' falla' : ''}">${contenido}</div>`;
 
-// firmas: [{ eti, nom, sub }]
+// firmas: [{ eti, nom, sub, firma }]; firma = { img, nombre } si se firmó en pantalla (sin ella queda la línea para firmar
+// a mano). La imagen va con estilo en línea para que también entre en los memos guardados como HTML (despachos).
+const imgFirma = src => (!/^data:image\/(png|jpeg);base64,[\w+/=]+$/.test(String(src)) ? '' : `<img src="${src}" alt="Firma" style="display:block;max-height:54px;max-width:85%;margin:-56px auto 2px">`);
+const firmo = f => (f?.nombre ? `<div class="firma-sub">Firmó: ${String(f.nombre).replace(/&/g, '&amp;').replace(/</g, '&lt;')}</div>` : '');
 export const firmas = lista =>
-  `<div class="firmas" style="--cols:${lista.length}">${lista.map(f => `<div class="firma"><div class="firma-linea"><div class="firma-eti">${f.eti}</div><div class="firma-nom">${f.nom || '&nbsp;'}</div>${f.sub ? `<div class="firma-sub">${f.sub}</div>` : ''}</div></div>`).join('')}</div>`;
+  `<div class="firmas" style="--cols:${lista.length}">${lista.map(f => `<div class="firma">${f.firma?.img ? imgFirma(f.firma.img) : ''}<div class="firma-linea"><div class="firma-eti">${f.eti}</div><div class="firma-nom">${f.nom || '&nbsp;'}</div>${f.sub ? `<div class="firma-sub">${f.sub}</div>` : ''}${firmo(f.firma)}</div></div>`).join('')}</div>`;
+
+// Pone las firmas en un memo ya guardado como HTML: en orden, en cada recuadro de firma (lista: [firma | null])
+export function ponerFirmas(html, lista) {
+  let i = 0;
+  return String(html).replace(/<div class="firma"><div class="firma-linea">([\s\S]*?)<\/div><\/div>/g, (todo, dentro) => {
+    const f = lista[i++];
+    return f?.img ? `<div class="firma">${imgFirma(f.img)}<div class="firma-linea">${dentro}${firmo(f)}</div></div>` : todo;
+  });
+}
 
 export const cuenta = (n, palabra = 'equipos') => `<span class="cuenta">${n} ${palabra}</span>`;
