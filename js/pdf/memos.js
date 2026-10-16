@@ -34,8 +34,8 @@ export function generateLotePDF(equiposLote, tipo) {
         <tbody>${filas}</tbody></table></div>`, cuenta(equiposLote.length))
     + (mov0.nota ? seccion('Observaciones', texto(e(mov0.nota))) : '')
     + seccion('Firmas de conformidad', firmas([
-      { eti: 'Entrega', nom: e(de), sub: areaRegistro === de ? e(registrado) : '' },
-      { eti: 'Recibe', nom: e(a), sub: areaRegistro === a ? e(registrado) : '' },
+      { eti: 'Entrega', nom: e(de), sub: areaRegistro === de ? e(registrado) : '', firma: mov0.firmas?.entrega },
+      { eti: 'Recibe', nom: e(a), sub: areaRegistro === a ? e(registrado) : '', firma: mov0.firmas?.recibe },
     ]));
 
   abrirDoc(docMemo({
@@ -64,8 +64,8 @@ export function generateMemoPDF(eq, mov) {
     + seccion('Movimiento', bloqueMovimiento({ eti: 'Área que entrega', val: e(de) }, { eti: 'Área que recibe', val: e(a) }))
     + (mov.nota ? seccion('Observaciones', texto(e(mov.nota))) : '')
     + seccion('Firmas de conformidad', firmas([
-      { eti: 'Entrega', nom: e(de), sub: firmaDe },
-      { eti: 'Recibe', nom: e(a), sub: firmaA },
+      { eti: 'Entrega', nom: e(de), sub: firmaDe, firma: mov.firmas?.entrega },
+      { eti: 'Recibe', nom: e(a), sub: firmaA, firma: mov.firmas?.recibe },
     ]));
 
   abrirDoc(docMemo({
@@ -185,9 +185,9 @@ export function generateMemoDanio(m) {
       dato('Técnico de Campos y Servicios', e(m.tecnicoCampos)),
     ]))
     + seccion('Firmas de conformidad', firmas([
-      { eti: e(m.areaGenera || 'CPT MT'), nom: e(m.generadoPor), sub: 'CPT INNOVA' },
-      { eti: 'Subestación Cucumacayán', nom: '', sub: 'Recibe el equipo' },
-      { eti: 'Campos y Servicios', nom: '', sub: 'Contratista' },
+      { eti: e(m.areaGenera || 'CPT MT'), nom: e(m.generadoPor), sub: 'CPT INNOVA', firma: m.firmas?.cpt },
+      { eti: 'Subestación Cucumacayán', nom: '', sub: 'Recibe el equipo', firma: m.firmas?.cucumacayan },
+      { eti: 'Campos y Servicios', nom: '', sub: 'Contratista', firma: m.firmas?.campos },
     ]));
 
   abrirDoc(docMemo({

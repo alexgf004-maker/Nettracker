@@ -9,6 +9,7 @@ import { equiposMedicion, normalizarInspeccion } from '../domain/inspeccion.js';
 import { hoyLocal } from '../domain/trabajo.js';
 import { state } from '../state.js';
 import { escapeHtml } from '../utils.js';
+import { modalFirma } from './firma.js';
 
 const esc = s => escapeHtml(s ?? '');
 const aObj = arr => Object.fromEntries(arr.map(x => [x, x]));
@@ -135,15 +136,7 @@ export function vistaInspeccion(e) {
       <div class="barra-acciones"><button class="b b-g" onclick="abrirFirma('${e.id}', '${rol}')">${f.img ? 'Firmar de nuevo' : 'Firmar en pantalla'}</button>${f.img ? `<button class="b b-l" onclick="borrarFirma('${e.id}', '${rol}')">Quitar firma</button>` : ''}</div></div>`;
   }).join('')}</div>`);
   html += `<div class="barra-acciones">${botonPDF}</div>`;
-  if (state.firmaInsp?.id === e.id) html += modalFirma();
+  if (state.firmaInsp?.id === e.id) html += modalFirma(ROLES_FIRMA[state.firmaInsp.rol]);
   return html;
 }
 
-// Recuadro para firmar con el dedo
-function modalFirma() {
-  const { rol } = state.firmaInsp;
-  return `<div class="modal-overlay"><div class="modal hoja"><div class="modal-head"><div><div class="modal-titulo">Firma</div><div class="page-sub">${esc(ROLES_FIRMA[rol])}</div></div><button class="modal-cerrar" onclick="cerrarFirma()" title="Cerrar">✕</button></div>
-    <canvas id="firma-canvas" class="firma-canvas" width="600" height="240" onpointerdown="firmaInicio(event)" onpointermove="firmaMover(event)" onpointerup="firmaFin(event)" onpointerleave="firmaFin(event)"></canvas>
-    <div class="page-sub" style="margin:6px 0 10px">Firma con el dedo dentro del recuadro.</div>
-    <div class="barra-acciones"><button class="b b-p" onclick="guardarFirma()"><i class="ic ic-check"></i> Guardar firma</button><button class="b b-g" onclick="limpiarFirma()">Borrar y repetir</button></div></div></div>`;
-}

@@ -489,7 +489,7 @@ test.describe('Memos de préstamo y devolución', () => {
     for (const t of ['Préstamo de lote', 'SN-105', 'SN-109', 'Campaña de octubre', 'Con detalles']) expect(doc).toContain(t);
     // Queda en Memos para reimprimirlo
     await expect(page.locator('.memo-item')).toContainText('CPT MT → Campos y Servicios');
-    await page.locator('.memo-item').getByRole('button', { name: 'Memo' }).click();
+    await page.locator('.memo-item').getByRole('button', { name: 'Memo', exact: true }).click();
     await expect.poll(() => page.evaluate(() => window.__docs.length)).toBe(2);
   });
 
@@ -1087,6 +1087,81 @@ test('planilla en cualquier instalación: se completa sola si el código está e
   await expect.poll(async () => (await docs()).length).toBe(1);
   const html = (await docs())[0];
   for (const t of ['C-900', 'EMPRESA MANUAL', '555', 'KM 5 CARRETERA', 'MED-555', '>M</td><td class="bt bb bl br x">X</td>']) expect(html).toContain(t);
+});
+
+test('memos firmados en pantalla: préstamo, despacho a Campos y equipo dañado; las que faltan quedan para firmar a mano', async ({ page }) => {
+  const d = JSON.parse(JSON.stringify(fixture));
+  d.memosEquipos = { m1: { tipo: 'prestamo', de: 'CPT MT', a: 'Campos y Servicios', fecha: '2026-09-20', hora: '08:00', nota: '', registradoPor: 'David García', equipos: [{ id: 'e6', serie: 'SN-106', modelo: 'PQ-1', vineta: 'V6', condicion: 'bueno' }] } };
+  d.analizadores.r6.memoDanio = { fecha: '2026-09-15', hora: '10:00', fechaDanio: '2026-09-12', descripcion: 'No enciende', condicion: 'fuera',
+    tecnicoCampos: '', generadoPor: 'David García', areaGenera: 'CPT MT', serie: 'SN-106', modelo: 'PQ-1', caso: 'C-006', lugar: 'Zaragoza', fechaRetiro: '2026-09-10' };
+  app = await abrirApp(page, { datos: d });
+  await cerrarAlerta(page);
+  // El memo del despacho se guarda como HTML (con los recuadros de firma de memo-base)
+  const memoDespacho = await page.evaluate(async () => {
+    const { firmas } = await import('/js/pdf/memo-base.js');
+    return `<html><body><table><tbody><tr><td>1</td></tr></tbody></table>${firmas([{ eti: 'Entrega', nom: 'CPT MT' }, { eti: 'Recibe', nom: 'Campos y Servicios' }])}</body></html>`;
+  });
+  await app.ejecutar(async html => { const { db, ref, set } = await import('/js/firebase.js'); set(ref(db, 'historialCargas/hc1/memo'), html); }, memoDespacho);
+  await page.evaluate(() => { window.__docs = []; const crear = URL.createObjectURL.bind(URL); URL.createObjectURL = b => { b.text().then(t => window.__docs.push(t)); return crear(b); }; });
+  const docs = () => page.evaluate(() => window.__docs);
+  const firmar = async nombre => {
+    if (nombre) await page.locator('#firma-nombre').fill(nombre);
+    const c = await page.locator('#firma-canvas').boundingBox();
+    await page.mouse.move(c.x + 40, c.y + 60); await page.mouse.down();
+    await page.mouse.move(c.x + 200, c.y + 90, { steps: 8 }); await page.mouse.move(c.x + 300, c.y + 40, { steps: 8 }); await page.mouse.up();
+    await page.getByRole('button', { name: 'Guardar firma' }).click();
+  };
+
+  // 1. Préstamo: firma quien entrega; quien recibe queda en blanco
+  await nav(page, 'Equipos');
+  await page.getByRole('button', { name: /^Memos/ }).click();
+  await expect(page.locator('.memo-item .btn-firmas')).toHaveText('Firmas 0/2');
+  await page.locator('.memo-item .btn-firmas').click();
+  const ventana = page.locator('.modal', { hasText: 'Firmas del memo' });
+  await expect(ventana).toContainText('Préstamo · CPT MT → Campos y Servicios');
+  await ventana.locator('.firma-memo', { hasText: 'Entrega' }).getByRole('button', { name: 'Firmar en pantalla' }).click();
+  await firmar('David García');
+  const esc = await app.escrituras();
+  const w = esc.find(([op, ruta]) => op === 'update' && ruta === 'memosEquipos/m1/firmas/entrega');
+  expect(w[2]).toMatchObject({ nombre: 'David García', img: expect.stringMatching(/^data:image\/png;base64,/), por: 'David García' });
+  await expect(ventana.locator('.firma-memo', { hasText: 'Entrega' }).locator('img')).toHaveCount(1);
+  await expect(ventana.locator('.firma-memo', { hasText: 'Recibe' })).toContainText('Sin firma');
+  await ventana.getByRole('button', { name: 'Ver memo con las firmas' }).click();
+  await expect.poll(async () => (await docs()).length).toBe(1);
+  let html = (await docs())[0];
+  expect(html.match(/<img src="data:image\/png;base64,[^"]+" alt="Firma"/g)).toHaveLength(1);
+  expect(html).toContain('Firmó: David García');
+  await page.locator('.modal', { hasText: 'Firmas del memo' }).locator('.modal-cerrar').click();
+  await expect(page.locator('.memo-item .btn-firmas')).toHaveText('Firmas 1/2');
+
+  // 2. Despacho a Campos y Servicios: firma quien recibe y la firma entra al memo guardado
+  await nav(page, 'Despachos');
+  await app.ejecutar(() => setCargaSubView('historial'));
+  await page.locator('.btn-firmas').first().click();
+  await page.locator('.firma-memo', { hasText: 'Recibe' }).getByRole('button', { name: 'Firmar en pantalla' }).click();
+  await firmar('Técnico de Campos');
+  await page.getByRole('button', { name: 'Ver memo con las firmas' }).click();
+  await expect.poll(async () => (await docs()).length).toBe(2);
+  html = (await docs())[1];
+  expect(html.match(/alt="Firma"/g)).toHaveLength(1);
+  expect(html.indexOf('alt="Firma"')).toBeGreaterThan(html.indexOf('Entrega')); // en el segundo recuadro (Recibe)
+  expect(html).toContain('Firmó: Técnico de Campos');
+  // Quitar la firma: vuelve la línea para firmar a mano
+  page.once('dialog', dl => dl.accept());
+  await page.locator('.firma-memo', { hasText: 'Recibe' }).getByRole('button', { name: 'Quitar firma' }).click();
+  expect(await app.escrituras()).toContainEqual(['remove', 'historialCargas/hc1/firmas/recibe']);
+  await page.locator('.modal', { hasText: 'Firmas del memo' }).locator('.modal-cerrar').click();
+
+  // 3. Equipo dañado: tres firmas
+  await app.ejecutar(() => { switchTab('instalaciones'); openDetail('r6'); });
+  await expect(page.locator('.btn-firmas')).toHaveText('Firmas 0/3');
+  await page.locator('.btn-firmas').click();
+  await page.locator('.firma-memo', { hasText: 'Subestación Cucumacayán' }).getByRole('button', { name: 'Firmar en pantalla' }).click();
+  await firmar('');
+  expect((await app.escrituras()).find(([op, ruta]) => ruta === 'analizadores/r6/memoDanio/firmas/cucumacayan')[2]).toMatchObject({ nombre: null });
+  await page.getByRole('button', { name: 'Ver memo con las firmas' }).click();
+  await expect.poll(async () => (await docs()).length).toBe(3);
+  expect((await docs())[2].match(/alt="Firma"/g)).toHaveLength(1);
 });
 
 test.describe('Firma de quien genera el memo', () => {

@@ -4,6 +4,7 @@ import { AREAS_DUENAS, AREAS_MOVIMIENTO, CAMPOS, coincideBusqueda, estadoEquipo,
 import { state } from '../state.js';
 import { escapeHtml, fmtDate } from '../utils.js';
 import { heroSeccion } from './componentes.js';
+import { botonFirmas } from './firma.js';
 
 const esc = s => escapeHtml(s ?? '');
 const COLOR = { disponible: 'verde', prestado: 'azul', campo: 'ambar', mantenimiento: 'morado', fuera: 'rojo' };
@@ -97,7 +98,7 @@ function renderMemosEquipos() {
         <div class="memo-item-sub">${fmtDate(m.fecha)}${m.hora ? ' · ' + esc(m.hora) : ''} · ${n} ${n === 1 ? 'equipo' : 'equipos'} · ${esc(m.registradoPor || '')}</div>
         <div class="memo-item-series">${(m.equipos || []).map(e => esc(e.serie)).join(', ')}</div>
         ${m.nota ? `<div class="memo-item-nota">${esc(m.nota)}</div>` : ''}
-      </div><button class="b b-g" onclick="reimprimirMemoEquipos('${m.id}')"><i class="ic ic-archivo"></i> Memo</button></div>`;
+      </div><div class="memo-item-btns"><button class="b b-g" onclick="reimprimirMemoEquipos('${m.id}')"><i class="ic ic-archivo"></i> Memo</button>${botonFirmas('equipos', m)}</div></div>`;
   }).join('') + '</div>';
 }
 

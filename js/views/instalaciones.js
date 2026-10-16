@@ -4,6 +4,7 @@ import { state } from '../state.js';
 import { badgeSt } from '../ui.js';
 import { calcSt, daysUntil, fmtDate, today } from '../utils.js';
 import { heroSeccion } from './componentes.js';
+import { botonFirmas } from './firma.js';
 import { avisoRemedicionHTML } from './ft.js';
 import { descargable } from '../actions/descargas.js';
 import { planillaDisponible } from '../actions/planilla.js';
@@ -301,7 +302,7 @@ export function renderInstalaciones() {
           <button class="btn btn-danger" onclick="openRetiroModal('${r.id}')">Marcar como retirado</button>
         ` : ''}
         ${r.areaInstalacion === 'Campos y Servicios' && r.equipoId ? (r.memoDanio
-          ? `<div style="display:flex;gap:8px"><button class="btn" style="flex:2;background:#fef2f2;color:#dc2626;border:1px solid #dc2626" onclick="memoDanio('${r.id}')"><i class=ic-archivo></i> Ver memo de equipo dañado</button><button class="btn" style="flex:1;background:var(--white);color:#dc2626;border:1px solid #dc2626" onclick="editarDanio('${r.id}')"><i class=ic-editar></i> Editar</button></div>`
+          ? `<div style="display:flex;gap:8px"><button class="btn" style="flex:2;background:#fef2f2;color:#dc2626;border:1px solid #dc2626" onclick="memoDanio('${r.id}')"><i class=ic-archivo></i> Ver memo de equipo dañado</button>${botonFirmas('danio', r.memoDanio, r.id)}<button class="btn" style="flex:1;background:var(--white);color:#dc2626;border:1px solid #dc2626" onclick="editarDanio('${r.id}')"><i class=ic-editar></i> Editar</button></div>`
           : `<button class="btn" style="background:#fef2f2;color:#dc2626;border:1px solid #dc2626" onclick="openDanioModal('${r.id}')"><i class=ic-archivo-editar></i> Memo de equipo dañado</button>`) : ''}
         ${isAdmin() ? `<div style="text-align:center;margin-top:4px">
           <button onclick="delInstall('${r.id}')" style="background:none;border:none;font-family:var(--font);font-size:12px;color:var(--text3);cursor:pointer;padding:6px 12px;text-decoration:underline">Eliminar registro</button>

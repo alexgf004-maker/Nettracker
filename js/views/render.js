@@ -8,6 +8,7 @@ import { renderDescargaBloque } from './descargas.js';
 import { renderAyudaInstalar, renderBottomNav, renderHeader } from './layout.js';
 import { renderLogin, renderMantenimiento } from './login.js';
 import { renderMapa } from './mapa.js';
+import { modalFirma, renderFirmasMemo } from './firma.js';
 import { ftParaAviso, retirosParaAviso, renderAlertaRetiros, renderCondicionModal, renderDescargaModal, renderGlobalSearch, renderImportModal, renderMantModal, renderDanioModal, renderRetiroModal, renderRevisionModal, renderSelectorModal } from './modals.js';
 import { renderCasoModal, renderConfigCartas, renderDocsModal, renderImportListados } from './casos.js';
 import { renderEquipoFechaModal, renderProgramacionModal } from './fechas.js';
@@ -88,6 +89,8 @@ export function render() {
   if (state.equipoFecha) html += renderEquipoFechaModal();
   if (state.importMult) html += renderImportMultModal();
   if (state.resultadoEdit) html += renderResultadoModal();
+  if (state.firmasMemo) html += renderFirmasMemo();
+  if (state.firmaInsp?.memo) html += modalFirma(state.firmaInsp.memo.sub, { nombre: state.firmaInsp.memo.nombre });
   if (state.analisisTXT) html += renderAnalisisModal();
   if (state.ftEdit) html += renderFTModal();
   if (state.showConfigCartas) html += renderConfigCartas();

@@ -88,7 +88,9 @@ export function guardarFirma() {
   const f = state.firmaInsp; const c = lienzo(); if (!f || !c) return;
   if (!f.trazos.some(t => t.length)) return showToast('Firma dentro del recuadro');
   dibujar(c);
-  update(ref(db, rutaBase(f.id)), { [`firmas/${f.rol}/img`]: c.toDataURL('image/png') });
+  // El mismo recuadro firma los memos (firmas-memo.js): ahí se guarda también quién firmó
+  if (f.memo) update(ref(db, f.memo.base), { img: c.toDataURL('image/png'), nombre: document.getElementById('firma-nombre')?.value.trim() || null, fecha: hoyLocal(), por: state.sesionUsuario?.nombre || '' });
+  else update(ref(db, rutaBase(f.id)), { [`firmas/${f.rol}/img`]: c.toDataURL('image/png') });
   state.firmaInsp = null;
   showToast('Firma guardada');
   render();

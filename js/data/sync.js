@@ -34,7 +34,7 @@ export function iniciarSync() {
     snap.forEach(c => {
       const v = c.val();
       // Only load metadata - NOT memo HTML (too heavy for listener)
-      state.historialCargas.push({ id: c.key, fecha: v.fecha, hora: v.hora, areaOrigen: v.areaOrigen, total: v.total, realizadoPor: v.realizadoPor });
+      state.historialCargas.push({ id: c.key, fecha: v.fecha, hora: v.hora, areaOrigen: v.areaOrigen, total: v.total, realizadoPor: v.realizadoPor, firmas: v.firmas || null });
     });
     state.historialCargas.sort((a, b) => ((b.fecha||'')+' '+(b.hora||'')).localeCompare((a.fecha||'')+' '+(a.hora||'')));
     render();

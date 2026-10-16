@@ -5,6 +5,7 @@ import { db, get, ref, remove, update } from '../firebase.js';
 import { state } from '../state.js';
 import { abrirDoc, abrirMemo, showToast } from '../ui.js';
 import { buildMemoAccesorios } from '../pdf/memos.js';
+import { ponerFirmas } from '../pdf/memo-base.js';
 import { today } from '../utils.js';
 import { devolucionAlRetirar } from '../domain/inventario.js';
 import { render } from '../views/render.js';
@@ -29,7 +30,8 @@ window.cancelarCarga = () => { state.cargaData = []; state.cargaView = 'upload';
 
 window.verMemo = id => {
   get(ref(db, 'historialCargas/' + id + '/memo')).then(snap => {
-    if (snap.exists()) abrirMemo(snap.val());
+    const f = state.historialCargas.find(x => x.id === id)?.firmas || {};
+    if (snap.exists()) abrirMemo(ponerFirmas(snap.val(), [f.entrega, f.recibe]));
     else showToast('Memo no disponible');
   }).catch(() => showToast('Error al cargar memo'));
 };

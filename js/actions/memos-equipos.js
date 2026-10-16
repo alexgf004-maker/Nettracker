@@ -95,7 +95,7 @@ export function confirmarMemoNuevo() {
 
 // Abre el memo guardado (individual si es un equipo, de lote si son varios)
 export function imprimirMemo(memo) {
-  const mov = { tipo: memo.tipo, de: memo.de, a: memo.a, fecha: memo.fecha, nota: memo.nota, registradoPor: memo.registradoPor };
+  const mov = { tipo: memo.tipo, de: memo.de, a: memo.a, fecha: memo.fecha, nota: memo.nota, registradoPor: memo.registradoPor, firmas: memo.firmas };
   const items = (memo.equipos || []).map(eq => ({ eq, movimiento: mov }));
   if (items.length === 1) generateMemoPDF(items[0].eq, mov);
   else generateLotePDF(items, memo.tipo);

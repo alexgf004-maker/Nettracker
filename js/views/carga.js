@@ -3,6 +3,7 @@ import { AREAS, isAdmin } from '../config.js';
 import { state } from '../state.js';
 import { fmtDate } from '../utils.js';
 import { heroSeccion } from './componentes.js';
+import { botonFirmas } from './firma.js';
 
 export function renderCarga() {
   let html = '';
@@ -43,6 +44,7 @@ export function renderCarga() {
 
         html += '<div style="display:flex;gap:6px;margin-bottom:6px">';
         html += '<button onclick="verMemo(\''+c.id+'\')" style="flex:1;padding:9px;border:1px solid var(--primary);border-radius:8px;background:var(--primary-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer"><i class=ic-archivo></i> Ver memo</button>';
+        html += botonFirmas('despacho', c);
         html += '<button onclick="emailDespacho(\''+c.id+'\')" style="flex-shrink:0;padding:9px 12px;border:1px solid var(--accent);border-radius:8px;background:var(--accent-light);color:var(--primary);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer"><i class=ic-correo></i></button>';
         html += '</div>';
         html += '<button onclick="gestionarRetiro(\''+c.id+'\')" style="width:100%;padding:9px;border:1px solid var(--yellow);border-radius:8px;background:var(--yellow-light);color:var(--yellow);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;margin-bottom:6px"><i class=ic-equipos></i> Gestionar retiro</button>';

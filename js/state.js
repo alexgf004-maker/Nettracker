@@ -57,7 +57,8 @@ export const state = {
   reclamos: {}, // reclamos/{id}: expedientes de reclamo creados a mano
   expedienteId: null, // expediente abierto en la pestaña Reclamos
   expedienteVista: 'mediciones', // datos | inspeccion | mediciones | seguimiento
-  firmaInsp: null, // { id, rol, trazos } mientras se firma la inspección en pantalla
+  firmaInsp: null, // { id, rol, trazos } mientras se firma la inspección en pantalla (con memo: { base, sub, nombre } si es un memo)
+  firmasMemo: null, // { tipo: 'equipos' | 'despacho' | 'danio', id } ventana de firmas de un memo
   puntoReclamo: null, // { id, n, nombre } agregar un punto de medición al reclamo
   nuevoReclamo: null, // { texto, datos } formulario de Nuevo reclamo
   graficar: null, // pestaña Graficar: análisis rápido de un TXT sin guardar
