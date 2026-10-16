@@ -3,6 +3,8 @@
 // - Quién lo tiene: si está prestado, el área del último préstamo; si no, su área dueña.
 // - Se pueden prestar los que están en Bueno o Con detalles (con aviso); no los de mantenimiento o fuera de servicio.
 // - Un equipo despachado a Campos y Servicios se devuelve solo al retirarse de campo.
+// - Un equipo instalado también se presta o se devuelve (pedido del equipo: a veces se instala antes de hacer el memo):
+//   queda registrado el movimiento, sigue instalado en su caso y su ubicación no cambia hasta que se retire.
 import { areaToSede } from '../utils.js';
 
 export const AREAS_DUENAS = ['CPT MT', 'CPT BT'];
@@ -31,9 +33,9 @@ export function estadoEquipo(eq, registros) {
 export function motivoNoPrestamo(eq, de, registros, a = '') {
   if (!eq.area) return 'Sin área asignada';
   if (eq.area !== de && a !== CAMPOS) return `Es de ${eq.area}`;
+  if (eq.prestado) { const t = tenedor(eq); return t === CAMPOS ? 'Con Campos y Servicios' : `Prestado a ${t}`; }
+  if (instalacionActiva(eq, registros)) return null; // en campo sí se presta
   const e = estadoEquipo(eq, registros);
-  if (e.clave === 'campo') return `Instalado en #${e.inst.caso || '?'}`;
-  if (e.clave === 'prestado') return e.label;
   if (e.clave === 'fuera' || e.clave === 'mantenimiento') return e.label;
   return null;
 }
@@ -41,8 +43,6 @@ export function motivoNoPrestamo(eq, de, registros, a = '') {
 // Por qué no se puede devolver de `de` a `para` (null = sí se puede)
 export function motivoNoDevolucion(eq, de, para, registros) {
   if (!eq.prestado) return 'No está prestado';
-  const inst = instalacionActiva(eq, registros);
-  if (inst) return `Instalado en #${inst.caso || '?'}`;
   const t = tenedor(eq);
   if (t !== de) return `Lo tiene ${t}`;
   if (!eq.area) return 'Sin área asignada';
@@ -59,13 +59,13 @@ export function sedeDespues({ tipo, de, a }) {
   return areaToSede(a);
 }
 
-// Datos que cambian en el equipo al registrar el movimiento
-export function aplicarMovimiento(eq, mov) {
+// Datos que cambian en el equipo al registrar el movimiento (instalado: la ubicación no cambia hasta que se retire)
+export function aplicarMovimiento(eq, mov, { instalado = false } = {}) {
   const movimientos = [...(eq.movimientos || []), mov];
-  const sede = sedeDespues(mov);
+  const sede = instalado ? {} : { sede: sedeDespues(mov) };
   return mov.tipo === 'prestamo'
-    ? { prestado: true, prestadoFecha: mov.fecha, sede, movimientos }
-    : { prestado: false, prestadoFecha: null, sede, movimientos };
+    ? { prestado: true, prestadoFecha: mov.fecha, ...sede, movimientos }
+    : { prestado: false, prestadoFecha: null, ...sede, movimientos };
 }
 
 // Al retirar de campo: si el equipo estaba con Campos y Servicios, la devolución a su área se registra sola.

@@ -12,7 +12,7 @@ const COLOR = { disponible: 'verde', prestado: 'azul', campo: 'ambar', mantenimi
 // Tarjeta de un equipo en la lista
 function tarjetaEquipo(eq, est) {
   const pend = state.records.some(r => r.equipoId === eq.id && r.retirado && r.descargaPendiente);
-  const linea = est.clave === 'campo' ? `<i class="ic ic-antena"></i> #${esc(est.inst.caso)} · ${esc(est.inst.lugar || '')}`
+  const linea = est.clave === 'campo' ? `<i class="ic ic-antena"></i> #${esc(est.inst.caso)} · ${esc(est.inst.lugar || '')}${eq.prestado ? ` · ${esc(est.tenedor === CAMPOS ? 'Con Campos y Servicios' : `Prestado a ${est.tenedor}`)}` : ''}`
     : est.clave === 'prestado' ? `<i class="ic ic-repetir"></i> ${esc(est.label)}${eq.prestadoFecha ? ' desde ' + fmtDate(eq.prestadoFecha) : ''}`
       : esc(eq.sede || 'Plantel Central');
   return `<button class="eq-item ${COLOR[est.clave]}" onclick="openEqDetalle('${eq.id}')">
@@ -135,9 +135,10 @@ export function renderMemoNuevo() {
         <button class="btn-link memo-todos" onclick="seleccionarTodosMemo(${esc(JSON.stringify(elegibles.map(x => x.eq.id)))})">${todosSel ? 'Quitar todos' : 'Elegir todos'}</button></div>`;
     if (abierta) html += '<div class="memo-eqs">' + elegibles.map(({ eq }) => {
       const sel = m.sel.includes(eq.id);
+      const inst = state.records.find(r => r.equipoId === eq.id && !r.retirado);
       return `<button class="memo-eq ${sel ? 'sel' : ''}" onclick="toggleEquipoMemo('${eq.id}')"><span class="memo-check">${sel ? '<i class="ic ic-check"></i>' : ''}</span>
         <span class="memo-eq-main"><b>${esc(eq.serie)}</b>${eq.vineta ? ` · ${esc(eq.vineta)}` : ''}<small>${esc(eq.modelo || '')}${eq.area !== m.de && esPrestamo ? ` · de ${esc(eq.area)} (${esc(eq.sede || '')})` : ''}${!esPrestamo && eq.prestadoFecha ? ' · prestado desde ' + fmtDate(eq.prestadoFecha) : ''}</small></span>
-        ${(eq.condicion || 'bueno') === 'detalles' ? '<span class="tg ambar">Con detalles</span>' : ''}</button>`;
+        ${inst ? `<span class="tg ambar">En campo · #${esc(inst.caso || '?')}</span>` : ''}${(eq.condicion || 'bueno') === 'detalles' ? '<span class="tg ambar">Con detalles</span>' : ''}</button>`;
     }).join('') + '</div>';
     html += '</div>';
   }
