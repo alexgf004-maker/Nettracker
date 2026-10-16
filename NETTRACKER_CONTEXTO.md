@@ -494,7 +494,7 @@ Cuando un equipo asignado falla, la Subestación Cucumacayán es el primer filtr
 - Caja "Recibe": queda en blanco para firma manual del receptor
 - En el memo de lote, el nombre de quien registró va bajo la firma de su área (igual que en el de un equipo)
 
-**Diseño de los memos** (`js/pdf/memo-base.js`): todos usan `docMemo()`, una hoja A4 con el encabezado degradado petróleo → turquesa de la app (rojo en equipo dañado), una franja de datos clave (fecha, equipo, quién registra), secciones con título turquesa, datos en cuadrícula, caja origen → destino, firmas y pie. Botón "Imprimir o guardar PDF" (no sale impreso). El de asignación (carga masiva) va en A4 horizontal y compacto por la cantidad de columnas. En celular la hoja se acomoda en una columna.
+**Diseño de los memos** (`js/pdf/memo-base.js`): todos usan `docMemo()`, una hoja carta con el encabezado degradado petróleo → turquesa de la app (rojo en equipo dañado), una franja de datos clave (fecha, equipo, quién registra), secciones con título turquesa, datos en cuadrícula, caja origen → destino, firmas y pie. Botón "Imprimir o guardar PDF" (no sale impreso). El de asignación (carga masiva) va en carta horizontal y compacto por la cantidad de columnas. Al imprimir: carta con márgenes de 12 mm y el encabezado dentro de ellos con esquinas redondeadas (`ESTILO_IMPRESION`; pedido del equipo: antes iba en A4 a sangre y al imprimir o guardar el PDF desde el celular se veía cortado en los bordes). A los despachos ya guardados como HTML se les pone el mismo estilo al abrirlos. En celular la hoja se acomoda en una columna.
 
 ---
 
