@@ -30,7 +30,7 @@ js/
   config.js              Constantes: SEDES, TECNICOS, AREAS, USUARIOS, CONDICIONES, isAdmin()
   utils.js               Funciones puras: fechas, calcSt(), eqSt(), formularios vacíos
   ui.js                  showToast(), badges, abrirDoc()/descargarDoc(), tema, monitor de conexión
-  data/sync.js           Listeners onValue() de Firebase → actualizan `state` y llaman render()
+  data/sync.js           Listeners onValue() de Firebase → actualizan `state` y llaman render(); al entrar se espera a que llegue el primer dato de todos los nodos (`state.datosListos`, máximo 8 s) con el "Cargando…", para que el inicio y el aviso no parpadeen
   domain/                Reglas del trabajo, funciones puras (sin Firebase ni estado)
     trabajo.js           Tipo de caso (campaña/reclamo/requerimiento), periodo, plazos, urgencia
     pendientes.js        Lista de pendientes del Inicio (vencido / hoy / próximos días / por hacer)

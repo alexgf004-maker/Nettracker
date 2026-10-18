@@ -14,12 +14,23 @@ function render() {
 
 // Cada listener actualiza su arreglo en el estado y vuelve a renderizar.
 // Se inicia al entrar (las reglas de la base no dejan leer sin sesión) y se detiene al cerrar sesión.
+// Al entrar se espera a que llegue todo (cada nodo llega por su lado): antes la pantalla de inicio y el aviso se
+// dibujaban con lo que hubiera llegado y cambiaban varias veces (parpadeo). Si algo no llega en 8 s se muestra igual.
 let activos = null;
-export function detenerSync() { (activos || []).forEach(off => off()); activos = null; }
+let esperaDatos = null;
+export function detenerSync() { (activos || []).forEach(off => off()); activos = null; clearTimeout(esperaDatos); }
 export function iniciarSync() {
   if (activos) return;
   activos = [];
-  const onValue = (r, cb) => activos.push(onValueFb(r, cb));
+  state.datosListos = false;
+  let esperados = 0; let registrados = false; const llegaron = new Set();
+  const listos = () => { if (state.datosListos) return; state.datosListos = true; clearTimeout(esperaDatos); render(); };
+  const revisar = () => { if (registrados && llegaron.size === esperados) listos(); };
+  esperaDatos = setTimeout(listos, 8000);
+  const onValue = (r, cb) => {
+    const n = esperados++;
+    activos.push(onValueFb(r, snap => { cb(snap); if (!state.datosListos) { llegaron.add(n); revisar(); } }));
+  };
   onValue(installsRef, snap => {
     state.records = [];
     snap.forEach(child => {
@@ -106,4 +117,6 @@ export function iniciarSync() {
     state.equipos.sort((a, b) => (a.serie || '').localeCompare(b.serie || ''));
     render();
   });
+  registrados = true;
+  revisar();
 }
