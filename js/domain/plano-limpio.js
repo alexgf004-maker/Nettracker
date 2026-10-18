@@ -5,7 +5,7 @@
 // con otras, con la red ni con los símbolos. Funciones puras: devuelven SVG en coordenadas de la lámina.
 import { SIMBOLOS } from './dibujo.js';
 import { metrosVano, nombrePunto } from './plano.js';
-import { conductorVano, textoAltura, textoEstructuras } from './red.js';
+import { conductorVano, textoAcometidas, textoAltura, textoEstructuras } from './red.js';
 
 const FUENTE = 'Arial, Helvetica, sans-serif';
 const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -111,11 +111,18 @@ export function planoLimpio(d, elementos, { x, y, w, h, vista, accion = () => nu
       const rad = (ang * Math.PI) / 180; const nx = -Math.sin(rad); const ny = Math.cos(rad); // abajo del vano (o a la derecha)
       const mx = (x0 + x1) / 2; const my = (y0 + y1) / 2;
       // A un lado o al otro, donde no choque
-      const lados = [1, -1].map(sg => { const cx = mx + nx * (8 * K + tam * 0.5) * sg; const cy = my + ny * (8 * K + tam * 0.5) * sg; const ax = Math.abs(Math.cos(rad)); const ay = Math.abs(Math.sin(rad));
-        return { cx, cy, caja: { x: cx - (tw * ax + tam * ay) / 2, y: cy - (tw * ay + tam * ax) / 2, w: tw * ax + tam * ay, h: tw * ay + tam * ax } }; });
+      // Acometidas del vano: segunda línea más chica, por fuera de la primera
+      const acom = textoAcometidas(el.acometidas?.[i]); const ta = 9 * K; const alto = acom ? tam + ta * 1.15 : tam;
+      const lados = [1, -1].map(sg => { const sep = 8 * K + alto * 0.5; const cx = mx + nx * sep * sg; const cy = my + ny * sep * sg; const ax = Math.abs(Math.cos(rad)); const ay = Math.abs(Math.sin(rad));
+        const aw = Math.max(tw, acom ? ancho(acom, ta, false) : 0);
+        return { sg, cx, cy, caja: { x: cx - (aw * ax + alto * ay) / 2, y: cy - (aw * ay + alto * ax) / 2, w: aw * ax + alto * ay, h: aw * ay + alto * ax } }; });
       const lado = lados.find(l => !ocupados.some(o => seCruzan(l.caja, o))) || lados[0];
       ocupados.push(lado.caja);
-      vanos += T(lado.cx, lado.cy + tam * 0.36, texto, { tam, peso: 600, color: e.color === C.retirar ? C.retirar : e.color === C.nuevo ? C.nuevo : C.sub, anc: 'middle', rot: ang });
+      const color = e.color === C.retirar ? C.retirar : e.color === C.nuevo ? C.nuevo : C.sub;
+      // Metros pegados a la línea y acometidas por fuera (en el lado de abajo o en el de arriba)
+      const d1 = (alto - tam) / 2 * -lado.sg; const d2 = (alto - ta) / 2 * lado.sg;
+      vanos += T(lado.cx + nx * d1, lado.cy + ny * d1 + tam * 0.36, texto, { tam, peso: 600, color, anc: 'middle', rot: ang });
+      if (acom) vanos += T(lado.cx + nx * d2, lado.cy + ny * d2 + ta * 0.36, acom, { tam: ta, peso: 500, color: C.sub, anc: 'middle', rot: ang });
     }
   });
 
