@@ -8,6 +8,7 @@
 import { caja, SIMBOLOS, simbologiaUsada, svgLamina } from './dibujo.js';
 import { metrosTramo, metrosVano, nombrePunto, TIPOS_TRAMO } from './plano.js';
 import { conductorVano } from './red.js';
+import { planoLimpio, simbolo as simboloLimpio } from './plano-limpio.js';
 
 export const ACCIONES = {
   instalar: { nombre: 'Instalar', tinta: '#0e7490', fondo: '#cffafe' },
@@ -205,9 +206,12 @@ export function elementosActuales(elementos) {
   const nuevos = elementos.filter(el => conAccion(el) && accionDe(el) === 'instalar');
   const puntas = nuevos.flatMap(el => (el.tipo === 'simbolo' ? [centro(el)] : []));
   const enNuevo = e => e.tipo === 'etiqueta' && (e.estilo === 'proyectado' || puntas.some(([x, y]) => Math.hypot(e.tx - x, e.ty - y) < 3));
-  return elementos.filter(el => !nuevos.includes(el) && !enNuevo(el)).map(el => {
+  // Acometidas que salen de un poste nuevo (p. ej. la trasladada) tampoco existen hoy
+  const deNuevo = el => el.tipo === 'polilinea' && el.tramo === 'acometida' && el.puntos.some(([px, py]) => puntas.some(([x, y]) => Math.hypot(px - x, py - y) < 3));
+  return elementos.filter(el => !nuevos.includes(el) && !enNuevo(el) && !deNuevo(el)).map(el => {
     if (!conAccion(el)) return el;
-    const r = { ...el, accion: 'existente' };
+    const { detalleAccion, ...sinDetalle } = el;
+    const r = { ...sinDetalle, accion: 'existente' };
     if (el.tipo === 'polilinea' && el.tramo === 'retirar') r.tramo = 'bt';
     return r;
   });
@@ -237,20 +241,25 @@ function equis(elementos, w) {
 }
 // Plano en una tarjeta (x, y, ancho, alto): el dibujo encajado sin deformar, con fondo tipo mapa si no hay imagen
 // Lo que ocupa el dibujo: se acerca a lo dibujado para que llene la tarjeta (la imagen de fondo se recorta igual)
-export function encuadre(d, elementos) {
+export function encuadre(d, elementos, { limpio = false } = {}) {
   const p = svgLamina({ ...d, elementos: [], lamina: { ...(d.lamina || {}), activa: false } });
   if (!elementos.length) return { x: 0, y: 0, w: p.w, h: p.h };
-  const cajas = elementos.map(caja).filter(c => Number.isFinite(c.x) && Number.isFinite(c.y));
+  // En el estilo de presentación las etiquetas van junto a su punto: cuenta solo la red (y deja aire para los rótulos)
+  const base = limpio ? elementos.filter(e => e.tipo === 'polilinea' || e.tipo === 'simbolo').concat(elementos.filter(e => e.tipo === 'etiqueta').map(e => ({ tipo: 'linea', x1: e.tx, y1: e.ty, x2: e.tx, y2: e.ty }))) : elementos;
+  const cajas = base.map(caja).filter(c => Number.isFinite(c.x) && Number.isFinite(c.y));
   if (!cajas.length) return { x: 0, y: 0, w: p.w, h: p.h };
   const x0 = Math.min(...cajas.map(c => c.x)); const y0 = Math.min(...cajas.map(c => c.y));
   const x1 = Math.max(...cajas.map(c => c.x + c.w)); const y1 = Math.max(...cajas.map(c => c.y + c.h));
-  const m = Math.max(x1 - x0, y1 - y0) * 0.07 + 40;
+  const m = Math.max(x1 - x0, y1 - y0) * (limpio ? 0.14 : 0.07) + 40;
   return { x: x0 - m, y: y0 - m, w: x1 - x0 + m * 2, h: y1 - y0 + m * 2 };
 }
-function tarjetaPlano(d, elementos, { x, y, w, h, id, extra = '', vista }) {
+function tarjetaPlano(d, elementos, { x, y, w, h, id, extra = '', vista, limpio = false, lista = [] }) {
+  const v = vista || encuadre(d, elementos, { limpio });
+  // Estilo de presentación: la red redibujada a tamaño de hoja (letras y grosores fijos, etiquetas sin cajas)
+  if (limpio) return `<defs><clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="18"/></clipPath></defs>
+    <g clip-path="url(#${id})"><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${PALETA.fondo}"/>${planoLimpio(d, elementos, { x, y, w, h, vista: v, accion: accionDe, marcas: lista })}</g>`;
   const p = svgLamina({ ...d, elementos, sel: null, lamina: { ...(d.lamina || {}), activa: false } });
   const fondo = d.fondo ? p.fondo : '';
-  const v = vista || encuadre(d, elementos);
   return `<defs><clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="18"/></clipPath></defs>
     <g clip-path="url(#${id})"><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${PALETA.fondo}"/>
     <svg x="${x}" y="${y}" width="${w}" height="${h}" viewBox="${r1(v.x)} ${r1(v.y)} ${r1(v.w)} ${r1(v.h)}" preserveAspectRatio="xMidYMid meet">${fondo}${p.capa}${extra}</svg></g>`;
@@ -267,7 +276,7 @@ function reemplazos(elementos, w) {
   }).join('');
 }
 // Leyenda flotante (solo lo que aparece) y escala gráfica
-function leyendaFlotante(elementos, { x, y, conMarca }) {
+function leyendaFlotante(elementos, { x, y, conMarca, limpio = false }) {
   const items = [];
   const hay = f => elementos.some(f);
   if (hay(e => e.tipo === 'polilinea' && e.tramo !== 'acometida' && !accionDe(e))) items.push(['linea', PALETA.existente, 'Existente']);
@@ -286,6 +295,7 @@ function leyendaFlotante(elementos, { x, y, conMarca }) {
     else if (tipo === 'gruesa') s += `<line x1="${cx}" y1="${cy}" x2="${cx + 30}" y2="${cy}" stroke="${color}" stroke-width="5"/>`;
     else if (tipo === 'guion') s += `<line x1="${cx}" y1="${cy}" x2="${cx + 30}" y2="${cy}" stroke="${color}" stroke-width="2.5" stroke-dasharray="6 5"/>`;
     else if (tipo === 'punteada') s += `<line x1="${cx}" y1="${cy}" x2="${cx + 30}" y2="${cy}" stroke="${color}" stroke-width="1.6" stroke-dasharray="3 3"/>`;
+    else if (tipo === 'simbolo' && limpio) s += simboloLimpio(sim, cx + 15, cy + (sim === 'usuario' ? 8 : 0), { nuevo: /_nuevo$/.test(sim), color: SIMBOLOS[sim].color }, sim === 'usuario' ? 0.75 : 1);
     else if (tipo === 'simbolo') s += `<g transform="translate(${cx + 6} ${cy - 9}) scale(0.3)" color="${color}" stroke="${color}" stroke-width="3" fill="none">${SIMBOLOS[sim].svg}</g>`;
     else if (tipo === 'equis') s += `<g stroke="${color}" stroke-width="2.5" stroke-linecap="round"><line x1="${cx + 8}" y1="${cy - 7}" x2="${cx + 22}" y2="${cy + 7}"/><line x1="${cx + 22}" y1="${cy - 7}" x2="${cx + 8}" y2="${cy + 7}"/></g>`;
     else s += `<circle cx="${cx + 15}" cy="${cy}" r="9" fill="#0f172a"/><text x="${cx + 15}" y="${cy + 4}" text-anchor="middle" font-family="${FUENTE}" font-size="10" font-weight="800" fill="#fff">1</text>`;
@@ -335,15 +345,15 @@ function pie(d, n, total) {
 const marco = cuerpo => `<svg xmlns="http://www.w3.org/2000/svg" width="1650" height="1275" viewBox="0 0 1650 1275"><rect width="1650" height="1275" fill="#ffffff"/>${cuerpo}</svg>`;
 
 // Lámina de la propuesta para ejecutar: plano con los trabajos numerados, lista de trabajos y cantidades de obra
-export function svgPropuesta(d, { n = 2, total = 2 } = {}) {
-  const lista = trabajos(d); const elementos = conPaleta(d.elementos);
+export function svgPropuesta(d, { n = 2, total = 2, limpio = true } = {}) {
+  const lista = trabajos(d); const elementos = limpio ? d.elementos : conPaleta(d.elementos);
   const p = svgLamina({ ...d, elementos, lamina: { ...(d.lamina || {}), activa: false } });
   const W = 1092; const H = 1026;
-  const v = encuadre(d, elementos); const factor = Math.min(W / v.w, H / v.h);
+  const v = encuadre(d, elementos, { limpio }); const factor = Math.min(W / v.w, H / v.h);
   let s = encabezado(d, lista);
-  s += tarjetaPlano(d, elementos, { x: 34, y: 154, w: W, h: H, id: 'clip-prop', vista: v, extra: reemplazos(d.elementos, p.w) + equis(d.elementos, p.w) + marcas(lista, p.w) });
+  s += tarjetaPlano(d, elementos, { x: 34, y: 154, w: W, h: H, id: 'clip-prop', vista: v, limpio, lista, extra: limpio ? '' : reemplazos(d.elementos, p.w) + equis(d.elementos, p.w) + marcas(lista, p.w) });
   if (d.lamina?.norte !== false) s += norte(34 + W - 40, 194);
-  s += leyendaFlotante(d.elementos, { x: 48, y: 154 + H - 14, conMarca: lista.length > 0 });
+  s += leyendaFlotante(d.elementos, { x: 48, y: 154 + H - 14, conMarca: lista.length > 0, limpio });
   s += escalaGrafica(d, { x: 34 + W - 14, y: 154 + H - 14, factor });
   // Columna derecha: trabajos (tarjetas) y cantidades de obra
   const X = 1146; let y = 172;
@@ -385,17 +395,17 @@ export function svgPropuesta(d, { n = 2, total = 2 } = {}) {
 }
 
 // Lámina de comparación: situación actual y propuesta lado a lado, con el problema y lo que se logra
-export function svgComparacion(d, { n = 1, total = 2 } = {}) {
+export function svgComparacion(d, { n = 1, total = 2, limpio = true } = {}) {
   const lista = trabajos(d); const l = d.lamina || {};
   const W = 781; const H = 770;
   let s = encabezado(d, lista);
-  const actual = elementosActuales(d.elementos).map(el => (el.tipo === 'polilinea' && el.tramo !== 'acometida' ? { ...el, colorRed: PALETA.existente } : el));
-  const prop = conPaleta(d.elementos);
+  const actual = limpio ? elementosActuales(d.elementos) : elementosActuales(d.elementos).map(el => (el.tipo === 'polilinea' && el.tramo !== 'acometida' ? { ...el, colorRed: PALETA.existente } : el));
+  const prop = limpio ? d.elementos : conPaleta(d.elementos);
   const pw = svgLamina({ ...d, lamina: { ...(l), activa: false } }).w;
   // Las dos vistas con el mismo encuadre (el de la propuesta) para compararlas lado a lado
-  const v = encuadre(d, prop);
-  s += tarjetaPlano(d, actual, { x: 34, y: 154, w: W, h: H, id: 'clip-act', vista: v });
-  s += tarjetaPlano(d, prop, { x: 835, y: 154, w: W, h: H, id: 'clip-pro', vista: v, extra: reemplazos(d.elementos, pw) + equis(d.elementos, pw) });
+  const v = encuadre(d, prop, { limpio });
+  s += tarjetaPlano(d, actual, { x: 34, y: 154, w: W, h: H, id: 'clip-act', vista: v, limpio });
+  s += tarjetaPlano(d, prop, { x: 835, y: 154, w: W, h: H, id: 'clip-pro', vista: v, limpio, extra: limpio ? '' : reemplazos(d.elementos, pw) + equis(d.elementos, pw) });
   const pastilla = (x, texto, color) => { const w = texto.length * 9.6 + 26; return `<rect x="${x + 14}" y="168" width="${w}" height="30" rx="8" fill="${color}"/>` + T(x + 27, 188, texto, { tam: 14, peso: 800, color: '#ffffff', esp: 1.4 }); };
   s += pastilla(34, '1 · SITUACIÓN ACTUAL', '#475569') + pastilla(835, '2 · SITUACIÓN PROPUESTA', PALETA.nuevo);
   // Problema y resultado: una línea por dato ("Transformador P1: 25 kVA al 118 %")
