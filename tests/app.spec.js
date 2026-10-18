@@ -3301,6 +3301,9 @@ test.describe('Herramienta Dibujar', () => {
     expect(r.cifras.map(c => c[0])).toEqual(['Trabajos', 'Red nueva', 'Postes nuevos', 'Transformador']);
     for (const t of ['TRABAJOS A EJECUTAR', 'CANTIDADES DE OBRA', 'Cambiar conductor a #2 Triplex', 'Col. Las Brisas', '2/2', 'David García']) expect(r.prop).toContain(t);
     for (const t of ['1 · SITUACIÓN ACTUAL', '2 · SITUACIÓN PROPUESTA', 'PROBLEMA ENCONTRADO', '104 V en demanda máxima', 'tensión dentro de tolerancia', '1/2']) expect(r.comp).toContain(t);
+    // Plano en estilo de presentación: un rótulo por poste (con su transformador nuevo) y metros con conductor en una línea por vano
+    for (const t of ['Trafo 37.5 kVA', '31.5 m · #2 Triplex', '40.0 m · #4 ACSR']) expect(r.prop).toContain(t);
+    expect(r.prop.match(/>P3</g)).toHaveLength(1);
     expect(r.actual).not.toContain('trafo_nuevo'); expect(r.actual).not.toContain('poste_nuevo');
     // Descarga en PDF: una página con las dos láminas en carta horizontal
     await page.evaluate(() => { window.__docs = []; const crear = URL.createObjectURL.bind(URL); URL.createObjectURL = b => { b.text().then(t => window.__docs.push(t)); return crear(b); }; });
