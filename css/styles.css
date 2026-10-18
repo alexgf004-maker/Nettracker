@@ -1761,3 +1761,14 @@ button.aviso-inicio-fila { cursor: pointer; }
 .firma-memo-k { display: flex; flex-direction: column; margin-bottom: 6px; }
 .firma-memo-k span { font-size: 12px; color: var(--text3); }
 .modal-firma { z-index: 1200; }
+/* Dibujar: lámina de propuesta (acción por elemento y lista de trabajos) */
+.dib-acciones-prop .dib-chip { flex: 1 1 auto; justify-content: center; }
+.dib-prop-trab { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: start; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.dib-prop-trab > b { width: 22px; height: 22px; border-radius: 50%; background: #0f172a; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; margin-top: 4px; }
+.dib-prop-trab > div { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
+.dib-prop-trab input, .dib-prop-trab select { flex: 1 1 160px; min-width: 0; }
+.dib-prop-trab .dib-prop-cant { flex: 0 0 84px; }
+.dib-prop-acc { font-size: 10.5px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; padding: 2px 8px; border-radius: 20px; }
+.dib-dos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.dib-lista.dib-acciones-prop { display: flex; flex-direction: row; flex-wrap: wrap; gap: 6px; }
+.dib-acciones-prop .dib-chip { flex: 1 1 30%; min-width: 0; }

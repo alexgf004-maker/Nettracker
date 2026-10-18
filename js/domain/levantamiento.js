@@ -98,7 +98,7 @@ export function aDibujo(lev, { ancho = 1600, alto = 1000, margen = 140 } = {}) {
     const [x, y] = pos[p.id]; const escala = p.tipo === 'usuario' ? 0.8 : 0.6;
     const sim = simboloPunto(p);
     elementos.push({ id: id(), tipo: 'simbolo', simbolo: sim, color: SIMBOLO_COLOR[sim] || '#111827', grosor: 3, escala, rot: 0, x: x - 30 * escala, y: y - 30 * escala,
-      ...(p.altura ? { altura: Number(p.altura) } : {}), ...(p.estructuras?.length ? { estructuras: [...p.estructuras] } : {}) });
+      ...(p.altura ? { altura: Number(p.altura) } : {}), ...(p.estructuras?.length ? { estructuras: [...p.estructuras] } : {}), ...(p.trafos?.length ? { trafos: [...p.trafos] } : {}) });
   });
   // Etiquetas: nombre y nota (en dos líneas) hacia el lado más libre de vanos, dentro de la lámina
   const vecinos = {};

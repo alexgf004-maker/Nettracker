@@ -105,7 +105,7 @@ async function montarMapa() {
   mapa = L.map(contenedor, { zoomControl: true, attributionControl: true }).setView([13.7, -89.2], 9);
   capaRed = L.layerGroup().addTo(mapa);
   mapa.on('click', e => alTocarMapa(e.latlng));
-  mapa.on('zoomend', () => dibujarRed()); // al acercar o alejar se ve qué distancias caben
+  mapa.on('zoomend moveend resize', () => dibujarRed()); // al acercar, alejar o cambiar el tamaño del mapa se ve qué distancias caben
   mapa.on('dragstart', () => { if (ui()) { ui().seguir = false; actualizarSeguir(); } });
   encuadrar();
   dibujarRed(); pintarGPS(); actualizarSeguir();
