@@ -59,6 +59,12 @@ export function render() {
     return;
   }
 
+  // Con sesión, hasta que lleguen los datos se queda el "Cargando…" (así el inicio y el aviso se dibujan una sola vez)
+  if (state.sesionUsuario && !state.datosListos) {
+    if (!el.querySelector('.loading')) el.innerHTML = '<div class="loading"><div class="spinner"></div><div class="loading-text">Cargando...</div></div>';
+    return;
+  }
+
   // Aviso al abrir la app (una vez por sesión): casos FT abiertos primero y retiros próximos
   if (state.sesionUsuario && !state.alertaDismissed && !state.showAlertaRetiros) {
     if (ftParaAviso().length || retirosParaAviso().length) { state.showAlertaRetiros = true; state.alertaDismissed = true; }

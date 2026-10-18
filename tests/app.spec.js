@@ -1155,6 +1155,7 @@ test('memos firmados en pantalla: préstamo, despacho a Campos y equipo dañado;
   let html = (await docs())[0];
   expect(html.match(/<img src="data:image\/png;base64,[^"]+" alt="Firma"/g)).toHaveLength(1);
   expect(html).toContain('Firmó: David García');
+  expect(html).toContain('@page { size: letter; margin: 12mm; }'); // carta con márgenes (antes A4 a sangre)
   await page.locator('.modal', { hasText: 'Firmas del memo' }).locator('.modal-cerrar').click();
   await expect(page.locator('.memo-item .btn-firmas')).toHaveText('Firmas 1/2');
 
