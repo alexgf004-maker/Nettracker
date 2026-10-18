@@ -4085,6 +4085,45 @@ test.describe('Levantamiento en campo', () => {
     expect(errores).toEqual([]);
   });
 
+  test('pasar a Dibujar con el mapa de la zona de fondo (calles o satélite), alineado con los postes', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    // Teselas de prueba: un PNG gris que se deja leer (CORS)
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN4/f//fwAJdAPeKFQxVwAAAABJRU5ErkJggg==', 'base64');
+    const pedidas = [];
+    const datos = JSON.parse(JSON.stringify(fixture));
+    datos.levantamientos = { L1: { nombre: 'Con mapa', puntos: { a: { lat: 13.6764, lng: -89.2897, nombre: 'P1', tipo: 'poste', orden: 1 }, b: { lat: 13.6764, lng: -89.2893, nombre: 'P2', tipo: 'poste', orden: 2 } },
+      vanos: { v: { a: 'a', b: 'b', tramo: 'bt', orden: 1 } }, creado: { fecha: '2026-10-01', por: 'David García' } } };
+    app = await abrirApp(page, { datos, leaflet: true });
+    await page.route(/tile\.openstreetmap\.org|arcgisonline/, route => { pedidas.push(route.request().url()); route.fulfill({ contentType: 'image/png', body: png, headers: { 'Access-Control-Allow-Origin': '*' } }); });
+    await cerrarAlerta(page);
+    // La lámina y el mapa coinciden: el píxel de cada poste vuelve a su latitud y longitud
+    const r = await page.evaluate(async () => {
+      const m = await import('/js/domain/levantamiento.js');
+      const { state } = await import('/js/state.js');
+      const L = state.levantamientos.L1; const d = m.aDibujo(L);
+      const postes = d.elementos.filter(e => e.tipo === 'simbolo').map(e => m.latLngDe(d.geo, e.x + 30 * e.escala, e.y + 30 * e.escala));
+      const t = m.teselasLamina(d.geo, 1600, 1000, { detalleMin: 1.5 });
+      return { postes, z: t.z, n: t.teselas.length, cubre: t.teselas.some(x => x.dx <= 0 && x.dy <= 0) && t.teselas.some(x => x.dx + x.dw >= 1600 && x.dy + x.dh >= 1000) };
+    });
+    expect(r.postes[0].lat).toBeCloseTo(13.6764, 6); expect(r.postes[0].lng).toBeCloseTo(-89.2897, 6);
+    expect(r.postes[1].lng).toBeCloseTo(-89.2893, 6);
+    expect(r.z).toBeGreaterThanOrEqual(18); expect(r.z).toBeLessThanOrEqual(19);
+    expect(r.cubre).toBe(true); expect(r.n).toBeLessThanOrEqual(48);
+    // Satélite: se elige en Más y el fondo de Dibujar es el mapa (JPG), con el crédito dibujado
+    await nav(page, 'Levantamiento');
+    await page.locator('.lev-card', { hasText: 'Con mapa' }).click();
+    await pestana(page, 'Más');
+    await page.getByRole('button', { name: 'Satélite' }).last().click();
+    pedidas.length = 0; // (el mapa en vivo del levantamiento también pide teselas)
+    await page.getByRole('button', { name: 'Pasar a Dibujar (lámina)' }).click();
+    await expect(page.locator('#dib-svg image')).toHaveCount(1);
+    expect(await page.locator('#dib-svg image').getAttribute('href')).toMatch(/^data:image\/jpeg;base64,/);
+    const delMapa = pedidas.filter(u => new RegExp(`/tile/${r.z}/\\d+/\\d+$`).test(u));
+    expect(delMapa.length).toBe(r.n);
+    expect(delMapa.every(u => /arcgisonline\.com\//.test(u))).toBe(true);
+    expect(errores).toEqual([]);
+  });
+
   test('corregir en campo: arrastrar un poste sin seleccionarlo (y deshacer) y poner un poste en medio de un vano', async ({ page, context }) => {
     const errores = []; page.on('pageerror', e => errores.push(e.message));
     await context.grantPermissions(['geolocation']);

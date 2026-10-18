@@ -178,6 +178,8 @@ function hojaVanos(l, vanos) {
 function hojaMas(l, u) {
   return `<div class="field"><label>Nombre del levantamiento</label><input class="lev-titulo" id="lev-titulo" value="${esc(l.nombre)}" onchange="guardarDatoLev('nombre', this.value)"></div>
     <div class="field"><label>Referencia</label><input class="lev-ref" id="lev-ref" value="${esc(l.referencia || '')}" placeholder="WO, NC, reclamo…" onchange="guardarDatoLev('referencia', this.value)"></div>
+    <div class="field"><label>Mapa de fondo en Dibujar</label><div class="segmento segmento-ancho">${[['calles', 'Calles'], ['satelite', 'Satélite'], ['ninguno', 'Sin mapa']].map(([k, t]) => `<button class="${(u.fondoDibujo || 'calles') === k ? 'active' : ''}" onclick="setLev('fondoDibujo', '${k}')">${t}</button>`).join('')}</div>
+      <div class="page-sub">El mapa de la zona queda de fondo, a la misma escala del levantamiento (necesita conexión).</div></div>
     <div class="lev-acciones lev-salidas"><button class="b b-p" onclick="pasarADibujarLev()"><i class="ic ic-editar"></i> Pasar a Dibujar (lámina)</button>
       <button class="b b-g" onclick="descargarKmlLev()"><i class="ic ic-descargar"></i> KML para Google Earth</button></div>
     <div class="page-sub">Arrastra un punto para corregirlo. Toca una línea para poner un poste en medio de ese vano.</div>

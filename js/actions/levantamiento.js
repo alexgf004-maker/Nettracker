@@ -3,7 +3,7 @@
 // posición actual y lo une con el anterior. El mapa se crea una sola vez y se vuelve a colocar tras cada render().
 import { db, push, ref, remove, set, update } from '../firebase.js';
 import { SIMBOLOS } from '../domain/dibujo.js';
-import { aDibujo, cambiosPartirVano, distancia, kmlLevantamiento, listaPuntos, listaVanos, metrosDeVano, nuevaPantallaLev, PRECISION_BAJA, siguienteNombre, simboloPunto, textoTrafos } from '../domain/levantamiento.js';
+import { aDibujo, cambiosPartirVano, teselasLamina, distancia, kmlLevantamiento, listaPuntos, listaVanos, metrosDeVano, nuevaPantallaLev, PRECISION_BAJA, siguienteNombre, simboloPunto, textoTrafos } from '../domain/levantamiento.js';
 import { TIPOS_TRAMO } from '../domain/plano.js';
 import { hayAcometidas, leerAltura } from '../domain/red.js';
 import { hoyLocal } from '../domain/trabajo.js';
@@ -415,16 +415,51 @@ export function datoVanoLev(id, campo, valor) {
 export function borrarVanoLev(id) { if (confirm('¿Quitar este vano?')) remove(ref(db, ruta(state.levId, 'vanos/' + id))); }
 
 // ── Salidas ──
-export function pasarADibujarLev() {
-  const l = lev(); if (!l) return;
+// Mapa de fondo para Dibujar: las teselas del mapa (calles o satélite) de la zona, en una imagen del tamaño de la lámina,
+// con el crédito del mapa abajo a la derecha (lo piden sus condiciones de uso). null si no se pudo bajar.
+const CREDITO = { calles: '© OpenStreetMap', satelite: '© Esri, Maxar, Earthstar Geographics' };
+const urlTesela = (capa, t) => CAPAS[capa][0].replace('{z}', t.z).replace('{x}', t.x).replace('{y}', t.y);
+function cargarTesela(src) {
+  return new Promise(resolve => {
+    const img = new Image(); img.crossOrigin = 'anonymous';
+    const fin = ok => { clearTimeout(espera); resolve(ok ? img : null); };
+    const espera = setTimeout(() => fin(false), 10000);
+    img.onload = () => fin(true); img.onerror = () => fin(false);
+    img.src = src;
+  });
+}
+export async function mapaDeFondo(geo, capa, { ancho = 1600, alto = 1000, factor = 1.5 } = {}) {
+  if (!geo || !CAPAS[capa]) return null;
+  const { teselas } = teselasLamina(geo, ancho, alto, { detalleMin: factor });
+  const imgs = await Promise.all(teselas.map(t => cargarTesela(urlTesela(capa, t))));
+  if (!imgs.some(Boolean)) return null;
+  const c = document.createElement('canvas'); c.width = Math.round(ancho * factor); c.height = Math.round(alto * factor);
+  const ctx = c.getContext('2d'); ctx.fillStyle = '#f2efe9'; ctx.fillRect(0, 0, c.width, c.height);
+  // Un píxel de más por lado para que no se vean rayas entre teselas
+  teselas.forEach((t, i) => { if (imgs[i]) ctx.drawImage(imgs[i], t.dx * factor - 0.5, t.dy * factor - 0.5, t.dw * factor + 1, t.dh * factor + 1); });
+  const tam = Math.round(13 * factor); ctx.font = `600 ${tam}px Arial, sans-serif`;
+  const texto = CREDITO[capa]; const w = ctx.measureText(texto).width + tam;
+  ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(c.width - w - 6, c.height - tam * 1.7 - 6, w, tam * 1.7);
+  ctx.fillStyle = '#334155'; ctx.fillText(texto, c.width - w - 6 + tam / 2, c.height - tam * 0.6 - 6);
+  try { return { src: c.toDataURL('image/jpeg', 0.85), w: ancho, h: alto }; } catch { return null; } // si el servidor no deja leer la imagen
+}
+export async function pasarADibujarLev() {
+  const l = lev(); const u = ui(); if (!l) return;
   if (listaPuntos(l).length < 2) return showToast('Marca al menos dos puntos');
   if (state.dibujo?.elementos?.length && !confirm('En Dibujar hay un dibujo; se reemplaza por este levantamiento. ¿Continuar?')) return;
   const d = aDibujo(l);
-  cargarEnDibujo({ elementos: d.elementos, escala: d.escala, lamina: { titulo: 'Levantamiento de red', subtitulo: l.nombre, proyecto: l.referencia || '', elaboro: l.creado?.por || por() } });
+  const capa = u?.fondoDibujo || 'calles';
+  let fondo = null;
+  if (capa !== 'ninguno') {
+    showToast('Bajando el mapa de la zona…');
+    fondo = await mapaDeFondo(d.geo, capa);
+    if (!fondo) showToast('No se pudo bajar el mapa (¿sin conexión?): pasa sin fondo; puedes subir una captura en Dibujar');
+  }
+  cargarEnDibujo({ elementos: d.elementos, escala: d.escala, fondo, lamina: { titulo: 'Levantamiento de red', subtitulo: l.nombre, proyecto: l.referencia || '', elaboro: l.creado?.por || por() } });
   state.levId = null; state.lev = null; detenerGPS();
   state.tab = 'dibujar'; state.view = 'lista';
   render();
-  showToast('Levantamiento pasado a Dibujar: agrega etiquetas, cajetín y descarga la lámina');
+  if (fondo || capa === 'ninguno') showToast('Levantamiento pasado a Dibujar: agrega etiquetas, cajetín y descarga la lámina');
 }
 export function descargarKmlLev() {
   const l = lev(); if (!l) return;
