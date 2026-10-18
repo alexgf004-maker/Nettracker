@@ -236,10 +236,10 @@ function equis(elementos, w) {
   }).join('');
 }
 // Plano en una tarjeta (x, y, ancho, alto): el dibujo encajado sin deformar, con fondo tipo mapa si no hay imagen
-// Lo que ocupa el dibujo (sin imagen de fondo se acerca a lo dibujado para que llene la tarjeta)
+// Lo que ocupa el dibujo: se acerca a lo dibujado para que llene la tarjeta (la imagen de fondo se recorta igual)
 export function encuadre(d, elementos) {
   const p = svgLamina({ ...d, elementos: [], lamina: { ...(d.lamina || {}), activa: false } });
-  if (d.fondo || !elementos.length) return { x: 0, y: 0, w: p.w, h: p.h };
+  if (!elementos.length) return { x: 0, y: 0, w: p.w, h: p.h };
   const cajas = elementos.map(caja).filter(c => Number.isFinite(c.x) && Number.isFinite(c.y));
   if (!cajas.length) return { x: 0, y: 0, w: p.w, h: p.h };
   const x0 = Math.min(...cajas.map(c => c.x)); const y0 = Math.min(...cajas.map(c => c.y));

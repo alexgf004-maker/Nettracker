@@ -70,7 +70,7 @@ export function proyectar(puntos) {
   if (!puntos.length) return { a: () => [0, 0], centro: null };
   const lat0 = puntos.reduce((s, p) => s + p.lat, 0) / puntos.length; const lng0 = puntos.reduce((s, p) => s + p.lng, 0) / puntos.length;
   const kx = RADIO * Math.cos(rad(lat0)) * Math.PI / 180; const ky = RADIO * Math.PI / 180;
-  return { a: p => [(p.lng - lng0) * kx, (lat0 - p.lat) * ky], centro: { lat: lat0, lng: lng0 } };
+  return { a: p => [(p.lng - lng0) * kx, (lat0 - p.lat) * ky], centro: { lat: lat0, lng: lng0 }, kx, ky };
 }
 
 // Lámina de Dibujar: croquis en blanco con el norte arriba y la escala exacta (m por px), postes, vanos con sus metros
@@ -124,7 +124,8 @@ export function aDibujo(lev, { ancho = 1600, alto = 1000, margen = 140 } = {}) {
     const ex = Math.max(8, Math.min(ancho - m.w - 8, bx)); const ey = Math.max(8, Math.min(alto - m.h - 8, by));
     elementos.push({ id: id(), tipo: 'etiqueta', estilo: p.tipo === 'usuario' ? 'destacado' : proyectado ? 'proyectado' : 'existente', texto, tam, tx: x, ty: y, x: ex, y: ey });
   });
-  return { fondo: null, elementos, escala: 1 / k, lienzo: { w: ancho, h: alto } };
+  // geo: para pasar de un píxel de la lámina a su latitud y longitud (y armar el mapa de fondo)
+  return { fondo: null, elementos, escala: 1 / k, lienzo: { w: ancho, h: alto }, geo: pr.centro ? { lat0: pr.centro.lat, lng0: pr.centro.lng, kx: pr.kx, ky: pr.ky, k, ox, oy, x0, y0 } : null };
 }
 const SIMBOLO_COLOR = { puente: '#0f766e', poste: '#111827', poste_nuevo: '#2563eb', trafo: '#15803d', trafo_nuevo: '#2563eb', banco: '#15803d', usuario: '#dc2626', medidor_red: '#0f172a', seccionador: '#ea580c', medicion: '#f59e0b' };
 
@@ -143,3 +144,30 @@ export function kmlLevantamiento(lev, nombresTipo = {}) {
 
 // Acometidas de todo el levantamiento (los vanos y las pendientes del próximo vano)
 export const acometidasLevantamiento = lev => sumaAcometidas([...listaVanos(lev).map(v => v.acom), lev?.pendiente]);
+
+// ── Mapa de fondo para Dibujar (calles o satélite) ──
+// Latitud y longitud de un píxel (x, y) de la lámina armada por aDibujo
+export function latLngDe(geo, x, y) {
+  const mx = (x - geo.ox) / geo.k + geo.x0; const my = (y - geo.oy) / geo.k + geo.y0;
+  return { lat: geo.lat0 - my / geo.ky, lng: geo.lng0 + mx / geo.kx };
+}
+// Píxel del mundo en Web Mercator (el de los mapas en teselas de 256 px) a un zoom
+const mundoX = (lng, z) => ((lng + 180) / 360) * 256 * 2 ** z;
+const mundoY = (lat, z) => { const f = rad(lat); return ((1 - Math.log(Math.tan(f) + 1 / Math.cos(f)) / Math.PI) / 2) * 256 * 2 ** z; };
+// Teselas que cubren la lámina (ancho × alto px) y dónde va cada una. Se usa el zoom con más detalle que la lámina
+// (hasta 19) sin pasar de `max` teselas. En una zona de unas cuadras, Mercator y la proyección local coinciden.
+export function teselasLamina(geo, ancho, alto, { max = 48, zMax = 19, detalleMin = 1 } = {}) {
+  const a = latLngDe(geo, 0, 0); const b = latLngDe(geo, ancho, alto);
+  const plan = z => {
+    const xa = mundoX(a.lng, z); const ya = mundoY(a.lat, z); const xb = mundoX(b.lng, z); const yb = mundoY(b.lat, z);
+    const tx0 = Math.floor(xa / 256); const tx1 = Math.floor((xb - 1e-9) / 256); const ty0 = Math.floor(ya / 256); const ty1 = Math.floor((yb - 1e-9) / 256);
+    return { z, xa, ya, sx: ancho / (xb - xa), sy: alto / (yb - ya), tx0, tx1, ty0, ty1, n: (tx1 - tx0 + 1) * (ty1 - ty0 + 1), detalle: (xb - xa) / ancho };
+  };
+  let z = 1; while (z < zMax && plan(z).detalle < detalleMin) z++;
+  while (z > 1 && plan(z).n > max) z--;
+  const p = plan(z); const teselas = [];
+  for (let tx = p.tx0; tx <= p.tx1; tx++) for (let ty = p.ty0; ty <= p.ty1; ty++) {
+    teselas.push({ z, x: tx, y: ty, dx: (tx * 256 - p.xa) * p.sx, dy: (ty * 256 - p.ya) * p.sy, dw: 256 * p.sx, dh: 256 * p.sy });
+  }
+  return { z, teselas };
+}
