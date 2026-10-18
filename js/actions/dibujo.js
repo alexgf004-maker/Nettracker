@@ -8,7 +8,8 @@ import { db, get, push, ref, remove, set } from '../firebase.js';
 import { leerAltura } from '../domain/red.js';
 import { hoyLocal } from '../domain/trabajo.js';
 import { state } from '../state.js';
-import { showToast } from '../ui.js';
+import { abrirDoc, showToast } from '../ui.js';
+import { svgComparacion, svgPropuesta } from '../domain/propuesta.js';
 import { alRedibujar, render } from '../views/render.js';
 
 const CLAVE = 'nettracker_dibujo';
@@ -842,4 +843,67 @@ export function buscarEstructuras(id, q) {
   // Al buscar se ve todo lo que coincide, primero lo del grupo elegido
   caja.querySelectorAll('.dib-estr-op').forEach(b => { const ver = t ? b.dataset.q.includes(t) : b.dataset.g === g; b.hidden = !ver; b.style.order = b.dataset.g === g ? 0 : 1; if (ver) n++; });
   caja.querySelector('.dib-estr-nada').hidden = n > 0;
+}
+
+// ── Lámina de propuesta (domain/propuesta.js) ──
+// Qué se hace con el elemento seleccionado en la propuesta: '' (el de su tipo), existente, instalar, reemplazar, retirar, trasladar
+export function setAccionDib(v) {
+  cambiarSel(el => { const { accion, ...resto } = el; return v ? { ...resto, accion: v } : resto; });
+}
+export function setDetalleAccionDib(v) { editar(el => { const t = String(v || ''); const { detalleAccion, ...resto } = el; return t.trim() ? { ...resto, detalleAccion: t } : resto; }); }
+// kVA de los transformadores del símbolo (uno por unidad: "37.5" o "25, 25, 25")
+export function setKvaDib(v) {
+  const lista = String(v || '').split(/[,;+]|\s+y\s+/).map(x => x.trim().replace(/\s*kva$/i, '').replace(',', '.')).filter(Boolean);
+  if (lista.some(x => Number.isNaN(Number(x)) || Number(x) <= 0)) return showToast('Escribe los kVA (solo números, separados por coma si son varios)');
+  cambiarSel(el => { const { trafos, ...resto } = el; return lista.length ? { ...resto, trafos: lista.map(x => String(Number(x))) } : resto; });
+}
+// Corregir el texto o la cantidad de un trabajo armado solo (vacío = el automático) u ocultarlo
+function cambiarTrabajos(fn) { const d = dib(); if (!d) return; d.lamina = { ...d.lamina, trabajos: fn({ ...(d.lamina?.trabajos || {}) }) }; guardarBorrador(); }
+export function setTrabajoDib(id, campo, valor) {
+  cambiarTrabajos(t => { const x = { ...(t[id] || {}) }; const v = String(valor ?? '').trim(); if (v) x[campo] = v; else delete x[campo]; if (Object.keys(x).length) t[id] = x; else delete t[id]; return t; });
+}
+export function ocultarTrabajoDib(id, oculto) { cambiarTrabajos(t => { const x = { ...(t[id] || {}) }; if (oculto) x.oculto = true; else delete x.oculto; if (Object.keys(x).length) t[id] = x; else delete t[id]; return t; }); render(); }
+// Trabajos escritos a mano (van después de los del dibujo)
+function cambiarExtra(fn) { const d = dib(); if (!d) return; d.lamina = { ...d.lamina, trabajosExtra: fn([...(d.lamina?.trabajosExtra || [])]) }; guardarBorrador(); }
+export function agregarTrabajoDib() { cambiarExtra(l => [...l, { accion: 'instalar', texto: '', cantidad: '' }]); render(); }
+export function setTrabajoExtraDib(i, campo, valor, redibujar = false) { cambiarExtra(l => l.map((t, k) => (k === i ? { ...t, [campo]: String(valor ?? '') } : t))); if (campo === 'accion' || redibujar) render(); }
+export function quitarTrabajoExtraDib(i) { cambiarExtra(l => l.filter((_, k) => k !== i)); render(); }
+
+// Descarga las dos láminas de la propuesta: PDF (carta horizontal, para imprimir) o PNG (una imagen por lámina)
+function pngDeSvg(svg, w, h, k = 2) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas'); c.width = Math.round(w * k); c.height = Math.round(h * k);
+      const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url); c.toBlob(b => (b ? resolve(b) : reject(new Error('sin imagen'))), 'image/png');
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('No se pudo generar la imagen')); };
+    img.src = url;
+  });
+}
+export async function descargarPropuestaDib(formato) {
+  const d = dib(); if (!d) return;
+  if (!d.elementos.length) return showToast('Todavía no hay nada dibujado');
+  const laminas = [svgComparacion(d), svgPropuesta(d)];
+  const base = nombreArchivo(d).replace(/\.png$/, '');
+  if (formato === 'pdf') {
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${base}</title><style>
+      @page { size: letter landscape; margin: 0; } * { margin: 0; padding: 0; } html, body { background: #e6edf0; }
+      .barra { position: sticky; top: 0; text-align: center; padding: 10px; background: #0b2e3b; } .barra button { font: 700 14px Arial; padding: 9px 20px; border: 0; border-radius: 8px; cursor: pointer; }
+      .hoja { width: 11in; height: 8.5in; margin: 16px auto; background: #fff; box-shadow: 0 6px 20px rgba(0,0,0,.15); page-break-after: always; break-after: page; }
+      .hoja:last-child { page-break-after: auto; break-after: auto; } .hoja svg { width: 100%; height: 100%; display: block; }
+      @media print { html, body { background: #fff; } .barra { display: none; } .hoja { margin: 0; box-shadow: none; } }
+    </style></head><body><div class="barra"><button onclick="window.print()">Imprimir o guardar como PDF</button></div>${laminas.map(s => `<div class="hoja">${s.replace(/ width="1650" height="1275"/, '')}</div>`).join('')}</body></html>`;
+    abrirDoc(html, `${base}.html`);
+    return;
+  }
+  try {
+    for (const [i, svg] of laminas.entries()) {
+      const b = await pngDeSvg(svg, 1650, 1275);
+      const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `${base}-lamina${i + 1}.png`;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    }
+  } catch (err) { showToast(err.message); }
 }

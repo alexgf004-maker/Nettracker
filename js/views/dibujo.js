@@ -6,6 +6,7 @@ import { cargarBorrador, partesSVG, viewBoxDib, zoomPct } from '../actions/dibuj
 import { COLORES, GROSORES, SIMBOLOS, TAM_TEXTO } from '../domain/dibujo.js';
 import { ACCIONES_PUNTO, ESTILOS_ETIQUETA, fmtMetros, metrosTramo, metrosVano, nombreRed, nombresVanos, TIPOS_TRAMO } from '../domain/plano.js';
 import { ALTURAS_POSTE, CALIBRES, ESTRUCTURAS, grupoEstructurasDe, nombreEstructura, TIPOS_CONDUCTOR } from '../domain/red.js';
+import { ACCIONES, accionDe, kvaTexto, trabajos, trabajosOcultos } from '../domain/propuesta.js';
 import { state } from '../state.js';
 import { escapeHtml, fmtDate } from '../utils.js';
 
@@ -196,6 +197,7 @@ function panel(d, sel, h, p) {
     html += seccion('Color de la red', `${coloresRed(sel.colorRed, sel.tramo)}${nota('Para distinguir redes del mismo tipo (por ejemplo, de dos transformadores). Cada color sale aparte en la simbología.')}`);
     html += seccion('Nombre en la simbología', `<input id="dib-nombre-red" value="${esc(sel.nombreRed || '')}" placeholder="${esc(TIPOS_TRAMO[sel.tramo]?.nombre || '')}" oninput="setNombreRedDib(this.value)" onchange="finEdicionDib()">`);
     html += seccion('Conductor', `${controlesConductor(sel.conductor, { id: 'dib-cond', fn: (c, v) => `setConductorDib('${c}', ${v})` })}<div class="page-sub">Los tramos que traces después salen con este conductor.</div>`);
+    html += seccionPropuesta(sel);
     html += seccion('Grosor', tamano('Grosor de la línea'));
     if (d.tramo !== sel.id && sel.puntos.length > 1) {
       const nombres = nombresVanos(sel, d.elementos, 14 * Math.max(1, p.w / 1600));
@@ -217,6 +219,8 @@ function panel(d, sel, h, p) {
   if (sel?.tipo === 'simbolo') {
     const red = SIMBOLOS[sel.simbolo]?.grupo === 'red';
     return seccion('', `<div class="dib-simbolo-sel">${mini(sel.simbolo, 34)}<span>${esc(SIMBOLOS[sel.simbolo]?.nombre || '')}</span></div>${tamano()}${red ? nota('Los postes que pongas después salen de este tamaño.') : ''}`)
+      + (red ? seccionPropuesta(sel) : '')
+      + (red && ['trafo', 'trafo_nuevo', 'banco'].includes(sel.simbolo) ? seccion('Transformador', `<div class="field"><label>kVA (uno por transformador)</label><input id="dib-kva" value="${esc((sel.trafos || []).join(', '))}" placeholder="Ej. 37.5 o 25, 25, 25" onchange="setKvaDib(this.value)"></div>${nota(kvaTexto(sel.trafos) ? `Sale en la lámina de propuesta como ${esc(kvaTexto(sel.trafos))}.` : 'Sale en los trabajos y las cantidades de la lámina de propuesta.')}`) : '')
       + (red ? seccion('Datos del poste', controlesPoste(sel, { id: 'dib-poste', altura: 'setAlturaDib', agregar: 'agregarEstructuraDib', quitar: 'quitarEstructuraDib', escrita: 'agregarEstructuraEscritaDib', clave: sel.id, grupo: grupoEstructurasDe(tramosEnPoste(d, sel)) })) : seccion('Color', colores()))
       + acciones(`<button class="b b-g" onclick="girarDib()">Girar 90°</button>${sel.desfase ? '<button class="b b-g" onclick="metrosASuLugarDib()">Datos a su lugar</button>' : ''}`);
   }
@@ -265,6 +269,41 @@ function panel(d, sel, h, p) {
   return panelLamina(d);
 }
 
+// Qué se hace con el elemento en la propuesta (para la lámina de propuesta: trabajos, cantidades y colores)
+function seccionPropuesta(sel) {
+  const actual = accionDe(sel) || 'existente';
+  const op = (k, t) => `<button class="dib-chip ${actual === k ? 'activo' : ''}" onclick="setAccionDib('${k}')">${t}</button>`;
+  return seccion('En la propuesta', `<div class="dib-lista dib-acciones-prop">${op('existente', 'Sin cambio')}${Object.entries(ACCIONES).map(([k, a]) => op(k, a.nombre)).join('')}</div>
+    ${actual !== 'existente' ? `<div class="field"><label>Detalle (opcional)</label><input id="dib-detalle-accion" value="${esc(sel.detalleAccion || '')}" placeholder="Ej. madera por concreto 35'" oninput="setDetalleAccionDib(this.value)" onchange="finEdicionDib()"></div>` : ''}
+    <div class="page-sub">Sale numerado en la lámina de propuesta, en los trabajos a ejecutar y en las cantidades de obra.</div>`);
+}
+// Lámina de propuesta: datos, trabajos (armados solos y corregibles), problema y resultado, y descarga
+function seccionLaminaPropuesta(d) {
+  const l = d.lamina || {}; const lista = trabajos(d); const ocultos = trabajosOcultos(d);
+  const campo = (k, label, ph = '') => `<div class="field"><label>${label}</label><input id="dib-lam-${k}" value="${esc(l[k] || '')}" placeholder="${esc(ph)}" oninput="setLaminaDib('${k}', this.value)"></div>`;
+  const area = (k, label, ph) => `<div class="field"><label>${label}</label><textarea id="dib-lam-${k}" rows="3" placeholder="${esc(ph)}" oninput="setLaminaDib('${k}', this.value)">${esc(l[k] || '')}</textarea></div>`;
+  const pastilla = k => `<span class="dib-prop-acc" style="background:${ACCIONES[k].fondo};color:${ACCIONES[k].tinta}">${ACCIONES[k].nombre}</span>`;
+  const filas = lista.map(t => t.extra !== undefined
+    ? `<div class="dib-prop-trab"><b>${t.n}</b><div><select aria-label="Acción del trabajo ${t.n}" onchange="setTrabajoExtraDib(${t.extra}, 'accion', this.value)">${Object.entries(ACCIONES).map(([k, a]) => `<option value="${k}" ${t.accion === k ? 'selected' : ''}>${a.nombre}</option>`).join('')}</select>
+        <input value="${esc(t.texto)}" aria-label="Trabajo ${t.n}" oninput="setTrabajoExtraDib(${t.extra}, 'texto', this.value)"><input class="dib-prop-cant" value="${esc(t.cantidad)}" placeholder="Cant." aria-label="Cantidad del trabajo ${t.n}" oninput="setTrabajoExtraDib(${t.extra}, 'cantidad', this.value)"></div>
+        <button class="b b-l" onclick="quitarTrabajoExtraDib(${t.extra})" aria-label="Quitar el trabajo ${t.n}">✕</button></div>`
+    : `<div class="dib-prop-trab"><b>${t.n}</b><div>${pastilla(t.accion)}<input value="${esc(t.texto === t.auto.texto ? '' : t.texto)}" placeholder="${esc(t.auto.texto)}" aria-label="Trabajo ${t.n}" oninput="setTrabajoDib('${t.id}', 'texto', this.value)">
+        <input class="dib-prop-cant" value="${esc(t.cantidad === t.auto.cantidad ? '' : t.cantidad)}" placeholder="${esc(t.auto.cantidad)}" aria-label="Cantidad del trabajo ${t.n}" oninput="setTrabajoDib('${t.id}', 'cantidad', this.value)"></div>
+        <button class="b b-l" onclick="ocultarTrabajoDib('${t.id}', true)" aria-label="Quitar el trabajo ${t.n} de la lista">✕</button></div>`).join('');
+  // Los trabajos escritos a mano que todavía están vacíos también se muestran para llenarlas
+  const vacias = (l.trabajosExtra || []).map((t, i) => ({ ...t, i })).filter(t => !String(t.texto || '').trim()).map(t => `<div class="dib-prop-trab"><b>+</b><div><select aria-label="Acción del trabajo nuevo" onchange="setTrabajoExtraDib(${t.i}, 'accion', this.value)">${Object.entries(ACCIONES).map(([k, a]) => `<option value="${k}" ${t.accion === k ? 'selected' : ''}>${a.nombre}</option>`).join('')}</select>
+      <input value="" placeholder="Ej. Podar árbol entre P3 y P4" aria-label="Trabajo nuevo" onchange="setTrabajoExtraDib(${t.i}, 'texto', this.value, true)"><input class="dib-prop-cant" value="${esc(t.cantidad || '')}" placeholder="Cant." aria-label="Cantidad del trabajo nuevo" oninput="setTrabajoExtraDib(${t.i}, 'cantidad', this.value)"></div>
+      <button class="b b-l" onclick="quitarTrabajoExtraDib(${t.i})" aria-label="Quitar el trabajo nuevo">✕</button></div>`).join('');
+  return seccion('Lámina de propuesta', `<div class="page-sub">Dos láminas en carta horizontal: situación actual contra propuesta y la propuesta para ejecutar, con los trabajos numerados y las cantidades de obra.</div>
+    ${campo('etiquetaPropuesta', 'Tipo de propuesta', 'Propuesta de mejora · Red de distribución')}${campo('referencia', 'Referencia', 'Ej. Reclamo RE192026456 · CT10001')}
+    <div class="dib-dos">${campo('reviso', 'Revisó')}${campo('aprobo', 'Aprobó')}</div>
+    <div class="field"><label>Trabajos a ejecutar (${lista.length})</label>${filas || '<div class="page-sub">Selecciona un poste, transformador o tramo y elige en "En la propuesta" si se instala, reemplaza, retira o traslada. Lo proyectado sale solo.</div>'}${vacias}
+      <div class="dib-acciones-el"><button class="b b-g" onclick="agregarTrabajoDib()"><i class="ic ic-plus"></i> Agregar trabajo</button>${ocultos.map(t => `<button class="b b-l" onclick="ocultarTrabajoDib('${t.id}', false)">Volver a poner: ${esc(t.texto.slice(0, 28))}</button>`).join('')}</div>
+      <div class="page-sub">Los textos y cantidades se arman solos; escribe encima para cambiarlos.</div></div>
+    ${area('problema', 'Problema encontrado (una línea por dato)', 'Transformador P1: 25 kVA al 118 % de carga')}${area('solucion', 'Con la propuesta (una línea por dato)', 'Transformadores: 25 kVA + 37.5 kVA nuevo en P4')}
+    <div class="dib-acciones-el"><button class="b b-p" onclick="descargarPropuestaDib('pdf')"><i class="ic ic-archivo"></i> Láminas en PDF</button><button class="b b-g" onclick="descargarPropuestaDib('png')"><i class="ic ic-descargar"></i> Láminas en PNG</button></div>`);
+}
+
 function panelLamina(d) {
   const l = d.lamina || {};
   const campo = (k, label, ph = '') => `<div class="field"><label>${label}</label><input id="dib-lam-${k}" value="${esc(l[k] || '')}" placeholder="${esc(ph)}" oninput="setLaminaDib('${k}', this.value)"></div>`;
@@ -279,6 +318,7 @@ function panelLamina(d) {
       <div class="page-sub">${l.distancias === 'manual' ? 'Escribe las distancias a mano.' : 'La tabla se arma sola entre los puntos etiquetados que están sobre cada tramo, con los metros de los vanos.'}</div>` : ''}`);
   if (d.fondo) html += seccion('Imagen de fondo', `<label class="dib-opacidad">Más tenue para que la red se lea encima<input id="dib-opacidad" type="range" min="0.2" max="1" step="0.05" value="${d.fondoOpacidad || 1}" oninput="setOpacidadFondoDib(this.value)"></label>
     <div class="dib-acciones-el">${d.elementos.length ? `<button class="b b-g" onclick="setHerramientaDib('encajar')">Encajar el dibujo sobre la imagen</button>` : ''}<button class="b b-l" onclick="quitarFondoDib()">Quitar imagen</button></div>`);
+  html += seccionLaminaPropuesta(d);
   html += seccion('Atajos', '<div class="page-sub">V seleccionar · Supr borrar · Ctrl+Z deshacer · + / − zoom · 0 ajustar · barra espaciadora + arrastrar para moverte · Ctrl + rueda zoom · Esc soltar</div>');
   return html;
 }

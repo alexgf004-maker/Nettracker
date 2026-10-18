@@ -3244,6 +3244,74 @@ test.describe('Herramienta Dibujar', () => {
     await page.mouse.move(...pa); await page.mouse.down(); await page.mouse.move(...pb, { steps: 6 }); await page.mouse.up();
   };
 
+  test('lámina de propuesta: acción por elemento, trabajos numerados y corregibles, cantidades y dos láminas en PDF', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    await page.setViewportSize({ width: 1400, height: 1000 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    // Red de ejemplo desde un levantamiento: P1–P3 existente, P3–P4 proyectado, poste P4 nuevo y transformador nuevo en P3
+    await page.evaluate(async () => {
+      const lev = await import('/js/domain/levantamiento.js'); const ad = await import('/js/actions/dibujo.js');
+      const dl = 0.00036;
+      const L = { nombre: 'X', puntos: {
+        a: { lat: 13.5, lng: -88.87, nombre: 'P1', tipo: 'poste', altura: 35, estructuras: ['TS3'], orden: 1 },
+        b: { lat: 13.5, lng: -88.87 + dl, nombre: 'P2', tipo: 'poste', altura: 35, orden: 2 },
+        c: { lat: 13.5, lng: -88.87 + 2 * dl, nombre: 'P3', tipo: 'trafo_nuevo', trafos: ['37.5'], orden: 3 },
+        d: { lat: 13.5, lng: -88.87 + 3 * dl, nombre: 'P4', tipo: 'poste_nuevo', altura: 26, estructuras: ['RS3'], orden: 4 } },
+        vanos: { v1: { a: 'a', b: 'b', tramo: 'bt', calibre: '#4', conductor: 'ACSR', metros: 40, orden: 1 }, v2: { a: 'b', b: 'c', tramo: 'bt', calibre: '#4', conductor: 'ACSR', metros: 38, orden: 2 },
+          v3: { a: 'c', b: 'd', tramo: 'bt_nueva', calibre: '#2', conductor: 'Triplex', metros: 31.5, orden: 3 } } };
+      const x = lev.aDibujo(L);
+      ad.cargarEnDibujo({ elementos: x.elementos, escala: x.escala, lamina: { titulo: 'Propuesta', subtitulo: 'Col. Las Brisas', elaboro: 'David García' } });
+    });
+    await nav(page, 'Dibujar');
+    // Lo proyectado ya sale como trabajo; los tramos P1–P3 se marcan como "Reemplazar" (cambio de conductor)
+    const sel = async filtro => { await page.evaluate(async f => { const { state } = await import('/js/state.js'); const { render } = await import('/js/views/render.js'); state.dibujo.sel = state.dibujo.elementos.find(new Function('e', `return ${f}`)).id; render(); }, filtro); };
+    await page.evaluate(async () => { const { state } = await import('/js/state.js'); window.__tramos = () => state.dibujo.elementos.filter(e => e.tipo === 'polilinea' && e.tramo === 'bt'); });
+    for (const i of [0, 1]) {
+      await sel(`e === window.__tramos()[${i}]`);
+      await page.locator('.dib-acciones-prop .dib-chip', { hasText: 'Reemplazar' }).click();
+    }
+    await expect(page.locator('#dib-detalle-accion')).toBeVisible();
+    // Sin selección: la lista de trabajos (los dos tramos juntos en uno) y la corrección de un texto
+    await page.evaluate(async () => { const { state } = await import('/js/state.js'); const { render } = await import('/js/views/render.js'); state.dibujo.sel = null; render(); });
+    const trab = page.locator('.dib-prop-trab');
+    await expect(trab).toHaveCount(4);
+    await expect(trab.nth(0)).toContainText('Reemplazar');
+    await expect(trab.nth(0).locator('input').first()).toHaveAttribute('placeholder', 'Red BT #4 ACSR, P1–P3');
+    await expect(trab.nth(0).locator('.dib-prop-cant')).toHaveAttribute('placeholder', '78 m');
+    await expect(trab.nth(1).locator('input').first()).toHaveAttribute('placeholder', 'Red BT #2 Triplex, P3–P4');
+    await expect(trab.nth(2).locator('input').first()).toHaveAttribute('placeholder', 'Transformador 37.5 kVA en P3');
+    await expect(trab.nth(3).locator('input').first()).toHaveAttribute('placeholder', "Poste 26' con RS3 (P4)");
+    await trab.nth(0).locator('input').first().fill('Cambiar conductor a #2 Triplex, P1–P3');
+    await page.getByRole('button', { name: 'Agregar trabajo' }).click();
+    await page.getByLabel('Trabajo nuevo', { exact: true }).fill('Podar árbol entre P1 y P2'); await page.getByLabel('Trabajo nuevo', { exact: true }).press('Tab');
+    await expect(trab).toHaveCount(5);
+    await page.locator('#dib-lam-problema').fill('Usuario: 104 V en demanda máxima');
+    await page.locator('#dib-lam-solucion').fill('Usuario: tensión dentro de tolerancia');
+    const r = await page.evaluate(async () => {
+      const { state } = await import('/js/state.js'); const pr = await import('/js/domain/propuesta.js');
+      const d = state.dibujo;
+      return { t: pr.trabajos(d).map(t => [t.n, t.accion, t.texto, t.cantidad]), c: pr.cantidades(d).map(f => [f.material, f.texto]), cifras: pr.cifras(d), prop: pr.svgPropuesta(d), comp: pr.svgComparacion(d),
+        actual: pr.elementosActuales(d.elementos).filter(e => e.tipo === 'simbolo').map(e => e.simbolo) };
+    });
+    expect(r.t.map(t => t.slice(0, 3))).toEqual([[1, 'reemplazar', 'Cambiar conductor a #2 Triplex, P1–P3'], [2, 'instalar', 'Red BT #2 Triplex, P3–P4'],
+      [3, 'instalar', 'Transformador 37.5 kVA en P3'], [4, 'instalar', "Poste 26' con RS3 (P4)"], [5, 'instalar', 'Podar árbol entre P1 y P2']]);
+    expect(r.t.map(t => t[3])).toEqual(['78 m', expect.stringMatching(/^31[.,]5 m$/), '1 u', '1 u', '']);
+    expect(r.c.map(f => f[0])).toEqual(["Poste de 26'", 'Transformador 37.5 kVA', 'Estructura RS3', 'Conductor #2 Triplex', 'Conductor #4 ACSR']);
+    expect(r.cifras.map(c => c[0])).toEqual(['Trabajos', 'Red nueva', 'Postes nuevos', 'Transformador']);
+    for (const t of ['TRABAJOS A EJECUTAR', 'CANTIDADES DE OBRA', 'Cambiar conductor a #2 Triplex', 'Col. Las Brisas', '2/2', 'David García']) expect(r.prop).toContain(t);
+    for (const t of ['1 · SITUACIÓN ACTUAL', '2 · SITUACIÓN PROPUESTA', 'PROBLEMA ENCONTRADO', '104 V en demanda máxima', 'tensión dentro de tolerancia', '1/2']) expect(r.comp).toContain(t);
+    expect(r.actual).not.toContain('trafo_nuevo'); expect(r.actual).not.toContain('poste_nuevo');
+    // Descarga en PDF: una página con las dos láminas en carta horizontal
+    await page.evaluate(() => { window.__docs = []; const crear = URL.createObjectURL.bind(URL); URL.createObjectURL = b => { b.text().then(t => window.__docs.push(t)); return crear(b); }; });
+    await page.getByRole('button', { name: 'Láminas en PDF' }).click();
+    await expect.poll(() => page.evaluate(() => window.__docs.length)).toBe(1);
+    const html = (await page.evaluate(() => window.__docs))[0];
+    expect(html).toContain('size: letter landscape');
+    expect(html.match(/<div class="hoja"><svg/g)).toHaveLength(2);
+    expect(errores).toEqual([]);
+  });
+
   test('dibujo libre: líneas, figuras, texto y unifilar; deshacer, borrador, cajetín opcional y PNG', async ({ page }) => {
     const errores = []; page.on('pageerror', e => errores.push(e.message));
     await page.setViewportSize({ width: 1280, height: 1000 });
