@@ -53,6 +53,47 @@ export const kvaTexto = trafos => {
 const nombreConductor = c => [c?.calibre, c?.tipo].filter(Boolean).join(' ');
 const conductorDe = (t, i = 1) => nombreConductor(conductorVano(t, i));
 
+// ── Lo que queda después del cambio ──
+// Reemplazar: "Se cambia por" (el.reemplazo: { conductor } en un tramo; { altura, estructuras } en un poste; { trafos } en
+// un transformador). Trasladar: dónde queda el poste o símbolo (el.traslado = [x, y], su centro nuevo en el dibujo).
+// El elemento guarda lo que hay hoy; la propuesta lo muestra con el cambio aplicado.
+const datosPoste = e => [e.altura ? `${e.altura}'` : '', (e.estructuras || []).length ? `con ${e.estructuras.join(' / ')}` : ''].filter(Boolean).join(' ');
+const datosCortos = e => [e.altura ? `${e.altura}'` : '', (e.estructuras || []).join(' / ')].filter(Boolean).join(' · ');
+export const reemplazoDe = el => (accionDe(el) === 'reemplazar' && el.reemplazo && Object.keys(el.reemplazo).length ? el.reemplazo : null);
+export const trasladoDe = el => (el.tipo === 'simbolo' && accionDe(el) === 'trasladar' && Array.isArray(el.traslado) ? el.traslado : null);
+// Metros que se mueve un traslado (con escala) o null
+export const metrosTraslado = (el, escala) => { const t = trasladoDe(el); if (!t || !escala) return null; const [x, y] = centro(el); return Math.hypot(t[0] - x, t[1] - y) * escala; };
+// Elemento con su reemplazo aplicado; _antes: lo de hoy en texto ("#4 ACSR", "35' · RS3", "25 kVA") para tacharlo
+function conReemplazo(el) {
+  const r = reemplazoDe(el); if (!r) return el;
+  if (el.tipo === 'polilinea') {
+    if (!r.conductor) return el;
+    const { calibres, ...resto } = el; const antes = conductorDe(el);
+    return { ...resto, conductor: { ...r.conductor }, ...(antes && antes !== nombreConductor(r.conductor) ? { _antes: antes } : {}) };
+  }
+  const x = { ...el }; const antes = [];
+  if (r.altura !== undefined || r.estructuras) { if (r.altura !== undefined) x.altura = r.altura; if (r.estructuras) x.estructuras = [...r.estructuras]; const a = datosCortos(el); if (a && a !== datosCortos(x)) antes.push(a); }
+  if (r.trafos) { x.trafos = [...r.trafos]; const a = kvaTexto(el.trafos); if (a && a !== kvaTexto(r.trafos)) antes.push(a); }
+  if (antes.length) x._antes = antes.join(' · ');
+  return x;
+}
+// Situación propuesta: los reemplazos con lo nuevo y lo trasladado en su lugar nuevo, con la red y la etiqueta que
+// llegan a ese punto (_traslado: de dónde a dónde, para la flecha). tol: qué tan cerca de su centro está "pegado"
+export function elementosPropuestos(elementos, tol = 12) {
+  const movidos = elementos.filter(el => trasladoDe(el)).map(el => ({ id: el.id, desde: centro(el), hasta: trasladoDe(el) }));
+  const cerca = ([x, y], m) => Math.hypot(m.desde[0] - x, m.desde[1] - y) <= tol;
+  const mover = p => { const m = movidos.find(q => cerca(p, q)); return m ? [...m.hasta] : p; };
+  return elementos.map(el => {
+    let e = conReemplazo(el);
+    if (!movidos.length) return e;
+    const m = movidos.find(q => q.id === el.id);
+    if (m) return { ...e, x: e.x + m.hasta[0] - m.desde[0], y: e.y + m.hasta[1] - m.desde[1], _traslado: { desde: m.desde, hasta: m.hasta } };
+    if (e.tipo === 'polilinea') e = { ...e, puntos: e.puntos.map(mover) };
+    if (e.tipo === 'etiqueta') { const q = movidos.find(z => cerca([e.tx, e.ty], z)); if (q) { const dx = q.hasta[0] - q.desde[0]; const dy = q.hasta[1] - q.desde[1]; e = { ...e, tx: e.tx + dx, ty: e.ty + dy, x: e.x + dx, y: e.y + dy }; } }
+    return e;
+  });
+}
+
 // Trabajo que sale de un elemento: { id, accion, texto, cantidad, ancla }
 function trabajoDe(el, d, tol) {
   const accion = accionDe(el); if (!accion) return null;
@@ -60,19 +101,33 @@ function trabajoDe(el, d, tol) {
     const k = el.simbolo; const pt = nombreEn(d.elementos, centro(el), tol);
     const datos = [el.altura ? `${el.altura}'` : '', (el.estructuras || []).length ? `con ${el.estructuras.join(' / ')}` : ''].filter(Boolean).join(' ');
     let texto;
-    if (esPoste(k)) texto = `Poste ${datos}${pt ? ` (${pt})` : ''}`.replace(/\s+/g, ' ').trim();
-    else if (esTrafo(k)) texto = `${k === 'banco' ? 'Banco de transformadores' : 'Transformador'}${kvaTexto(el.trafos) ? ` ${kvaTexto(el.trafos)}` : ''}${pt ? ` en ${pt}` : ''}`;
-    else texto = `${SIMBOLOS[k]?.nombre.replace(/ (existente|proyectado)$/i, '') || 'Elemento'}${pt ? ` en ${pt}` : ''}`;
+    const r = reemplazoDe(el); const nombre = SIMBOLOS[k]?.nombre.replace(/ (existente|proyectado)$/i, '') || 'Elemento';
+    const trafo = k === 'banco' ? 'Banco de transformadores' : 'Transformador';
+    if (accion === 'trasladar') {
+      // "Trasladar poste P5 6.5 m" (los metros con escala y el lugar marcado)
+      const m = metrosTraslado(el, d.escala);
+      texto = `Trasladar ${esPoste(k) ? 'poste' : esTrafo(k) ? trafo.toLowerCase() : nombre.toLowerCase()}${pt ? ` ${pt}` : ''}${m !== null ? ` ${fmt(m)} m` : ''}`;
+    } else if (r && esPoste(k) && (r.altura !== undefined || r.estructuras)) {
+      // "Cambiar poste 35' con RS3 por 40' con TS3 (P2)"
+      const nuevo = { altura: r.altura !== undefined ? r.altura : el.altura, estructuras: r.estructuras || el.estructuras };
+      texto = `Cambiar poste${datos ? ` ${datos}` : ''} por ${datosPoste(nuevo) || 'otro'}${pt ? ` (${pt})` : ''}`;
+    } else if (r && esTrafo(k) && r.trafos) texto = `Cambiar ${trafo.toLowerCase()}${kvaTexto(el.trafos) ? ` ${kvaTexto(el.trafos)}` : ''} por ${kvaTexto(r.trafos)}${pt ? ` en ${pt}` : ''}`;
+    else if (esPoste(k)) texto = `Poste ${datos}${pt ? ` (${pt})` : ''}`.replace(/\s+/g, ' ').trim();
+    else if (esTrafo(k)) texto = `${trafo}${kvaTexto(el.trafos) ? ` ${kvaTexto(el.trafos)}` : ''}${pt ? ` en ${pt}` : ''}`;
+    else texto = `${nombre}${pt ? ` en ${pt}` : ''}`;
     if (el.detalleAccion) texto += `: ${el.detalleAccion}`;
-    // Marca abajo a la derecha del símbolo (arriba suele ir su etiqueta)
-    const [cx, cy] = centro(el); const s = 30 * el.escala;
+    // Marca abajo a la derecha del símbolo (arriba suele ir su etiqueta); en un traslado, junto a su lugar nuevo
+    const [cx, cy] = trasladoDe(el) || centro(el); const s = 30 * el.escala;
     return { id: el.id, accion, texto, cantidad: '1 u', ancla: [cx + s * 1.45, cy + s * 1.45] };
   }
   // Tramo: entre los puntos de sus extremos, con el conductor y los metros
   const a = nombreEn(d.elementos, el.puntos[0], tol); const b = nombreEn(d.elementos, el.puntos[el.puntos.length - 1], tol);
   const tramo = el.tramo === 'acometida' ? 'Acometida' : /^mt/.test(el.tramo) ? 'Red MT' : el.tramo === 'retirar' ? 'Red' : 'Red BT';
   const cond = conductorDe(el);
-  let texto = accion === 'retirar' ? `Conductor${cond ? ` ${cond}` : ''}` : `${tramo}${cond ? ` ${cond}` : ''}`;
+  // Reemplazo con el conductor nuevo elegido: "Cambiar conductor #4 ACSR por #2 Triplex"
+  const nuevo = reemplazoDe(el)?.conductor ? nombreConductor(reemplazoDe(el).conductor) : '';
+  const base = nuevo ? `Cambiar ${el.tramo === 'acometida' ? 'acometida' : 'conductor'}${cond ? ` ${cond}` : ''} por ${nuevo}` : accion === 'retirar' ? `Conductor${cond ? ` ${cond}` : ''}` : `${tramo}${cond ? ` ${cond}` : ''}`;
+  let texto = base;
   if (a && b) texto += `, ${a}–${b}`;
   if (el.detalleAccion) texto += `: ${el.detalleAccion}`;
   const m = metrosTramo(el, d.escala);
@@ -83,7 +138,7 @@ function trabajoDe(el, d, tol) {
   const L = Math.hypot(x1 - x0, y1 - y0) || 1; const sep = 34 * tol / 12;
   let nx = -(y1 - y0) / L; let ny = (x1 - x0) / L; if (ny > 0 || (ny === 0 && nx > 0)) { nx = -nx; ny = -ny; }
   return { id: el.id, accion, texto, cantidad: m !== null ? `${fmt(m)} m` : el.tramo === 'acometida' ? '1 u' : '— m', metros: m, ancla: [(x0 + x1) / 2 + nx * sep, (y0 + y1) / 2 + ny * sep],
-    tramo: { clave: `${accion}|${el.tramo}|${cond}|${el.detalleAccion || ''}`, a: el.puntos[0], b: el.puntos[el.puntos.length - 1], na: a, nb: b, largo, base: el.tramo === 'acometida' ? 'Acometida' : accion === 'retirar' ? 'Conductor' : tramo, cond, detalle: el.detalleAccion || '' } };
+    tramo: { clave: `${accion}|${el.tramo}|${cond}|${nuevo}|${el.detalleAccion || ''}`, a: el.puntos[0], b: el.puntos[el.puntos.length - 1], na: a, nb: b, largo, base, detalle: el.detalleAccion || '' } };
 }
 // Los tramos seguidos con el mismo trabajo (acción, tipo y conductor) salen como uno solo: "Red BT #2 Triplex, P1–P3"
 function juntarTramos(lista, tol) {
@@ -107,7 +162,7 @@ function juntarTramos(lista, tol) {
     const nombres = puntas.map(([, n]) => n);
     const metros = grupo.every(g => g.metros !== null && g.metros !== undefined) ? grupo.reduce((a, g) => a + g.metros, 0) : null;
     const largo = grupo.reduce((m, g) => (g.tramo.largo > m.tramo.largo ? g : m), grupo[0]);
-    let texto = `${t.tramo.base}${t.tramo.cond ? ` ${t.tramo.cond}` : ''}`;
+    let texto = t.tramo.base;
     if (nombres.length === 2 && nombres.every(Boolean)) texto += `, ${nombres[0]}–${nombres[1]}`;
     if (t.tramo.detalle) texto += `: ${t.tramo.detalle}`;
     out.push({ ...t, texto, metros, cantidad: metros !== null ? `${fmt(metros)} m` : '— m', ancla: largo.ancla, ids: grupo.map(g => g.id) });
@@ -115,6 +170,7 @@ function juntarTramos(lista, tol) {
   return out;
 }
 
+const tolDe = d => 12 * Math.max(1, (d.fondo?.w || 1600) / 1600);
 // Trabajos a ejecutar, numerados: los de los elementos (con las correcciones de la lámina) y luego los escritos a mano
 export function trabajos(d) {
   const l = d.lamina || {}; const tol = 12 * Math.max(1, (d.fondo?.w || 1600) / 1600);
@@ -135,8 +191,10 @@ export function trabajosOcultos(d) {
 export function cantidades(d) {
   const filas = new Map();
   const sumar = (k, ud, n) => { const x = filas.get(k) || { material: k, unidad: ud, cantidad: 0, incompleto: false }; if (n === null) x.incompleto = true; else x.cantidad += n; filas.set(k, x); };
-  d.elementos.filter(conAccion).forEach(el => {
-    const acc = accionDe(el); if (!acc) return;
+  // Lo que se instala sale con los datos nuevos (lo elegido en "Se cambia por"); lo que se retira, con los de hoy
+  d.elementos.filter(conAccion).forEach(hoy => {
+    const acc = accionDe(hoy); if (!acc) return;
+    const el = conReemplazo(hoy);
     if (el.tipo === 'simbolo') {
       const k = el.simbolo;
       if (esPoste(k)) {
@@ -149,7 +207,7 @@ export function cantidades(d) {
       } else if (esTrafo(k)) {
         const lista = (el.trafos || []).filter(Boolean);
         if (acc === 'instalar' || acc === 'reemplazar') (lista.length ? lista : ['']).forEach(kva => sumar(kva ? `Transformador ${kva} kVA` : 'Transformador', 'u', 1));
-        if (acc === 'retirar' || acc === 'reemplazar') sumar('Retiro de transformador', 'u', lista.length || 1);
+        if (acc === 'retirar' || acc === 'reemplazar') sumar('Retiro de transformador', 'u', (hoy.trafos || []).filter(Boolean).length || 1);
         if (acc === 'trasladar') sumar('Traslado de transformador', 'u', lista.length || 1);
       } else {
         const nom = SIMBOLOS[k]?.nombre.replace(/ (existente|proyectado)$/i, '') || 'Elemento';
@@ -170,6 +228,8 @@ export function cantidades(d) {
       if (acc === 'retirar') sumar(`Retiro de conductor ${c}`, 'm', m);
       if (acc === 'trasladar') sumar(`Traslado de red ${c}`, 'm', m);
     });
+    // Reemplazo: el conductor de hoy también se retira
+    if (acc === 'reemplazar' && !acometida) for (let i = 1; i < hoy.puntos.length; i++) sumar(`Retiro de conductor ${conductorDe(hoy, i) || 'sin calibre'}`, 'm', metrosVano(hoy, i, d.escala));
   });
   const orden = x => (/^Poste/.test(x) ? 0 : /^Transformador|^Banco/.test(x) ? 1 : /^Estructura/.test(x) ? 2 : /^Conductor|^Acometida nueva/.test(x) ? 3 : /^Retiro/.test(x) ? 4 : 5);
   return [...filas.values()].sort((a, b) => orden(a.material) - orden(b.material) || a.material.localeCompare(b.material))
@@ -184,6 +244,9 @@ export function cifras(d, lista = trabajos(d)) {
     if (el.tipo === 'polilinea' && el.tramo !== 'acometida' && (acc === 'instalar' || acc === 'reemplazar')) { const m = metrosTramo(el, d.escala); if (m !== null) { red += m; redOk = true; } }
     if (el.tipo === 'simbolo' && esPoste(el.simbolo) && (acc === 'instalar' || acc === 'reemplazar')) postes++;
     if (el.tipo === 'simbolo' && esTrafo(el.simbolo) && acc === 'instalar') kva.push(...(el.trafos || []).filter(Boolean).map(Number).filter(n => n > 0));
+    // Cambio de transformador: lo que se agrega (kVA nuevos menos los de hoy)
+    const r = reemplazoDe(el); const suma = t => (t || []).map(Number).filter(n => n > 0).reduce((a, b) => a + b, 0);
+    if (el.tipo === 'simbolo' && esTrafo(el.simbolo) && r?.trafos && suma(r.trafos) > suma(el.trafos)) kva.push(suma(r.trafos) - suma(el.trafos));
   });
   const out = [['Trabajos', String(lista.length)]];
   if (redOk) out.push(['Red nueva', `${fmt(red)} m`]);
@@ -210,7 +273,7 @@ export function elementosActuales(elementos) {
   const deNuevo = el => el.tipo === 'polilinea' && el.tramo === 'acometida' && el.puntos.some(([px, py]) => puntas.some(([x, y]) => Math.hypot(px - x, py - y) < 3));
   return elementos.filter(el => !nuevos.includes(el) && !enNuevo(el) && !deNuevo(el)).map(el => {
     if (!conAccion(el)) return el;
-    const { detalleAccion, ...sinDetalle } = el;
+    const { detalleAccion, reemplazo, traslado, ...sinDetalle } = el;
     const r = { ...sinDetalle, accion: 'existente' };
     if (el.tipo === 'polilinea' && el.tramo === 'retirar') r.tramo = 'bt';
     return r;
@@ -346,10 +409,11 @@ const marco = cuerpo => `<svg xmlns="http://www.w3.org/2000/svg" width="1650" he
 
 // Lámina de la propuesta para ejecutar: plano con los trabajos numerados, lista de trabajos y cantidades de obra
 export function svgPropuesta(d, { n = 2, total = 2, limpio = true } = {}) {
-  const lista = trabajos(d); const elementos = limpio ? d.elementos : conPaleta(d.elementos);
+  const lista = trabajos(d); const elementos = limpio ? elementosPropuestos(d.elementos, tolDe(d)) : conPaleta(d.elementos);
   const p = svgLamina({ ...d, elementos, lamina: { ...(d.lamina || {}), activa: false } });
   const W = 1092; const H = 1026;
-  const v = encuadre(d, elementos, { limpio }); const factor = Math.min(W / v.w, H / v.h);
+  // El encuadre abarca lo de hoy y lo propuesto (un traslado se ve de dónde a dónde)
+  const v = encuadre(d, limpio ? [...elementos, ...d.elementos] : elementos, { limpio }); const factor = Math.min(W / v.w, H / v.h);
   let s = encabezado(d, lista);
   s += tarjetaPlano(d, elementos, { x: 34, y: 154, w: W, h: H, id: 'clip-prop', vista: v, limpio, lista, extra: limpio ? '' : reemplazos(d.elementos, p.w) + equis(d.elementos, p.w) + marcas(lista, p.w) });
   if (d.lamina?.norte !== false) s += norte(34 + W - 40, 194);
@@ -400,10 +464,10 @@ export function svgComparacion(d, { n = 1, total = 2, limpio = true } = {}) {
   const W = 781; const H = 770;
   let s = encabezado(d, lista);
   const actual = limpio ? elementosActuales(d.elementos) : elementosActuales(d.elementos).map(el => (el.tipo === 'polilinea' && el.tramo !== 'acometida' ? { ...el, colorRed: PALETA.existente } : el));
-  const prop = limpio ? d.elementos : conPaleta(d.elementos);
+  const prop = limpio ? elementosPropuestos(d.elementos, tolDe(d)) : conPaleta(d.elementos);
   const pw = svgLamina({ ...d, lamina: { ...(l), activa: false } }).w;
-  // Las dos vistas con el mismo encuadre (el de la propuesta) para compararlas lado a lado
-  const v = encuadre(d, prop, { limpio });
+  // Las dos vistas con el mismo encuadre (lo de hoy y lo propuesto) para compararlas lado a lado
+  const v = encuadre(d, limpio ? [...prop, ...d.elementos] : prop, { limpio });
   s += tarjetaPlano(d, actual, { x: 34, y: 154, w: W, h: H, id: 'clip-act', vista: v, limpio });
   s += tarjetaPlano(d, prop, { x: 835, y: 154, w: W, h: H, id: 'clip-pro', vista: v, limpio, extra: limpio ? '' : reemplazos(d.elementos, pw) + equis(d.elementos, pw) });
   const pastilla = (x, texto, color) => { const w = texto.length * 9.6 + 26; return `<rect x="${x + 14}" y="168" width="${w}" height="30" rx="8" fill="${color}"/>` + T(x + 27, 188, texto, { tam: 14, peso: 800, color: '#ffffff', esp: 1.4 }); };

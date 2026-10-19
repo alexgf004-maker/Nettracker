@@ -222,6 +222,7 @@ export function dibPointerDown(ev) {
   medirIman(ev);
   let [x, y] = punto(ev);
   if (y > tamano(d).h) return; // el cajetín no se dibuja a mano
+  if (d.trasladando) { toques.delete(ev.pointerId); ponerTraslado(d, x, y); return; }
   const base = { id: nuevoId(), color: d.color, grosor: GROSORES[d.grosor] * escalaBase() };
   const h = d.herramienta;
   if (h === 'seleccionar') {
@@ -580,7 +581,7 @@ export function agregarEstructuraDib(codigo) {
   const c = String(codigo || '').trim().toUpperCase(); if (!c) return;
   cambiarSel(el => ((el.estructuras || []).includes(c) ? el : { ...el, estructuras: [...(el.estructuras || []), c] }));
 }
-export function agregarEstructuraEscritaDib() { const inp = document.getElementById('dib-estr-otra'); if (inp?.value.trim()) agregarEstructuraDib(inp.value); }
+export function agregarEstructuraEscritaDib() { const inp = document.getElementById('dib-poste-estr-otra'); if (inp?.value.trim()) { agregarEstructuraDib(inp.value); inp.value = ''; } }
 export function quitarEstructuraDib(i) { cambiarSel(el => { const estructuras = (el.estructuras || []).filter((_, k) => k !== i); const { estructuras: _e, ...resto } = el; return estructuras.length ? { ...resto, estructuras } : resto; }); }
 // Conductor del tramo (calibre y tipo); queda para los tramos siguientes
 export function setConductorDib(campo, v) {
@@ -857,6 +858,41 @@ export function setKvaDib(v) {
   if (lista.some(x => Number.isNaN(Number(x)) || Number(x) <= 0)) return showToast('Escribe los kVA (solo números, separados por coma si son varios)');
   cambiarSel(el => { const { trafos, ...resto } = el; return lista.length ? { ...resto, trafos: lista.map(x => String(Number(x))) } : resto; });
 }
+// "Se cambia por" (Reemplazar): lo nuevo que va en lugar de lo de hoy (conductor, altura y estructuras, kVA)
+function cambiarReemplazo(fn) {
+  cambiarSel(el => {
+    const r = fn({ ...(el.reemplazo || {}) });
+    Object.keys(r).forEach(k => { const v = r[k]; if (v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length) || (typeof v === 'object' && !Array.isArray(v) && !Object.keys(v).length)) delete r[k]; });
+    const { reemplazo, ...resto } = el; return Object.keys(r).length ? { ...resto, reemplazo: r } : resto;
+  });
+}
+export function setReemplazoConductorDib(campo, v) { const val = String(v || '').trim(); cambiarReemplazo(r => { const c = { ...(r.conductor || {}) }; if (val) c[campo] = val; else delete c[campo]; return { ...r, conductor: c }; }); }
+export function setReemplazoAlturaDib(v) {
+  const a = leerAltura(v);
+  if (String(v ?? '').trim() && a === null) return showToast('Escribe la altura en pies (solo el número)');
+  cambiarReemplazo(r => ({ ...r, altura: a || undefined }));
+}
+export function agregarReemplazoEstructuraDib(codigo) {
+  const c = String(codigo || '').trim().toUpperCase(); if (!c) return;
+  cambiarReemplazo(r => ({ ...r, estructuras: (r.estructuras || []).includes(c) ? r.estructuras : [...(r.estructuras || []), c] }));
+}
+export function agregarReemplazoEstructuraEscritaDib() { const inp = document.getElementById('dib-remp-estr-otra'); if (inp?.value.trim()) agregarReemplazoEstructuraDib(inp.value); }
+export function quitarReemplazoEstructuraDib(i) { cambiarReemplazo(r => ({ ...r, estructuras: (r.estructuras || []).filter((_, k) => k !== i) })); }
+export function setReemplazoKvaDib(v) {
+  const lista = String(v || '').split(/[,;+]|\s+y\s+/).map(x => x.trim().replace(/\s*kva$/i, '').replace(',', '.')).filter(Boolean);
+  if (lista.some(x => Number.isNaN(Number(x)) || Number(x) <= 0)) return showToast('Escribe los kVA (solo números, separados por coma si son varios)');
+  cambiarReemplazo(r => ({ ...r, trafos: lista.map(x => String(Number(x))) }));
+}
+// Trasladar: el siguiente toque en el plano marca dónde queda el poste o símbolo seleccionado
+export function marcarTrasladoDib() { const d = dib(); const el = seleccionado(); if (!el) return; d.trasladando = el.id; render(); showToast('Toca en el plano dónde queda'); }
+export function cancelarTrasladoDib() { const d = dib(); if (d) d.trasladando = null; render(); }
+export function quitarTrasladoDib() { cambiarSel(el => { const { traslado, ...resto } = el; return resto; }); }
+function ponerTraslado(d, x, y) {
+  const el = d.elementos.find(e => e.id === d.trasladando); d.trasladando = null;
+  if (!el) return render();
+  d.sel = el.id; memorizar(); reemplazar({ ...el, traslado: [Math.round(x * 10) / 10, Math.round(y * 10) / 10] }); guardarBorrador(); render();
+}
+
 // Corregir el texto o la cantidad de un trabajo armado solo (vacío = el automático) u ocultarlo
 function cambiarTrabajos(fn) { const d = dib(); if (!d) return; d.lamina = { ...d.lamina, trabajos: fn({ ...(d.lamina?.trabajos || {}) }) }; guardarBorrador(); }
 export function setTrabajoDib(id, campo, valor) {

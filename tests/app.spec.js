@@ -3297,7 +3297,7 @@ test.describe('Herramienta Dibujar', () => {
     expect(r.t.map(t => t.slice(0, 3))).toEqual([[1, 'reemplazar', 'Cambiar conductor a #2 Triplex, P1–P3'], [2, 'instalar', 'Red BT #2 Triplex, P3–P4'],
       [3, 'instalar', 'Transformador 37.5 kVA en P3'], [4, 'instalar', "Poste 26' con RS3 (P4)"], [5, 'instalar', 'Podar árbol entre P1 y P2']]);
     expect(r.t.map(t => t[3])).toEqual(['78 m', expect.stringMatching(/^31[.,]5 m$/), '1 u', '1 u', '']);
-    expect(r.c.map(f => f[0])).toEqual(["Poste de 26'", 'Transformador 37.5 kVA', 'Estructura RS3', 'Conductor #2 Triplex', 'Conductor #4 ACSR']);
+    expect(r.c.map(f => f[0])).toEqual(["Poste de 26'", 'Transformador 37.5 kVA', 'Estructura RS3', 'Conductor #2 Triplex', 'Conductor #4 ACSR', 'Retiro de conductor #4 ACSR']);
     expect(r.cifras.map(c => c[0])).toEqual(['Trabajos', 'Red nueva', 'Postes nuevos', 'Transformador']);
     for (const t of ['TRABAJOS A EJECUTAR', 'CANTIDADES DE OBRA', 'Cambiar conductor a #2 Triplex', 'Col. Las Brisas', '2/2', 'David García']) expect(r.prop).toContain(t);
     for (const t of ['1 · SITUACIÓN ACTUAL', '2 · SITUACIÓN PROPUESTA', 'PROBLEMA ENCONTRADO', '104 V en demanda máxima', 'tensión dentro de tolerancia', '1/2']) expect(r.comp).toContain(t);
@@ -3312,6 +3312,69 @@ test.describe('Herramienta Dibujar', () => {
     const html = (await page.evaluate(() => window.__docs))[0];
     expect(html).toContain('size: letter landscape');
     expect(html.match(/<div class="hoja"><svg/g)).toHaveLength(2);
+    expect(errores).toEqual([]);
+  });
+
+  test('propuesta: reemplazar con "Se cambia por" (tramo, poste, transformador) y trasladar marcando dónde queda', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    await page.setViewportSize({ width: 1400, height: 1000 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await page.evaluate(async () => {
+      const lev = await import('/js/domain/levantamiento.js'); const ad = await import('/js/actions/dibujo.js');
+      const dl = 0.00036;
+      const L = { nombre: 'X', puntos: {
+        a: { lat: 13.5, lng: -88.87, nombre: 'P1', tipo: 'trafo', trafos: ['25'], orden: 1 },
+        b: { lat: 13.5, lng: -88.87 + dl, nombre: 'P2', tipo: 'poste', altura: 35, estructuras: ['RS3'], orden: 2 },
+        c: { lat: 13.5 - dl, lng: -88.87 + dl, nombre: 'P3', tipo: 'poste', altura: 30, orden: 3 } },
+        vanos: { v1: { a: 'a', b: 'b', tramo: 'bt', calibre: '#4', conductor: 'ACSR', metros: 40, orden: 1 }, v2: { a: 'b', b: 'c', tramo: 'bt', calibre: '#6', conductor: 'ACSR', metros: 40, orden: 2 } } };
+      const x = lev.aDibujo(L);
+      ad.cargarEnDibujo({ elementos: x.elementos, escala: x.escala, lamina: { titulo: 'Propuesta' } });
+    });
+    await nav(page, 'Dibujar');
+    const sel = async f => { await page.evaluate(async f => { const { state } = await import('/js/state.js'); const { render } = await import('/js/views/render.js'); state.dibujo.sel = state.dibujo.elementos.find(new Function('e', `return ${f}`)).id; render(); }, f); };
+    const chip = t => page.locator('.dib-acciones-prop .dib-chip', { hasText: t });
+    // Tramo P1–P2: cambio de conductor
+    await sel("e.tipo === 'polilinea' && e.conductor?.calibre === '#4'");
+    await expect(chip('Trasladar')).toHaveCount(0); // en un tramo no se traslada (la red sigue a los postes)
+    await chip('Reemplazar').click();
+    await expect(page.locator('.dib-ayuda-accion')).toContainText('Elige abajo lo nuevo');
+    await expect(page.locator('.dib-reemplazo')).toContainText('Hoy: #4 ACSR');
+    await page.locator('.dib-reemplazo .dib-op', { hasText: '#2' }).first().click();
+    await page.locator('.dib-reemplazo .dib-op', { hasText: 'Triplex' }).click();
+    // P2: poste de 40' con TS3 (escrita) y P1: transformador de 50 kVA
+    await sel("e.tipo === 'simbolo' && e.simbolo === 'poste' && e.altura === 35");
+    await chip('Reemplazar').click();
+    await page.locator('.dib-reemplazo .dib-op', { hasText: "40'" }).click();
+    await page.fill('#dib-remp-estr-otra', 'ts3'); await page.locator('.dib-reemplazo .dib-estr-otra button').click();
+    await sel("e.tipo === 'simbolo' && e.simbolo === 'trafo'");
+    await chip('Reemplazar').click();
+    await page.fill('#dib-remp-kva', '50'); await page.press('#dib-remp-kva', 'Tab');
+    // P3: se traslada; el toque en el plano marca dónde queda
+    await sel("e.tipo === 'simbolo' && e.altura === 30");
+    await chip('Trasladar').click();
+    await page.getByRole('button', { name: 'Marcar dónde queda' }).click();
+    const pos = await page.evaluate(async () => { const { state } = await import('/js/state.js'); const e = state.dibujo.elementos.find(x => x.tipo === 'simbolo' && x.altura === 30); const svg = document.querySelector('#dib-svg'); const pt = svg.createSVGPoint(); pt.x = e.x + 30 * e.escala - 150; pt.y = e.y + 30 * e.escala; const s = pt.matrixTransform(svg.getScreenCTM()); return [s.x, s.y]; });
+    await page.mouse.click(pos[0], pos[1]);
+    await expect(page.locator('.dib-reemplazo')).toContainText('se mueve');
+    // En el editor: lo nuevo junto a lo de hoy y la flecha del traslado
+    await expect(page.locator('#dib-capa')).toContainText("35' · RS3 → 40' · TS3");
+    await expect(page.locator('#dib-capa')).toContainText('25 kVA → 50 kVA');
+    await expect(page.locator('#dib-capa')).toContainText('#4 ACSR → #2 Tpx');
+    const r = await page.evaluate(async () => {
+      const { state } = await import('/js/state.js'); const pr = await import('/js/domain/propuesta.js'); const d = state.dibujo;
+      const prop = pr.elementosPropuestos(d.elementos); const p3 = d.elementos.find(x => x.tipo === 'simbolo' && x.altura === 30); const p3n = prop.find(x => x.id === p3.id);
+      return { t: pr.trabajos(d).map(t => t.texto), c: pr.cantidades(d).map(f => `${f.material}: ${f.texto}`), svg: pr.svgPropuesta(d), comp: pr.svgComparacion(d),
+        movido: Math.round(p3.x - p3n.x), tramoSigue: prop.some(x => x.tipo === 'polilinea' && x.puntos.some(([px]) => Math.abs(px - (p3n.x + 30 * p3n.escala)) < 1)),
+        actual: pr.elementosActuales(d.elementos).some(x => x.reemplazo || x.traslado) };
+    });
+    expect(r.t).toEqual(['Cambiar conductor #4 ACSR por #2 Triplex, P1–P2', 'Cambiar transformador 25 kVA por 50 kVA en P1', "Cambiar poste 35' con RS3 por 40' con TS3 (P2)", expect.stringMatching(/^Trasladar poste P3 \d+(\.\d)? m$/)]);
+    expect(r.c).toEqual(expect.arrayContaining(["Poste de 40': 1 u", 'Transformador 50 kVA: 1 u', 'Estructura TS3: 1 u', 'Conductor #2 Triplex: 40 m', 'Retiro de conductor #4 ACSR: 40 m', 'Retiro de poste: 1 u', 'Retiro de transformador: 1 u', 'Traslado de poste: 1 u']));
+    expect(r.c.some(f => f.startsWith('Conductor #4'))).toBe(false);
+    expect(r.movido).toBe(150); expect(r.tramoSigue).toBe(true); expect(r.actual).toBe(false);
+    // En la lámina: lo de hoy tachado y el kVA nuevo
+    for (const t of ['Trafo nuevo 50 kVA', '25 kVA', "35' · RS3", '#4 ACSR', '#2 Triplex']) expect(r.svg).toContain(t);
+    expect(r.comp).toContain('Trafo 25 kVA');
     expect(errores).toEqual([]);
   });
 

@@ -16,7 +16,7 @@ const fmtM = m => `${(Math.round(m * 10) / 10).toFixed(1)} m`;
 const K = 1.45;
 
 // Colores (los de la lámina de propuesta)
-const C = { existente: '#334155', nuevo: '#0e7490', retirar: '#e11d48', texto: '#0f172a', sub: '#475569', acometida: '#1e293b', mt: '#1e293b' };
+const C = { existente: '#334155', nuevo: '#0e7490', retirar: '#e11d48', traslado: '#b45309', texto: '#0f172a', sub: '#475569', acometida: '#1e293b', mt: '#1e293b' };
 
 // ── Choques (para acomodar etiquetas) ──
 const seCruzan = (a, b, m = 2) => a.x < b.x + b.w + m && b.x < a.x + a.w + m && a.y < b.y + b.h + m && b.y < a.y + a.h + m;
@@ -30,6 +30,12 @@ function tocaSegmento(r, [x0, y0], [x1, y1]) {
 // Texto con borde blanco (se lee sobre el mapa o las líneas)
 const T = (x, y, t, { tam = 11, peso = 600, color = C.texto, anc = 'start', rot = 0 } = {}) =>
   `<text x="${r1(x)}" y="${r1(y)}" font-family="${FUENTE}" font-size="${tam}" font-weight="${peso}" fill="${color}" text-anchor="${anc}" stroke="#ffffff" stroke-width="${r1(tam * 0.32)}" stroke-linejoin="round" paint-order="stroke"${rot ? ` transform="rotate(${r1(rot)} ${r1(x)} ${r1(y)})"` : ''}>${esc(t)}</text>`;
+
+// Texto tachado (lo de hoy que se cambia), con la raya dibujada (se imprime igual en cualquier visor)
+const Tachado = (x, y, t, { tam, color = C.retirar, anc = 'middle', rot = 0 }) => {
+  const w = ancho(t, tam, false); const x0 = anc === 'middle' ? x - w / 2 : anc === 'end' ? x - w : x;
+  return `<g${rot ? ` transform="rotate(${r1(rot)} ${r1(x)} ${r1(y)})"` : ''}>${T(x, y, t, { tam, peso: 500, color, anc })}<line x1="${r1(x0)}" y1="${r1(y - tam * 0.32)}" x2="${r1(x0 + w)}" y2="${r1(y - tam * 0.32)}" stroke="${color}" stroke-width="${r1(Math.max(1, tam * 0.09))}"/></g>`;
+};
 
 // Símbolos de red simplificados, del mismo tamaño en cualquier dibujo (cx, cy en la lámina)
 // (también se usan en la leyenda de la lámina; e: tamaño)
@@ -85,7 +91,15 @@ export function planoLimpio(d, elementos, { x, y, w, h, vista, accion = () => nu
   let sims = '';
   const datosSim = simbolos.map(el => {
     const [cx, cy] = P([el.x + 30 * el.escala, el.y + 30 * el.escala]);
-    const acc = accion(el); const nuevo = acc === 'instalar' || acc === 'reemplazar' || /_nuevo$/.test(el.simbolo);
+    const acc = accion(el); const nuevo = acc === 'instalar' || acc === 'reemplazar' || acc === 'trasladar' || /_nuevo$/.test(el.simbolo);
+    // Traslado: dónde está hoy (círculo punteado) y una flecha hasta su lugar nuevo
+    if (el._traslado) {
+      const [ax, ay] = P(el._traslado.desde); const L = Math.hypot(cx - ax, cy - ay) || 1; const ux = (cx - ax) / L; const uy = (cy - ay) / L;
+      const r0 = 7 * K; const bx = cx - ux * 11 * K; const by = cy - uy * 11 * K; const q = 6 * K;
+      sims += `<circle cx="${r1(ax)}" cy="${r1(ay)}" r="${r1(r0)}" fill="#ffffff" fill-opacity="0.6" stroke="${C.traslado}" stroke-width="${r1(1.8 * K)}" stroke-dasharray="${r1(3 * K)} ${r1(2.5 * K)}"/>`;
+      if (L > r0 + 14 * K) sims += `<line x1="${r1(ax + ux * (r0 + 2 * K))}" y1="${r1(ay + uy * (r0 + 2 * K))}" x2="${r1(bx - ux * q * 0.6)}" y2="${r1(by - uy * q * 0.6)}" stroke="${C.traslado}" stroke-width="${r1(2.2 * K)}" stroke-dasharray="${r1(6 * K)} ${r1(4 * K)}"/><path d="M${r1(bx)} ${r1(by)} L${r1(bx - ux * q * 1.6 - uy * q)} ${r1(by - uy * q * 1.6 + ux * q)} L${r1(bx - ux * q * 1.6 + uy * q)} ${r1(by - uy * q * 1.6 - ux * q)} Z" fill="${C.traslado}"/>`;
+      ocupados.push({ x: ax - r0, y: ay - r0, w: r0 * 2, h: r0 * 2 });
+    }
     sims += simbolo(el.simbolo, cx, cy, { nuevo, color: SIMBOLOS[el.simbolo]?.color || C.existente });
     if (acc === 'retirar' || acc === 'reemplazar') { const q = 9 * K; sims += `<g stroke="${C.retirar}" stroke-width="${r1(2.6 * K)}" stroke-linecap="round"><line x1="${r1(cx - q)}" y1="${r1(cy - q)}" x2="${r1(cx + q)}" y2="${r1(cy + q)}"/><line x1="${r1(cx + q)}" y1="${r1(cy - q)}" x2="${r1(cx - q)}" y2="${r1(cy + q)}"/></g>`; }
     ocupados.push(cajaSimbolo(el.simbolo, cx, cy));
@@ -111,18 +125,24 @@ export function planoLimpio(d, elementos, { x, y, w, h, vista, accion = () => nu
       const rad = (ang * Math.PI) / 180; const nx = -Math.sin(rad); const ny = Math.cos(rad); // abajo del vano (o a la derecha)
       const mx = (x0 + x1) / 2; const my = (y0 + y1) / 2;
       // A un lado o al otro, donde no choque
-      // Acometidas del vano: segunda línea más chica, por fuera de la primera
-      const acom = textoAcometidas(el.acometidas?.[i]); const ta = 9 * K; const alto = acom ? tam + ta * 1.15 : tam;
+      // Debajo, más chico: el conductor de hoy tachado (si se cambia) y las acometidas del vano, por fuera de la primera
+      const ta = 9 * K;
+      const extra = [el._antes && el.tramo !== 'acometida' ? { t: el._antes, tachado: true } : null, textoAcometidas(el.acometidas?.[i]) ? { t: textoAcometidas(el.acometidas?.[i]) } : null].filter(Boolean);
+      const alto = tam + extra.length * ta * 1.15;
       const lados = [1, -1].map(sg => { const sep = 8 * K + alto * 0.5; const cx = mx + nx * sep * sg; const cy = my + ny * sep * sg; const ax = Math.abs(Math.cos(rad)); const ay = Math.abs(Math.sin(rad));
-        const aw = Math.max(tw, acom ? ancho(acom, ta, false) : 0);
+        const aw = Math.max(tw, ...extra.map(x => ancho(x.t, ta, false)));
         return { sg, cx, cy, caja: { x: cx - (aw * ax + alto * ay) / 2, y: cy - (aw * ay + alto * ax) / 2, w: aw * ax + alto * ay, h: aw * ay + alto * ax } }; });
       const lado = lados.find(l => !ocupados.some(o => seCruzan(l.caja, o))) || lados[0];
       ocupados.push(lado.caja);
       const color = e.color === C.retirar ? C.retirar : e.color === C.nuevo ? C.nuevo : C.sub;
-      // Metros pegados a la línea y acometidas por fuera (en el lado de abajo o en el de arriba)
-      const d1 = (alto - tam) / 2 * -lado.sg; const d2 = (alto - ta) / 2 * lado.sg;
+      // Metros pegados a la línea y lo demás por fuera (en el lado de abajo o en el de arriba)
+      const d1 = (alto - tam) / 2 * -lado.sg;
       vanos += T(lado.cx + nx * d1, lado.cy + ny * d1 + tam * 0.36, texto, { tam, peso: 600, color, anc: 'middle', rot: ang });
-      if (acom) vanos += T(lado.cx + nx * d2, lado.cy + ny * d2 + ta * 0.36, acom, { tam: ta, peso: 500, color: C.sub, anc: 'middle', rot: ang });
+      extra.forEach((x, k) => {
+        const dk = -alto / 2 + tam + ta * 1.15 * (k + 0.5); const off = lado.sg > 0 ? dk : -dk; // hacia afuera de la línea
+        const px = lado.cx + nx * off; const py = lado.cy + ny * off + ta * 0.36;
+        vanos += x.tachado ? Tachado(px, py, x.t, { tam: ta, anc: 'middle', rot: ang }) : T(px, py, x.t, { tam: ta, peso: 500, color: C.sub, anc: 'middle', rot: ang });
+      });
     }
   });
 
@@ -139,7 +159,9 @@ export function planoLimpio(d, elementos, { x, y, w, h, vista, accion = () => nu
     if (et) usadas.add(et);
     const lineas = et ? String(et.texto || '').split('\n').map(t => t.trim()).filter(Boolean) : [];
     const nombre = et ? nombrePunto(lineas[0]) : '';
-    const resto = et ? [lineas[0].includes(':') ? lineas[0].split(':').slice(1).join(':').trim() : '', ...lineas.slice(1)].filter(Boolean) : [];
+    // Si cambian los kVA, la nota de la etiqueta con los de hoy ("Trafo 25 kVA") no sale: van los nuevos y los de hoy tachados
+    const cambiaKva = g.some(s => /kVA/.test(s.el._antes || ''));
+    const resto = et ? [lineas[0].includes(':') ? lineas[0].split(':').slice(1).join(':').trim() : '', ...lineas.slice(1)].filter(t => t && !(cambiaKva && /kva/i.test(t))) : [];
     const sub = [];
     g.forEach(s => { const datos = [textoAltura(s.el.altura), textoEstructuras(s.el.estructuras)].filter(Boolean).join(' · '); if (datos) sub.push({ t: datos, nuevo: s.nuevo }); });
     resto.forEach(t => sub.push({ t, nuevo: g.every(s => s.nuevo) }));
@@ -148,6 +170,8 @@ export function planoLimpio(d, elementos, { x, y, w, h, vista, accion = () => nu
       if (kva.length && !resto.some(t => /kva/i.test(t))) sub.push({ t: `${s.nuevo ? 'Trafo nuevo ' : 'Trafo '}${kva.length > 1 ? kva.join(' + ') : kva[0]} kVA`, nuevo: s.nuevo });
       if (s.el.detalleAccion) sub.push({ t: s.el.detalleAccion, nuevo: true });
     });
+    // Lo de hoy que se cambia, tachado en rojo debajo de lo nuevo
+    g.forEach(s => { if (s.el._antes) sub.push({ t: s.el._antes, antes: true }); });
     return { cx: s0.cx, cy: s0.cy, nuevo: g.every(s => s.nuevo), nombre, sub, destacado: et?.estilo === 'destacado' || g.some(s => s.el.simbolo === 'usuario') };
   }).filter(p => p.nombre || p.sub.length);
   // Etiquetas sueltas (no apuntan a un símbolo)
@@ -176,7 +200,7 @@ export function planoLimpio(d, elementos, { x, y, w, h, vista, accion = () => nu
     if (o.lejos > 1) { const qx = Math.max(o.caja.x, Math.min(p.cx, o.caja.x + o.caja.w)); const qy = Math.max(o.caja.y, Math.min(p.cy, o.caja.y + o.caja.h)); rotulos += `<line x1="${r1(p.cx)}" y1="${r1(p.cy)}" x2="${r1(qx)}" y2="${r1(qy)}" stroke="#64748b" stroke-width="1.2"/>`; }
     if (p.destacado) rotulos += `<rect x="${r1(o.caja.x - 6)}" y="${r1(o.caja.y - 4)}" width="${r1(o.caja.w + 12)}" height="${r1(lh + 7)}" rx="7" fill="#fde047"/>`;
     rotulos += T(tx, o.caja.y + tn * 0.9, p.nombre, { tam: tn, peso: 800, color: p.nuevo ? C.nuevo : C.texto, anc: o.anc });
-    p.sub.forEach((l, i) => { rotulos += T(tx, o.caja.y + tn + 2 + (i + 1) * (ts + 2.5) - 3 * K, l.t, { tam: ts, peso: 600, color: l.nuevo ? C.nuevo : C.sub, anc: o.anc }); });
+    p.sub.forEach((l, i) => { const yy = o.caja.y + tn + 2 + (i + 1) * (ts + 2.5) - 3 * K; rotulos += l.antes ? Tachado(tx, yy, l.t, { tam: ts, anc: o.anc }) : T(tx, yy, l.t, { tam: ts, peso: 600, color: l.nuevo ? C.nuevo : C.sub, anc: o.anc }); });
   });
 
   // ── Marcas de los trabajos: junto a su elemento, sin taparlo ──
