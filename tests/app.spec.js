@@ -4172,9 +4172,9 @@ test.describe('Levantamiento en campo', () => {
     // Al sumar, la hoja se queda donde estaba (no vuelve arriba)
     const hojaScroll = () => page.locator('.lev-hoja-cuerpo').evaluate(e => e.scrollTop);
     await page.setViewportSize({ width: 412, height: 760 });
-    await page.locator('.lev-hoja-cuerpo').evaluate(e => { e.scrollTop = e.scrollHeight; e.dispatchEvent(new Event('scroll')); });
+    // Al cambiar a pantalla de celular la hoja se vuelve a acomodar: se baja hasta el fondo cuando ya se puede
+    await expect.poll(() => page.locator('.lev-hoja-cuerpo').evaluate(e => { e.scrollTop = e.scrollHeight; e.dispatchEvent(new Event('scroll')); return e.scrollTop; })).toBeGreaterThan(0);
     const abajo = await hojaScroll();
-    expect(abajo).toBeGreaterThan(0);
     await page.getByRole('button', { name: 'Sumar acometida 120 B' }).click();
     await expect(page.locator('#lev-acom-b')).toHaveText('1');
     const [top, alto, vis] = await page.locator('.lev-hoja-cuerpo').evaluate(e => [e.scrollTop, e.scrollHeight, e.clientHeight]);
