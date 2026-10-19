@@ -1776,3 +1776,6 @@ button.aviso-inicio-fila { cursor: pointer; }
 .dib-reemplazo { margin: 10px 0; padding: 10px 12px; border: 1.5px solid rgba(99, 102, 241, .45); border-radius: 10px; background: var(--white); }
 .dib-reemplazo h5 { margin: 0 0 6px; font-size: 12px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; color: #6366f1; }
 .dib-reemplazo .field { margin-top: 8px; }
+.mult-auto { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 20px; background: var(--primary-light); color: var(--primary); font-size: 10.5px; font-weight: 700; vertical-align: middle; }
+.mult-auto[hidden] { display: none; }
+.mult-red { margin: -4px 0 10px; }

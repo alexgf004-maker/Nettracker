@@ -3,6 +3,7 @@
 import { filasListado, normalizar, normalizarNC } from './listados.js';
 import { buscarCasoImportado } from './trabajo.js';
 import { fechaExcel } from './fechas.js';
+import { nivelDeAlimentador } from './analisis.js';
 
 export const ESTADOS = ['Realizado', 'Pendiente de validar', 'Validado con histórico', 'Cliente de baja', 'Revisar', 'Validado con usuario', 'Acceso denegado'];
 // En el Excel, "Conexión no posible" solo aparece en las filas de flicker (DF)
@@ -33,17 +34,48 @@ export const TENSIONES_BT = ['120', '208', '240', '480'];
 export const CR_OBLIGATORIOS_MT = 38;
 
 const num = v => (v === '' || v === null || v === undefined || Number.isNaN(Number(v)) ? null : Number(v));
+
+// ── Autorrelleno (confirmado por el equipo; todo queda editable por si no es nominal) ──
+// Tensión según TAP por red (la del alimentador) y tipo de conexión. Trifásico: delta y estrella (entre fases).
+// Monofásico: monofásico, bifásico y estrella 2 hilos (fase-neutro).
+export const TAPS_RED = {
+  23000: { tri: [24940, 23900, 22900, 22290, 21755], mono: [14400, 13800, 13200, 12870, 12540] },
+  13200: { tri: [14400, 13800, 13200, 12870, 12540], mono: [8001, 7810, 7620, 7430, 7240] },
+  4160: { tri: [4365, 4260, 4160, 4053, 3897], mono: [2520, 2460, 2400, 2340, 2280] },
+};
+// Tensión de baja según la configuración
+export const BT_CONFIGURACION = { Monofásico: 240, Bifásico: 240, Delta: 240, Estrella: 208, 'Estrella 2 hilos': 120 };
+// Medición primaria (MP): tensión del primario y de baja según la red, y el divisor del TI
+export const MP_RED = { 23000: { tap: 24940, bt: 208, ti: 120 }, 13200: { tap: 13200, bt: 208, ti: 63.5 } };
+// Red del caso a partir de su alimentador ("AL013-23000" → 23000; 0 si no se sabe)
+export const redDeCaso = c => nivelDeAlimentador(c?.alimentador);
+const familia = conf => (conf === 'Delta' || conf === 'Estrella' ? 'tri' : conf ? 'mono' : null);
+// Lo que se rellena solo con la red, la configuración y el TAP (null: no se sabe)
+export function sugerenciaMultiplicador(m = {}, red = 0) {
+  const out = { tensionTap: null, tensionBT: BT_CONFIGURACION[m.configuracion] ?? null };
+  if (m.tap === 'MP' && MP_RED[red]) return { tensionTap: MP_RED[red].tap, tensionBT: MP_RED[red].bt };
+  const pos = Number(m.tap); const fam = familia(m.configuracion);
+  if (pos >= 1 && pos <= 5 && fam && TAPS_RED[red]) out.tensionTap = TAPS_RED[red][fam][pos - 1];
+  return out;
+}
+// Campos que tiene que tener un multiplicador para darlo por realizado (con los datos vistos en campo)
+export const CAMPOS_REALIZADO = ['configuracion', 'tap', 'tensionTap', 'tensionBT', 'xMedidor'];
+// Estado que pone la app: tapón o interno → Pendiente de validar; todos los datos → Realizado; si no, ninguno
+export function estadoAutomatico(m = {}) {
+  if (m.tap === 'Tapón' || m.tap === 'Interno') return 'Pendiente de validar';
+  return CAMPOS_REALIZADO.every(k => String(m[k] ?? '').trim() !== '') ? 'Realizado' : '';
+}
 // Redondeo para mostrar (como Excel con pocos decimales), sin ceros de más
 export const redondear = (n, dec = 4) => (n === null ? '' : String(Number(n.toFixed(dec))));
 
-// m: { tap, tensionTap, tensionBT, xMedidor, vab, vbc, vac }
-export function calcularMultiplicador(m = {}) {
+// m: { tap, tensionTap, tensionBT, xMedidor, vab, vbc, vac }; red: tensión de la red (para el TI de MP)
+export function calcularMultiplicador(m = {}, red = 0) {
   const prim = num(m.tensionTap); const sec = num(m.tensionBT); const x = num(m.xMedidor);
   const dranetz = prim !== null && sec ? prim / sec : null;
-  // TI: =IFS(F="MP",(K/120)*5&"/5", AND(F<>"MP",K<>1),(K*5)&"/5", K=1,"1/1")
+  // TI: =IFS(F="MP",(K/120)*5&"/5", AND(F<>"MP",K<>1),(K*5)&"/5", K=1,"1/1"); en MP de red de 13200 es K/63.5
   let ti = '';
   if (x !== null) {
-    if (m.tap === 'MP') ti = `${redondear((x / 120) * 5)}/5`;
+    if (m.tap === 'MP') ti = `${redondear((x / (MP_RED[red]?.ti || 120)) * 5)}/5`;
     else if (x !== 1) ti = `${redondear(x * 5)}/5`;
     else ti = '1/1';
   }
@@ -89,7 +121,7 @@ export function filasMultiplicadores(casos) {
     'Multiplicador ECAMEC', 'Multiplicador DRANETZ', 'X medidor', 'TI', 'Testblock', 'Fecha de instalación', 'Fecha de retiro', 'EQUIPO', 'ELEMENTOS',
     'Vab', 'Vbc', 'Vac', 'Proyección primario ab', 'Proyección primario bc', 'Proyección primario ac', 'Urbanidad']];
   for (const c of casos) {
-    const m = c.mult || {}; const r = calcularMultiplicador(m);
+    const m = c.mult || {}; const r = calcularMultiplicador(m, redDeCaso(c));
     const n = v => num(v) ?? '';
     filas.push([m.estado || '', c.codigo || c.codigoEnte, /^\d+$/.test(c.nc) ? Number(c.nc) : c.nc, c.alimentador || '', m.configuracion || '', m.tap || '',
       n(m.tensionTap), n(m.tensionBT), r.ecamec, r.dranetz ?? '', n(m.xMedidor), r.ti, m.testblock || '', '', '', '', '',

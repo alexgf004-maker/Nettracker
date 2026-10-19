@@ -3,7 +3,7 @@ import { ACCESORIOS_DEFECTO, casosDeFecha, fechasDe, revisarFecha } from '../dom
 import { flujoBT, MESES } from '../domain/trabajo.js';
 import { fmtDate } from '../utils.js';
 import { ordenarCasos } from '../domain/listados.js';
-import { calcularMultiplicador, grupoDeEstado } from '../domain/multiplicadores.js';
+import { redDeCaso, calcularMultiplicador, grupoDeEstado } from '../domain/multiplicadores.js';
 import { state } from '../state.js';
 import { descargable } from '../actions/descargas.js';
 import { instalacionDeCaso } from '../domain/resultados.js';
@@ -64,7 +64,7 @@ export function renderFechas(c) {
 
   html += `<div class="tabla-caja"><div class="tabla-scroll"><table class="tabla-r tabla-casos tabla-fechas"><thead><tr><th>Código</th>${bt ? '<th>CT/DS</th><th>Medidor</th>' : '<th>Estado</th><th>Multiplicador</th>'}<th>Fecha</th><th>Equipo</th></tr></thead><tbody>`;
   casos.forEach(x => {
-    const m = x.mult || {}; const k = calcularMultiplicador(m);
+    const m = x.mult || {}; const k = calcularMultiplicador(m, redDeCaso(x));
     const p = x.programa || {};
     html += `<tr>
       <td class="cod"><b>${esc(x.codigo || x.codigoEnte)}</b><small>${esc(x.nombre)}</small></td>

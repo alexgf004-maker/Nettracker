@@ -1,7 +1,7 @@
 // Fechas 1, 2 y 3: grupos de instalación de una campaña. Cada caso se asigna a una fecha con su equipo.
 // El Excel de cada fecha tiene las columnas que lee Despachos (carga masiva). Funciones puras.
 import { normalizar, normalizarNC } from './listados.js';
-import { calcularMultiplicador } from './multiplicadores.js';
+import { redDeCaso, calcularMultiplicador } from './multiplicadores.js';
 import { buscarCasoImportado } from './trabajo.js';
 
 export const FECHAS = ['1', '2', '3'];
@@ -21,7 +21,7 @@ export const casosDeFecha = (casos, n) => casos.filter(c => String(c.programa?.f
 
 // Fila de un caso con los datos de su fecha (mismo orden que COLUMNAS_FECHA, o COLUMNAS_FECHA_BT si `bt`)
 export function filaFecha(c, fecha = {}, bt = false) {
-  const m = c.mult || {}; const k = calcularMultiplicador(m);
+  const m = c.mult || {}; const k = calcularMultiplicador(m, redDeCaso(c));
   const medio = bt ? [c.ct || '', c.medidor || ''] : [k.ecamec, k.ti, m.configuracion || ''];
   return [c.codigo || c.codigoEnte, c.programa?.equipo || '', c.nombre || '', c.nc || '', c.direccion || c.direccionEnte || '', ...medio,
     fecha.instalacion || '', fecha.retiro || '', c.lat ?? '', c.lng ?? '', fecha.accesorios || ACCESORIOS_DEFECTO];

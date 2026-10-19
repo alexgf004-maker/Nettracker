@@ -5,11 +5,11 @@
 import { estadisticas, fasesDe, resumenTension } from './reclamo.js';
 
 export const POSICIONES = ['1', '2', '3', '4', '5'];
-// Placas de cada posición según la red (confirmado por el equipo). 4.16 kV: solo se sabe la posición 3; el resto se escribe.
+// Placas de cada posición según la red (confirmado por el equipo; trafo monofásico, fase-neutro)
 export const PLACAS_TAP = {
   '23kv': { nombre: 'Red 23 kV (trafo 13.2 kV)', v: [14400, 13800, 13200, 12870, 12540] },
   '13.2kv': { nombre: 'Red 13.2 kV (trafo 7.62 kV)', v: [8001, 7810, 7620, 7430, 7240] },
-  '4.16kv': { nombre: 'Red 4.16 kV (trafo 2.2 kV)', v: [null, null, 2200, null, null] },
+  '4.16kv': { nombre: 'Red 4.16 kV (trafo 2.4 kV)', v: [2520, 2460, 2400, 2340, 2280] },
   otra: { nombre: 'Otra (escribir las placas)', v: [null, null, null, null, null] },
 };
 export const nuevaProyeccionTap = () => ({ activo: false, red: '', placas: ['', '', '', '', ''], actual: '', propuesta: '' });
