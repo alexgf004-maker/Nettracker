@@ -106,42 +106,41 @@ export function planoLimpio(d, elementos, { x, y, w, h, vista, accion = () => nu
     return { el, cx, cy, nuevo };
   });
 
-  // ── Metros y conductor de cada vano: una línea discreta, a lo largo del vano ──
+  // ── Metros de cada vano como en el editor (pedido del equipo): recuadro blanco derecho al lado de la línea, metros
+  // arriba y debajo, más chico, el conductor y las acometidas (y el conductor de hoy tachado si se cambia) ──
   let vanos = '';
   tramos.forEach(el => {
     const e = estiloTramo(el);
     for (let i = 1; i < el.puntos.length; i++) {
       const [x0, y0] = P(el.puntos[i - 1]); const [x1, y1] = P(el.puntos[i]);
-      const L = Math.hypot(x1 - x0, y1 - y0); if (L < 46 * K) continue;
+      const L = Math.hypot(x1 - x0, y1 - y0); if (L < 14 * K) continue;
       const m = metrosVano(el, i, d.escala); const c = conductorVano(el, i);
-      const cond = [c?.calibre, c?.tipo].filter(Boolean).join(' ');
-      // Metros y conductor; si no caben en el vano, solo los metros
-      const tam = 10.5 * K;
-      const opciones = [[m !== null ? fmtM(m) : '', el.tramo === 'acometida' ? '' : cond].filter(Boolean).join(' · '), m !== null ? fmtM(m) : ''].filter(Boolean);
-      const texto = opciones.find(t => ancho(t, tam, true) <= L - 10 * K);
-      if (!texto) continue;
-      const tw = ancho(texto, tam, true);
-      let ang = (Math.atan2(y1 - y0, x1 - x0) * 180) / Math.PI; if (ang > 90) ang -= 180; if (ang < -90) ang += 180;
-      const rad = (ang * Math.PI) / 180; const nx = -Math.sin(rad); const ny = Math.cos(rad); // abajo del vano (o a la derecha)
-      const mx = (x0 + x1) / 2; const my = (y0 + y1) / 2;
-      // A un lado o al otro, donde no choque
-      // Debajo, más chico: el conductor de hoy tachado (si se cambia) y las acometidas del vano, por fuera de la primera
-      const ta = 9 * K;
-      const extra = [el._antes && el.tramo !== 'acometida' ? { t: el._antes, tachado: true } : null, textoAcometidas(el.acometidas?.[i]) ? { t: textoAcometidas(el.acometidas?.[i]) } : null].filter(Boolean);
-      const alto = tam + extra.length * ta * 1.15;
-      const lados = [1, -1].map(sg => { const sep = 8 * K + alto * 0.5; const cx = mx + nx * sep * sg; const cy = my + ny * sep * sg; const ax = Math.abs(Math.cos(rad)); const ay = Math.abs(Math.sin(rad));
-        const aw = Math.max(tw, ...extra.map(x => ancho(x.t, ta, false)));
-        return { sg, cx, cy, caja: { x: cx - (aw * ax + alto * ay) / 2, y: cy - (aw * ay + alto * ax) / 2, w: aw * ax + alto * ay, h: aw * ay + alto * ax } }; });
-      const lado = lados.find(l => !ocupados.some(o => seCruzan(l.caja, o))) || lados[0];
-      ocupados.push(lado.caja);
-      const color = e.color === C.retirar ? C.retirar : e.color === C.nuevo ? C.nuevo : C.sub;
-      // Metros pegados a la línea y lo demás por fuera (en el lado de abajo o en el de arriba)
-      const d1 = (alto - tam) / 2 * -lado.sg;
-      vanos += T(lado.cx + nx * d1, lado.cy + ny * d1 + tam * 0.36, texto, { tam, peso: 600, color, anc: 'middle', rot: ang });
-      extra.forEach((x, k) => {
-        const dk = -alto / 2 + tam + ta * 1.15 * (k + 0.5); const off = lado.sg > 0 ? dk : -dk; // hacia afuera de la línea
-        const px = lado.cx + nx * off; const py = lado.cy + ny * off + ta * 0.36;
-        vanos += x.tachado ? Tachado(px, py, x.t, { tam: ta, anc: 'middle', rot: ang }) : T(px, py, x.t, { tam: ta, peso: 500, color: C.sub, anc: 'middle', rot: ang });
+      const cond = el.tramo === 'acometida' ? '' : [c?.calibre, c?.tipo].filter(Boolean).join(' ');
+      const acom = textoAcometidas(el.acometidas?.[i]);
+      const tam = 10.5 * K; const ta = 8.5 * K;
+      const lineas = [m !== null ? { t: fmtM(m), tam, peso: 800 } : null, cond || acom ? { t: [cond, acom].filter(Boolean).join(' · '), tam: ta, peso: 600 } : null,
+        el._antes && el.tramo !== 'acometida' ? { t: el._antes, tam: ta, tachado: true } : null].filter(Boolean);
+      if (!lineas.length) continue;
+      if (m === null) { lineas[0].tam = tam * 0.9; lineas[0].peso = 700; }
+      const pad = 4 * K; const cw = Math.max(...lineas.map(l => ancho(l.t, l.tam, l.peso >= 700))) + pad * 2;
+      const ch = lineas.reduce((a, l) => a + l.tam * 1.18, 0) + pad * 1.1;
+      // Al lado de la línea (no encima), donde no choque: a un lado o al otro, en el centro o corrido a lo largo del vano
+      const ux = (x1 - x0) / L; const uy = (y1 - y0) / L; let nx = -uy; let ny = ux;
+      if (Math.abs(ny) >= 0.45 ? ny < 0 : nx > 0) { nx = -nx; ny = -ny; } // abajo en los acostados, a la izquierda en los parados
+      const sep = Math.abs(ny) * ch / 2 + Math.abs(nx) * cw / 2 + e.w / 2 + 4 * K + (accion(el) === 'reemplazar' ? 9 * K : 0); // libra el conductor de hoy (rojo punteado)
+      const opciones = [0.5, 0.32, 0.68].flatMap(t => [1, -1].map(sg => {
+        const cx = x0 + (x1 - x0) * t + nx * sep * sg; const cy = y0 + (y1 - y0) * t + ny * sep * sg;
+        return { cx, cy, caja: { x: cx - cw / 2, y: cy - ch / 2, w: cw, h: ch } };
+      }));
+      const o = opciones.find(q => !ocupados.some(z => seCruzan(q.caja, z)) && !segmentos.some(([pa, pb]) => tocaSegmento(q.caja, pa, pb))) || opciones.find(q => !ocupados.some(z => seCruzan(q.caja, z))) || opciones[0];
+      ocupados.push(o.caja);
+      const borde = e.color === C.retirar ? C.retirar : e.color === C.nuevo ? C.nuevo : '#94a3b8';
+      vanos += `<rect x="${r1(o.caja.x)}" y="${r1(o.caja.y)}" width="${r1(cw)}" height="${r1(ch)}" rx="${r1(4 * K)}" fill="#ffffff" fill-opacity="0.96" stroke="${borde}" stroke-width="${r1(1.1 * K)}"/>`;
+      let yy = o.caja.y + pad * 0.55;
+      lineas.forEach((l, k) => {
+        yy += l.tam * 1.18; const by = yy - l.tam * 0.28;
+        const color = k === 0 ? (e.color === C.retirar ? C.retirar : e.color === C.nuevo ? C.nuevo : C.texto) : C.sub;
+        vanos += l.tachado ? Tachado(o.cx, by, l.t, { tam: l.tam, anc: 'middle' }) : `<text x="${r1(o.cx)}" y="${r1(by)}" font-family="${FUENTE}" font-size="${r1(l.tam)}" font-weight="${l.peso}" fill="${color}" text-anchor="middle">${esc(l.t)}</text>`;
       });
     }
   });
