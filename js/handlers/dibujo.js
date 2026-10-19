@@ -11,7 +11,7 @@ const NOMBRES = [
   'escalarTodoDib', 'setOpacidadFondoDib',
   'grupoEstructurasUI', 'buscarEstructuras',
   'metrosASuLugarDib', 'setColorRedDib', 'setNombreRedDib', 'setTamanoDib', 'setTamNuevosDib', 'togglePanelDib', 'abrirPanelMovilDib', 'zoomDib', 'ajustarVistaDib', 'ampliarDib', 'dibRueda',
-  'setAccionDib', 'setDetalleAccionDib', 'setKvaDib', 'setTrabajoDib', 'ocultarTrabajoDib', 'agregarTrabajoDib', 'setTrabajoExtraDib', 'quitarTrabajoExtraDib', 'descargarPropuestaDib',
+  'setAccionDib', 'setDetalleAccionDib', 'setKvaDib', 'setReemplazoConductorDib', 'setReemplazoAlturaDib', 'agregarReemplazoEstructuraDib', 'agregarReemplazoEstructuraEscritaDib', 'quitarReemplazoEstructuraDib', 'setReemplazoKvaDib', 'marcarTrasladoDib', 'cancelarTrasladoDib', 'quitarTrasladoDib', 'setTrabajoDib', 'ocultarTrabajoDib', 'agregarTrabajoDib', 'setTrabajoExtraDib', 'quitarTrabajoExtraDib', 'descargarPropuestaDib',
   'setVistaProyectosDib', 'guardarProyectoDib', 'guardarComoProyectoDib', 'abrirProyectoDib', 'eliminarProyectoDib', 'soltarProyectoDib',
 ];
 NOMBRES.forEach(n => { window[n] = a[n]; });

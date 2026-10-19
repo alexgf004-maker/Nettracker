@@ -6,7 +6,7 @@ import { cargarBorrador, partesSVG, viewBoxDib, zoomPct } from '../actions/dibuj
 import { COLORES, GROSORES, SIMBOLOS, TAM_TEXTO } from '../domain/dibujo.js';
 import { ACCIONES_PUNTO, ESTILOS_ETIQUETA, fmtMetros, metrosTramo, metrosVano, nombreRed, nombresVanos, TIPOS_TRAMO } from '../domain/plano.js';
 import { ALTURAS_POSTE, CALIBRES, ESTRUCTURAS, grupoEstructurasDe, nombreEstructura, TIPOS_CONDUCTOR } from '../domain/red.js';
-import { ACCIONES, accionDe, kvaTexto, trabajos, trabajosOcultos } from '../domain/propuesta.js';
+import { ACCIONES, accionDe, kvaTexto, metrosTraslado, trabajos, trabajosOcultos } from '../domain/propuesta.js';
 import { state } from '../state.js';
 import { escapeHtml, fmtDate } from '../utils.js';
 
@@ -197,7 +197,7 @@ function panel(d, sel, h, p) {
     html += seccion('Color de la red', `${coloresRed(sel.colorRed, sel.tramo)}${nota('Para distinguir redes del mismo tipo (por ejemplo, de dos transformadores). Cada color sale aparte en la simbología.')}`);
     html += seccion('Nombre en la simbología', `<input id="dib-nombre-red" value="${esc(sel.nombreRed || '')}" placeholder="${esc(TIPOS_TRAMO[sel.tramo]?.nombre || '')}" oninput="setNombreRedDib(this.value)" onchange="finEdicionDib()">`);
     html += seccion('Conductor', `${controlesConductor(sel.conductor, { id: 'dib-cond', fn: (c, v) => `setConductorDib('${c}', ${v})` })}<div class="page-sub">Los tramos que traces después salen con este conductor.</div>`);
-    html += seccionPropuesta(sel);
+    html += seccionPropuesta(sel, d);
     html += seccion('Grosor', tamano('Grosor de la línea'));
     if (d.tramo !== sel.id && sel.puntos.length > 1) {
       const nombres = nombresVanos(sel, d.elementos, 14 * Math.max(1, p.w / 1600));
@@ -219,7 +219,7 @@ function panel(d, sel, h, p) {
   if (sel?.tipo === 'simbolo') {
     const red = SIMBOLOS[sel.simbolo]?.grupo === 'red';
     return seccion('', `<div class="dib-simbolo-sel">${mini(sel.simbolo, 34)}<span>${esc(SIMBOLOS[sel.simbolo]?.nombre || '')}</span></div>${tamano()}${red ? nota('Los postes que pongas después salen de este tamaño.') : ''}`)
-      + (red ? seccionPropuesta(sel) : '')
+      + (red ? seccionPropuesta(sel, d) : '')
       + (red && ['trafo', 'trafo_nuevo', 'banco'].includes(sel.simbolo) ? seccion('Transformador', `<div class="field"><label>kVA (uno por transformador)</label><input id="dib-kva" value="${esc((sel.trafos || []).join(', '))}" placeholder="Ej. 37.5 o 25, 25, 25" onchange="setKvaDib(this.value)"></div>${nota(kvaTexto(sel.trafos) ? `Sale en la lámina de propuesta como ${esc(kvaTexto(sel.trafos))}.` : 'Sale en los trabajos y las cantidades de la lámina de propuesta.')}`) : '')
       + (red ? seccion('Datos del poste', controlesPoste(sel, { id: 'dib-poste', altura: 'setAlturaDib', agregar: 'agregarEstructuraDib', quitar: 'quitarEstructuraDib', escrita: 'agregarEstructuraEscritaDib', clave: sel.id, grupo: grupoEstructurasDe(tramosEnPoste(d, sel)) })) : seccion('Color', colores()))
       + acciones(`<button class="b b-g" onclick="girarDib()">Girar 90°</button>${sel.desfase ? '<button class="b b-g" onclick="metrosASuLugarDib()">Datos a su lugar</button>' : ''}`);
@@ -270,12 +270,44 @@ function panel(d, sel, h, p) {
 }
 
 // Qué se hace con el elemento en la propuesta (para la lámina de propuesta: trabajos, cantidades y colores)
-function seccionPropuesta(sel) {
+// Qué hace cada acción (se lee debajo de los botones al elegirla)
+const AYUDA_ACCION = {
+  existente: 'No se toca: sale en gris como está hoy.',
+  instalar: 'Es nuevo: sale en turquesa con los datos que le pongas aquí (altura, estructuras, conductor o kVA).',
+  reemplazar: 'Se quita lo de hoy y se pone otro en el mismo lugar. Elige abajo lo nuevo: en la lámina sale en turquesa y lo de hoy tachado en rojo.',
+  retirar: 'Se quita y no se repone: sale en rojo con una X y en los retiros de las cantidades de obra.',
+  trasladar: 'Es el mismo, pero cambia de lugar. Marca dónde queda: en la propuesta sale ahí, con una flecha desde donde está hoy, y la red que llega se mueve con él.',
+};
+function seccionPropuesta(sel, d) {
   const actual = accionDe(sel) || 'existente';
+  const tramo = sel.tipo === 'polilinea';
   const op = (k, t) => `<button class="dib-chip ${actual === k ? 'activo' : ''}" onclick="setAccionDib('${k}')">${t}</button>`;
-  return seccion('En la propuesta', `<div class="dib-lista dib-acciones-prop">${op('existente', 'Sin cambio')}${Object.entries(ACCIONES).map(([k, a]) => op(k, a.nombre)).join('')}</div>
-    ${actual !== 'existente' ? `<div class="field"><label>Detalle (opcional)</label><input id="dib-detalle-accion" value="${esc(sel.detalleAccion || '')}" placeholder="Ej. madera por concreto 35'" oninput="setDetalleAccionDib(this.value)" onchange="finEdicionDib()"></div>` : ''}
-    <div class="page-sub">Sale numerado en la lámina de propuesta, en los trabajos a ejecutar y en las cantidades de obra.</div>`);
+  // Trasladar es para postes y símbolos (la red los sigue); en un tramo solo si ya lo tenía
+  const opciones = Object.entries(ACCIONES).filter(([k]) => k !== 'trasladar' || !tramo || actual === 'trasladar');
+  let html = `<div class="dib-lista dib-acciones-prop">${op('existente', 'Sin cambio')}${opciones.map(([k, a]) => op(k, a.nombre)).join('')}</div>
+    <div class="page-sub dib-ayuda-accion">${AYUDA_ACCION[actual]}</div>`;
+  // Reemplazar: qué se pone en su lugar (con los mismos botones de siempre)
+  if (actual === 'reemplazar') {
+    const r = sel.reemplazo || {};
+    const hoy = t => `<div class="page-sub">Hoy: <b>${esc(t || 'sin datos')}</b></div>`;
+    let cuerpo = '';
+    if (tramo) cuerpo = hoy([sel.conductor?.calibre, sel.conductor?.tipo].filter(Boolean).join(' ')) + controlesConductor(r.conductor, { id: 'dib-remp', fn: (c, v) => `setReemplazoConductorDib('${c}', ${v})` });
+    else if (['trafo', 'trafo_nuevo', 'banco'].includes(sel.simbolo)) cuerpo = hoy(kvaTexto(sel.trafos)) + `<div class="field"><label>kVA nuevos (uno por transformador)</label><input id="dib-remp-kva" value="${esc((r.trafos || []).join(', '))}" placeholder="Ej. 50 o 25, 25, 25" onchange="setReemplazoKvaDib(this.value)"></div>`;
+    else if (['poste', 'poste_nuevo'].includes(sel.simbolo)) cuerpo = hoy([sel.altura ? `${sel.altura}'` : '', (sel.estructuras || []).join(' / ')].filter(Boolean).join(' · ')) + controlesPoste(r, { id: 'dib-remp', altura: 'setReemplazoAlturaDib', agregar: 'agregarReemplazoEstructuraDib', quitar: 'quitarReemplazoEstructuraDib', escrita: 'agregarReemplazoEstructuraEscritaDib', clave: `${sel.id}-remp`, grupo: grupoEstructurasDe(tramosEnPoste(d, sel)) });
+    if (cuerpo) html += `<div class="dib-reemplazo"><h5>Se cambia por</h5>${cuerpo}</div>`;
+  }
+  // Trasladar: dónde queda (un toque en el plano)
+  if (actual === 'trasladar' && !tramo) {
+    const m = metrosTraslado(sel, d.escala);
+    html += `<div class="dib-reemplazo"><h5>Dónde queda</h5>${d.trasladando === sel.id
+      ? `<div class="page-sub"><b>Toca en el plano el lugar nuevo.</b></div><div class="dib-acciones-el"><button class="b b-l" onclick="cancelarTrasladoDib()">Cancelar</button></div>`
+      : sel.traslado
+        ? `<div class="page-sub">Marcado${m !== null ? `: se mueve <b>${fmtMetros(m)}</b>` : ''}. Se ve con la flecha punteada.</div><div class="dib-acciones-el"><button class="b b-g" onclick="marcarTrasladoDib()">Cambiar el lugar</button><button class="b b-l" onclick="quitarTrasladoDib()">Quitar</button></div>`
+        : `<div class="dib-acciones-el"><button class="b b-p" onclick="marcarTrasladoDib()">Marcar dónde queda</button></div>`}</div>`;
+  }
+  if (actual !== 'existente') html += `<div class="field"><label>Nota (opcional)</label><input id="dib-detalle-accion" value="${esc(sel.detalleAccion || '')}" placeholder="${actual === 'reemplazar' ? 'Ej. madera por concreto' : actual === 'retirar' ? 'Ej. se entrega a bodega' : 'Ej. por servidumbre'}" oninput="setDetalleAccionDib(this.value)" onchange="finEdicionDib()"></div>`;
+  html += '<div class="page-sub">Sale numerado en la lámina de propuesta, en los trabajos a ejecutar y en las cantidades de obra.</div>';
+  return seccion('En la propuesta', html);
 }
 // Lámina de propuesta: datos, trabajos (armados solos y corregibles), problema y resultado, y descarga
 function seccionLaminaPropuesta(d) {

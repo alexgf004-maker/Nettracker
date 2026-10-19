@@ -1772,3 +1772,7 @@ button.aviso-inicio-fila { cursor: pointer; }
 .dib-dos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .dib-lista.dib-acciones-prop { display: flex; flex-direction: row; flex-wrap: wrap; gap: 6px; }
 .dib-acciones-prop .dib-chip { flex: 1 1 30%; min-width: 0; }
+.dib-ayuda-accion { margin: 8px 0 4px; padding: 8px 10px; border-radius: 8px; background: var(--bg); color: var(--text2); line-height: 1.4; }
+.dib-reemplazo { margin: 10px 0; padding: 10px 12px; border: 1.5px solid rgba(99, 102, 241, .45); border-radius: 10px; background: var(--white); }
+.dib-reemplazo h5 { margin: 0 0 6px; font-size: 12px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; color: #6366f1; }
+.dib-reemplazo .field { margin-top: 8px; }

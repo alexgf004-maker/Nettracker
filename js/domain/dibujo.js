@@ -196,7 +196,9 @@ export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias
         for (let i = 1; i < el.puntos.length; i++) {
           const [x0, y0] = el.puntos[i - 1]; const [x1, y1] = el.puntos[i];
           const m = distancias ? metrosVano(el, i, escala) : null;
-          const cond = ver.calibre !== false ? textoConductor(conductorVano(el, i)) : '';
+          // Conductor que se cambia en la propuesta: "#4 ACSR → #2 Tpx"
+          const cambio = el.accion === 'reemplazar' && el.reemplazo?.conductor ? textoConductor(el.reemplazo.conductor) : '';
+          const cond = ver.calibre !== false ? [textoConductor(conductorVano(el, i)), cambio].filter(Boolean).join(' → ') : '';
           const acom = ver.acometidas !== false ? textoAcometidas(el.acometidas?.[i]) : '';
           // Metros arriba (grande); conductor y acometidas debajo (más chico)
           const detalle = [cond, acom].filter(Boolean).join(' · ');
@@ -230,7 +232,7 @@ export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias
       const dibujo = `<g transform="translate(${r1(el.x)} ${r1(el.y)}) scale(${el.escala}) rotate(${el.rot || 0} 30 30)" color="${el.color}" stroke="${el.color}" stroke-width="${r1(sw * (el.grosor || 3) / 3)}" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="0" y="0" width="60" height="60" fill="transparent" stroke="none"/>${sim.svg}</g>`;
       // Altura y estructuras del poste debajo de él (se arrastran como los metros)
       const centro = [el.x + 30 * el.escala, el.y + 30 * el.escala];
-      const datos = conEtiqueta?.(...centro) ? '' : textoPoste(el, { altura: ver.altura !== false, estructuras: ver.estructuras !== false });
+      const datos = conEtiqueta?.(...centro) ? '' : textoConCambio(el, { altura: ver.altura !== false, estructuras: ver.estructuras !== false });
       // Por defecto arriba a la derecha del símbolo (lejos de los tramos que entran por los lados)
       const tam = Math.max(15, 27 * el.escala); const ancho = String(datos).length * tam * 0.6 + tam;
       const cx = el.x + 60 * el.escala + ancho / 2; const cy = el.y - tam * 0.4;
@@ -419,6 +421,28 @@ function svgCajetin(d, y0) {
   return s;
 }
 
+// Datos del poste con lo que se cambia en la propuesta: "35' · RS3 → 40' · TS3" (y los kVA de un transformador)
+function textoConCambio(el, ver) {
+  const hoy = textoPoste(el, ver); const r = el.accion === 'reemplazar' ? el.reemplazo : null;
+  const kva = t => ((t || []).filter(Boolean).length ? `${t.filter(Boolean).join(' + ')} kVA` : '');
+  if (!r) return hoy;
+  const partes = [];
+  if (r.altura !== undefined || r.estructuras) { const nuevo = textoPoste({ ...el, ...(r.altura !== undefined ? { altura: r.altura } : {}), ...(r.estructuras ? { estructuras: r.estructuras } : {}) }, ver); partes.push(nuevo !== hoy ? `${hoy || '—'} → ${nuevo}` : hoy); } else if (hoy) partes.push(hoy);
+  if (r.trafos) partes.push(`${kva(el.trafos) || '—'} → ${kva(r.trafos)}`);
+  return partes.filter(Boolean).join(' · ');
+}
+// Traslado en la propuesta: flecha punteada desde el poste hasta donde queda, con un círculo en el lugar nuevo
+function flechasTraslado(elementos, w) {
+  const k = w / 1600; const c = '#b45309';
+  return elementos.filter(e => e.tipo === 'simbolo' && e.accion === 'trasladar' && Array.isArray(e.traslado)).map(e => {
+    const ax = e.x + 30 * e.escala; const ay = e.y + 30 * e.escala; const [bx, by] = e.traslado;
+    const L = Math.hypot(bx - ax, by - ay) || 1; const ux = (bx - ax) / L; const uy = (by - ay) / L; const r = 30 * e.escala * 0.75; const q = 9 * k;
+    const ex = bx - ux * (r + 3 * k); const ey = by - uy * (r + 3 * k);
+    return `<g pointer-events="none"><circle cx="${r1(bx)}" cy="${r1(by)}" r="${r1(r)}" fill="#ffffff" fill-opacity="0.7" stroke="${c}" stroke-width="${r1(4 * k)}" stroke-dasharray="${r1(7 * k)} ${r1(5 * k)}"/>`
+      + (L > r * 2 ? `<line x1="${r1(ax + ux * r)}" y1="${r1(ay + uy * r)}" x2="${r1(ex - ux * q)}" y2="${r1(ey - uy * q)}" stroke="#ffffff" stroke-width="${r1(8 * k)}" stroke-linecap="round"/><line x1="${r1(ax + ux * r)}" y1="${r1(ay + uy * r)}" x2="${r1(ex - ux * q)}" y2="${r1(ey - uy * q)}" stroke="${c}" stroke-width="${r1(4 * k)}" stroke-dasharray="${r1(10 * k)} ${r1(7 * k)}"/><path d="M${r1(ex)} ${r1(ey)} L${r1(ex - ux * q * 1.8 - uy * q)} ${r1(ey - uy * q * 1.8 + ux * q)} L${r1(ex - ux * q * 1.8 + uy * q)} ${r1(ey - uy * q * 1.8 - ux * q)} Z" fill="${c}"/>` : '') + '</g>';
+  }).join('');
+}
+
 // Partes del SVG de la lámina: plano (fondo y capa de elementos) y cajetín. pantalla/ui: tiradores para editar
 export function svgLamina(d, { pantalla = false, ui = 1 } = {}) {
   const { w, h } = tamano(d);
@@ -430,12 +454,12 @@ export function svgLamina(d, { pantalla = false, ui = 1 } = {}) {
   const l = d.lamina || {};
   const ver = { calibre: l.verCalibre !== false, altura: l.verAltura !== false, estructuras: l.verEstructuras !== false, acometidas: l.verAcometidas !== false };
   // Un poste con etiqueta lleva sus datos dentro de la etiqueta (un solo rótulo por poste, sin encimarse)
-  const postes = d.elementos.filter(e => e.tipo === 'simbolo' && SIMBOLOS[e.simbolo]?.grupo === 'red').map(e => ({ x: e.x + 30 * e.escala, y: e.y + 30 * e.escala, texto: textoPoste(e, ver) })).filter(p => p.texto);
+  const postes = d.elementos.filter(e => e.tipo === 'simbolo' && SIMBOLOS[e.simbolo]?.grupo === 'red').map(e => ({ x: e.x + 30 * e.escala, y: e.y + 30 * e.escala, texto: textoConCambio(e, ver) })).filter(p => p.texto);
   const puntas = d.elementos.filter(e => e.tipo === 'etiqueta').map(e => [e.tx, e.ty]);
   const cerca = (a, x, y) => Math.hypot(a[0] - x, a[1] - y) < 2;
   const opts = { escala: d.escala, distancias: l.distanciasEnTramos !== false, ver,
     datoEn: (x, y) => postes.find(p => cerca([p.x, p.y], x, y))?.texto || '', conEtiqueta: (x, y) => puntas.some(p => cerca(p, x, y)) };
-  const capa = definiciones(d.elementos) + d.elementos.map(e => svgElemento(e, { ...opts, sel: pantalla && e.id === d.sel, ui })).join('')
+  const capa = definiciones(d.elementos) + d.elementos.map(e => svgElemento(e, { ...opts, sel: pantalla && e.id === d.sel, ui })).join('') + flechasTraslado(d.elementos, w)
     + (pantalla && d.iman ? `<circle class="dib-iman" cx="${r1(d.iman[0])}" cy="${r1(d.iman[1])}" r="${r1(8 * ui)}"/>` : '')
     + (pantalla && d.calibracion ? `<line x1="${r1(d.calibracion.x1)}" y1="${r1(d.calibracion.y1)}" x2="${r1(d.calibracion.x2)}" y2="${r1(d.calibracion.y2)}" stroke="#f97316" stroke-width="${r1(4 * ui)}" stroke-dasharray="${r1(10 * ui)} ${r1(6 * ui)}"/>` : '');
   const marco = `<rect x="0" y="0" width="${w}" height="${h}" fill="none" stroke="#0f2a43" stroke-width="${r1(3 * w / 1600)}"/>`;
