@@ -3,7 +3,7 @@ import { db, ref, set, update } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { kmlMapa, ordenarCasos } from '../domain/listados.js';
-import { casosPorValidar, filasMultiplicadores, filasPorValidar, historicoDe, leerMultiplicadoresExcel, planificarMultiplicadores } from '../domain/multiplicadores.js';
+import { casosPorValidar, estadoAutomatico, filasMultiplicadores, filasPorValidar, historicoDe, leerMultiplicadoresExcel, planificarMultiplicadores, redDeCaso, sugerenciaMultiplicador } from '../domain/multiplicadores.js';
 import { leerArchivo } from './campanas.js';
 import { hoyLocal, MESES } from '../domain/trabajo.js';
 import { render } from '../views/render.js';
@@ -15,9 +15,30 @@ const caso = () => state.campanas?.[state.multEdit?.clave]?.casos?.[state.multEd
 export function abrirMultiplicador(clave, id) {
   const c = state.campanas?.[clave]?.casos?.[id];
   if (!c) return;
-  state.multEdit = { clave, id };
-  state.multForm = Object.fromEntries(CAMPOS_MULT.map(k => [k, c.mult?.[k] ?? '']));
+  state.multEdit = { clave, id, red: redDeCaso(c) };
+  state.multForm = { ...Object.fromEntries(CAMPOS_MULT.map(k => [k, c.mult?.[k] ?? ''])), auto: [...(c.mult?.auto || [])] };
   render();
+}
+
+// Cambio de un dato del multiplicador con el autorrelleno (pedido del equipo): con la configuración y el TAP se ponen la
+// tensión según TAP (de la red del alimentador) y la de baja; el estado se pone solo (Tapón o Interno → Pendiente de
+// validar; todos los datos → Realizado). Lo que pone la app queda en `auto`; lo escrito o elegido a mano no se pisa.
+export function cambiarMultiplicador(k, v) {
+  const f = state.multForm; const auto = new Set(f.auto || []);
+  f[k] = v; auto.delete(k);
+  if (k === 'configuracion' || k === 'tap') {
+    const sug = sugerenciaMultiplicador(f, state.multEdit?.red);
+    ['tensionTap', 'tensionBT'].forEach(c => {
+      if (String(f[c] ?? '').trim() !== '' && !auto.has(c)) return;
+      if (sug[c] !== null) { f[c] = String(sug[c]); auto.add(c); } else if (auto.has(c)) { f[c] = ''; auto.delete(c); }
+    });
+  }
+  // El estado elegido a mano se respeta; el vacío o el que puso la app se recalcula
+  if (k !== 'estado' && (!f.estado || auto.has('estado'))) {
+    const e = estadoAutomatico(f);
+    if (e) { f.estado = e; auto.add('estado'); } else if (auto.has('estado')) { f.estado = ''; auto.delete('estado'); }
+  }
+  f.auto = [...auto];
 }
 export function cerrarMultiplicador() { state.multEdit = null; state.multForm = {}; render(); }
 
@@ -28,6 +49,7 @@ export function usarHistorico() {
   if (!h) return;
   ['configuracion', 'tap', 'tensionTap', 'tensionBT', 'xMedidor', 'testblock'].forEach(k => { if (h.mult[k] !== undefined) state.multForm[k] = h.mult[k]; });
   state.multForm.estado = 'Validado con histórico';
+  state.multForm.auto = [];
   state.multForm.historico = { clave: h.clave, codigo: h.codigo };
   render();
 }
@@ -46,6 +68,9 @@ export function guardarMultiplicador() {
     } else datos[k] = v;
   }
   if (state.multForm.historico && datos.estado === 'Validado con histórico') datos.historico = state.multForm.historico;
+  // Lo que puso la app (para seguir recalculándolo al volver a abrirlo)
+  const auto = (state.multForm.auto || []).filter(k => datos[k] !== undefined);
+  if (auto.length) datos.auto = auto;
   datos.editadoPor = state.sesionUsuario?.nombre || '';
   datos.fecha = hoyLocal();
   set(ref(db, `campanas/${clave}/casos/${id}/mult`), datos).then(() => showToast('Multiplicador guardado'));

@@ -1556,6 +1556,71 @@ test.describe('Precampaña', () => {
     expect(filas[1].slice(0, 12)).toEqual(['Realizado', 'CR1O2026201', 111, '', 'Estrella', '3', 13200, 240, '13200/240', 55, 80, '400/5']);
   });
 
+  test('multiplicadores: autorrelleno de tensiones según la red, el TAP y la configuración, y estado automático', async ({ page }) => {
+    const datos = conCampana();
+    const casos = datos.campanas['2026-10_CPT-MT'].casos;
+    casos.CR1O2026201.alimentador = 'AL013-23000'; casos.CR1O2026202.alimentador = 'AL020-13200'; casos.DA1O2026011O00.alimentador = 'AL030-4160';
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    app = await abrirApp(page, { datos });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('multiplicadores'); });
+    const abrir = async cod => { await page.locator('.tabla-casos tr', { hasText: cod }).click(); };
+    const v = id => page.locator('#mult-' + id);
+    // Red de 23000, delta: TAP 3 → 22900 y 240 en baja; TAP 4 → 22290; estrella → 208
+    await abrir('CR1O2026201');
+    await expect(page.locator('.mult-red')).toContainText('Red de 23000 V');
+    await v('configuracion').selectOption('Delta');
+    await expect(v('tensionBT')).toHaveValue('240');
+    await v('tap').selectOption('3');
+    await expect(v('tensionTap')).toHaveValue('22900');
+    await v('tap').selectOption('4');
+    await expect(v('tensionTap')).toHaveValue('22290');
+    await v('configuracion').selectOption('Estrella');
+    await expect(v('tensionBT')).toHaveValue('208');
+    await expect(v('estado')).toHaveValue(''); // falta el X del medidor
+    // Con todos los datos queda Realizado (sin testblock); editable si la placa no es nominal
+    await v('xMedidor').fill('1');
+    await expect(v('estado')).toHaveValue('Realizado');
+    await expect(page.locator('#mult-estado-auto')).toBeVisible();
+    await v('tensionTap').fill('22500');
+    await v('tap').selectOption('5'); // lo escrito a mano no se pisa
+    await expect(v('tensionTap')).toHaveValue('22500');
+    // Tapón: Pendiente de validar; al volver a un TAP con datos, Realizado otra vez
+    await v('tap').selectOption('Tapón');
+    await expect(v('estado')).toHaveValue('Pendiente de validar');
+    await v('tap').selectOption('3');
+    await expect(v('estado')).toHaveValue('Realizado');
+    await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+    expect((await app.escrituras()).at(-1)).toEqual(['set', 'campanas/2026-10_CPT-MT/casos/CR1O2026201/mult',
+      { estado: 'Realizado', configuracion: 'Estrella', tap: '3', tensionTap: 22500, tensionBT: 208, xMedidor: 1, auto: ['tensionBT', 'estado'], editadoPor: 'David García', fecha: '2026-09-23' }]);
+
+    // Red de 13200: monofásico TAP 3 → 7620; trifásico usa las monofásicas de 23000; MP → 13200/208 y TI entre 63.5
+    await abrir('CR1O2026202');
+    await v('configuracion').selectOption('Monofásico'); await v('tap').selectOption('3');
+    await expect(v('tensionTap')).toHaveValue('7620'); await expect(v('tensionBT')).toHaveValue('240');
+    await v('configuracion').selectOption('Delta');
+    await expect(v('tensionTap')).toHaveValue('13200');
+    await v('configuracion').selectOption('Estrella 2 hilos');
+    await expect(v('tensionTap')).toHaveValue('7620'); await expect(v('tensionBT')).toHaveValue('120');
+    await v('tap').selectOption('MP');
+    await expect(v('tensionTap')).toHaveValue('13200'); await expect(v('tensionBT')).toHaveValue('208');
+    await v('xMedidor').fill('127');
+    await expect(page.locator('#mult-calculo')).toContainText('10/5');
+    // Un estado elegido a mano no lo cambia la app
+    await v('estado').selectOption('Cliente de baja');
+    await v('tap').selectOption('Interno');
+    await expect(v('estado')).toHaveValue('Cliente de baja');
+    await app.ejecutar(() => cerrarMultiplicador());
+
+    // Red de 4160: bifásico (tabla monofásica) y trifásico
+    await abrir('DA1O2026011O00');
+    await v('configuracion').selectOption('Bifásico'); await v('tap').selectOption('1');
+    await expect(v('tensionTap')).toHaveValue('2520');
+    await v('configuracion').selectOption('Delta');
+    await expect(v('tensionTap')).toHaveValue('4365');
+    expect(errores).toEqual([]);
+  });
+
   test('multiplicadores: importar un Excel ya hecho con sus fechas y equipos, con vista previa', async ({ page }) => {
     const datos = conCampana();
     datos.campanas['2026-10_CPT-MT'].casos.CR1O2026202.mult = { estado: 'Revisar', notas: 'llamar antes' };
@@ -2681,12 +2746,14 @@ test.describe('Análisis de reclamos', () => {
     await expect(page.locator('.graf-titulo', { hasText: 'proyectada en TAP 2' })).toHaveCount(1);
     // La medición sigue igual (FT); la proyección no la cambia
     await expect(page.locator('.veredicto-dtft').first()).toContainText('FebNoPer 6.94 %');
-    // Placa corregida a mano (4.16 kV solo trae la posición 3)
+    // Red de 4.16 kV: placas del trafo de 2.4 kV (nominal monofásico 2400 en la posición 3)
     await page.locator('#ar-tap-red').selectOption('4.16kv');
-    await expect(page.locator('#ar-tap-placa-3')).toHaveValue('2200');
-    await expect(page.locator('#ar-tap-placa-2')).toHaveValue('');
+    await expect(page.locator('#ar-tap-placa-3')).toHaveValue('2400');
+    await expect(page.locator('#ar-tap-placa-2')).toHaveValue('2460');
+    // Placa corregida a mano: si se borra la propuesta, la pide; al escribirla vuelve la proyección
+    await page.locator('#ar-tap-placa-2').fill(''); await page.locator('#ar-tap-placa-2').press('Enter');
     await expect(page.locator('.tap-bloque')).toContainText('Escribe la placa de la posición propuesta');
-    await page.locator('#ar-tap-placa-2').fill('2255'); await page.locator('#ar-tap-placa-2').press('Enter');
+    await page.locator('#ar-tap-placa-2').fill('2455'); await page.locator('#ar-tap-placa-2').press('Enter');
     await expect(page.locator('.tap-bloque .veredicto-dtft')).toContainText('En TAP 2');
     expect((await app.escrituras()).length).toBe(0);
   });

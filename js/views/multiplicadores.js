@@ -1,7 +1,7 @@
 // Pestaña Multiplicadores de una campaña: resumen por estado, tabla y editor de cada caso
 import { ordenarCasos } from '../domain/listados.js';
 import {
-  calcularMultiplicador, CONFIGURACIONES, CR_OBLIGATORIOS_MT, estadosDe, GRUPOS_ESTADO, grupoDeEstado, historicoDe, POSICIONES_TAP,
+  calcularMultiplicador, redDeCaso, CONFIGURACIONES, CR_OBLIGATORIOS_MT, estadosDe, GRUPOS_ESTADO, grupoDeEstado, historicoDe, POSICIONES_TAP,
   casosPorValidar, redondear, resumenMultiplicadores, TENSIONES_BT,
 } from '../domain/multiplicadores.js';
 import { MESES, nombreCampana } from '../domain/trabajo.js';
@@ -46,7 +46,7 @@ export function renderMultiplicadores(c) {
 
   html += '<div class="tabla-caja"><div class="tabla-scroll"><table class="tabla-r tabla-casos"><thead><tr><th>Código</th><th>Estado</th><th>Configuración</th><th>Multiplicador</th><th>X medidor · TI</th><th>Testblock</th></tr></thead><tbody>';
   visibles.forEach(x => {
-    const m = x.mult || {}; const k = calcularMultiplicador(m);
+    const m = x.mult || {}; const k = calcularMultiplicador(m, redDeCaso(x));
     const tieneDatos = m.configuracion || k.ecamec;
     html += `<tr onclick="abrirMultiplicador('${c.clave}', '${x.id}')">
       <td class="cod"><b>${esc(x.codigo || x.codigoEnte)}</b><small>${esc(x.nombre)}</small>${x.alimentador ? `<small>${esc(x.alimentador)}</small>` : ''}</td>
@@ -61,8 +61,8 @@ export function renderMultiplicadores(c) {
 }
 
 // Resultado calculado (se actualiza sin redibujar mientras se escribe)
-export function htmlCalculo(m) {
-  const k = calcularMultiplicador(m);
+export function htmlCalculo(m, red = 0) {
+  const k = calcularMultiplicador(m, red);
   const p = k.proyeccion;
   const proy = [['ab', p.ab], ['bc', p.bc], ['ac', p.ac]].filter(([, v]) => v !== null);
   return `<div class="calc"><small>Multiplicador ECAMEC</small><b class="mono">${esc(k.ecamec) || '—'}</b></div>
@@ -75,24 +75,27 @@ export function renderMultModal() {
   const { clave, id } = state.multEdit;
   const caso = state.campanas?.[clave]?.casos?.[id] || {};
   const f = state.multForm;
-  const sel = (k, opciones, vacio = '—') => `<select onchange="setMultSelect('${k}', this.value)"><option value="">${vacio}</option>${opciones.map(o => `<option ${String(f[k] ?? '') === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+  const sel = (k, opciones, vacio = '—') => `<select id="mult-${k}" onchange="setMultSelect('${k}', this.value)"><option value="">${vacio}</option>${opciones.map(o => `<option ${String(f[k] ?? '') === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
   const inp = (k, ph = '', extra = 'inputmode="decimal"') => `<input id="mult-${k}" value="${esc(f[k])}" placeholder="${esc(ph)}" ${extra} oninput="setMultField('${k}', this.value)">`;
   const hist = historicoDe(caso.nc, state.campanas, clave);
 
   let html = '<div class="modal-overlay"><div class="modal hoja">';
   html += `<div class="modal-head"><div><div class="modal-titulo mono">${esc(caso.codigo || caso.codigoEnte)}</div><div class="page-sub">${esc(caso.nombre)} · ${esc(caso.alimentador || 'sin alimentador')}</div></div><button class="modal-cerrar" onclick="cerrarMultiplicador()" title="Cerrar">✕</button></div>`;
   if (hist) {
-    const k = calcularMultiplicador(hist.mult);
+    const k = calcularMultiplicador(hist.mult, state.multEdit.red);
     html += `<div class="aviso aviso-azul"><i class="ic ic-reloj"></i><div style="flex:1">Histórico de ${nombreCampana(hist)} (${esc(hist.codigo)}): ${esc(hist.mult.configuracion || '')} · TAP ${esc(hist.mult.tap || '—')} · ${esc(k.ecamec)}${hist.mult.xMedidor ? ' · X ' + esc(hist.mult.xMedidor) : ''}</div>
       <button class="btn-accion" onclick="usarHistorico()">Usar</button></div>`;
   }
-  html += `<div class="field"><label>Estado</label>${sel('estado', estadosDe(caso.tipo), 'Sin estado')}</div>`;
+  const auto = new Set(f.auto || []); const red = state.multEdit.red;
+  const marcaAuto = (k, id = '') => `<span class="mult-auto"${id ? ` id="${id}"` : ''}${auto.has(k) ? '' : ' hidden'}>automático</span>`;
+  html += `<div class="field"><label>Estado ${marcaAuto('estado', 'mult-estado-auto')}</label>${sel('estado', estadosDe(caso.tipo), 'Sin estado')}</div>`;
   html += `<div class="row"><div class="field"><label>Configuración</label>${sel('configuracion', CONFIGURACIONES)}</div><div class="field"><label>Posición de TAP</label>${sel('tap', POSICIONES_TAP)}</div></div>`;
-  html += `<div class="row"><div class="field"><label>Tensión según TAP (V, de la placa del trafo)</label>${inp('tensionTap', '13200')}</div>
-    <div class="field"><label>Tensión de baja (V)</label>${inp('tensionBT', '240', `inputmode="decimal" list="tensiones-bt"`)}<datalist id="tensiones-bt">${TENSIONES_BT.map(t => `<option value="${t}">`).join('')}</datalist></div></div>`;
+  html += `<div class="row"><div class="field"><label>Tensión según TAP (V, de la placa del trafo) ${marcaAuto('tensionTap')}</label>${inp('tensionTap', '13200')}</div>
+    <div class="field"><label>Tensión de baja (V) ${marcaAuto('tensionBT')}</label>${inp('tensionBT', '240', `inputmode="decimal" list="tensiones-bt"`)}<datalist id="tensiones-bt">${TENSIONES_BT.map(t => `<option value="${t}">`).join('')}</datalist></div></div>`;
+  html += `<div class="page-sub mult-red">${red ? `Red de ${red} V (del alimentador): al elegir configuración y TAP se rellenan las tensiones nominales; cámbialas si la placa dice otra cosa.` : 'El caso no tiene alimentador con su tensión: escribe las tensiones a mano.'}</div>`;
   html += `<div class="row"><div class="field"><label>X medidor</label>${inp('xMedidor', '1')}</div><div class="field"><label>Testblock</label>${sel('testblock', ['Sí', 'No'])}</div></div>`;
   html += `<div class="field"><label>Lecturas de voltaje secundario (opcional, para proyectar al primario)</label><div class="row">${inp('vab', 'Vab')}${inp('vbc', 'Vbc')}${inp('vac', 'Vac')}</div></div>`;
-  html += `<div class="calculo" id="mult-calculo">${htmlCalculo(f)}</div>`;
+  html += `<div class="calculo" id="mult-calculo">${htmlCalculo(f, red)}</div>`;
   html += `<div class="field"><label>Notas</label><input id="mult-notas" value="${esc(f.notas)}" oninput="setMultField('notas', this.value)" placeholder="Detalle o duda del caso"></div>`;
   html += '<button class="btn btn-primary" onclick="guardarMultiplicador()">Guardar</button>';
   html += '<button class="btn btn-secondary" onclick="cerrarMultiplicador()">Cancelar</button>';
