@@ -4005,7 +4005,7 @@ test.describe('Levantamiento en campo', () => {
     const puntos = {}; const vanos = {};
     for (let i = 0; i < 6; i++) puntos['p' + i] = { lat: 13.5 + i * 0.000108, lng: -88.87, nombre: `P${i + 1}`, tipo: 'poste', orden: i + 1 };
     for (let i = 0; i < 5; i++) vanos['v' + i] = { a: 'p' + i, b: 'p' + (i + 1), tramo: 'bt', orden: i + 1 };
-    puntos.p6 = { lat: 13.5, lng: -88.8693, nombre: 'P7', tipo: 'poste', orden: 7 }; vanos.v5 = { a: 'p0', b: 'p6', tramo: 'bt', orden: 6 }; // uno largo (~75 m)
+    puntos.p6 = { lat: 13.5, lng: -88.868, nombre: 'P7', tipo: 'poste', orden: 7 }; vanos.v5 = { a: 'p0', b: 'p6', tramo: 'bt', orden: 6 }; // uno largo (216 m): su distancia cabe con holgura lejos de los nombres
     datos.levantamientos = { L1: { nombre: 'Cortos', puntos, vanos, creado: { fecha: '2026-10-01', por: 'David García' } } };
     await page.setViewportSize({ width: 1280, height: 1100 });
     app = await abrirApp(page, { datos, leaflet: true });
@@ -4013,9 +4013,8 @@ test.describe('Levantamiento en campo', () => {
     await nav(page, 'Levantamiento');
     await page.locator('.lev-card', { hasText: 'Cortos' }).click();
     await expect(page.locator('#lev-mapa.leaflet-container')).toHaveCount(1);
-    await page.evaluate(async () => { const { mapaLev } = await import('/js/actions/levantamiento.js'); mapaLev().setView([13.50013, -88.8697], 17, { animate: false }); });
-    await expect(page.locator('.lev-dist')).toHaveCount(1); // de lejos solo se ve la del vano largo
-    await expect(page.locator('.lev-dist')).toHaveText('75.7 m');
+    await page.evaluate(async () => { const { mapaLev } = await import('/js/actions/levantamiento.js'); mapaLev().setView([13.50013, -88.869], 17, { animate: false }); });
+    await expect(page.locator('.lev-dist')).toHaveText(['216.2 m']); // de lejos solo se ve la del vano largo
     await page.evaluate(async () => { const { mapaLev } = await import('/js/actions/levantamiento.js'); mapaLev().setView([13.50027, -88.87], 21, { animate: false }); });
     await expect.poll(() => page.locator('.lev-dist').count()).toBeGreaterThan(3); // al acercar aparecen las de los vanos cortos
     // Botón para ocultarlas todas
@@ -4208,8 +4207,14 @@ test.describe('Levantamiento en campo', () => {
     await expect(page.locator('#lev-gps')).toHaveText('GPS ±4 m');
     await poste.click();
     await expect(page.locator('.leaflet-marker-icon')).toHaveCount(2);
-    await page.getByRole('button', { name: 'Seguir mi ubicación' }).click(); // que el mapa no se mueva solo
-    const centro = async n => { const b = await page.locator('.leaflet-marker-icon', { hasText: n }).boundingBox(); return [b.x + b.width / 2, b.y + b.height / 2]; };
+    // Que el mapa no se mueva solo: el botón apaga el seguimiento (y lo vuelve a prender) según está, aunque el mapa lo haya cambiado
+    const seguir = page.getByRole('button', { name: 'Seguir mi ubicación' });
+    if (await seguir.evaluate(b => b.classList.contains('activo'))) await seguir.click();
+    await expect(seguir).not.toHaveClass(/activo/);
+    await seguir.click(); await expect(seguir).toHaveClass(/activo/);
+    await seguir.click(); await expect(seguir).not.toHaveClass(/activo/);
+    // Centro de un poste en pantalla (los marcadores se vuelven a dibujar al mover el mapa: se espera a que esté)
+    const centro = async n => { let b = null; await expect.poll(async () => { b = await page.locator('.leaflet-marker-icon', { hasText: n }).boundingBox(); return !!b; }).toBe(true); return [b.x + b.width / 2, b.y + b.height / 2]; };
     const pos = async n => page.evaluate(async n => { const { state } = await import('/js/state.js'); return Object.values(state.levantamientos[state.levId].puntos).find(p => p.nombre === n); }, n);
     // Arrastrar P1 directo (sin tocarlo antes)
     const antes = await pos('P1');
