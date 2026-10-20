@@ -5,6 +5,8 @@ import { showToast } from '../ui.js';
 import { today } from '../utils.js';
 import { render } from '../views/render.js';
 import { darEstilo } from '../excel.js';
+import { multDesdeValidacion, redDeCaso, tipoValidacionDe } from '../domain/multiplicadores.js';
+import { escribirMultiplicador } from '../actions/multiplicadores.js';
 
 // ── VALIDACIONES HANDLERS ──
 window.abrirNuevaValidacion = () => { state.showValImport = true; state.valImportData = []; state.valTipo = 'monofasico'; render(); };
@@ -62,9 +64,10 @@ window.abrirCampana = el => {
 
 window.abrirFormVal = el => {
   state.valUsuarioIdx = parseInt(typeof el === 'string' ? el : el.dataset.idx);
-  state.valTipoUsuario = 'monofasico'; // reset per-user tipo
   const camp = state.validaciones.find(v => v.id === state.valCampanaId);
   const u = camp?.usuarios?.[state.valUsuarioIdx];
+  // Tipo de conexión según la configuración del caso (si viene de una campaña); si no, monofásico
+  state.valTipoUsuario = tipoValidacionDe(u?.configuracion);
   // Pre-load saved form data if already validated
   if (u?.formData) { state.valForm = { ...u.formData }; }
   else { state.valForm = {}; }
@@ -163,8 +166,16 @@ window.guardarValidacion = () => {
     resultado: state.valForm.resultado,
     formData: { ...state.valForm, resultado: state.valForm.resultado },
   };
+  // Validación hecha desde una campaña: el TAP estimado pasa al multiplicador del caso y queda Validado con usuario
+  const u = usuarios[state.valUsuarioIdx]; const caso = camp.campana && u.casoId ? state.campanas?.[camp.campana]?.casos?.[u.casoId] : null;
+  let aviso = '';
+  if (caso && u.resultado) {
+    const mult = multDesdeValidacion(caso.mult, u.resultado, { tipo: u.formData?.tipoConexion, id: state.valCampanaId, fecha: u.fechaValidacion, por: u.validadoPor });
+    const otros = escribirMultiplicador(camp.campana, u.casoId, mult, { red: redDeCaso(caso), validacion: true });
+    aviso = ` · multiplicador de ${caso.codigo || caso.codigoEnte} Validado con usuario${otros.length ? ` (y ${otros.join(', ')})` : ''}`;
+  }
   update(ref(db, 'validaciones/' + state.valCampanaId), { usuarios }).then(() => {
-    showToast('Validación guardada');
+    showToast('Validación guardada' + aviso);
     state.valView = 'detalle'; state.valForm = {}; render();
   });
 };
@@ -207,7 +218,7 @@ window.autoFillTapsTri = () => {
   const vpEl = document.getElementById('vf-cp-vp');
   const tapsEl = document.getElementById('vf-taps');
   if (!vpEl || !tapsEl) return;
-  const T = {'23000':'24940,23900,22900,22290,21755','13200':'13860,13530,13200,12870,12540','4160':'4364,4260,4157,4054,3950'};
+  const T = {'23000':'24940,23900,22900,22290,21755','13200':'14400,13800,13200,12870,12540','4160':'4365,4260,4160,4053,3897'}; // las mismas de Multiplicadores (confirmadas por el equipo)
   const _tv = vpEl.value.trim(); if (T[_tv]) { tapsEl.value = T[_tv]; state.valForm.taps = T[_tv]; }
 };
 

@@ -23,7 +23,7 @@ export function renderValidaciones() {
         html += '<div onclick="abrirCampana(this.dataset.id)" data-id="'+v.id+'" style="background:var(--white);border:1px solid var(--border);border-left:4px solid var(--primary);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer">';
         html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">';
         html += '<div><div style="font-size:14px;font-weight:700;color:var(--text)">'+v.nombre+'</div>';
-        html += '<div style="font-size:11px;color:var(--text3);margin-top:2px">'+v.fecha+' · '+(v.tipo==='monofasico'?'Monofásico':v.tipo==='bifasico'?'Bifásico':'Trifásico')+'</div></div>';
+        html += '<div style="font-size:11px;color:var(--text3);margin-top:2px">'+v.fecha+' · '+(v.campana?'De la campaña (sin Excel); el TAP pasa al multiplicador':v.tipo==='monofasico'?'Monofásico':v.tipo==='bifasico'?'Bifásico':'Trifásico')+'</div></div>';
         html += '<span style="background:var(--primary-light);color:var(--primary);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px">'+validados2+'/'+total+'</span>';
         html += '</div>';
         html += '<div style="height:6px;background:var(--border2);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+(pct===100?'var(--green)':'var(--primary)')+';border-radius:3px"></div></div>';

@@ -511,6 +511,8 @@ Cuando un equipo asignado falla, la Subestación Cucumacayán es el primer filtr
 ## Área: Validaciones de Tap
 Flujo para validar el tap de un transformador comparando lecturas de referencia vs campaña.
 
+**Desde la campaña (sin Excel; pedido del equipo):** en Multiplicadores, "Validación de TAP (n)" crea la validación con los casos en Pendiente de validar (`usuariosParaValidacion`; un DA/DF cuyo CR del mismo NC también está pendiente no entra, se valida con su CR). Se guarda con `campana` y cada usuario lleva `casoId`, `configuracion` y `tapCampo`; el formulario abre con el tipo de conexión del caso. Al guardar la validación, el TAP estimado pasa al multiplicador (`multDesdeValidacion`): TAP, tensión según TAP y de baja (del multiplicador "VP/VS" calculado), estado "Validado con usuario" y `validacion: { id, fecha, por }`; los DA/DF del mismo usuario se rellenan como al guardar el CR, incluso si estaban en Pendiente de validar (`escribirMultiplicador(…, { validacion: true })`). Se sigue pudiendo cambiar a mano. La forma de antes (subir Excel) sigue.
+
 ### Flujo de navegación (`valView`)
 ```
 'lista' → seleccionar campaña
@@ -537,8 +539,10 @@ Flujo para validar el tap de un transformador comparando lecturas de referencia 
 | VP | TAPs |
 |---|---|
 | 23000 V | 24940, 23900, 22900, 22290, 21755 |
-| 13200 V | 13860, 13530, 13200, 12870, 12540 |
-| 4160 V  | 4364, 4260, 4157, 4054, 3950 |
+| 13200 V | 14400, 13800, 13200, 12870, 12540 |
+| 4160 V  | 4365, 4260, 4160, 4053, 3897 |
+
+(13.2 kV y 4.16 kV corregidos a los valores que confirmó el equipo para Multiplicadores.)
 
 ### Voltaje Secundario "Otro"
 Cuando el usuario selecciona "Otro..." en el select de VS (ref o campaña), en los tres tipos de conexión:
