@@ -1,9 +1,9 @@
 // Multiplicadores: editar el de cada caso, usar el histórico del usuario y exportar la hoja
-import { db, ref, set, update } from '../firebase.js';
+import { db, push, ref, set, update, validacionesRef } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { kmlMapa, ordenarCasos } from '../domain/listados.js';
-import { aplicarDeCR, casosPorValidar, COLORES_POR_VALIDAR, estadoAutomatico, multiplicadorDeCR, relacionadosDeCR, filasMultiplicadores, filasPorValidar, historicoDe, leerMultiplicadoresExcel, planificarMultiplicadores, redDeCaso, sugerenciaMultiplicador } from '../domain/multiplicadores.js';
+import { aplicarDeCR, casosPorValidar, COLORES_POR_VALIDAR, estadoAutomatico, multiplicadorDeCR, relacionadosDeCR, filasMultiplicadores, filasPorValidar, historicoDe, leerMultiplicadoresExcel, planificarMultiplicadores, redDeCaso, sugerenciaMultiplicador, usuariosParaValidacion } from '../domain/multiplicadores.js';
 import { leerArchivo } from './campanas.js';
 import { hoyLocal, MESES } from '../domain/trabajo.js';
 import { render } from '../views/render.js';
@@ -73,20 +73,46 @@ export function guardarMultiplicador() {
   if (auto.length) datos.auto = auto;
   datos.editadoPor = state.sesionUsuario?.nombre || '';
   datos.fecha = hoyLocal();
-  // Un CR rellena sus DA y DF (lo que se cambió a mano en ellos no se pisa)
-  const c = caso(); const extra = {}; const nombres = [];
+  const red = state.multEdit.red;
+  cerrarMultiplicador();
+  const nombres = escribirMultiplicador(clave, id, datos, { red, aviso: true });
+  if (!nombres.length) showToast('Multiplicador guardado');
+}
+
+// Guarda el multiplicador de un caso; un CR rellena sus DA y DF (lo que se cambió a mano en ellos no se pisa).
+// Devuelve los códigos de los DA/DF que se rellenaron.
+// validacion: viene de la validación de TAP (los DA/DF en Pendiente de validar toman el TAP aunque se haya escrito a mano)
+export function escribirMultiplicador(clave, id, datos, { red = 0, aviso = false, validacion = false } = {}) {
+  const c = state.campanas?.[clave]?.casos?.[id]; if (!c) return [];
+  const extra = {}; const nombres = [];
   if (c.tipo === 'CR') {
-    const deCR = multiplicadorDeCR(datos, state.multEdit.red);
+    const deCR = multiplicadorDeCR(datos, red);
     relacionadosDeCR(c, state.campanas[clave].casos).forEach(r => {
-      const nuevo = aplicarDeCR(r.caso.mult || {}, deCR);
+      const liberar = validacion && r.caso.mult?.estado === 'Pendiente de validar' ? ['estado', 'tap', 'tensionTap', 'tensionBT'] : [];
+      const nuevo = aplicarDeCR(r.caso.mult || {}, deCR, { liberar });
       if (!nuevo) return;
-      extra[`casos/${r.id}/mult`] = { ...nuevo, editadoPor: datos.editadoPor, fecha: datos.fecha, origen: 'cr' };
+      extra[`casos/${r.id}/mult`] = { ...nuevo, editadoPor: datos.editadoPor || state.sesionUsuario?.nombre || '', fecha: datos.fecha || hoyLocal(), origen: 'cr' };
       nombres.push(r.caso.codigo || r.caso.codigoEnte || r.id);
     });
   }
-  set(ref(db, `campanas/${clave}/casos/${id}/mult`), datos).then(() => showToast(nombres.length ? `Multiplicador guardado · también en ${nombres.join(', ')}` : 'Multiplicador guardado'));
+  set(ref(db, `campanas/${clave}/casos/${id}/mult`), datos).then(() => { if (aviso && nombres.length) showToast(`Multiplicador guardado · también en ${nombres.join(', ')}`); });
   if (nombres.length) update(ref(db, `campanas/${clave}`), extra);
-  cerrarMultiplicador();
+  return nombres;
+}
+
+// Validación de TAP con los Pendiente de validar de la campaña (sin subir Excel): se abre en Validaciones de TAP
+export function crearValidacionTap(clave) {
+  const g = state.campanas?.[clave]; if (!g) return;
+  const casos = Object.entries(g.casos || {}).map(([cid, c]) => ({ ...c, id: c.id || cid }));
+  const usuarios = usuariosParaValidacion(casos);
+  if (!usuarios.length) return showToast('No hay casos en Pendiente de validar');
+  const nombre = `Validación ${MESES[g.mes - 1]} ${g.anio} · ${g.area}`;
+  if ((state.validaciones || []).some(v => v.campana === clave) && !confirm(`Ya hay una validación de TAP de esta campaña. ¿Crear otra con los ${usuarios.length} pendientes de ahora?`)) return;
+  push(validacionesRef, { nombre, fecha: hoyLocal(), tipo: 'campana', campana: clave, usuarios, creadoPor: state.sesionUsuario?.nombre || 'Desconocido' }).then(r => {
+    showToast(`Validación de TAP creada con ${usuarios.length} ${usuarios.length === 1 ? 'usuario' : 'usuarios'}`);
+    Object.assign(state, { tab: 'validaciones', valView: 'detalle', valCampanaId: r.key });
+    render();
+  });
 }
 
 export function exportarMultiplicadores(clave) {

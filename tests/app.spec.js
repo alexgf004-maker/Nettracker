@@ -1666,6 +1666,40 @@ test.describe('Precampaña', () => {
     expect(errores).toEqual([]);
   });
 
+  test('validación de TAP desde la campaña (sin Excel): los pendientes de validar y el TAP estimado vuelve al multiplicador', async ({ page }) => {
+    const datos = conCampana();
+    const casos = datos.campanas['2026-10_CPT-MT'].casos;
+    casos.CR1O2026201.mult = { estado: 'Realizado' };
+    Object.assign(casos.CR1O2026202, { alimentador: 'AL020-13200', mult: { estado: 'Pendiente de validar', configuracion: 'Monofásico', tap: 'Tapón', xMedidor: 1, notas: 'Tapón en el trafo' } });
+    casos.DA1O2026011O00.mult = { estado: 'Pendiente de validar' }; // mismo usuario que el CR202: se valida con él
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    app = await abrirApp(page, { datos });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('multiplicadores'); });
+    await page.getByRole('button', { name: 'Validación de TAP (1)' }).click();
+    const creada = (await app.escrituras()).find(([op, ruta]) => op === 'push' && ruta === 'validaciones');
+    expect(creada[2]).toMatchObject({ nombre: 'Validación Octubre 2026 · CPT MT', campana: '2026-10_CPT-MT', creadoPor: 'David García' });
+    expect(creada[2].usuarios).toEqual([expect.objectContaining({ siget: 'CR1O2026202', nc: '222', casoId: 'CR1O2026202', configuracion: 'Monofásico', tapCampo: 'Tapón', estado: 'pendiente', alimentador: 'AL020-13200' })]);
+    // Se abre en Validaciones de TAP, con el tipo de conexión del caso
+    await expect(app$(page)).toContainText('Validación Octubre 2026 · CPT MT');
+    await app.ejecutar(() => abrirFormVal('0'));
+    expect(await page.evaluate(async () => (await import('/js/state.js')).state.valTipoUsuario)).toBe('monofasico');
+    // Resultado de la validación (TAP 2 → 7810/240) y guardar: pasa al multiplicador del CR y a su DA
+    await page.evaluate(async () => {
+      const { state } = await import('/js/state.js');
+      state.valForm = { tipoConexion: 'monofasico', resultado: { tap: 2, multiplicador: '7810/240', primarioProyectado: 7790, relacionCalc: 32.5, ok: true } };
+      window.guardarValidacion();
+    });
+    await expect(page.locator('.toast')).toContainText('multiplicador de CR1O2026202 Validado con usuario (y DA1O2026011O00)');
+    const esc = await app.escrituras();
+    const cr = esc.filter(([op, ruta]) => op === 'set' && ruta === 'campanas/2026-10_CPT-MT/casos/CR1O2026202/mult').at(-1)[2];
+    expect(cr).toEqual({ estado: 'Validado con usuario', configuracion: 'Monofásico', tap: '2', tensionTap: 7810, tensionBT: 240, xMedidor: 1, notas: 'Tapón en el trafo',
+      validacion: { id: 'k0001', fecha: '2026-09-23', por: 'David García' } });
+    const da = esc.filter(([op, ruta]) => op === 'update' && ruta === 'campanas/2026-10_CPT-MT').at(-1)[2]['casos/DA1O2026011O00/mult'];
+    expect(da).toMatchObject({ estado: 'Validado con usuario', configuracion: 'Monofásico', tap: '2', tensionTap: 7810, tensionBT: 240, origen: 'cr' });
+    expect(errores).toEqual([]);
+  });
+
   test('multiplicadores: importar un Excel ya hecho con sus fechas y equipos, con vista previa', async ({ page }) => {
     const datos = conCampana();
     datos.campanas['2026-10_CPT-MT'].casos.CR1O2026202.mult = { estado: 'Revisar', notas: 'llamar antes' };

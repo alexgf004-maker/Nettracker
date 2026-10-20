@@ -83,6 +83,33 @@ export function estadoAutomatico(m = {}) {
 // Redondeo para mostrar (como Excel con pocos decimales), sin ceros de más
 export const redondear = (n, dec = 4) => (n === null ? '' : String(Number(n.toFixed(dec))));
 
+// ── Validación de TAP desde la campaña (pedido del equipo: antes se subía un Excel) ──
+// Entran los Pendiente de validar; un DA/DF cuyo CR (mismo NC) también está pendiente no va: al validar el CR se rellena
+export function usuariosParaValidacion(casos) {
+  const pend = (casos || []).filter(c => c.mult?.estado === 'Pendiente de validar');
+  const crPend = new Set(pend.filter(c => c.tipo === 'CR').map(c => c.nc));
+  return pend.filter(c => c.tipo === 'CR' || !crPend.has(c.nc)).map(c => ({
+    nc: String(c.nc ?? ''), siget: c.codigo || c.codigoEnte || '', nombre: c.nombre || '', direccion: c.direccion || c.direccionEnte || '', ct: c.ct || '', medidor: c.medidor || '',
+    alimentador: c.alimentador || '', lat: c.lat != null ? String(c.lat) : '', lng: c.lng != null ? String(c.lng) : '', estado: 'pendiente', resultado: null,
+    casoId: c.id, ...(c.mult?.configuracion ? { configuracion: c.mult.configuracion } : {}), ...(c.mult?.tap ? { tapCampo: c.mult.tap } : {}),
+  }));
+}
+// Tipo de conexión del formulario de validación según la configuración del caso
+export const tipoValidacionDe = conf => (conf === 'Delta' || conf === 'Estrella' ? 'trifasico' : conf === 'Bifásico' || conf === 'Estrella 2 hilos' ? 'bifasico' : 'monofasico');
+const CONF_DE_TIPO = { monofasico: 'Monofásico', bifasico: 'Bifásico' };
+// Multiplicador con el TAP estimado de la validación: TAP, tensión según TAP y de baja, y Validado con usuario
+// (resultado.multiplicador = "VP/VS"). La configuración del caso se respeta; si no tenía, la del formulario (no en trifásico).
+export function multDesdeValidacion(mult = {}, resultado = {}, { tipo, id, fecha, por } = {}) {
+  const [vp, vs] = String(resultado.multiplicador || '').split('/').map(Number);
+  const cambia = ['tap', 'tensionTap', 'tensionBT', 'estado'];
+  const out = { ...mult, tap: String(resultado.tap), estado: 'Validado con usuario', validacion: { id, fecha, por } };
+  if (vp > 0) out.tensionTap = vp; if (vs > 0) out.tensionBT = vs;
+  if (!out.configuracion && CONF_DE_TIPO[tipo]) out.configuracion = CONF_DE_TIPO[tipo];
+  const auto = (mult.auto || []).filter(k => !cambia.includes(k)); // lo que puso la validación ya no es "automático"
+  if (auto.length) out.auto = auto; else delete out.auto;
+  return out;
+}
+
 // ── DA y DF: se rellenan con el multiplicador de su CR (pedido del equipo) ──
 // Configuración, TAP, X medidor, testblock y estado iguales a los del CR; las tensiones también, salvo en estrella, que
 // se mide línea-neutro: tensión según TAP de la tabla monofásica del mismo TAP y 120 en baja (MP, tapón o interno:
@@ -101,8 +128,9 @@ export function multiplicadorDeCR(cr = {}, red = 0) {
 }
 // Lo que queda en el DA/DF: lo escrito o elegido a mano en él se respeta; lo vacío o lo que puso la app se toma del CR.
 // Devuelve null si no cambia nada.
-export function aplicarDeCR(actual = {}, deCR = {}) {
-  const auto = new Set(actual.auto || []); const out = { ...actual }; let cambio = false;
+// liberar: campos que se toman del CR aunque se hayan escrito a mano (al validar el TAP del CR, en un DA/DF pendiente)
+export function aplicarDeCR(actual = {}, deCR = {}, { liberar = [] } = {}) {
+  const auto = new Set([...(actual.auto || []), ...liberar]); const out = { ...actual }; let cambio = false;
   CAMPOS_DE_CR.forEach(k => {
     const manual = actual[k] !== undefined && actual[k] !== '' && !auto.has(k);
     if (manual) return;
