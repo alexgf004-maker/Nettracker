@@ -160,7 +160,8 @@ function bloquePuntos(e, m) {
     html += `<div class="exp-punto"><div class="exp-punto-main"><b>${esc(p.nombre)}</b><span>${esc(i.serie || '')} · ${fmtDate(i.fechaInstalacion)} → ${i.retirado ? fmtDate(i.fechaRetiroReal) : fmtDate(i.fechaRetiro)}</span>
       <div class="tags"><span class="tg ${CLASE_ETAPA[p.etapa]}">${ETAPAS_MEDICION[p.etapa]}</span>${tagsResultado(p.resultado)}</div></div>
       <div class="exp-punto-acc">${i.retirado ? `<button class="b ${p.resultado ? 'b-g' : 'b-p'}" onclick="abrirAnalisisReclamo('${i.id}')"><i class="ic ic-grafica"></i> ${p.resultado ? 'Ver análisis' : 'Analizar TXT'}</button>` : ''}
-        <button class="b b-l" onclick="goToInstall('${i.id}')">Ver</button><button class="b b-l" onclick="desvincularPuntoReclamo('${i.id}')">Quitar</button></div></div>`;
+        <button class="b b-l" onclick="goToInstall('${i.id}')">Ver</button>${p.sinNombre ? `<button class="b b-p" onclick="abrirPuntoReclamo('${e.id}', ${m.n}, '${i.id}')">Ponerle nombre</button>` : `<button class="b b-l" onclick="desvincularPuntoReclamo('${i.id}')">Quitar</button>`}</div></div>`;
+    if (p.sinNombre) html += `<div class="aviso aviso-amarillo"><i class="ic ic-alerta"></i> Se registró con el mismo código mientras el analizador principal estaba en campo: es otro punto de esta medición. Ponle nombre (medidor, trafo, tablero…).</div>`;
   });
   return html + `<button class="b b-g" onclick="abrirPuntoReclamo('${e.id}', ${m.n})"><i class="ic ic-plus"></i> Agregar punto (medidor, trafo, tablero…)</button></div>`;
 }
@@ -174,9 +175,12 @@ export function renderPuntoReclamo() {
     .filter(r => !r.reclamo?.id && !['campana', 'reclamo'].includes(tipoDeTrabajo(r.caso)) && (!r.retirado || (r.fechaInstalacion || '') >= desde))
     .sort((a, b) => (b.fechaInstalacion || '').localeCompare(a.fechaInstalacion || '')).slice(0, 20);
   let html = '<div class="modal-overlay"><div class="modal hoja">';
-  html += `<div class="modal-head"><div><div class="modal-titulo">Agregar punto de medición</div><div class="page-sub">${esc(e.codigo)} · medición ${p.n}</div></div><button class="modal-cerrar" onclick="cerrarPuntoReclamo()" title="Cerrar">✕</button></div>`;
+  const inst = p.instId ? state.records.find(r => r.id === p.instId) : null;
+  html += `<div class="modal-head"><div><div class="modal-titulo">${inst ? 'Nombre del punto de medición' : 'Agregar punto de medición'}</div><div class="page-sub">${esc(e.codigo)} · medición ${p.n}${inst ? ` · ${esc(inst.serie || '')} instalado el ${fmtDate(inst.fechaInstalacion)}` : ''}</div></div><button class="modal-cerrar" onclick="cerrarPuntoReclamo()" title="Cerrar">✕</button></div>`;
   html += `<div class="field"><label>Nombre del punto</label><input id="punto-nombre" list="punto-nombres" value="${esc(p.nombre)}" oninput="setNombrePunto(this.value)" placeholder="Medidor, trafo, tablero principal…">
     <datalist id="punto-nombres">${['Medidor', 'Trafo', 'Tablero principal', 'Tablero secundario'].map(x => `<option value="${x}">`).join('')}</datalist></div>`;
+  // Instalación con el mismo código que la principal: solo falta su nombre
+  if (inst) return html + `<button class="btn btn-primary" onclick="vincularPuntoReclamo('${inst.id}')">Guardar nombre</button></div></div>`;
   html += `<button class="btn btn-primary" onclick="registrarPuntoReclamo()"><i class="ic ic-plus"></i> Registrar instalación nueva</button>`;
   html += '<div class="section-title" style="margin-top:14px">O vincular una instalación que ya está registrada</div>';
   html += candidatas.length ? '<div class="filas">' + candidatas.map(r => `<div class="fila"><div class="fila-main"><div class="fila-titulo">${esc(r.caso)}</div><div class="fila-sub">${esc(r.serie || '')} · ${fmtDate(r.fechaInstalacion)} · ${esc(r.lugar || '')}</div></div>

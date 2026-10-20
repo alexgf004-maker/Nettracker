@@ -105,7 +105,7 @@ export function eliminarExpediente(id) {
 
 // ── Puntos adicionales de una medición ──
 
-export function abrirPuntoReclamo(id, n) { state.puntoReclamo = { id, n, nombre: '' }; render(); }
+export function abrirPuntoReclamo(id, n, instId = null) { state.puntoReclamo = { id, n, nombre: '', ...(instId ? { instId } : {}) }; render(); }
 export function cerrarPuntoReclamo() { state.puntoReclamo = null; render(); }
 export function setNombrePunto(v) { if (state.puntoReclamo) state.puntoReclamo.nombre = v; }
 

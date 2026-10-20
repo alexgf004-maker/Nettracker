@@ -9,7 +9,7 @@
 //   (campo reclamo: { id, n, punto } en la instalación). Cada punto tiene su análisis; el informe es uno solo.
 // - FT (FebNoPer > 5 % en tensión): mismo tratamiento que un caso regulatorio FT (aviso, 90 días, remedición).
 // - Armónicos o flicker fuera de límite: solo se avisa; le compete al usuario corregirlo.
-import { instalacionDeCaso } from './resultados.js';
+import { instalacionesMismoCaso } from './resultados.js';
 import { casosFT, DIAS_SOLUCION_FT } from './ft.js';
 import { DIAS_INFORME_RECLAMO, diasEntre, etapaInstalacion, fechaInformeReclamo, normalizarCodigo, sumarDias } from './trabajo.js';
 
@@ -82,14 +82,16 @@ export function medicionesExpediente(exp, registros, hoy) {
   const lista = [];
   for (let n = 1; n <= MAX_MEDICIONES; n++) {
     const codigo = codigoMedicion(p.resto, n);
-    const inst = instalacionDeCaso({ codigo }, registros);
+    const { principal: inst, otras } = instalacionesMismoCaso({ codigo }, registros);
     const res = inst?.analisisReclamo?.resultado || null;
-    // Puntos adicionales de esta medición (medidor, trafo, tablero…): instalaciones vinculadas al expediente
-    const puntos = registros.filter(r => exp.id && r.reclamo?.id === exp.id && Number(r.reclamo.n) === n && normalizarCodigo(r.caso) !== codigo)
+    // Puntos adicionales de esta medición (medidor, trafo, tablero…): instalaciones vinculadas al expediente y las que
+    // se registraron con el mismo código mientras la principal estaba en campo (sinNombre: falta decir qué punto es)
+    const vinculadas = registros.filter(r => exp.id && r.reclamo?.id === exp.id && Number(r.reclamo.n) === n && (r.reclamo.punto || normalizarCodigo(r.caso) !== codigo));
+    const puntos = [...vinculadas, ...otras.filter(r => !vinculadas.includes(r))]
       .sort((a, b) => (a.fechaInstalacion || '').localeCompare(b.fechaInstalacion || ''))
       .map(r => {
-        const rp = r.analisisReclamo?.resultado || null;
-        return { inst: r, nombre: r.reclamo.punto || r.caso, etapa: etapaInstalacion(r, hoy), resultado: rp, avisos: avisosUsuario(rp) };
+        const rp = r.analisisReclamo?.resultado || null; const sinNombre = !r.reclamo?.punto && normalizarCodigo(r.caso) === codigo;
+        return { inst: r, nombre: sinNombre ? `${r.serie || r.caso} (mismo código)` : r.reclamo?.punto || r.caso, sinNombre, etapa: etapaInstalacion(r, hoy), resultado: rp, avisos: avisosUsuario(rp) };
       });
     if (!inst && !puntos.length && n !== p.n) continue;
     lista.push({
