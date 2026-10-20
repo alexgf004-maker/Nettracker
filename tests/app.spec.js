@@ -1621,6 +1621,45 @@ test.describe('Precampaña', () => {
     expect(errores).toEqual([]);
   });
 
+  test('multiplicadores: al guardar el CR se rellenan sus DA y DF (estrella línea-neutro) sin pisar lo escrito a mano', async ({ page }) => {
+    const datos = conCampana();
+    const casos = datos.campanas['2026-10_CPT-MT'].casos;
+    casos.CR1O2026202.alimentador = 'AL013-23000';
+    casos.DF1O2026012O00 = caso('DF1O2026012O00', '222', { crRelacionado: 'CR1O2026202', mult: { notas: 'poste en patio', xMedidor: 2 } });
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    app = await abrirApp(page, { datos });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('multiplicadores'); });
+    const v = id => page.locator('#mult-' + id);
+    // CR en estrella, TAP 3: 22900/208, X 1, testblock Sí → Realizado
+    await page.locator('.tabla-casos tr', { hasText: 'CR1O2026202' }).click();
+    await v('configuracion').selectOption('Estrella'); await v('tap').selectOption('3');
+    await v('xMedidor').fill('1'); await v('testblock').selectOption('Sí');
+    await expect(v('estado')).toHaveValue('Realizado');
+    await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+    await expect(page.locator('.toast')).toContainText('también en DA1O2026011O00, DF1O2026012O00');
+    const esc = await app.escrituras();
+    const upd = esc.find(e => e[0] === 'update' && e[1] === 'campanas/2026-10_CPT-MT');
+    // DA vacío: todo del CR, con la estrella línea-neutro (13200/120 de la tabla monofásica)
+    expect(upd[2]['casos/DA1O2026011O00/mult']).toEqual({ estado: 'Realizado', configuracion: 'Estrella', tap: '3', tensionTap: 13200, tensionBT: 120, xMedidor: 1, testblock: 'Sí',
+      auto: ['estado', 'configuracion', 'tap', 'tensionTap', 'tensionBT', 'xMedidor', 'testblock'], editadoPor: 'David García', fecha: '2026-09-23', origen: 'cr' });
+    // DF con X escrito a mano y una nota: se conservan
+    expect(upd[2]['casos/DF1O2026012O00/mult']).toMatchObject({ estado: 'Realizado', configuracion: 'Estrella', tensionTap: 13200, tensionBT: 120, xMedidor: 2, notas: 'poste en patio' });
+    // El DA abierto muestra de dónde salió
+    await page.locator('.tabla-casos tr', { hasText: 'DA1O2026011O00' }).click();
+    await expect(page.locator('.modal')).toContainText('Se rellena al guardar el multiplicador de su CR (CR1O2026202)');
+    await expect(v('tensionTap')).toHaveValue('13200');
+    await app.ejecutar(() => cerrarMultiplicador());
+    // Delta: igual que el CR
+    await page.locator('.tabla-casos tr', { hasText: 'CR1O2026202' }).click();
+    await v('configuracion').selectOption('Delta');
+    await expect(v('tensionTap')).toHaveValue('22900'); await expect(v('tensionBT')).toHaveValue('240');
+    await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+    const ult = (await app.escrituras()).filter(e => e[0] === 'update' && e[1] === 'campanas/2026-10_CPT-MT').at(-1);
+    expect(ult[2]['casos/DA1O2026011O00/mult']).toMatchObject({ configuracion: 'Delta', tensionTap: 22900, tensionBT: 240 });
+    expect(errores).toEqual([]);
+  });
+
   test('multiplicadores: importar un Excel ya hecho con sus fechas y equipos, con vista previa', async ({ page }) => {
     const datos = conCampana();
     datos.campanas['2026-10_CPT-MT'].casos.CR1O2026202.mult = { estado: 'Revisar', notas: 'llamar antes' };

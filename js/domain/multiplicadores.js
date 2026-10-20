@@ -68,6 +68,41 @@ export function estadoAutomatico(m = {}) {
 // Redondeo para mostrar (como Excel con pocos decimales), sin ceros de más
 export const redondear = (n, dec = 4) => (n === null ? '' : String(Number(n.toFixed(dec))));
 
+// ── DA y DF: se rellenan con el multiplicador de su CR (pedido del equipo) ──
+// Configuración, TAP, X medidor, testblock y estado iguales a los del CR; las tensiones también, salvo en estrella, que
+// se mide línea-neutro: tensión según TAP de la tabla monofásica del mismo TAP y 120 en baja (MP, tapón o interno:
+// la del primario se escribe a mano).
+export const CAMPOS_DE_CR = ['estado', 'configuracion', 'tap', 'tensionTap', 'tensionBT', 'xMedidor', 'testblock'];
+export function multiplicadorDeCR(cr = {}, red = 0) {
+  const out = {};
+  CAMPOS_DE_CR.forEach(k => { if (cr[k] !== undefined && cr[k] !== '') out[k] = cr[k]; });
+  if (cr.configuracion === 'Estrella') {
+    const pos = Number(cr.tap);
+    delete out.tensionTap;
+    if (pos >= 1 && pos <= 5 && TAPS_RED[red]) out.tensionTap = TAPS_RED[red].mono[pos - 1];
+    out.tensionBT = 120;
+  }
+  return out;
+}
+// Lo que queda en el DA/DF: lo escrito o elegido a mano en él se respeta; lo vacío o lo que puso la app se toma del CR.
+// Devuelve null si no cambia nada.
+export function aplicarDeCR(actual = {}, deCR = {}) {
+  const auto = new Set(actual.auto || []); const out = { ...actual }; let cambio = false;
+  CAMPOS_DE_CR.forEach(k => {
+    const manual = actual[k] !== undefined && actual[k] !== '' && !auto.has(k);
+    if (manual) return;
+    const v = deCR[k];
+    if (v === undefined) { if (out[k] !== undefined) { delete out[k]; auto.delete(k); cambio = true; } return; }
+    if (out[k] !== v) { out[k] = v; cambio = true; }
+    auto.add(k);
+  });
+  out.auto = [...auto].filter(k => out[k] !== undefined);
+  if (!out.auto.length) delete out.auto;
+  return cambio ? out : null;
+}
+// DA y DF del mismo usuario que un CR, en la misma campaña
+export const relacionadosDeCR = (cr, casos) => Object.entries(casos || {}).filter(([, c]) => (c.tipo === 'DA' || c.tipo === 'DF') && c.nc === cr.nc).map(([id, c]) => ({ id, caso: c }));
+
 // m: { tap, tensionTap, tensionBT, xMedidor, vab, vbc, vac }; red: tensión de la red (para el TI de MP)
 export function calcularMultiplicador(m = {}, red = 0) {
   const prim = num(m.tensionTap); const sec = num(m.tensionBT); const x = num(m.xMedidor);
