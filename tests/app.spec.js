@@ -4257,7 +4257,12 @@ test.describe('Levantamiento en campo', () => {
     const hojaScroll = () => page.locator('.lev-hoja-cuerpo').evaluate(e => e.scrollTop);
     await page.setViewportSize({ width: 412, height: 760 });
     // Al cambiar a pantalla de celular la hoja se vuelve a acomodar: se baja hasta el fondo cuando ya se puede
-    await expect.poll(() => page.locator('.lev-hoja-cuerpo').evaluate(e => { e.scrollTop = e.scrollHeight; e.dispatchEvent(new Event('scroll')); return e.scrollTop; })).toBeGreaterThan(0);
+    // (y se espera a que se quede abajo: un redibujo pendiente de las acometidas sumadas no debe moverla después)
+    await expect.poll(async () => {
+      await page.locator('.lev-hoja-cuerpo').evaluate(e => { e.scrollTop = e.scrollHeight; e.dispatchEvent(new Event('scroll')); });
+      await page.waitForTimeout(300);
+      return hojaScroll();
+    }).toBeGreaterThan(0);
     const abajo = await hojaScroll();
     await page.getByRole('button', { name: 'Sumar acometida 120 B' }).click();
     await expect(page.locator('#lev-acom-b')).toHaveText('1');
