@@ -20,11 +20,26 @@ export const grupoDeEstado = estado => GRUPOS_ESTADO.find(([, , es]) => es.inclu
 // Puntos que hay que ir a validar en campo: solo Pendiente de validar y Acceso denegado (los sin estado no)
 export const ESTADOS_POR_VALIDAR = ['Pendiente de validar', 'Acceso denegado'];
 export const casosPorValidar = casos => casos.filter(c => ESTADOS_POR_VALIDAR.includes(c.mult?.estado));
-// Listado de esos puntos: las columnas del listado de la campaña más el estado del multiplicador y su nota
+// Por qué hay que ir a validar el punto (pedido del equipo): el TAP tapón o interno, o el acceso denegado
+export function motivoPorValidar(c) {
+  const m = c?.mult || {};
+  if (m.estado === 'Acceso denegado') return 'Acceso denegado';
+  if (m.tap === 'Tapón') return 'Pendiente de validar: TAP con tapón';
+  if (m.tap === 'Interno') return 'Pendiente de validar: TAP interno';
+  return m.estado || '';
+}
+// Colores de las gotas del mapa por motivo (KML aabbggrr): tapón ámbar, interno morado, acceso denegado rojo
+export const COLORES_POR_VALIDAR = {
+  'Acceso denegado': ['ff2626dc', 'red-circle'],
+  'Pendiente de validar: TAP con tapón': ['ff0b9ef5', 'ylw-circle'],
+  'Pendiente de validar: TAP interno': ['ffd5559b', 'purple-circle'],
+  'Pendiente de validar': ['ff0b9ef5', 'ylw-blank'],
+};
+// Listado de esos puntos: las columnas del listado de la campaña más el estado del multiplicador, el motivo y su nota
 export function filasPorValidar(casos) {
   const [enc, ...filas] = filasListado(casos);
   const porCodigo = new Map(casos.map(c => [c.codigo, c]));
-  return [[...enc, 'ESTADO', 'NOTAS'], ...filas.map(f => { const c = porCodigo.get(f[1]) || {}; return [...f, c.mult?.estado || '', c.mult?.notas || '']; })];
+  return [[...enc, 'ESTADO', 'MOTIVO', 'NOTAS'], ...filas.map(f => { const c = porCodigo.get(f[1]) || {}; return [...f, c.mult?.estado || '', motivoPorValidar(c), c.mult?.notas || '']; })];
 }
 
 export const CONFIGURACIONES = ['Monofásico', 'Bifásico', 'Estrella', 'Delta', 'Estrella 2 hilos'];

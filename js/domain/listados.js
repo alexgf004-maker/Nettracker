@@ -205,18 +205,27 @@ export function filasListado(casos) {
 // (en la precampaña todavía no hay fechas de instalación). Cada punto lleva las columnas del listado,
 // que My Maps muestra como tabla. Devuelve { kml, conPunto, sinCoordenadas: [códigos] }.
 // `armarFilas` permite otro listado con las mismas columnas base (p. ej. los puntos por validar, con su estado).
-export function kmlMapa(nombre, casos, armarFilas = filasListado) {
+// opciones.motivo: columna que dice por qué está el punto; va en el nombre de la gota, en su descripción y le da color
+// (opciones.colores: { valor que empieza con…: [color KML aabbggrr, ícono] })
+export function kmlMapa(nombre, casos, armarFilas = filasListado, opciones = {}) {
   const x = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const [enc, ...filas] = armarFilas(casos);
   const iLat = enc.indexOf('LATITUD'); const iLng = enc.indexOf('LONGITUD'); const iCod = enc.indexOf('CÓDIGO SIGET');
   const num = v => (v === '' || v === null || v === undefined || Number.isNaN(Number(v)) ? null : Number(v));
   const conPunto = filas.filter(f => num(f[iLat]) !== null && num(f[iLng]) !== null);
   const sinCoordenadas = filas.filter(f => !conPunto.includes(f)).map(f => f[iCod]);
-  const marca = f => `<Placemark><name>${x(f[iCod])}</name><styleUrl>#caso</styleUrl><ExtendedData>${enc.map((h, i) => `<Data name="${x(h)}"><value>${x(f[i])}</value></Data>`).join('')}</ExtendedData>`
+  const iMot = opciones.motivo ? enc.indexOf(opciones.motivo) : -1;
+  const colores = Object.entries(opciones.colores || {});
+  const estilo = f => { if (iMot < 0) return 'caso'; const k = colores.findIndex(([v]) => String(f[iMot] || '').startsWith(v)); return k >= 0 ? `motivo${k}` : 'caso'; };
+  const titulo = f => (iMot >= 0 && f[iMot] ? `${f[iCod]} · ${f[iMot]}` : f[iCod]);
+  const iNotas = enc.indexOf('NOTAS');
+  const descripcion = f => (iMot >= 0 ? `<description>${x([f[iMot], iNotas >= 0 ? f[iNotas] : ''].filter(Boolean).join(' — '))}</description>` : '');
+  const marca = f => `<Placemark><name>${x(titulo(f))}</name>${descripcion(f)}<styleUrl>#${estilo(f)}</styleUrl><ExtendedData>${enc.map((h, i) => `<Data name="${x(h)}"><value>${x(f[i])}</value></Data>`).join('')}</ExtendedData>`
     + `<Point><coordinates>${num(f[iLng])},${num(f[iLat])},0</coordinates></Point></Placemark>`;
   const kml = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${x(nombre)}</name>
 <Style id="caso"><IconStyle><color>ff90740e</color><scale>1.1</scale><Icon><href>https://maps.google.com/mapfiles/kml/paddle/blu-circle.png</href></Icon></IconStyle></Style>
+${colores.map(([, [color, icono]], k) => `<Style id="motivo${k}"><IconStyle><color>${color}</color><scale>1.1</scale><Icon><href>https://maps.google.com/mapfiles/kml/paddle/${icono}.png</href></Icon></IconStyle></Style>`).join('\n')}
 <Folder><name>${x(nombre)}</name>
 ${conPunto.map(marca).join('\n')}
 </Folder></Document></kml>`;
