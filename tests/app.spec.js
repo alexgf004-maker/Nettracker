@@ -3324,6 +3324,51 @@ test.describe('Expedientes de reclamo', () => {
     await page.getByRole('button', { name: 'Registrar instalación nueva' }).click();
     await expect(page.locator('input[oninput*="\'caso\'"]')).toHaveValue('trafo');
   });
+
+  test('varios analizadores con el mismo código de reclamo: salen como puntos sin nombre y al registrar pregunta si es otro punto', async ({ page }) => {
+    const datos = JSON.parse(JSON.stringify(fixture));
+    // Otro analizador con el mismo código, en campo al mismo tiempo que r9 (instalado un día después)
+    datos.analizadores.dup = { serie: 'SN-203', caso: 'RE192026456', lugar: 'x', fechaInstalacion: '2026-09-02', fechaRetiro: '2026-09-15', retirado: true, fechaRetiroReal: '2026-09-16', areaInstalacion: 'CPT MT',
+      analisisReclamo: { resultado: { flicker: 'NO CUMPLE' } } };
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    app = await abrirApp(page, { datos });
+    await cerrarAlerta(page);
+    // Una reinstalación (sin encimarse) reemplaza a la anterior; las que están juntas en campo: la primera es la principal
+    const dom = await page.evaluate(async () => {
+      const { instalacionesMismoCaso } = await import('/js/domain/resultados.js');
+      const a = { id: 'a', caso: 'RE1', fechaInstalacion: '2026-09-01', retirado: true, fechaRetiroReal: '2026-09-03' };
+      const b = { id: 'b', caso: 'RE1', fechaInstalacion: '2026-09-05', fechaRetiro: '2026-09-12' };
+      const c = { id: 'c', caso: 'RE1', fechaInstalacion: '2026-09-05', fechaRetiro: '2026-09-12' };
+      const r1 = instalacionesMismoCaso({ codigo: 'RE1' }, [a, b]); const r2 = instalacionesMismoCaso({ codigo: 'RE1' }, [a, c, b]);
+      return [r1.principal.id, r1.otras.map(x => x.id), r2.principal.id, r2.otras.map(x => x.id)];
+    });
+    expect(dom).toEqual(['b', [], 'b', ['c']]);
+    await nav(page, 'Reclamos');
+    await page.locator('.exp-card', { hasText: 'USUARIO DE PRUEBA' }).click();
+    await page.getByRole('tab', { name: /Mediciones/ }).click();
+    const punto = page.locator('.exp-punto', { hasText: 'SN-203 (mismo código)' });
+    await expect(punto).toContainText('Flicker no cumple');
+    await expect(page.locator('.exp-puntos .aviso')).toContainText('Se registró con el mismo código');
+    await punto.getByRole('button', { name: 'Ponerle nombre' }).click();
+    await page.locator('#punto-nombre').fill('Medidor');
+    await page.getByRole('button', { name: 'Guardar nombre' }).click();
+    expect((await app.escrituras()).at(-1)).toEqual(['update', 'analizadores/dup', { reclamo: { id: 'RE-92026456', n: 1, punto: 'Medidor' } }]);
+    await expect(page.locator('.exp-punto', { hasText: 'Medidor' })).toHaveCount(1);
+    await expect(page.locator('.exp-puntos .aviso')).toHaveCount(0);
+
+    // Al registrar con un código que ya tiene analizador en campo pregunta si es otro punto y pide su nombre
+    await page.evaluate(async () => {
+      const { state } = await import('/js/state.js'); const { emptyForm } = await import('/js/utils.js');
+      state.records.push({ id: 'activo', serie: 'SN-204', caso: 'RE1O2026777', fechaInstalacion: '2026-09-20', fechaRetiro: '2026-09-28', retirado: false });
+      window.__preguntas = []; window.confirm = m => { window.__preguntas.push(m); return true; }; window.prompt = () => 'Trafo';
+      state.form = { ...emptyForm(), equipoId: 'e7', caso: 're1o2026777', fechaInstalacion: '2026-09-21', fechaRetiro: '2026-09-29', lugar: 'x' };
+      window.saveInstall();
+    });
+    expect((await page.evaluate(() => window.__preguntas))[0]).toContain('RE1O2026777 ya tiene un analizador en campo (SN-204');
+    const push = (await app.escrituras()).find(([op, ruta]) => op === 'push' && ruta === 'analizadores');
+    expect(push[2].reclamo).toEqual({ id: 'RE-O2026777', n: 1, punto: 'Trafo' });
+    expect(errores).toEqual([]);
+  });
 });
 
 test.describe('Herramienta Dibujar', () => {

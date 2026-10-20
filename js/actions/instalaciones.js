@@ -1,7 +1,8 @@
 // Lógica de instalaciones: guardar, retiro, descarga, calendario
 import { FALLAS_GRAVES, isAdmin, sedeRetorno } from '../config.js';
 import { devolucionAlRetirar } from '../domain/inventario.js';
-import { DIAS_INFORME_RECLAMO, sumarDias, tipoDeTrabajo } from '../domain/trabajo.js';
+import { DIAS_INFORME_RECLAMO, normalizarCodigo, sumarDias, tipoDeTrabajo } from '../domain/trabajo.js';
+import { claveExpediente, partesCodigoRE } from '../domain/expedientes.js';
 import { db, installsRef, push, ref, remove, update } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
@@ -38,6 +39,16 @@ export function handleSave() {
   if (eq) {
     const yaActivo = state.records.find(r => r.serie === eq.serie && !r.retirado && r.id !== state.editId);
     if (yaActivo) return showToast('La serie ' + eq.serie + ' ya está instalada en caso #' + (yaActivo.caso||'?'));
+  }
+  // Otro analizador para un reclamo que ya tiene uno en campo con el mismo código: es otro punto de la medición
+  if (!state.editId && !state.form.reclamo && partesCodigoRE(state.form.caso)) {
+    const codigo = normalizarCodigo(state.form.caso);
+    const enCampo = state.records.find(r => normalizarCodigo(r.caso) === codigo && !r.retirado && !r.reclamo?.punto);
+    if (enCampo && confirm(`${codigo} ya tiene un analizador en campo (${enCampo.serie || 'sin serie'}, desde ${enCampo.fechaInstalacion || '—'}).\n\n¿Este es otro punto de medición del mismo reclamo (medidor, trafo, tablero…)?\n\nAceptar: se agrega como otro punto. Cancelar: se registra igual, sin ligarlo.`)) {
+      const nombre = String(prompt('Nombre del punto (medidor, trafo, tablero principal…)', 'Medidor') || '').trim();
+      if (!nombre) return showToast('Escribe el nombre del punto para agregarlo al reclamo');
+      state.form.reclamo = { id: claveExpediente(codigo), n: partesCodigoRE(codigo).n, punto: nombre };
+    }
   }
   const usuario = state.sesionUsuario?.nombre || 'Desconocido';
   const energiaInst = state.form.energiaTipoInst === 'una'

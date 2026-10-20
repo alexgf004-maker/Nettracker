@@ -8,11 +8,21 @@ export const MEDICION = { valida: 'Válida', fallida: 'Fallida', revisar: 'Por r
 export const TOLERANCIA = { dentro: 'Dentro de tolerancia', fuera: 'Fuera de tolerancia (FT)' };
 
 // Instalación de la app que corresponde a un caso (por código, sin importar formato)
-export function instalacionDeCaso(caso, registros) {
+// Con varias del mismo código: la última es la que vale (una reinstalación reemplaza a la anterior), pero si hay varias
+// en campo a la vez (varios analizadores para el mismo caso) la principal es la primera que se instaló y las demás son
+// puntos adicionales (`instalacionesMismoCaso`). Las que ya se nombraron como punto de un reclamo no cuentan.
+const finInst = r => (r.retirado ? r.fechaRetiroReal || r.fechaRetiro : r.fechaRetiro) || '9999-12-31';
+export function instalacionesMismoCaso(caso, registros) {
   const codigos = [caso.codigo, caso.codigoEnte].filter(Boolean).map(normalizarCodigo);
-  const propias = registros.filter(r => codigos.includes(normalizarCodigo(r.caso)));
-  return propias.sort((a, b) => (b.fechaInstalacion || '').localeCompare(a.fechaInstalacion || ''))[0] || null;
+  const propias = registros.filter(r => codigos.includes(normalizarCodigo(r.caso)) && !r.reclamo?.punto)
+    .sort((a, b) => (a.fechaInstalacion || '').localeCompare(b.fechaInstalacion || '') || String(a.id || '').localeCompare(String(b.id || '')));
+  if (!propias.length) return { principal: null, otras: [] };
+  const ultima = propias[propias.length - 1];
+  // Las que estuvieron en campo al mismo tiempo que la última (se enciman sus fechas)
+  const juntas = propias.filter(r => r === ultima || ((r.fechaInstalacion || '') <= finInst(ultima) && finInst(r) >= (ultima.fechaInstalacion || '')));
+  return { principal: juntas[0], otras: juntas.slice(1) };
 }
+export function instalacionDeCaso(caso, registros) { return instalacionesMismoCaso(caso, registros).principal; }
 
 // Situación del caso en la campaña
 export function situacionCaso(caso, inst, hoy) {
