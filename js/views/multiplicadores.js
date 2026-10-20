@@ -88,6 +88,7 @@ export function renderMultModal() {
   }
   const auto = new Set(f.auto || []); const red = state.multEdit.red;
   const marcaAuto = (k, id = '') => `<span class="mult-auto"${id ? ` id="${id}"` : ''}${auto.has(k) ? '' : ' hidden'}>automático</span>`;
+  if ((caso.tipo === 'DA' || caso.tipo === 'DF') && caso.crRelacionado) html += `<div class="page-sub mult-red">Se rellena al guardar el multiplicador de su CR (${esc(caso.crRelacionado)}): igual que el CR, salvo en estrella, que va línea-neutro (tabla monofásica y 120 en baja). Lo que cambies aquí a mano se respeta.</div>`;
   html += `<div class="field"><label>Estado ${marcaAuto('estado', 'mult-estado-auto')}</label>${sel('estado', estadosDe(caso.tipo), 'Sin estado')}</div>`;
   html += `<div class="row"><div class="field"><label>Configuración</label>${sel('configuracion', CONFIGURACIONES)}</div><div class="field"><label>Posición de TAP</label>${sel('tap', POSICIONES_TAP)}</div></div>`;
   html += `<div class="row"><div class="field"><label>Tensión según TAP (V, de la placa del trafo) ${marcaAuto('tensionTap')}</label>${inp('tensionTap', '13200')}</div>

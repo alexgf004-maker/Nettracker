@@ -3,7 +3,7 @@ import { db, ref, set, update } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { kmlMapa, ordenarCasos } from '../domain/listados.js';
-import { casosPorValidar, estadoAutomatico, filasMultiplicadores, filasPorValidar, historicoDe, leerMultiplicadoresExcel, planificarMultiplicadores, redDeCaso, sugerenciaMultiplicador } from '../domain/multiplicadores.js';
+import { aplicarDeCR, casosPorValidar, estadoAutomatico, multiplicadorDeCR, relacionadosDeCR, filasMultiplicadores, filasPorValidar, historicoDe, leerMultiplicadoresExcel, planificarMultiplicadores, redDeCaso, sugerenciaMultiplicador } from '../domain/multiplicadores.js';
 import { leerArchivo } from './campanas.js';
 import { hoyLocal, MESES } from '../domain/trabajo.js';
 import { render } from '../views/render.js';
@@ -73,7 +73,19 @@ export function guardarMultiplicador() {
   if (auto.length) datos.auto = auto;
   datos.editadoPor = state.sesionUsuario?.nombre || '';
   datos.fecha = hoyLocal();
-  set(ref(db, `campanas/${clave}/casos/${id}/mult`), datos).then(() => showToast('Multiplicador guardado'));
+  // Un CR rellena sus DA y DF (lo que se cambió a mano en ellos no se pisa)
+  const c = caso(); const extra = {}; const nombres = [];
+  if (c.tipo === 'CR') {
+    const deCR = multiplicadorDeCR(datos, state.multEdit.red);
+    relacionadosDeCR(c, state.campanas[clave].casos).forEach(r => {
+      const nuevo = aplicarDeCR(r.caso.mult || {}, deCR);
+      if (!nuevo) return;
+      extra[`casos/${r.id}/mult`] = { ...nuevo, editadoPor: datos.editadoPor, fecha: datos.fecha, origen: 'cr' };
+      nombres.push(r.caso.codigo || r.caso.codigoEnte || r.id);
+    });
+  }
+  set(ref(db, `campanas/${clave}/casos/${id}/mult`), datos).then(() => showToast(nombres.length ? `Multiplicador guardado · también en ${nombres.join(', ')}` : 'Multiplicador guardado'));
+  if (nombres.length) update(ref(db, `campanas/${clave}`), extra);
   cerrarMultiplicador();
 }
 
