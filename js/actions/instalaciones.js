@@ -25,7 +25,8 @@ export function getGPS() {
 
 // ── SAVE DEPLOY ──
 export function handleSave() {
-  if (!state.form.equipoId) return showToast('Selecciona un equipo del inventario');
+  // (al corregir una que se registró sin equipo del inventario, basta con su serie)
+  if (!state.form.equipoId && !(state.editId && state.form.serie)) return showToast('Selecciona un equipo del inventario');
   if (!state.form.caso.trim()) return showToast('Ingresa el código de caso / campaña');
   if (!state.form.fechaRetiro) return showToast('Ingresa la fecha de retiro');
   if (!state.form.lugar.trim()) return showToast('Ingresa la ubicación del equipo');
@@ -34,9 +35,9 @@ export function handleSave() {
     const activa = state.records.find(r => r.equipoId === state.form.equipoId && !r.retirado);
     if (activa) return showToast('Este equipo ya tiene instalación activa en #' + (activa.caso||'?'));
   }
-  // #13 Duplicate series check
+  // #13 Duplicate series check (una instalación ya retirada que se corrige no choca con donde esté el equipo ahora)
   const eq = state.equipos.find(e => e.id === state.form.equipoId);
-  if (eq) {
+  if (eq && !state.form.retirado) {
     const yaActivo = state.records.find(r => r.serie === eq.serie && !r.retirado && r.id !== state.editId);
     if (yaActivo) return showToast('La serie ' + eq.serie + ' ya está instalada en caso #' + (yaActivo.caso||'?'));
   }
@@ -57,13 +58,20 @@ export function handleSave() {
     ? { tipo: 'tres', punta: state.form.energiaInstPunta, resto: state.form.energiaInstResto, valle: state.form.energiaInstValle }
     : { tipo: 'ninguna' };
   // Sin planilla no se guardan sus datos; el origen (si el código está en la base) es solo para el formulario
-  const { planillaOrigen, planillaCodigo, ...form } = state.form;
+  const { planillaOrigen, planillaCodigo, energiaTipoRet, energiaRetUna, energiaRetPunta, energiaRetResto, energiaRetValle, ...form } = state.form;
   const payload = { ...form, conPlanilla: !!form.conPlanilla, planilla: form.conPlanilla ? form.planilla || {} : null, energiaInstalacion: energiaInst, retirado: false, fechaRegistro: today(), creadoPor: usuario };
+  // Instalación ya retirada que corrige el administrador: sigue retirada, con los datos del retiro corregidos
+  if (state.editId && form.retirado) {
+    if (!form.fechaRetiroReal) return showToast('Escribe la fecha en que se retiró');
+    Object.assign(payload, { retirado: true, fechaRetiroReal: form.fechaRetiroReal, horaRetiro: form.horaRetiro || null, descripcionFalla: form.descripcionFalla || '',
+      energiaRetiro: energiaTipoRet === 'una' ? { tipo: 'una', una: energiaRetUna } : energiaTipoRet === 'tres' ? { tipo: 'tres', punta: energiaRetPunta, resto: energiaRetResto, valle: energiaRetValle } : { tipo: 'ninguna' } });
+  }
   if (state.editId) {
     const id = state.editId;
     state.editId = null; state.view = 'lista'; state.form = emptyForm();
     // Al editar se conservan quién la registró y cuándo
     const { fechaRegistro, creadoPor, ...cambios } = payload;
+    Object.keys(cambios).forEach(k => { if (cambios[k] === undefined) delete cambios[k]; }); // Firebase no acepta undefined
     update(ref(db, `analizadores/${id}`), { ...cambios, editadoPor: usuario, fechaEdicion: today() }).then(() => showToast('Actualizado'));
   } else {
     const savedPayload = {...payload};
