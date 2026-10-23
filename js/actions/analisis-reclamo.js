@@ -7,7 +7,7 @@ import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { catalogoSeries, fasesConTension, fasesDe, leerTension, MAX_UNIDADES_COMBO, resumenGuardado, sugerirNominal, tipoDeTXT } from '../domain/reclamo.js';
 import { hoyLocal, normalizarCodigo } from '../domain/trabajo.js';
-import { analisisActivo, calculoReclamo } from '../views/analisis-reclamo.js';
+import { analisisActivo, calculoReclamo, periodoParcial } from '../views/analisis-reclamo.js';
 import { userArea } from '../config.js';
 import { render } from '../views/render.js';
 
@@ -27,14 +27,20 @@ const paramsIniciales = r => ({
   usuario: '', fases: 3, nominal: '', red: r.areaInstalacion === 'CPT BT' ? 'urbano_bt' : 'urbano_mt', kva: '', vll: '',
 });
 
-export async function abrirAnalisisReclamo(id) {
+// Análisis parcial (pedido del equipo): con el TXT de una descarga mientras el equipo sigue en campo. Se guarda aparte
+// (analisisParcial y archivosReclamo/{id}/parcial): no decide el FT ni cuenta para plazos; el del retiro lo reemplaza.
+const rutaArchivos = (id, parcial) => 'archivosReclamo/' + id + (parcial ? '/parcial' : '');
+export async function abrirAnalisisReclamo(id, opciones = {}) {
   const r = state.records.find(x => x.id === id); if (!r) return;
-  const g = r.analisisReclamo;
-  state.analisisReclamo = { id, params: { ...paramsIniciales(r), ...(g?.params || {}) }, tension: null, armonicos: null, cargando: !!g?.archivos };
+  const parcial = opciones.parcial ?? !r.retirado;
+  const g = parcial ? r.analisisParcial : r.analisisReclamo;
+  // El primer parcial toma los datos de la medición que ya se hubieran puesto; el final, los del parcial
+  const base = g?.params || (parcial ? r.analisisReclamo?.params : r.analisisParcial?.params) || {};
+  state.analisisReclamo = { id, parcial, params: { ...paramsIniciales(r), ...base }, tension: null, armonicos: null, cargando: !!g?.archivos };
   render();
   if (!g?.archivos) return;
   try {
-    const snap = await get(ref(db, 'archivosReclamo/' + id));
+    const snap = await get(ref(db, rutaArchivos(id, parcial)));
     const a = state.analisisReclamo; if (a?.id !== id) return;
     const guardados = snap.exists() ? snap.val() : {};
     for (const tipo of ['tension', 'armonicos']) {
@@ -109,17 +115,18 @@ export async function guardarAnalisisReclamo() {
   try {
     const archivos = {};
     for (const tipo of ['tension', 'armonicos']) if (a[tipo]) archivos[tipo] = { nombre: a[tipo].nombre, gz: await comprimir(a[tipo].texto) };
-    await update(ref(db, 'archivosReclamo/' + a.id), archivos);
-    await update(ref(db, 'analizadores/' + a.id), {
-      analisisReclamo: {
-        params: a.params,
-        archivos: Object.fromEntries(Object.entries(archivos).map(([k, v]) => [k, v.nombre])),
-        resultado: resumenGuardado(c.t, c.arm),
-        fecha: hoyLocal(), por: state.sesionUsuario?.nombre || '',
-      },
-    });
+    await update(ref(db, rutaArchivos(a.id, a.parcial)), archivos);
+    const guardado = {
+      params: a.params,
+      archivos: Object.fromEntries(Object.entries(archivos).map(([k, v]) => [k, v.nombre])),
+      resultado: resumenGuardado(c.t, c.arm),
+      fecha: hoyLocal(), por: state.sesionUsuario?.nombre || '',
+    };
+    // Parcial: hasta cuándo llegan los datos de la descarga
+    if (a.parcial) { const p = periodoParcial(c); if (p) Object.assign(guardado, p); }
+    await update(ref(db, 'analizadores/' + a.id), { [a.parcial ? 'analisisParcial' : 'analisisReclamo']: guardado });
     a.cambios = false;
-    showToast('Análisis guardado en el reclamo');
+    showToast(a.parcial ? 'Análisis parcial guardado (no decide el FT)' : 'Análisis guardado en el reclamo');
   } catch (err) {
     showToast('No se pudo guardar: ' + err.message);
   }

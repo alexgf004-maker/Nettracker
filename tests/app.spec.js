@@ -3004,6 +3004,46 @@ test.describe('Análisis de reclamos', () => {
     expect(XLSX.CFB.find(zip, '/[Content_Types].xml')).toBeTruthy();
   });
 
+  test('análisis parcial con el equipo en campo: no decide el FT y el borrador sale como informe preliminar', async ({ page }) => {
+    const datos = JSON.parse(JSON.stringify(fixture));
+    // Remedición RE2 todavía en campo
+    datos.analizadores.rem = { serie: 'SN-300', caso: 'RE292026456', lugar: 'x', fechaInstalacion: '2026-09-20', fechaRetiro: '2026-09-28', areaInstalacion: 'CPT MT' };
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    app = await abrirApp(page, { datos, excel: true });
+    await cerrarAlerta(page);
+    await nav(page, 'Reclamos');
+    await page.locator('.exp-card', { hasText: 'USUARIO DE PRUEBA' }).click();
+    await page.getByRole('tab', { name: /Mediciones/ }).click();
+    const rem = page.locator('.exp-medicion', { hasText: 'RE292026456' });
+    await rem.getByRole('button', { name: 'Analizar TXT (parcial)' }).click();
+    await expect(page.locator('.aviso-parcial')).toContainText('El equipo sigue en campo');
+    await page.evaluate(tt => cargarTXTReclamo([{ nombre: 'RE292026456.txt', texto: tt }]), txtTension());
+    await expect(page.locator('.aviso-parcial')).toContainText('Análisis parcial: datos del');
+    await page.getByRole('button', { name: 'Guardar parcial en el reclamo' }).click();
+    await expect(page.locator('.toast')).toContainText('Análisis parcial guardado');
+    const esc = await app.escrituras();
+    const upd = esc.filter(([op, ruta]) => op === 'update' && ruta === 'analizadores/rem').at(-1)[2];
+    expect(Object.keys(upd)).toEqual(['analisisParcial']); // el análisis final no se toca
+    expect(upd.analisisParcial).toMatchObject({ archivos: { tension: 'RE292026456' }, desde: expect.any(String), hasta: expect.any(String), por: 'David García' });
+    expect(esc.some(([op, ruta]) => op === 'update' && ruta === 'archivosReclamo/rem/parcial')).toBe(true);
+    // Informe preliminar en Word
+    const descarga = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Informe preliminar (Word)' }).click();
+    const d = await descarga;
+    expect(d.suggestedFilename()).toBe('RE192026456_Informe_preliminar.docx') // el nombre del archivo lleva el código del reclamo, como el borrador final;
+    const XLSX = require('xlsx-js-style');
+    const doc = Buffer.from(XLSX.CFB.find(XLSX.CFB.read(require('fs').readFileSync(await d.path()), { type: 'buffer' }), '/word/document.xml').content).toString();
+    expect(doc).toContain('INFORME PRELIMINAR DE RECLAMO RE192026456');
+    expect(doc).toContain('Medición en curso: resultados parciales');
+    // En el expediente sale como preliminar, sin FT
+    await app.ejecutar(() => cerrarAnalisisReclamo());
+    await expect(rem).toContainText('(preliminar)');
+    await expect(rem.getByRole('button', { name: 'Ver análisis parcial' })).toBeVisible();
+    await page.getByRole('tab', { name: /Seguimiento/ }).click();
+    await expect(page.locator('.ft-item', { hasText: 'RE292026456' })).toHaveCount(0);
+    expect(errores).toEqual([]);
+  });
+
   test('inspección: reglas de puesta a tierra y del rango de placa del equipo', async ({ page }) => {
     app = await abrirApp(page);
     const r = await page.evaluate(async tt => {

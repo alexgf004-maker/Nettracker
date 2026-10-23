@@ -132,8 +132,17 @@ function vistaMediciones(e, hoy) {
       if (res.armonicos) html += `<span class="tg ${res.armonicos.tension === 'CUMPLE' && res.armonicos.corriente === 'CUMPLE' ? 'verde' : 'ambar'}">Armónicos: tensión ${res.armonicos.tension === 'CUMPLE' ? 'cumple' : 'no cumple'} · corriente ${res.armonicos.corriente === 'CUMPLE' ? 'cumple' : 'no cumple'}</span>`;
       html += '</div>';
     }
+    // Análisis parcial (con una descarga mientras el equipo sigue en campo): solo informativo
+    const rp = i.analisisParcial;
+    if (rp?.resultado && !(i.retirado && res)) {
+      html += `<div class="tags" style="margin:10px 0 2px"><span class="tg ambar">Parcial${rp.hasta ? ' hasta ' + esc(rp.hasta) : ''}</span>`;
+      if (rp.resultado.tension) html += `<span class="tg gris">FebNoPer ${pct(rp.resultado.tension.febNoPer)} (preliminar)</span>`;
+      if (rp.resultado.flicker) html += `<span class="tg gris">Flicker ${rp.resultado.flicker === 'CUMPLE' ? 'cumple' : 'no cumple'} (preliminar)</span>`;
+      html += '</div>';
+    }
     html += '<div class="barra-acciones" style="margin-top:10px">';
     if (i.retirado) html += `<button class="b ${res ? 'b-g' : 'b-p'}" onclick="abrirAnalisisReclamo('${i.id}')"><i class="ic ic-grafica"></i> ${res ? 'Ver análisis' : 'Analizar TXT'}</button>`;
+    if (!i.retirado || rp) html += `<button class="b ${i.retirado ? 'b-l' : rp ? 'b-g' : 'b-p'}" onclick="abrirAnalisisReclamo('${i.id}', { parcial: true })"><i class="ic ic-grafica"></i> ${rp ? 'Ver análisis parcial' : 'Analizar TXT (parcial)'}</button>`;
     if (i.retirado && !m.informe) html += `<button class="b b-p" onclick="marcarInformeEntregado('${i.id}')"><i class="ic ic-check"></i> Informe entregado</button> ${m.informeLimite ? tagPlazo(m.informeLimite, hoy) : ''}`;
     if (m.informe) html += `<button class="b b-l" onclick="desmarcarInformeEntregado('${i.id}')">Quitar marca de informe</button>`;
     html += `<span class="sep"></span><button class="b b-l" onclick="goToInstall('${i.id}')">Ver instalación</button></div>${bloquePuntos(e, m)}</div>`;
@@ -159,7 +168,7 @@ function bloquePuntos(e, m) {
     const i = p.inst;
     html += `<div class="exp-punto"><div class="exp-punto-main"><b>${esc(p.nombre)}</b><span>${esc(i.serie || '')} · ${fmtDate(i.fechaInstalacion)} → ${i.retirado ? fmtDate(i.fechaRetiroReal) : fmtDate(i.fechaRetiro)}</span>
       <div class="tags"><span class="tg ${CLASE_ETAPA[p.etapa]}">${ETAPAS_MEDICION[p.etapa]}</span>${tagsResultado(p.resultado)}</div></div>
-      <div class="exp-punto-acc">${i.retirado ? `<button class="b ${p.resultado ? 'b-g' : 'b-p'}" onclick="abrirAnalisisReclamo('${i.id}')"><i class="ic ic-grafica"></i> ${p.resultado ? 'Ver análisis' : 'Analizar TXT'}</button>` : ''}
+      <div class="exp-punto-acc">${i.retirado ? `<button class="b ${p.resultado ? 'b-g' : 'b-p'}" onclick="abrirAnalisisReclamo('${i.id}')"><i class="ic ic-grafica"></i> ${p.resultado ? 'Ver análisis' : 'Analizar TXT'}</button>` : `<button class="b ${i.analisisParcial ? 'b-g' : 'b-p'}" onclick="abrirAnalisisReclamo('${i.id}', { parcial: true })"><i class="ic ic-grafica"></i> ${i.analisisParcial ? 'Ver análisis parcial' : 'Analizar TXT (parcial)'}</button>`}
         <button class="b b-l" onclick="goToInstall('${i.id}')">Ver</button>${p.sinNombre ? `<button class="b b-p" onclick="abrirPuntoReclamo('${e.id}', ${m.n}, '${i.id}')">Ponerle nombre</button>` : `<button class="b b-l" onclick="desvincularPuntoReclamo('${i.id}')">Quitar</button>`}</div></div>`;
     if (p.sinNombre) html += `<div class="aviso aviso-amarillo"><i class="ic ic-alerta"></i> Se registró con el mismo código mientras el analizador principal estaba en campo: es otro punto de esta medición. Ponle nombre (medidor, trafo, tablero…).</div>`;
   });
