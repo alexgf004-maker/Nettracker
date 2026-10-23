@@ -27,7 +27,7 @@ window.setSearch = v => {
 
 window.setField = (k, v) => {
   state.form[k] = v;
-  if (k === 'energiaTipoInst' || k === 'areaInstalacion' || k === 'locMode' || k === 'conPlanilla') render();
+  if (k === 'energiaTipoInst' || k === 'energiaTipoRet' || k === 'areaInstalacion' || k === 'locMode' || k === 'conPlanilla') render();
   // Remedición de un caso FT: el recordatorio de las fotos aparece mientras se escribe el código (sin redibujar el formulario)
   if (k === 'caso') { const el = document.getElementById('aviso-remedicion'); if (el) el.innerHTML = avisoRemedicionHTML(v); }
 };
@@ -60,6 +60,12 @@ window.editInstall = id => {
     areaInstalacion: r.areaInstalacion || 'CPT MT', sede: r.sede || 'Plantel Central', energiaTipoInst: e.tipo || 'ninguna', energiaInstUna: e.una || '', energiaInstPunta: e.punta || '', energiaInstResto: e.resto || '', energiaInstValle: e.valle || '',
     horaInstalacion: r.horaInstalacion || '', xMedidor: r.xMedidor || '', tensionServicio: r.tensionServicio || '',
     conPlanilla: !!r.conPlanilla, planilla: { ...(r.planilla || {}) }, planillaOrigen: null };
+  // Ya retirada (solo el administrador): también los datos del retiro, para corregirlos
+  if (r.retirado) {
+    const er = r.energiaRetiro || {};
+    Object.assign(state.form, { retirado: true, fechaRetiroReal: r.fechaRetiroReal || '', horaRetiro: r.horaRetiro || '', descripcionFalla: r.descripcionFalla || '',
+      energiaTipoRet: er.tipo || 'ninguna', energiaRetUna: er.una || '', energiaRetPunta: er.punta || '', energiaRetResto: er.resto || '', energiaRetValle: er.valle || '' });
+  }
   state.editId = id; state.view = 'form'; render();
 };
 

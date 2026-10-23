@@ -275,6 +275,20 @@ test.describe('Instalaciones', () => {
     await expect(app$(page)).toContainText(/total/i);
   });
 
+  test('el administrador corrige una instalación ya retirada y sigue retirada', async ({ page }) => {
+    await app.ejecutar(() => openDetail('r9'));
+    await page.getByRole('button', { name: 'Editar (ya retirada)' }).click();
+    await expect(app$(page)).toContainText('Esta instalación ya se retiró');
+    await expect(page.locator('#inst-retiro-real')).toHaveValue('2026-09-16');
+    await app.ejecutar(() => { setField('lugar', 'Antiguo Cuscatlán, poste 4'); setField('fechaRetiroReal', '2026-09-17'); setField('horaRetiro', '10:30'); setField('energiaTipoRet', 'una'); setField('energiaRetUna', '1520'); });
+    await page.getByRole('button', { name: 'Guardar cambios' }).click();
+    const [op, ruta, v] = (await app.escrituras()).at(-1);
+    expect([op, ruta]).toEqual(['update', 'analizadores/r9']);
+    expect(v).toMatchObject({ retirado: true, fechaRetiroReal: '2026-09-17', horaRetiro: '10:30', lugar: 'Antiguo Cuscatlán, poste 4', energiaRetiro: { tipo: 'una', una: '1520' }, caso: 'RE192026456', editadoPor: 'David García' });
+    expect(v).not.toHaveProperty('creadoPor');
+    expect(Object.values(v)).not.toContain(undefined); // Firebase no acepta undefined (se registró sin equipo del inventario)
+  });
+
   test('un registro que ya no existe vuelve a la lista', async ({ page }) => {
     await app.ejecutar(() => openDetail('no-existe'));
     await expect(app$(page)).toContainText(/total/i);

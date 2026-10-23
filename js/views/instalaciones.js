@@ -2,7 +2,7 @@
 import { SEDES, USUARIOS, isAdmin, userArea } from '../config.js';
 import { state } from '../state.js';
 import { badgeSt } from '../ui.js';
-import { calcSt, daysUntil, fmtDate, today } from '../utils.js';
+import { calcSt, daysUntil, escapeHtml, fmtDate, today } from '../utils.js';
 import { heroSeccion } from './componentes.js';
 import { botonFirmas } from './firma.js';
 import { avisoRemedicionHTML } from './ft.js';
@@ -237,6 +237,18 @@ export function renderInstalaciones() {
         eHtml += '</div>';
         return eHtml;
       })() : ''}
+      ${state.form.retirado ? (() => {
+        // Instalación ya retirada (solo el administrador la edita): también se corrigen los datos del retiro
+        const f = state.form; const tipos = [['ninguna', 'Sin lectura'], ['una', 'Una lectura'], ['tres', 'Punta/resto/valle']];
+        let h = '<div class="section-title">Retiro</div><div class="aviso aviso-amarillo"><i class="ic ic-alerta"></i> Esta instalación ya se retiró: al guardar sigue retirada; solo se corrigen sus datos.</div>';
+        h += '<div class="row"><div class="field"><label>Retirada el</label><input id="inst-retiro-real" type="date" value="' + (f.fechaRetiroReal || '') + '" oninput="setField(\'fechaRetiroReal\',this.value)"></div>';
+        h += '<div class="field"><label>Hora de retiro</label><input type="time" value="' + (f.horaRetiro || '') + '" oninput="setField(\'horaRetiro\',this.value)"></div></div>';
+        h += '<div class="field"><label>Energía de retiro</label><div class="dib-lista dib-acciones-prop">' + tipos.map(([t, l]) => '<button class="dib-chip ' + (f.energiaTipoRet === t ? 'activo' : '') + '" onclick="setField(\'energiaTipoRet\',\'' + t + '\')">' + l + '</button>').join('') + '</div></div>';
+        if (f.energiaTipoRet === 'una') h += '<div class="field"><input type="number" placeholder="Energía (kWh)" value="' + (f.energiaRetUna || '') + '" oninput="setField(\'energiaRetUna\',this.value)"></div>';
+        if (f.energiaTipoRet === 'tres') h += '<div class="row">' + [['energiaRetPunta', 'Punta'], ['energiaRetResto', 'Resto'], ['energiaRetValle', 'Valle']].map(([k, l]) => '<div class="field"><label>' + l + '</label><input type="number" value="' + (f[k] || '') + '" oninput="setField(\'' + k + '\',this.value)"></div>').join('') + '</div>';
+        h += '<div class="field"><label>Observaciones del retiro</label><input value="' + escapeHtml(f.descripcionFalla || '') + '" oninput="setField(\'descripcionFalla\',this.value)"></div>';
+        return h;
+      })() : ''}
         <button class="btn btn-primary" onclick="saveInstall()">${state.editId ? 'Guardar cambios' : 'Registrar instalación'}</button>
       </div>`;
   }
@@ -301,6 +313,7 @@ export function renderInstalaciones() {
           </div>
           <button class="btn btn-danger" onclick="openRetiroModal('${r.id}')">Marcar como retirado</button>
         ` : ''}
+        ${r.retirado && isAdmin() ? `<button class="btn btn-secondary" style="margin-bottom:10px" onclick="editInstall('${r.id}')"><i class="ic ic-editar"></i> Editar (ya retirada)</button>` : ''}
         ${r.areaInstalacion === 'Campos y Servicios' && r.equipoId ? (r.memoDanio
           ? `<div style="display:flex;gap:8px"><button class="btn" style="flex:2;background:#fef2f2;color:#dc2626;border:1px solid #dc2626" onclick="memoDanio('${r.id}')"><i class=ic-archivo></i> Ver memo de equipo dañado</button>${botonFirmas('danio', r.memoDanio, r.id)}<button class="btn" style="flex:1;background:var(--white);color:#dc2626;border:1px solid #dc2626" onclick="editarDanio('${r.id}')"><i class=ic-editar></i> Editar</button></div>`
           : `<button class="btn" style="background:#fef2f2;color:#dc2626;border:1px solid #dc2626" onclick="openDanioModal('${r.id}')"><i class=ic-archivo-editar></i> Memo de equipo dañado</button>`) : ''}
