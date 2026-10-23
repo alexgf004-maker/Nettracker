@@ -40,6 +40,12 @@ export function calculoReclamo(a = analisisActivo()) {
   return { d, t, arm, tol };
 }
 
+// Del primer al último registro de los TXT cargados: { desde, hasta } (texto como viene en el TXT)
+export function periodoParcial(c) {
+  const fuente = c?.d || (c?.arm?.n ? c.arm : null);
+  return fuente?.inicio && fuente?.fin ? { desde: String(fuente.inicio), hasta: String(fuente.fin) } : null;
+}
+
 // ── Gráficas ──
 
 // Datos de cada gráfica dibujada, para el cursor
@@ -453,8 +459,12 @@ export function renderAnalisisReclamo() {
   const a = state.analisisReclamo;
   const r = state.records.find(x => x.id === a.id) || {};
   let html = '<div class="modal-overlay" onclick="if (event.target === this) cerrarAnalisisReclamo()"><div class="modal hoja modal-ancha graf-modal">';
-  const g = r.analisisReclamo;
-  html += `<div class="modal-head"><div><div class="modal-titulo mono">${esc(r.caso)}</div><div class="page-sub">${esc(r.lugar)}${g ? ` · guardado el ${fmtDate(g.fecha)}${g.por ? ' por ' + esc(g.por) : ''}` : ''}</div></div><button class="modal-cerrar" onclick="cerrarAnalisisReclamo()" title="Cerrar">✕</button></div>`;
+  const g = a.parcial ? r.analisisParcial : r.analisisReclamo;
+  html += `<div class="modal-head"><div><div class="modal-titulo mono">${esc(r.caso)}${a.parcial ? ' <span class="tg ambar">Parcial</span>' : ''}</div><div class="page-sub">${esc(r.lugar)}${g ? ` · guardado el ${fmtDate(g.fecha)}${g.por ? ' por ' + esc(g.por) : ''}` : ''}</div></div><button class="modal-cerrar" onclick="cerrarAnalisisReclamo()" title="Cerrar">✕</button></div>`;
+  if (a.parcial) {
+    const per = periodoParcial(calculoReclamo(a));
+    html += `<div class="aviso aviso-amarillo aviso-parcial"><i class="ic ic-alerta"></i><div><b>Análisis parcial${per ? `: datos del ${esc(per.desde)} al ${esc(per.hasta)}` : ''}.</b> ${r.retirado ? 'Se hizo antes del retiro.' : 'El equipo sigue en campo: sube el TXT de la descarga que hiciste.'} Es un resultado preliminar: no decide el FT ni cuenta para los plazos; al retirar, el análisis final lo reemplaza. El borrador sale como informe preliminar.</div></div>`;
+  }
   if (a.cargando) return html + '<div class="graf-vacio">Cargando los archivos guardados…</div></div></div>';
   return html + cuerpoAnalisis(a, { guardar: true }) + '</div></div>';
 }
@@ -485,10 +495,10 @@ function cuerpoAnalisis(a, { guardar }) {
     html += '<div class="graf-tooltip" id="graf-tooltip" hidden></div>';
     html += vista === 'tension' ? seccionTension(a, c) : seccionArmonicos(a, c);
     html += `<div class="barra-acciones analisis-acciones">
-      ${guardar ? `<button class="b b-p" onclick="guardarAnalisisReclamo()" ${a.guardando ? 'disabled' : ''}><i class="ic ic-check"></i> ${a.guardando ? 'Guardando…' : 'Guardar en el reclamo'}</button>` : ''}
+      ${guardar ? `<button class="b b-p" onclick="guardarAnalisisReclamo()" ${a.guardando ? 'disabled' : ''}><i class="ic ic-check"></i> ${a.guardando ? 'Guardando…' : a.parcial ? 'Guardar parcial en el reclamo' : 'Guardar en el reclamo'}</button>` : ''}
       ${c.d ? '<button class="b b-g" onclick="exportarTensionReclamo()"><i class="ic ic-excel"></i> Excel de tensión</button>' : ''}
       ${c.arm?.n ? '<button class="b b-g" onclick="exportarArmonicosReclamo()"><i class="ic ic-excel"></i> Excel de armónicos</button>' : ''}
-      ${guardar ? '<button class="b b-g" onclick="exportarBorradorInforme()"><i class="ic ic-archivo"></i> Borrador de informe (Word)</button>' : ''}</div>`;
+      ${guardar ? `<button class="b b-g" onclick="exportarBorradorInforme()"><i class="ic ic-archivo"></i> ${a.parcial ? 'Informe preliminar (Word)' : 'Borrador de informe (Word)'}</button>` : ''}</div>`;
   }
   return html;
 }

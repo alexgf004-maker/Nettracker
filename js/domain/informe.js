@@ -115,7 +115,8 @@ function ordenesFuera(lista, fases) {
 
 // ── Borrador completo ──
 // datos: { exp, inst, params, d, t, arm, hoy }
-export function borradorInforme({ exp = {}, inst = {}, params = {}, d = null, t = null, arm = null, hoy = '' }) {
+// parcial: { desde, hasta } si es con la descarga de una medición en curso (informe preliminar)
+export function borradorInforme({ exp = {}, inst = {}, params = {}, d = null, t = null, arm = null, hoy = '', parcial = null }) {
   const B = [];
   const h = (texto, nivel = 1) => B.push({ t: 'h', texto, nivel });
   const p = texto => B.push({ t: 'p', texto });
@@ -140,7 +141,8 @@ export function borradorInforme({ exp = {}, inst = {}, params = {}, d = null, t 
   const minus = x => String(x || '').replace(/^[A-ZÁÉÍÓÚ](?![A-Z\s/])/, c => c.toLowerCase());
   const foto = texto => B.push({ t: 'grafica', texto: texto, foto: true });
 
-  B.push({ t: 'titulo', texto: `INFORME DE RECLAMO ${exp.codigo || inst.caso || ''}`.trim(), sub: `${usuario}${exp.ct ? ' · ' + exp.ct : ''}` });
+  B.push({ t: 'titulo', texto: `${parcial ? 'INFORME PRELIMINAR' : 'INFORME'} DE RECLAMO ${exp.codigo || inst.caso || ''}`.trim(), sub: `${usuario}${exp.ct ? ' · ' + exp.ct : ''}` });
+  if (parcial) B.push({ t: 'nota', texto: `Medición en curso: resultados parciales con los datos ${parcial.desde ? `del ${parcial.desde} ` : ''}${parcial.hasta ? `al ${parcial.hasta}` : 'descargados hasta ahora'}. No es la evaluación final; el informe definitivo se hace con la medición completa al retirar el equipo.` });
   B.push({ t: 'nota', texto: `Borrador generado por NetTracker${hoy ? ' el ' + fechaISO(hoy) : ''} con los datos del expediente y el análisis de los TXT${punto ? ` del punto ${punto}` : ''}. Revisar y completar lo marcado ${COMPLETAR} antes de entregar.` });
 
   // 1. Generalidades
