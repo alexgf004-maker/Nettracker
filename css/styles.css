@@ -1779,3 +1779,6 @@ button.aviso-inicio-fila { cursor: pointer; }
 .mult-auto { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 20px; background: var(--primary-light); color: var(--primary); font-size: 10.5px; font-weight: 700; vertical-align: middle; }
 .mult-auto[hidden] { display: none; }
 .mult-red { margin: -4px 0 10px; }
+/* Arrastrar y soltar archivos: las zonas donde se pueden soltar se marcan mientras se arrastra */
+.zona-archivo { outline: 2px dashed var(--primary); outline-offset: 3px; transition: outline-color .15s, background-color .15s; }
+.zona-archivo-activa { outline-style: solid; background-color: var(--primary-light) !important; }

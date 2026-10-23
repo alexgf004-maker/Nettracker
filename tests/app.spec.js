@@ -3044,6 +3044,37 @@ test.describe('Análisis de reclamos', () => {
     expect(errores).toEqual([]);
   });
 
+  test('arrastrar y soltar o pegar archivos: van al lugar donde se pide subir uno', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    app = await abrirApp(page, { excel: true });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => abrirAnalisisReclamo('r9'));
+    // Soltar un archivo arrastrado sobre la ventana del análisis: se toma como si se hubiera elegido con el botón
+    const soltar = (tipo, nombre, texto) => page.evaluate(([tipo, nombre, texto]) => {
+      const dt = new DataTransfer(); dt.items.add(new File([texto], nombre, { type: nombre.endsWith('.png') ? 'image/png' : 'text/plain' }));
+      const destino = document.querySelector('.arch-slots');
+      const r = destino.getBoundingClientRect(); const x = r.left + 10; const y = r.top + 10;
+      if (tipo === 'drop') {
+        destino.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt, clientX: x, clientY: y }));
+        const marcada = document.querySelectorAll('.zona-archivo').length;
+        destino.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt, clientX: x, clientY: y }));
+        return marcada;
+      }
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: y }));
+      const ev = new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt }); document.body.dispatchEvent(ev); return ev.defaultPrevented;
+    }, [tipo, nombre, texto]);
+    expect(await soltar('drop', 'RE192026456.txt', txtTension())).toBe(1); // la zona se marca mientras se arrastra
+    await expect(page.locator('.arch-slot.lleno')).toHaveCount(1);
+    await expect(page.locator('.zona-archivo')).toHaveCount(0);
+    // Un tipo de archivo que no va ahí no se toma
+    await soltar('drop', 'foto.png', 'x');
+    await expect(page.locator('.toast')).toContainText('no se sube ese tipo de archivo');
+    // Pegar (Ctrl+V) también lo sube
+    expect(await soltar('paste', 'RE1920264560.txt', txtArmonicos())).toBe(true);
+    await expect(page.locator('.arch-slot.lleno')).toHaveCount(2);
+    expect(errores).toEqual([]);
+  });
+
   test('inspección: reglas de puesta a tierra y del rango de placa del equipo', async ({ page }) => {
     app = await abrirApp(page);
     const r = await page.evaluate(async tt => {
