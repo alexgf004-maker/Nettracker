@@ -256,7 +256,7 @@ function bloqueArchivos(a, c) {
   return `<div class="bloque"><div class="bloque-head"><div class="bloque-titulo">Archivos de la medición</div>
       <label class="btn-accion"><i class="ic ic-subir"></i> ${a.tension || a.armonicos ? 'Cambiar TXT' : 'Subir los TXT'}<input type="file" accept=".txt,text/plain" multiple hidden onchange="subirTXTReclamo(this.files); this.value=''"></label></div>
     <div class="arch-slots">${slot('tension', 'Tensión', 'TXT de 74 columnas (máximos y mínimos)', infoT)}${slot('armonicos', 'Armónicos', 'TXT de 10 minutos de 197 columnas', infoA)}</div>
-    <div class="page-sub" style="margin-top:8px">Puedes subir los dos a la vez; la app reconoce cuál es cuál por sus columnas.</div></div>`;
+    <div class="page-sub" style="margin-top:8px">Puedes subir los dos a la vez (o arrastrarlos y soltarlos aquí); la app reconoce cuál es cuál por sus columnas.</div></div>`;
 }
 
 function bloqueDatos(p) {
