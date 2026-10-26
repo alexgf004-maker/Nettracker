@@ -2,7 +2,7 @@
 // SVG propio, sin librerías. Cada gráfica tiene una sola escala; los límites van como líneas punteadas.
 import {
   analizarArmonicos, analizarTension, ARMONICAS, catalogoSeries, LIMITE_INVALIDO, tituloCombo, CARGA_ALERTA, DATI_LIM, LIMITE_PST, NIVELES, PERC_MAX,
-  leerTension, P_UMBRAL, textoP95Corriente, TIPOS_RED, VDAT_LIM,
+  factorMultiplicador, leerTension, P_UMBRAL, revertirTension, textoP95Corriente, TIPOS_RED, VDAT_LIM,
 } from '../domain/reclamo.js';
 import { diagnosticarArmonicos } from '../domain/diagnostico.js';
 import { claveExpediente } from '../domain/expedientes.js';
@@ -20,7 +20,7 @@ const COLOR_LIMITE = { limite: '#64748b', trafo: '#dc2626', alerta: '#d97706' };
 
 // ── Cálculo (memorizado: render() se llama con cualquier cambio de la app) ──
 // Los armónicos solo dependen del TXT y de las fases; la tensión, además, del nominal, la red y el trafo.
-const memo = { lectura: {}, tension: {}, armonicos: {} };
+const memo = { lectura: {}, revertida: {}, tension: {}, armonicos: {} };
 function memorizar(caja, entradas, calcular) {
   if (caja.entradas && caja.entradas.length === entradas.length && caja.entradas.every((x, i) => x === entradas[i])) return caja.valor;
   caja.entradas = entradas; caja.valor = calcular();
@@ -33,7 +33,10 @@ export function calculoReclamo(a = analisisActivo()) {
   if (!a) return null;
   const p = a.params || {};
   const tol = TIPOS_RED[p.red]?.tol || 0;
-  const d = memorizar(memo.lectura, [a.tension?.texto], () => (a.tension ? leerTension(a.tension.texto) : null));
+  const leida = memorizar(memo.lectura, [a.tension?.texto], () => (a.tension ? leerTension(a.tension.texto) : null));
+  // Multiplicador revertido: la tensión dividida para trabajar con la del secundario
+  const rev = factorMultiplicador(p.revertirV);
+  const d = leida && rev ? memorizar(memo.revertida, [leida, rev], () => revertirTension(leida, rev)) : leida;
   const t = d ? memorizar(memo.tension, [d, p.fases, p.nominal, p.red, p.kva, p.vll],
     () => analizarTension(d, { fases: p.fases || 3, nominal: Number(p.nominal) || 0, tol, kva: Number(p.kva) || 0, vll: Number(p.vll) || 0 })) : null;
   const arm = memorizar(memo.armonicos, [a.armonicos?.texto, p.fases], () => (a.armonicos ? analizarArmonicos(a.armonicos.texto, p.fases || 3) : null));
@@ -271,7 +274,9 @@ function bloqueDatos(p) {
       <div class="field"><label>Voltaje L-L de salida del trafo (V)</label><input id="ar-vll" inputmode="decimal" value="${esc(p.vll)}" onchange="setParamReclamo('vll', this.value)" placeholder="Para la corriente máxima del trafo"></div>
       <div class="field"><label>Relación de voltaje (TP)</label><input id="ar-relv" value="${esc(p.relV || '')}" onchange="setParamReclamo('relV', this.value)" placeholder="Ej. 22290/240 · para el informe"></div>
       <div class="field"><label>Relación de corriente (TC)</label><input id="ar-reli" value="${esc(p.relI || '')}" onchange="setParamReclamo('relI', this.value)" placeholder="Ej. 800/5 · para el informe"></div>
-    </div></div>`;
+    </div>
+    <div class="field revertir-mult"><label>Revertir multiplicador de tensión</label><input id="ar-revertir" value="${esc(p.revertirV || '')}" onchange="setParamReclamo('revertirV', this.value)" placeholder="Ej. 22900/240 o 95.42">
+      <div class="page-sub">Si la medición ya viene multiplicada (en MT), la tensión se divide entre este multiplicador para trabajar con la del secundario (BT): gráficas, FebNoPer, proyección de TAP, Excel e informe. La corriente no cambia. Déjalo vacío para usar la medición tal cual.</div></div></div>`;
 }
 
 const fasesSeries = (fases, obtener, prefijo) => fases.map(p => ({ nombre: `${prefijo}${p}`, color: COLOR_FASE[p], v: obtener(p) })).filter(s => s.v);
@@ -282,6 +287,7 @@ function seccionTension(a, c) {
   const p = a.params; const fases = t.fases; const nominal = Number(p.nominal) || 0;
   const banda = nominal > 0 ? { nominal, tol, sup: nominal * (1 + tol), inf: nominal * (1 - tol) } : null;
   let html = `<div class="graf-periodo">${esc(d.inicio)} al ${esc(d.fin)} · ${d.n} registros${banda ? ` · nominal ${fmt(nominal)} V, ${esc(TIPOS_RED[p.red]?.label)} ±${Math.round(tol * 100)} % (${fmt(banda.inf)} a ${fmt(banda.sup)} V)` : ''}</div>`;
+  if (d.revertida) html += `<div class="aviso aviso-azul aviso-revertida"><i class="ic ic-info"></i><div>Tensión revertida: la medida dividida entre ${fmt(d.revertida, 2)} (${esc(p.revertirV)}). Todo lo de abajo es con la tensión del secundario.</div></div>`;
   if (!banda) html += aviso('Escribe la tensión nominal para calcular el FebNoPer y dibujar los límites.');
   const r = t.resumen;
   if (r) {

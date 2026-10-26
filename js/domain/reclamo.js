@@ -89,6 +89,24 @@ export function leerTension(texto) {
   return out;
 }
 
+// ── Revertir un multiplicador (pedido del equipo) ──
+// Si la medición ya viene multiplicada (p. ej. medida en BT y guardada como MT con 22900/240), se divide la tensión
+// para volver al secundario. txt: "22900/240" o el factor (95.42). null si no es válido.
+export function factorMultiplicador(txt) {
+  const t = String(txt ?? '').replace(/\s/g, '').replace(',', '.');
+  if (!t) return null;
+  const m = t.match(/^(\d+(?:\.\d+)?)\/(\d+(?:\.\d+)?)$/);
+  const f = m ? Number(m[1]) / Number(m[2]) : Number(t);
+  return Number.isFinite(f) && f > 0 && f !== 1 ? f : null;
+}
+// La lectura de tensión con U (promedio, máximo y mínimo) dividida entre el factor; corriente, PST y S no cambian
+export function revertirTension(d, factor) {
+  if (!d || !factor) return d;
+  const div = arr => (arr ? arr.map(x => (x === null ? null : x / factor)) : arr);
+  const U = Object.fromEntries(Object.entries(d.U).map(([p, u]) => [p, { v: div(u.v), max: div(u.max), min: div(u.min) }]));
+  return { ...d, U, revertida: factor };
+}
+
 // Fases que trae el TXT con tensión (mediana sobre el 5 % de la mayor): sugerencia del tipo de instalación
 export function fasesConTension(U) {
   const mediana = arr => { const s = arr.filter(x => x !== null).sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : 0; };

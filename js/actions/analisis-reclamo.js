@@ -5,7 +5,7 @@ import { db, get, ref, update } from '../firebase.js';
 import { nuevaProyeccionTap, PLACAS_TAP } from '../domain/tap.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
-import { catalogoSeries, fasesConTension, fasesDe, leerTension, MAX_UNIDADES_COMBO, resumenGuardado, sugerirNominal, tipoDeTXT } from '../domain/reclamo.js';
+import { catalogoSeries, factorMultiplicador, fasesConTension, fasesDe, leerTension, MAX_UNIDADES_COMBO, resumenGuardado, sugerirNominal, tipoDeTXT } from '../domain/reclamo.js';
 import { hoyLocal, normalizarCodigo } from '../domain/trabajo.js';
 import { analisisActivo, calculoReclamo, periodoParcial } from '../views/analisis-reclamo.js';
 import { userArea } from '../config.js';
@@ -92,6 +92,16 @@ export function cargarTXTReclamo(archivos) {
 export function setParamReclamo(campo, valor) {
   const a = analisisActivo(); if (!a) return;
   a.params[campo] = campo === 'fases' ? Number(valor) : String(valor).trim();
+  // Al revertir (o dejar de revertir) un multiplicador cambia el nivel: nominal sugerido y red MT ↔ BT (se pueden corregir)
+  if (campo === 'revertirV') {
+    if (a.params.revertirV && !factorMultiplicador(a.params.revertirV)) showToast('Escribe el multiplicador como 22900/240 o como un número (95.42)');
+    const d = calculoReclamo(a).d;
+    if (d) {
+      const nominal = sugerirNominal(d.U); if (nominal) a.params.nominal = String(nominal);
+      const familia = Number(a.params.nominal) > 1000 ? 'mt' : 'bt';
+      a.params.red = String(a.params.red || 'urbano_mt').replace(/_(mt|bt)$/, '_' + familia);
+    }
+  }
   a.cambios = true;
   render();
 }
