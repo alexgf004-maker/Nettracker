@@ -2,9 +2,10 @@
 // SVG propio, sin librerías. Cada gráfica tiene una sola escala; los límites van como líneas punteadas.
 import {
   analizarArmonicos, analizarTension, ARMONICAS, catalogoSeries, LIMITE_INVALIDO, tituloCombo, CARGA_ALERTA, DATI_LIM, LIMITE_PST, NIVELES, PERC_MAX,
-  factorMultiplicador, leerTension, P_UMBRAL, revertirTension, textoP95Corriente, TIPOS_RED, VDAT_LIM,
+  campoDeMinutos, factorMultiplicador, leerTension, minutosDeCampo, P_UMBRAL, recortarTXT, revertirTension, textoP95Corriente, TIPOS_RED, VDAT_LIM,
 } from '../domain/reclamo.js';
 import { diagnosticarArmonicos } from '../domain/diagnostico.js';
+import { minutosDeFecha } from '../domain/analisis.js';
 import { claveExpediente } from '../domain/expedientes.js';
 import { normalizarInspeccion } from '../domain/inspeccion.js';
 import { compararPosiciones, factorTap, PLACAS_TAP, placaDe, POSICIONES, proyectarU, resumenProyectado, totalesFases } from '../domain/tap.js';
@@ -20,7 +21,7 @@ const COLOR_LIMITE = { limite: '#64748b', trafo: '#dc2626', alerta: '#d97706' };
 
 // ── Cálculo (memorizado: render() se llama con cualquier cambio de la app) ──
 // Los armónicos solo dependen del TXT y de las fases; la tensión, además, del nominal, la red y el trafo.
-const memo = { lectura: {}, revertida: {}, tension: {}, armonicos: {} };
+const memo = { lectura: {}, completa: {}, recorteT: {}, recorteA: {}, revertida: {}, tension: {}, armonicos: {} };
 function memorizar(caja, entradas, calcular) {
   if (caja.entradas && caja.entradas.length === entradas.length && caja.entradas.every((x, i) => x === entradas[i])) return caja.valor;
   caja.entradas = entradas; caja.valor = calcular();
@@ -33,14 +34,21 @@ export function calculoReclamo(a = analisisActivo()) {
   if (!a) return null;
   const p = a.params || {};
   const tol = TIPOS_RED[p.red]?.tol || 0;
-  const leida = memorizar(memo.lectura, [a.tension?.texto], () => (a.tension ? leerTension(a.tension.texto) : null));
+  // Recorte: solo los registros del tramo elegido (tensión y armónicos)
+  const r = p.recorte || {}; const desde = minutosDeCampo(r.desde); const hasta = minutosDeCampo(r.hasta);
+  const txtT = memorizar(memo.recorteT, [a.tension?.texto, desde, hasta], () => recortarTXT(a.tension?.texto, desde, hasta));
+  const txtA = memorizar(memo.recorteA, [a.armonicos?.texto, desde, hasta], () => recortarTXT(a.armonicos?.texto, desde, hasta));
+  const leida = memorizar(memo.lectura, [txtT], () => (txtT ? leerTension(txtT) : null));
   // Multiplicador revertido: la tensión dividida para trabajar con la del secundario
   const rev = factorMultiplicador(p.revertirV);
   const d = leida && rev ? memorizar(memo.revertida, [leida, rev], () => revertirTension(leida, rev)) : leida;
   const t = d ? memorizar(memo.tension, [d, p.fases, p.nominal, p.red, p.kva, p.vll],
     () => analizarTension(d, { fases: p.fases || 3, nominal: Number(p.nominal) || 0, tol, kva: Number(p.kva) || 0, vll: Number(p.vll) || 0 })) : null;
-  const arm = memorizar(memo.armonicos, [a.armonicos?.texto, p.fases], () => (a.armonicos ? analizarArmonicos(a.armonicos.texto, p.fases || 3) : null));
-  return { d, t, arm, tol };
+  const arm = memorizar(memo.armonicos, [txtA, p.fases], () => (txtA ? analizarArmonicos(txtA, p.fases || 3) : null));
+  // La medición completa (para el aviso del recorte y los límites de las fechas)
+  const recortada = desde !== null || hasta !== null;
+  const completa = recortada ? memorizar(memo.completa, [a.tension?.texto || a.armonicos?.texto], () => { const tx = a.tension?.texto || a.armonicos?.texto; const l = tx ? leerTension(tx) : null; return l ? { n: l.n, inicio: l.inicio, fin: l.fin } : null; }) : null;
+  return { d, t, arm, tol, recortada, completa };
 }
 
 // Del primer al último registro de los TXT cargados: { desde, hasta } (texto como viene en el TXT)
@@ -279,6 +287,24 @@ function bloqueDatos(p) {
       <div class="page-sub">Si la medición ya viene multiplicada (en MT), la tensión se divide entre este multiplicador para trabajar con la del secundario (BT): gráficas, FebNoPer, proyección de TAP, Excel e informe. La corriente no cambia. Déjalo vacío para usar la medición tal cual.</div></div></div>`;
 }
 
+// Recortar la medición: desde / hasta (fecha y hora), el tramo que se ve en la gráfica o quitar el recorte
+function bloqueRecorte(a, c) {
+  if (!a.tension && !a.armonicos) return '';
+  const r = a.params.recorte || {}; const fuente = c.completa || c.d || c.arm;
+  const lim = fuente ? { min: campoDeMinutos(minutosDeFecha(fuente.inicio)), max: campoDeMinutos(minutosDeFecha(fuente.fin)) } : { min: '', max: '' };
+  let html = `<div class="bloque recorte-bloque"><div class="bloque-head"><div class="bloque-titulo">Recortar la medición</div><span class="page-sub">Trabajar solo con un tramo: todo se recalcula con esos registros</span></div>
+    <div class="form-analisis"><div class="field"><label>Desde</label><input id="ar-recorte-desde" type="datetime-local" min="${lim.min}" max="${lim.max}" value="${esc(r.desde || '')}" onchange="setRecorteReclamo('desde', this.value)"></div>
+    <div class="field"><label>Hasta</label><input id="ar-recorte-hasta" type="datetime-local" min="${lim.min}" max="${lim.max}" value="${esc(r.hasta || '')}" onchange="setRecorteReclamo('hasta', this.value)"></div></div>
+    <div class="barra-acciones">${a.zoom ? '<button class="b b-g" onclick="recorteDelZoomReclamo()">Usar el tramo que estoy viendo</button>' : '<span class="page-sub">Acerca la gráfica a un tramo y aparece "Usar el tramo que estoy viendo".</span>'}${c.recortada ? '<button class="b b-l" onclick="quitarRecorteReclamo()">Quitar recorte</button>' : ''}</div>`;
+  if (c.recortada) {
+    const f = c.d || c.arm;
+    html += f?.n ? `<div class="aviso aviso-amarillo aviso-recorte"><i class="ic ic-alerta"></i><div><b>Medición recortada:</b> del ${esc(f.inicio)} al ${esc(f.fin)} · ${f.n} de ${c.completa?.n ?? '—'} registros. Los resultados son solo de ese tramo${diasEntreFechas(f.inicio, f.fin) < 7 ? ' (menos de 7 días: no es una evaluación completa)' : ''}.</div></div>`
+      : aviso('No hay registros en ese tramo: revisa las fechas.');
+  }
+  return html + '</div>';
+}
+const diasEntreFechas = (a, b) => (minutosDeFecha(b) - minutosDeFecha(a)) / 1440;
+
 const fasesSeries = (fases, obtener, prefijo) => fases.map(p => ({ nombre: `${prefijo}${p}`, color: COLOR_FASE[p], v: obtener(p) })).filter(s => s.v);
 
 function seccionTension(a, c) {
@@ -492,7 +518,7 @@ function cuerpoAnalisis(a, { guardar }) {
   if (a.error) html += aviso(`No se pudieron cargar los archivos guardados: ${esc(a.error)}`);
   const c = calculoReclamo(a);
   html += bloqueArchivos(a, c);
-  html += bloqueDatos(a.params);
+  html += bloqueDatos(a.params) + bloqueRecorte(a, c);
   if (a.tension || a.armonicos) {
     const vista = a.vista || (a.tension ? 'tension' : 'armonicos');
     html += `<div class="segmento segmento-ancho" style="margin-bottom:12px">

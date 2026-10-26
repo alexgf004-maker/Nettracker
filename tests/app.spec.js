@@ -2880,6 +2880,37 @@ test.describe('Análisis de reclamos', () => {
     expect(errores).toEqual([]);
   });
 
+  test('Graficar: recortar la medición a un tramo (por fechas o el tramo acercado) y quitar el recorte', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await nav(page, 'Graficar');
+    // 144 registros de 10 min desde el 01/09/2026 00:00; los 10 primeros fuera de tolerancia (13200 × 1.08)
+    await page.locator('.graf-pagina input[type=file]').setInputFiles({ name: 'CR192026100.txt', mimeType: 'text/plain', buffer: Buffer.from(txtTension()) });
+    await expect(page.locator('#ar-recorte-desde')).toHaveAttribute('min', '2026-09-01T00:00');
+    const calc = () => page.evaluate(async () => { const v = await import('/js/views/analisis-reclamo.js'); const c = v.calculoReclamo(); return { n: c.d.n, inicio: c.d.inicio, fin: c.d.fin, max: Math.max(...c.d.U['1'].v), feb: c.t.febNoPer ?? c.t.febnoper ?? null }; });
+    // Desde las 02:00: sin los registros altos
+    await page.locator('#ar-recorte-desde').fill('2026-09-01T02:00'); await page.locator('#ar-recorte-desde').dispatchEvent('change');
+    let c = await calc();
+    expect(c.n).toBe(132); expect(c.inicio).toBe('01/09/2026 02:00:00'); expect(c.max).toBe(13200);
+    await expect(page.locator('.aviso-recorte')).toContainText('132 de 144 registros');
+    await expect(page.locator('.aviso-recorte')).toContainText('menos de 7 días');
+    // Hasta las 05:00
+    await page.locator('#ar-recorte-hasta').fill('2026-09-01T05:00'); await page.locator('#ar-recorte-hasta').dispatchEvent('change');
+    c = await calc(); expect(c.n).toBe(19); expect(c.fin).toBe('01/09/2026 05:00:00');
+    // Quitar el recorte: la medición completa
+    await page.getByRole('button', { name: 'Quitar recorte' }).click();
+    c = await calc(); expect(c.n).toBe(144);
+    await expect(page.locator('.aviso-recorte')).toHaveCount(0);
+    // Acercar la gráfica (de 60 a 120 min) y usar ese tramo
+    await page.evaluate(() => setZoomReclamo(60, 120));
+    await page.getByRole('button', { name: 'Usar el tramo que estoy viendo' }).click();
+    await expect(page.locator('#ar-recorte-desde')).toHaveValue('2026-09-01T01:00');
+    await expect(page.locator('#ar-recorte-hasta')).toHaveValue('2026-09-01T02:00');
+    c = await calc(); expect(c.n).toBe(7);
+    expect(errores).toEqual([]);
+  });
+
   test('Graficar: subir un TXT en la pestaña rápida muestra DT o FT sin guardar nada', async ({ page }) => {
     app = await abrirApp(page);
     await cerrarAlerta(page);

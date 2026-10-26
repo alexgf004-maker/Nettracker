@@ -5,8 +5,9 @@ import { db, get, ref, update } from '../firebase.js';
 import { nuevaProyeccionTap, PLACAS_TAP } from '../domain/tap.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
-import { catalogoSeries, factorMultiplicador, fasesConTension, fasesDe, leerTension, MAX_UNIDADES_COMBO, resumenGuardado, sugerirNominal, tipoDeTXT } from '../domain/reclamo.js';
+import { campoDeMinutos, catalogoSeries, factorMultiplicador, fasesConTension, fasesDe, leerTension, MAX_UNIDADES_COMBO, resumenGuardado, sugerirNominal, tipoDeTXT } from '../domain/reclamo.js';
 import { hoyLocal, normalizarCodigo } from '../domain/trabajo.js';
+import { minutosDeFecha } from '../domain/analisis.js';
 import { analisisActivo, calculoReclamo, periodoParcial } from '../views/analisis-reclamo.js';
 import { userArea } from '../config.js';
 import { render } from '../views/render.js';
@@ -115,6 +116,23 @@ export function setTapReclamo(campo, valor, i = null) {
   a.cambios = true;
   render();
 }
+// Recortar la medición: params.recorte = { desde, hasta } (fecha y hora del campo; vacío = sin límite)
+export function setRecorteReclamo(campo, valor) {
+  const a = analisisActivo(); if (!a) return;
+  const r = { ...(a.params.recorte || {}), [campo]: String(valor || '') };
+  if (r.desde && r.hasta && r.desde > r.hasta) return showToast('"Desde" tiene que ser antes de "Hasta"');
+  a.params.recorte = r.desde || r.hasta ? r : null; a.zoom = null; a.cambios = true;
+  render();
+}
+// El tramo que se ve en la gráfica acercada pasa a ser el recorte
+export function recorteDelZoomReclamo() {
+  const a = analisisActivo(); const c = calculoReclamo(a); if (!a?.zoom) return;
+  const base = minutosDeFecha((c.d || c.arm)?.inicio); if (!base) return;
+  a.params.recorte = { desde: campoDeMinutos(base + Math.floor(a.zoom.desde)), hasta: campoDeMinutos(base + Math.ceil(a.zoom.hasta)) };
+  a.zoom = null; a.cambios = true;
+  render();
+}
+export function quitarRecorteReclamo() { const a = analisisActivo(); if (!a) return; a.params.recorte = null; a.zoom = null; a.cambios = true; render(); }
 export function setVistaReclamo(vista) { const a = analisisActivo(); if (a) { a.vista = vista; render(); } }
 
 export async function guardarAnalisisReclamo() {
