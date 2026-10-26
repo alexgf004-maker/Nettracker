@@ -2851,6 +2851,35 @@ test.describe('Análisis de reclamos', () => {
     expect((await app.escrituras()).length).toBe(0);
   });
 
+  test('Graficar: revertir un multiplicador para trabajar con la tensión del secundario (y proyectar el TAP con ella)', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await nav(page, 'Graficar');
+    await page.locator('.graf-pagina input[type=file]').setInputFiles({ name: 'CR192026100.txt', mimeType: 'text/plain', buffer: Buffer.from(txtTension()) });
+    await expect(page.locator('#ar-nominal')).toHaveValue('13200');
+    // Medido en MT (13200): con 13200/240 se divide entre 55 → 240 V en BT, la red pasa a BT y la nominal a 240
+    await page.locator('#ar-revertir').fill('13200/240'); await page.locator('#ar-revertir').press('Tab');
+    await expect(page.locator('#ar-nominal')).toHaveValue('240');
+    await expect(page.locator('#ar-red')).toHaveValue('urbano_bt');
+    await expect(page.locator('.aviso-revertida')).toContainText('dividida entre 55');
+    const u = await page.evaluate(async () => { const v = await import('/js/views/analisis-reclamo.js'); const c = v.calculoReclamo(); return [c.d.U['1'].v.at(-1), c.d.U['1'].max.at(-1), c.d.I['1'].v.at(-1)]; });
+    expect(u[0]).toBeCloseTo(240, 6); expect(u[1]).toBeCloseTo(13250 / 55, 6); expect(u[2]).toBe(50); // la corriente no cambia
+    // Proyección de TAP con la tensión de BT
+    await page.locator('#ar-tap-activo').check();
+    await page.locator('#ar-tap-red').selectOption('13.2kv');
+    await page.locator('#ar-tap-actual').selectOption('3'); await page.locator('#ar-tap-propuesta').selectOption('2');
+    await expect(page.locator('.tap-bloque')).toContainText('En TAP 2');
+    const proy = await page.evaluate(async () => { const v = await import('/js/views/analisis-reclamo.js'); const t = await import('/js/domain/tap.js'); const c = v.calculoReclamo(); return c.d.U['1'].v.at(-1) * t.factorTap(c ? (await import('/js/state.js')).state.graficar.params.tapProy : null); });
+    expect(proy).toBeCloseTo(240 * 7620 / 7810, 4);
+    // Vacío: vuelve a la medición tal cual (MT)
+    await page.locator('#ar-revertir').fill(''); await page.locator('#ar-revertir').press('Tab');
+    await expect(page.locator('#ar-nominal')).toHaveValue('13200');
+    await expect(page.locator('#ar-red')).toHaveValue('urbano_mt');
+    await expect(page.locator('.aviso-revertida')).toHaveCount(0);
+    expect(errores).toEqual([]);
+  });
+
   test('Graficar: subir un TXT en la pestaña rápida muestra DT o FT sin guardar nada', async ({ page }) => {
     app = await abrirApp(page);
     await cerrarAlerta(page);
