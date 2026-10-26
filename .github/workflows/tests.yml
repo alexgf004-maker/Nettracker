@@ -8,7 +8,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20 # instalar Chromium con sus dependencias a veces tarda más de 10 min en GitHub
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
