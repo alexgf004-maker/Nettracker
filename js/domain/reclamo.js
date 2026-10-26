@@ -89,6 +89,26 @@ export function leerTension(texto) {
   return out;
 }
 
+// ── Recortar la medición (pedido del equipo): trabajar solo con un tramo ──
+// Fecha del campo de fecha y hora ("2026-09-01T08:30") en minutos, como minutosDeFecha
+export function minutosDeCampo(v) {
+  const m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  return m ? Math.floor(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) / 60000) : null;
+}
+// Minutos a fecha y hora del campo ("2026-09-01T08:30")
+export function campoDeMinutos(min) {
+  const d = new Date(min * 60000); const z = n => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}-${z(d.getUTCMonth() + 1)}-${z(d.getUTCDate())}T${z(d.getUTCHours())}:${z(d.getUTCMinutes())}`;
+}
+// El TXT solo con los registros entre desde y hasta (minutos; null = sin límite). Sirve igual para tensión y armónicos.
+export function recortarTXT(texto, desde, hasta) {
+  if (!texto || (desde === null && hasta === null)) return texto;
+  const lineas = String(texto).split(/\r?\n/);
+  const i0 = lineas.findIndex(l => l.trim() !== ''); if (i0 < 0) return texto;
+  const dentro = l => { const m = minutosDeFecha(l.split(',')[0].trim()); return m > 0 && (desde === null || m >= desde) && (hasta === null || m <= hasta); };
+  return [lineas[i0], ...lineas.slice(i0 + 1).filter(l => l.trim() !== '' && dentro(l))].join('\r\n');
+}
+
 // ── Revertir un multiplicador (pedido del equipo) ──
 // Si la medición ya viene multiplicada (p. ej. medida en BT y guardada como MT con 22900/240), se divide la tensión
 // para volver al secundario. txt: "22900/240" o el factor (95.42). null si no es válido.
