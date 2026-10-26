@@ -108,6 +108,22 @@ export function transformar(el, f, dx = 0, dy = 0) {
   }
 }
 
+// Gira un elemento `grados` alrededor de (cx, cy) para encajar todo el dibujo sobre una imagen. Las distancias no
+// cambian. Los símbolos, textos y cuadros giran su lugar pero se quedan derechos (se siguen leyendo); la etiqueta se
+// mueve junto con su punto, sin cambiar de lado.
+export function girar(el, grados, cx, cy) {
+  const a = (grados * Math.PI) / 180; const cos = Math.cos(a); const sin = Math.sin(a);
+  const R = ([x, y]) => [cx + (x - cx) * cos - (y - cy) * sin, cy + (x - cx) * sin + (y - cy) * cos];
+  const correr = (x, y) => { const [nx, ny] = R([x, y]); return [nx - x, ny - y]; };
+  switch (el.tipo) {
+    case 'linea': case 'flecha': case 'cota': { const [x1, y1] = R([el.x1, el.y1]); const [x2, y2] = R([el.x2, el.y2]); return { ...el, x1, y1, x2, y2 }; }
+    case 'trazo': case 'polilinea': return { ...el, puntos: el.puntos.map(R) };
+    case 'simbolo': { const s = 30 * el.escala; const [dx, dy] = correr(el.x + s, el.y + s); return { ...el, x: el.x + dx, y: el.y + dy }; }
+    case 'etiqueta': { const [dx, dy] = correr(el.tx, el.ty); return { ...el, x: el.x + dx, y: el.y + dy, tx: el.tx + dx, ty: el.ty + dy }; }
+    default: { const b = caja(el); const [dx, dy] = correr(b.x + b.w / 2, b.y + b.h / 2); return mover(el, dx, dy); }
+  }
+}
+
 // Mueve un elemento dx, dy (la etiqueta mueve su cuadro; la punta de la línea guía se queda en el punto)
 export function mover(el, dx, dy) {
   switch (el.tipo) {
