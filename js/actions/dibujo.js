@@ -2,7 +2,7 @@
 // (localStorage) y, para poder modificarlo después, se guarda como proyecto en la base para el equipo:
 // dibujos/{id} = { nombre, referencia, creado, editado } (liviano, para la lista) y dibujosDatos/{id} = { fondo, datos }
 // (la imagen en JPG y el dibujo en JSON, que se baja solo al abrirlo). Mientras se arrastra se repinta solo el SVG.
-import { altoCajetin, caja, transformar, COLORES, coloresTramos, GROSORES, leerFilasTabla, medidaEtiqueta, medidaReducida, mover, nuevoId, redimensionar, siguienteEtiqueta, SIMBOLOS, svgExportable, svgLamina, tamano, TAM_TEXTO } from '../domain/dibujo.js';
+import { altoCajetin, caja, girar, transformar, COLORES, coloresTramos, GROSORES, leerFilasTabla, medidaEtiqueta, medidaReducida, mover, nuevoId, redimensionar, siguienteEtiqueta, SIMBOLOS, svgExportable, svgLamina, tamano, TAM_TEXTO } from '../domain/dibujo.js';
 import { anclas, escalaDe, ESTILOS_ETIQUETA, fmtMetros, imanar, metrosTramo, nombrePunto, segmentosTramos } from '../domain/plano.js';
 import { db, get, push, ref, remove, set } from '../firebase.js';
 import { leerAltura } from '../domain/red.js';
@@ -598,13 +598,38 @@ export function setCalibreVanoDib(i, v) {
   cambiarSel(el => { const calibres = { ...(el.calibres || {}) }; if (val) calibres[i] = val; else delete calibres[i]; const { calibres: _c, ...resto } = el; return Object.keys(calibres).length ? { ...resto, calibres } : resto; });
 }
 
+// Centro de todo el dibujo (para agrandarlo o girarlo desde ahí)
+function centroDibujo(d) {
+  const cajas = d.elementos.map(caja).filter(b => b.w || b.h);
+  if (!cajas.length) return [0, 0];
+  const x0 = Math.min(...cajas.map(b => b.x)); const y0 = Math.min(...cajas.map(b => b.y));
+  const x1 = Math.max(...cajas.map(b => b.x + b.w)); const y1 = Math.max(...cajas.map(b => b.y + b.h));
+  return [(x0 + x1) / 2, (y0 + y1) / 2];
+}
+// Encajar: girar todo el dibujo desde su centro (las distancias y los metros no cambian)
+// Gira alrededor del promedio de los puntos del dibujo (vértices, centros de los postes, puntas de las etiquetas):
+// ese punto gira con el dibujo, así girar a un lado y luego al otro deja todo donde estaba
+function centroGiro(d) {
+  const pts = d.elementos.flatMap(e => {
+    if (e.tipo === 'polilinea' || e.tipo === 'trazo') return e.puntos;
+    if (e.tipo === 'linea' || e.tipo === 'flecha' || e.tipo === 'cota') return [[e.x1, e.y1], [e.x2, e.y2]];
+    if (e.tipo === 'simbolo') return [[e.x + 30 * e.escala, e.y + 30 * e.escala]];
+    if (e.tipo === 'etiqueta') return [[e.tx, e.ty]];
+    const b = caja(e); return [[b.x + b.w / 2, b.y + b.h / 2]];
+  });
+  return pts.length ? [pts.reduce((a, p) => a + p[0], 0) / pts.length, pts.reduce((a, p) => a + p[1], 0) / pts.length] : [0, 0];
+}
+export function girarTodoDib(grados) {
+  const d = dib(); const g = Number(String(grados ?? '').replace(',', '.')); if (!d?.elementos.length || !g) return;
+  const [cx, cy] = centroGiro(d);
+  memorizar();
+  d.elementos = d.elementos.map(e => girar(e, g, cx, cy));
+  guardarBorrador(); render();
+}
 // Encajar: agrandar o achicar todo el dibujo desde su centro; la escala se ajusta para que los metros no cambien
 export function escalarTodoDib(f) {
   const d = dib(); if (!d?.elementos.length) return;
-  const cajas = d.elementos.map(caja).filter(b => b.w || b.h);
-  const x0 = Math.min(...cajas.map(b => b.x)); const y0 = Math.min(...cajas.map(b => b.y));
-  const x1 = Math.max(...cajas.map(b => b.x + b.w)); const y1 = Math.max(...cajas.map(b => b.y + b.h));
-  const cx = (x0 + x1) / 2; const cy = (y0 + y1) / 2;
+  const [cx, cy] = centroDibujo(d);
   memorizar();
   d.elementos = d.elementos.map(e => transformar(e, f, cx * (1 - f), cy * (1 - f)));
   if (d.escala) d.escala /= f;

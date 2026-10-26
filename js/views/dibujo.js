@@ -49,7 +49,7 @@ const AYUDA = {
   texto: 'Toca donde va el texto y escríbelo en el panel.', flecha: 'Arrastra desde el inicio hasta donde apunta la flecha.',
   linea: 'Arrastra para trazar la línea.', rect: 'Arrastra para dibujar el rectángulo.', elipse: 'Arrastra para dibujar el círculo.', trazo: 'Dibuja a mano alzada.',
   calibrar: 'Traza una línea sobre algo cuya medida conozcas y escribe cuántos metros mide.',
-  encajar: 'Arrastra el dibujo hasta que calce con las calles de la imagen; agrándalo o achícalo con − / +. Los metros no cambian.',
+  encajar: 'Arrastra el dibujo hasta que calce con las calles de la imagen; gíralo y agrándalo o achícalo con los botones. Los metros no cambian.',
 };
 
 export function renderDibujar() {
@@ -95,7 +95,7 @@ function barraSuperior(d) {
   return `<div class="dib-superior">
     <div class="dib-proyecto">${proyecto}<button class="b b-g" aria-label="Proyectos guardados${n ? ` (${n})` : ''}" title="Proyectos guardados" onclick="setVistaProyectosDib('lista')">Proyectos${n ? ` (${n})` : ''}</button>${d.proyecto ? '<button class="b b-l" onclick="soltarProyectoDib()">Cerrar proyecto</button>' : ''}</div>
     <div class="dib-sup-grupo">${btn('Deshacer', I.deshacer, 'deshacerDib()', d.historial.length ? '' : 'disabled')}${btn('Rehacer', I.rehacer, 'rehacerDib()', d.rehacer.length ? '' : 'disabled')}</div>
-    <div class="dib-sup-grupo"><label class="b b-g dib-subir" title="${d.fondo ? 'Cambiar imagen' : 'Subir imagen'}">${I.imagen}<span>${d.fondo ? 'Cambiar imagen' : 'Subir imagen'}</span><input type="file" accept="image/*" hidden onchange="subirFondoDib(this.files); this.value=''"></label></div>
+    <div class="dib-sup-grupo"><label class="b b-g dib-subir" title="${d.fondo ? 'Cambiar imagen' : 'Subir imagen'}">${I.imagen}<span>${d.fondo ? 'Cambiar imagen' : 'Subir imagen'}</span><input type="file" accept="image/*" hidden onchange="subirFondoDib(this.files); this.value=''"></label>${d.elementos.length && d.herramienta !== 'encajar' ? `<button class="b b-g" onclick="setHerramientaDib('encajar')" title="Mover, girar o cambiar el tamaño de todo el dibujo a la vez (los metros no cambian)">Mover o girar todo</button>` : ''}</div>
     <div class="dib-sup-grupo dib-sup-fin"><button class="b b-p" onclick="descargarDib()"><i class="ic ic-descargar"></i> Descargar PNG</button><button class="b b-g" onclick="copiarDib()">Copiar</button><button class="b b-l" onclick="nuevoLienzoDib()">Nuevo</button>
       ${btn(state.dibPanel === false ? 'Mostrar propiedades' : 'Ocultar propiedades', I.panel, 'togglePanelDib()', 'class="dib-btn dib-toggle-panel"')}</div>
   </div>`;
@@ -177,6 +177,8 @@ function panel(d, sel, h, p) {
   if (h === 'encajar') {
     return seccion('', `${nota(AYUDA.encajar)}`)
       + seccion('Tamaño del dibujo', `<div class="dib-acciones-el"><button class="b b-g" onclick="escalarTodoDib(0.8)" aria-label="Achicar mucho el dibujo">−−</button><button class="b b-g" onclick="escalarTodoDib(0.96)" aria-label="Achicar el dibujo">−</button><button class="b b-g" onclick="escalarTodoDib(1.04)" aria-label="Agrandar el dibujo">+</button><button class="b b-g" onclick="escalarTodoDib(1.25)" aria-label="Agrandar mucho el dibujo">++</button></div>`)
+      + seccion('Girar el dibujo', `<div class="dib-acciones-el dib-girar">${[[-90, '↺ 90°'], [-15, '↺ 15°'], [-1, '↺ 1°'], [1, '↻ 1°'], [15, '↻ 15°'], [90, '↻ 90°']].map(([g, t]) => `<button class="b b-g" onclick="girarTodoDib(${g})" aria-label="Girar el dibujo ${Math.abs(g)}° ${g < 0 ? 'a la izquierda' : 'a la derecha'}">${t}</button>`).join('')}</div>
+        <label class="dib-prefijo">Girar <input id="dib-giro" inputmode="decimal" placeholder="Ej. 37" onkeydown="if (event.key === 'Enter') { girarTodoDib(this.value); this.value = ''; }"> grados <button class="b b-g" onclick="const i = document.getElementById('dib-giro'); girarTodoDib(i.value); i.value = ''">Girar</button></label>${nota('Positivo gira a la derecha. Los postes y textos se quedan derechos; los metros no cambian.')}`)
       + (d.fondo ? seccion('Imagen', opacidad()) : '')
       + seccion('', `<button class="b b-p" onclick="setHerramientaDib('seleccionar')"><i class="ic ic-check"></i> Listo</button>`);
   }

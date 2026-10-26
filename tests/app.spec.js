@@ -4054,6 +4054,49 @@ test.describe('Herramienta Dibujar', () => {
     expect(errores).toEqual([]);
   });
 
+  test('mover o girar todo el dibujo: el trazo gira desde su centro, los postes y etiquetas siguen derechos y los metros no cambian', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    await page.setViewportSize({ width: 1280, height: 900 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await page.evaluate(() => localStorage.removeItem('nettracker_dibujo'));
+    await nav(page, 'Dibujar');
+    // Vano horizontal de 40 m (400 px a 0.1 m/px) con un poste en cada punta y la etiqueta del segundo
+    await page.evaluate(async () => {
+      const a = await import('/js/actions/dibujo.js');
+      a.cargarEnDibujo({ elementos: [
+        { id: 't', tipo: 'polilinea', tramo: 'bt', color: '#000', grosor: 6, puntos: [[600, 500], [1000, 500]], metros: {} },
+        { id: 's1', tipo: 'simbolo', simbolo: 'poste', color: '#111827', grosor: 3, escala: 0.6, rot: 0, x: 582, y: 482 },
+        { id: 's2', tipo: 'simbolo', simbolo: 'poste', color: '#111827', grosor: 3, escala: 0.6, rot: 0, x: 982, y: 482 },
+        { id: 'e', tipo: 'etiqueta', estilo: 'existente', texto: 'P2', tam: 28, tx: 1000, ty: 500, x: 1030, y: 420 },
+      ], escala: 0.1 });
+      (await import('/js/views/render.js')).render();
+    });
+    await page.getByRole('button', { name: 'Mover o girar todo' }).click();
+    await expect(page.locator('.dib-panel-cab')).toContainText('Encajar el dibujo sobre la imagen');
+    await page.getByRole('button', { name: 'Girar el dibujo 90° a la derecha' }).click();
+    const est = () => page.evaluate(async () => { const d = (await import('/js/state.js')).state.dibujo; const by = id => d.elementos.find(e => e.id === id); return { t: by('t').puntos, s2: [by('s2').x + 18, by('s2').y + 18], e: by('e'), escala: d.escala }; });
+    let e = await est();
+    const r = v => v.map(p => p.map(Math.round));
+    // Gira desde el centro de los puntos → el vano queda vertical, mismo largo
+    expect(r(e.t)[0][0]).toBe(r(e.t)[1][0]);
+    expect(Math.abs(e.t[1][1] - e.t[0][1])).toBeCloseTo(400, 5);
+    expect(e.escala).toBe(0.1);
+    // El poste 2 sigue en la punta del vano; la etiqueta se mueve con su punto, sin girar ni cambiar de lado
+    expect(e.s2.map(Math.round)).toEqual(r([e.t[1]])[0]);
+    expect([e.e.tx, e.e.ty].map(Math.round)).toEqual(r([e.t[1]])[0]);
+    expect(Math.round(e.e.x - e.e.tx)).toBe(30); expect(Math.round(e.e.y - e.e.ty)).toBe(-80);
+    await expect(page.locator('#dib-capa text', { hasText: /^40\.0 m$/ })).toHaveCount(1);
+    // Ángulo escrito: 90 más vuelve al revés; deshacer regresa un paso
+    await page.locator('#dib-giro').fill('-90'); await page.locator('#dib-giro').press('Enter');
+    e = await est();
+    expect(r(e.t)).toEqual([[600, 500], [1000, 500]]);
+    await page.getByRole('button', { name: 'Deshacer' }).click();
+    e = await est();
+    expect(r(e.t)[0][0]).toBe(r(e.t)[1][0]);
+    expect(errores).toEqual([]);
+  });
+
   test('proyectos: se guardan en la base para el equipo, se marcan los cambios sin guardar y se vuelven a abrir', async ({ page }) => {
     const errores = []; page.on('pageerror', e => errores.push(e.message));
     await page.setViewportSize({ width: 1280, height: 1100 });
