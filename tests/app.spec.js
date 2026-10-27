@@ -4157,6 +4157,42 @@ test.describe('Herramienta Dibujar', () => {
     expect(errores).toEqual([]);
   });
 
+  test('anclar medidas: se mueven los postes y los metros de los vanos no cambian; al soltarlas vuelven a la escala', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    await page.setViewportSize({ width: 1280, height: 900 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await page.evaluate(() => localStorage.removeItem('nettracker_dibujo'));
+    await nav(page, 'Dibujar');
+    // Vano de 400 px a 0.1 m/px = 40 m, con un poste en cada punta
+    await page.evaluate(async () => {
+      const a = await import('/js/actions/dibujo.js');
+      a.cargarEnDibujo({ elementos: [
+        { id: 't', tipo: 'polilinea', tramo: 'bt', color: '#000', grosor: 6, puntos: [[600, 500], [1000, 500]], metros: {} },
+        { id: 's1', tipo: 'simbolo', simbolo: 'poste', color: '#111827', grosor: 3, escala: 0.6, rot: 0, x: 582, y: 482 },
+        { id: 's2', tipo: 'simbolo', simbolo: 'poste', color: '#111827', grosor: 3, escala: 0.6, rot: 0, x: 982, y: 482 },
+      ], escala: 0.1 });
+      (await import('/js/views/render.js')).render();
+    });
+    const metros = () => page.locator('#dib-capa [data-id="t"] [data-chip] text').first();
+    await expect(metros()).toHaveText('40.0 m');
+    await page.getByRole('button', { name: 'Anclar medidas' }).click();
+    await expect(page.getByRole('button', { name: 'Medidas ancladas' })).toHaveAttribute('aria-pressed', 'true');
+    // Mover el poste 2 hacia abajo: el vano se estira en pantalla pero sigue midiendo 40 m
+    await arrastrar(page, [1000, 500], [1000, 700]);
+    const t = await page.evaluate(async () => (await import('/js/state.js')).state.dibujo.elementos.find(e => e.id === 't'));
+    expect(t.puntos[1].map(Math.round)).toEqual([1000, 700]);
+    expect(t.metrosAncla).toEqual({ 1: 40 });
+    await expect(metros()).toHaveText('40.0 m');
+    // Un tramo nuevo con las medidas ancladas también queda anclado al terminarlo
+    await page.evaluate(async () => { const a = await import('/js/actions/dibujo.js'); const { state } = await import('/js/state.js'); const d = state.dibujo; d.elementos.push({ id: 'n', tipo: 'polilinea', tramo: 'bt', color: '#000', grosor: 6, puntos: [[600, 500], [600, 300]], metros: {} }); d.tramo = 'n'; a.terminarTramoDib(); });
+    expect(await page.evaluate(async () => (await import('/js/state.js')).state.dibujo.elementos.find(e => e.id === 'n').metrosAncla)).toEqual({ 1: 20 });
+    // Soltar: los metros vuelven a salir de la escala (el vano movido ahora mide 44.7 m)
+    await page.getByRole('button', { name: 'Medidas ancladas' }).click();
+    await expect(metros()).toHaveText('44.7 m');
+    expect(errores).toEqual([]);
+  });
+
   test('proyectos: se guardan en la base para el equipo, se marcan los cambios sin guardar y se vuelven a abrir', async ({ page }) => {
     const errores = []; page.on('pageerror', e => errores.push(e.message));
     await page.setViewportSize({ width: 1280, height: 1100 });
@@ -4346,6 +4382,9 @@ test.describe('Levantamiento en campo', () => {
     await expect(page.locator('#dib-cajetin text', { hasText: /^P1 – P2$/ })).toHaveCount(1);
     await expect(page.locator('#dib-cajetin text', { hasText: /^32\.0$/ })).toHaveCount(1);
     await expect(page.locator('#dib-cajetin text', { hasText: 'LEVANTAMIENTO DE RED' })).toHaveCount(1);
+    // Llega con las medidas ancladas (las distancias son las de campo)
+    await expect(page.getByRole('button', { name: 'Medidas ancladas' })).toHaveCount(1);
+    expect(await page.evaluate(async () => (await import('/js/state.js')).state.dibujo.elementos.filter(e => e.tipo === 'polilinea').every(e => e.metrosAncla || Object.keys(e.metros || {}).length))).toBe(true);
     // Etiqueta en dos líneas: nombre y nota
     await expect(page.locator('#dib-capa text', { hasText: /^P1$/ })).toHaveCount(1);
     await expect(page.locator('#dib-capa text', { hasText: /^Poste de madera deteriorado$/ })).toHaveCount(1);
