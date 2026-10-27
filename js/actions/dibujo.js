@@ -3,7 +3,7 @@
 // dibujos/{id} = { nombre, referencia, creado, editado } (liviano, para la lista) y dibujosDatos/{id} = { fondo, datos }
 // (la imagen en JPG y el dibujo en JSON, que se baja solo al abrirlo). Mientras se arrastra se repinta solo el SVG.
 import { altoCajetin, caja, girar, transformar, COLORES, coloresTramos, GROSORES, leerFilasTabla, medidaEtiqueta, medidaReducida, mover, nuevoId, redimensionar, siguienteEtiqueta, SIMBOLOS, svgExportable, svgLamina, tamano, TAM_TEXTO } from '../domain/dibujo.js';
-import { anclas, escalaDe, ESTILOS_ETIQUETA, fmtMetros, imanar, metrosTramo, nombrePunto, segmentosTramos } from '../domain/plano.js';
+import { anclarTramo, anclas, escalaDe, ESTILOS_ETIQUETA, soltarTramo, fmtMetros, imanar, metrosTramo, nombrePunto, segmentosTramos } from '../domain/plano.js';
 import { db, get, push, ref, remove, set } from '../firebase.js';
 import { leerAltura } from '../domain/red.js';
 import { hoyLocal } from '../domain/trabajo.js';
@@ -447,6 +447,8 @@ function cerrarTramo() {
   const d = dib(); if (!d?.tramo) return;
   const t = d.elementos.find(e => e.id === d.tramo);
   if (t && t.puntos.length < 2) { d.elementos = d.elementos.filter(e => e.id !== t.id); d.sel = null; d.historial.pop(); }
+  // Con las medidas ancladas, el tramo nuevo también queda anclado con lo que mide
+  else if (t && d.lamina?.anclarMedidas) reemplazar(anclarTramo(t, d.escala));
   d.tramo = null; guardarBorrador();
 }
 export function terminarTramoDib() { cerrarTramo(); render(); }
@@ -596,6 +598,22 @@ export function setConductorDib(campo, v) {
 export function setCalibreVanoDib(i, v) {
   const val = String(v || '').trim();
   cambiarSel(el => { const calibres = { ...(el.calibres || {}) }; if (val) calibres[i] = val; else delete calibres[i]; const { calibres: _c, ...resto } = el; return Object.keys(calibres).length ? { ...resto, calibres } : resto; });
+}
+
+// Anclar medidas (pedido del equipo): los metros de cada vano se quedan como están y los postes se pueden mover a
+// conveniencia sin que cambien (para acomodar la red, no solo moverla toda). Al soltarlas vuelven a salir de la escala.
+export function anclarTodo(d) {
+  d.lamina = { ...(d.lamina || {}), anclarMedidas: true };
+  d.elementos = d.elementos.map(e => anclarTramo(e, d.escala));
+}
+export function anclarMedidasDib(on) {
+  const d = dib(); if (!d) return;
+  if (on && !d.escala && !d.elementos.some(e => e.tipo === 'polilinea' && e.metros && Object.keys(e.metros).length)) return showToast('Primero calibra la escala (o escribe los metros de los vanos) para tener qué anclar');
+  memorizar();
+  if (on) anclarTodo(d);
+  else { d.lamina = { ...(d.lamina || {}), anclarMedidas: false }; d.elementos = d.elementos.map(soltarTramo); }
+  guardarBorrador(); render();
+  showToast(on ? 'Medidas ancladas: mueve los postes sin que cambien los metros' : 'Medidas sueltas: los metros vuelven a salir de la escala');
 }
 
 // Centro de todo el dibujo (para agrandarlo o girarlo desde ahí)

@@ -10,7 +10,7 @@ import { hoyLocal } from '../domain/trabajo.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { alRedibujar, render } from '../views/render.js';
-import { cargarEnDibujo } from './dibujo.js';
+import { anclarTodo, cargarEnDibujo } from './dibujo.js';
 
 const LEAFLET = 'https://unpkg.com/leaflet@1.9.4/dist/';
 const CAPAS = {
@@ -455,7 +455,9 @@ export async function pasarADibujarLev() {
     fondo = await mapaDeFondo(d.geo, capa);
     if (!fondo) showToast('No se pudo bajar el mapa (¿sin conexión?): pasa sin fondo; puedes subir una captura en Dibujar');
   }
-  cargarEnDibujo({ elementos: d.elementos, escala: d.escala, fondo, lamina: { titulo: 'Levantamiento de red', subtitulo: l.nombre, proyecto: l.referencia || '', elaboro: l.creado?.por || por() } });
+  // Del levantamiento las distancias son las medidas en campo: el dibujo llega con las medidas ancladas
+  const dibujo = { elementos: d.elementos, escala: d.escala, lamina: {} }; anclarTodo(dibujo);
+  cargarEnDibujo({ elementos: dibujo.elementos, escala: d.escala, fondo, lamina: { titulo: 'Levantamiento de red', subtitulo: l.nombre, proyecto: l.referencia || '', elaboro: l.creado?.por || por(), anclarMedidas: true } });
   state.levId = null; state.lev = null; detenerGPS();
   state.tab = 'dibujar'; state.view = 'lista';
   render();

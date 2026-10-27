@@ -63,14 +63,30 @@ export const segmentosTramos = elementos => elementos.filter(e => e.tipo === 'po
 // Nombre corto de una etiqueta: "P1: DS111267" → "P1"
 export const nombrePunto = t => String(t || '').split(/[:\n]/)[0].trim();
 
-// Metros de un vano (entre puntos[i-1] y puntos[i]): el escrito a mano manda; si no, con la escala; si no, null
+// Metros de un vano (entre puntos[i-1] y puntos[i]): el escrito a mano manda; luego el anclado (medidas ancladas:
+// el que tenía al anclar, aunque después se muevan los postes); si no, con la escala; si no, null
 export function metrosVano(t, i, escala) {
   const manual = Number(t.metros?.[i]);
   if (t.metros?.[i] !== undefined && t.metros?.[i] !== '' && manual >= 0 && !Number.isNaN(manual)) return manual;
+  const ancla = Number(t.metrosAncla?.[i]);
+  if (t.metrosAncla?.[i] !== undefined && ancla >= 0 && !Number.isNaN(ancla)) return ancla;
   if (!escala) return null;
   const [x0, y0] = t.puntos[i - 1]; const [x1, y1] = t.puntos[i];
   return Math.hypot(x1 - x0, y1 - y0) * escala;
 }
+// Ancla los metros de los vanos de un tramo con lo que miden ahora (los escritos a mano ya mandan; sin escala no hay qué anclar)
+export function anclarTramo(t, escala) {
+  if (t.tipo !== 'polilinea' || !escala) return t;
+  const ancla = { ...(t.metrosAncla || {}) }; let cambio = false;
+  for (let i = 1; i < t.puntos.length; i++) {
+    if (ancla[i] !== undefined || (t.metros?.[i] !== undefined && t.metros?.[i] !== '')) continue;
+    const [x0, y0] = t.puntos[i - 1]; const [x1, y1] = t.puntos[i];
+    ancla[i] = Math.round(Math.hypot(x1 - x0, y1 - y0) * escala * 100) / 100; cambio = true;
+  }
+  return cambio ? { ...t, metrosAncla: ancla } : t;
+}
+export const soltarTramo = t => { if (!t.metrosAncla) return t; const { metrosAncla, ...resto } = t; return resto; };
+
 // Largo total de un tramo en metros (null si falta algún vano)
 export function metrosTramo(t, escala) {
   let total = 0;
