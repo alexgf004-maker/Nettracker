@@ -67,7 +67,8 @@ export function planoLimpio(d, elementos, { x, y, w, h, vista, accion = () => nu
     if (el.tramo === 'acometida') return { color: acc === 'retirar' ? C.retirar : acc ? C.nuevo : C.acometida, w: 1.6 * K, dash: `${5 * K} ${4 * K}` };
     if (acc === 'retirar') return { color: C.retirar, w: 2.4 * K, dash: `${8 * K} ${6 * K}` };
     if (acc === 'instalar' || acc === 'reemplazar' || acc === 'trasladar') return { color: C.nuevo, w: 4.6 * K };
-    return { color: /^mt/.test(el.tramo) ? C.mt : C.existente, w: (/^mt/.test(el.tramo) ? 3.6 : 3) * K };
+    // Existente: con su color si la red tiene uno propio (para distinguir redes, p. ej. de dos transformadores)
+    return { color: el.colorRed || (/^mt/.test(el.tramo) ? C.mt : C.existente), w: (/^mt/.test(el.tramo) ? 3.6 : 3) * K };
   };
   tramos.forEach(el => {
     const pts = el.puntos.map(P); const e = estiloTramo(el);

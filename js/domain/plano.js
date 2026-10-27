@@ -12,6 +12,33 @@ export const TIPOS_TRAMO = {
   acometida: { nombre: 'Acometida', color: '#0f172a', dash: '1 1', ancho: 0.55 },
 };
 
+// Colores para distinguir redes del mismo tipo (p. ej. los secundarios de dos transformadores)
+export const COLORES_RED = ['#a21caf', '#2563eb', '#dc2626', '#ea580c', '#16a34a', '#0891b2', '#7c3aed', '#ca8a04', '#111827'];
+
+// ── Redes: tramos conectados entre sí (pedido del equipo: distinguir y nombrar redes) ──
+// Familia del tramo: lo existente y lo proyectado del mismo nivel son la misma red; acometidas y retiros no cuentan
+export const familiaTramo = t => (t === 'acometida' || t === 'retirar' ? null : /^mt/.test(t || '') ? 'mt' : 'bt');
+const distSeg = ([px, py], [ax, ay], [bx, by]) => {
+  const dx = bx - ax; const dy = by - ay; const L = dx * dx + dy * dy;
+  const k = L ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / L)) : 0;
+  return Math.hypot(px - ax - k * dx, py - ay - k * dy);
+};
+// ¿Dos tramos se tocan? (un vértice de uno sobre el otro: en una punta o a media línea)
+export function seTocan(a, b, tol = 12) {
+  const sobre = (p, t) => t.puntos.length === 1 ? Math.hypot(p[0] - t.puntos[0][0], p[1] - t.puntos[0][1]) <= tol : t.puntos.slice(1).some((q, i) => distSeg(p, t.puntos[i], q) <= tol);
+  return a.puntos.some(p => sobre(p, b)) || b.puntos.some(p => sobre(p, a));
+}
+// Ids de los tramos de la misma red que `id` (conectados entre sí, de la misma familia)
+export function redDe(elementos, id, tol = 12) {
+  const tramos = elementos.filter(e => e.tipo === 'polilinea' && e.puntos?.length);
+  const ini = tramos.find(e => e.id === id); const fam = ini && familiaTramo(ini.tramo);
+  if (!fam) return ini ? [ini.id] : [];
+  const misma = tramos.filter(e => familiaTramo(e.tramo) === fam);
+  const red = [ini]; const cola = [ini];
+  while (cola.length) { const t = cola.shift(); misma.forEach(o => { if (!red.includes(o) && seTocan(t, o, tol)) { red.push(o); cola.push(o); } }); }
+  return red.map(e => e.id);
+}
+
 // Estilos de las etiquetas de punto
 export const ESTILOS_ETIQUETA = {
   existente: { nombre: 'Punto existente', fondo: '#0f2a43', texto: '#ffffff', prefijo: 'P' },

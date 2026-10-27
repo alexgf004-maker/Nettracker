@@ -3,7 +3,7 @@
 // dibujos/{id} = { nombre, referencia, creado, editado } (liviano, para la lista) y dibujosDatos/{id} = { fondo, datos }
 // (la imagen en JPG y el dibujo en JSON, que se baja solo al abrirlo). Mientras se arrastra se repinta solo el SVG.
 import { altoCajetin, caja, girar, transformar, COLORES, coloresTramos, GROSORES, leerFilasTabla, medidaEtiqueta, medidaReducida, mover, nuevoId, redimensionar, siguienteEtiqueta, SIMBOLOS, svgExportable, svgLamina, tamano, TAM_TEXTO } from '../domain/dibujo.js';
-import { anclarTramo, anclas, escalaDe, ESTILOS_ETIQUETA, soltarTramo, fmtMetros, imanar, metrosTramo, nombrePunto, segmentosTramos } from '../domain/plano.js';
+import { anclarTramo, anclas, COLORES_RED, escalaDe, ESTILOS_ETIQUETA, familiaTramo, redDe, seTocan, soltarTramo, TIPOS_TRAMO, fmtMetros, imanar, metrosTramo, nombrePunto, segmentosTramos } from '../domain/plano.js';
 import { db, get, push, ref, remove, set } from '../firebase.js';
 import { leerAltura } from '../domain/red.js';
 import { hoyLocal } from '../domain/trabajo.js';
@@ -443,12 +443,32 @@ export function setHerramientaDib(h) {
   render();
 }
 // Cierra el tramo en curso; con un solo punto no queda
+// Tramo recién terminado: si toca una red, toma su color y nombre; si no toca ninguna del mismo tipo pero ya hay otra
+// dibujada, pregunta si es otra red (de otro transformador) y le pone otro color y el nombre que se escriba
+function redNueva(d, t) {
+  const fam = familiaTramo(t.tramo); if (!fam || t.colorRed || t.nombreRed) return t;
+  const otros = d.elementos.filter(e => e.id !== t.id && e.tipo === 'polilinea' && e.puntos?.length > 1 && familiaTramo(e.tramo) === fam);
+  if (!otros.length) return t;
+  const vecino = otros.find(o => seTocan(t, o, tolRed()));
+  if (vecino) return vecino.colorRed || vecino.nombreRed ? { ...t, ...(vecino.colorRed ? { colorRed: vecino.colorRed } : {}), ...(vecino.nombreRed ? { nombreRed: vecino.nombreRed } : {}) } : t;
+  const nivel = fam === 'mt' ? 'MT' : 'BT';
+  if (!confirm(`Este tramo no toca la red ${nivel} que ya está dibujada.\n\n¿Es otra red (por ejemplo, el secundario de otro transformador)?\n\nAceptar: se le pone otro color y un nombre. Cancelar: queda igual que la otra.`)) return t;
+  const redes = new Set(otros.map(o => o.nombreRed || o.colorRed || 'base'));
+  const nombre = String(prompt('Nombre de esta red (sale en la simbología y en la leyenda)', `Red ${nivel} ${redes.size + 1}`) ?? '').trim();
+  const usados = new Set(otros.map(o => o.colorRed || TIPOS_TRAMO[o.tramo]?.color));
+  const color = COLORES_RED.find(c => !usados.has(c) && c !== TIPOS_TRAMO[t.tramo]?.color) || COLORES_RED[redes.size % COLORES_RED.length];
+  return { ...t, colorRed: color, ...(nombre ? { nombreRed: nombre } : {}) };
+}
 function cerrarTramo() {
   const d = dib(); if (!d?.tramo) return;
   const t = d.elementos.find(e => e.id === d.tramo);
   if (t && t.puntos.length < 2) { d.elementos = d.elementos.filter(e => e.id !== t.id); d.sel = null; d.historial.pop(); }
-  // Con las medidas ancladas, el tramo nuevo también queda anclado con lo que mide
-  else if (t && d.lamina?.anclarMedidas) reemplazar(anclarTramo(t, d.escala));
+  else if (t) {
+    let nuevo = redNueva(d, t);
+    // Con las medidas ancladas, el tramo nuevo también queda anclado con lo que mide
+    if (d.lamina?.anclarMedidas) nuevo = anclarTramo(nuevo, d.escala);
+    if (nuevo !== t) reemplazar(nuevo);
+  }
   d.tramo = null; guardarBorrador();
 }
 export function terminarTramoDib() { cerrarTramo(); render(); }
@@ -543,15 +563,28 @@ export function setLaminaDib(campo, valor) {
 }
 
 // Color de la red: del tramo seleccionado o, sin selección, de los tramos nuevos (null = el de su tipo)
+// Color y nombre de la red: se aplican a toda la red conectada al tramo seleccionado
+const tolRed = () => 14 * Math.max(1, tamano(dib()).w / 1600);
+const enLaRed = el => new Set(redDe(dib().elementos, el.id, tolRed()));
 export function setColorRedDib(c) {
   const d = dib(); if (!d) return; c = c || null;
   const el = seleccionado();
-  if (el?.tipo === 'polilinea') { memorizar(); const { colorRed, ...resto } = el; reemplazar(c ? { ...resto, colorRed: c } : resto); guardarBorrador(); }
+  if (el?.tipo === 'polilinea') {
+    memorizar(); const ids = enLaRed(el);
+    d.elementos = d.elementos.map(e => { if (!ids.has(e.id)) return e; const { colorRed, ...resto } = e; return c ? { ...resto, colorRed: c } : resto; });
+    guardarBorrador();
+  }
   d.colorRed = c;
   render();
 }
 // Nombre de la red en la simbología y los totales (opcional)
-export function setNombreRedDib(v) { const el = seleccionado(); if (el?.tipo !== 'polilinea') return; editar(e => ({ ...e, nombreRed: String(v || '') })); }
+export function setNombreRedDib(v) {
+  const d = dib(); const el = seleccionado(); if (el?.tipo !== 'polilinea') return;
+  if (textoMemorizado !== el.id) { memorizar(); textoMemorizado = el.id; }
+  const ids = enLaRed(el); const nombre = String(v || '');
+  d.elementos = d.elementos.map(e => (ids.has(e.id) ? { ...e, nombreRed: nombre } : e));
+  repintar(); guardarBorrador();
+}
 // Tamaño del elemento seleccionado (× f): símbolos (sin moverse del centro), textos, etiquetas, cotas y grosor de tramos.
 // Un poste agrandado deja ese tamaño para los siguientes.
 export function setTamanoDib(f) {

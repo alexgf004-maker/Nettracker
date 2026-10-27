@@ -4193,6 +4193,48 @@ test.describe('Herramienta Dibujar', () => {
     expect(errores).toEqual([]);
   });
 
+  test('varias redes: un tramo que no toca la red pregunta si es otra, se nombra toda la red y salen aparte en la simbología y en la lámina', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    await page.setViewportSize({ width: 1280, height: 900 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await page.evaluate(() => localStorage.removeItem('nettracker_dibujo'));
+    await nav(page, 'Dibujar');
+    await page.evaluate(async () => {
+      const a = await import('/js/actions/dibujo.js');
+      a.cargarEnDibujo({ elementos: [{ id: 'r1', tipo: 'polilinea', tramo: 'bt', color: '#000', grosor: 6, puntos: [[100, 200], [500, 200]], metros: {} }], escala: 0.1 });
+      window.__preguntas = []; window.confirm = m => { window.__preguntas.push(m); return true; }; window.prompt = (m, def) => { window.__preguntas.push(def); return 'Trafo P4'; };
+      // Termina un tramo (como al dibujarlo)
+      window.__tramo = async (id, puntos) => { const { state } = await import('/js/state.js'); state.dibujo.elementos.push({ id, tipo: 'polilinea', tramo: 'bt', color: '#000', grosor: 6, puntos, metros: {} }); state.dibujo.tramo = id; a.terminarTramoDib(); };
+    });
+    const el = id => page.evaluate(async id => (await import('/js/state.js')).state.dibujo.elementos.find(e => e.id === id), id);
+    // Lejos de la red: pregunta si es otra y la nombra (con otro color)
+    await page.evaluate(() => window.__tramo('r2', [[100, 600], [500, 600]]));
+    expect((await page.evaluate(() => window.__preguntas))[0]).toContain('no toca la red BT que ya está dibujada');
+    expect((await page.evaluate(() => window.__preguntas))[1]).toBe('Red BT 2');
+    let r2 = await el('r2');
+    expect(r2.nombreRed).toBe('Trafo P4'); expect(r2.colorRed).toBe('#2563eb');
+    // Un tramo que sale de esa red toma su color y su nombre, sin preguntar
+    await page.evaluate(() => window.__tramo('r3', [[500, 600], [500, 800]]));
+    expect(await page.evaluate(() => window.__preguntas.length)).toBe(2);
+    expect(await el('r3')).toMatchObject({ nombreRed: 'Trafo P4', colorRed: '#2563eb' });
+    // Renombrar desde el panel cambia toda la red conectada
+    await page.evaluate(async () => { const { state } = await import('/js/state.js'); const { render } = await import('/js/views/render.js'); state.dibujo.sel = 'r3'; render(); });
+    await expect(page.locator('.dib-panel')).toContainText('Se aplica a toda la red conectada (2 tramos)');
+    await page.locator('#dib-nombre-red').fill('Red BT trafo P4'); await page.locator('#dib-nombre-red').press('Tab');
+    expect((await el('r2')).nombreRed).toBe('Red BT trafo P4');
+    await page.evaluate(async () => { const { state } = await import('/js/state.js'); const { render } = await import('/js/views/render.js'); state.dibujo.sel = 'r1'; render(); });
+    await page.locator('#dib-nombre-red').fill('Red BT trafo P1'); await page.locator('#dib-nombre-red').press('Tab');
+    expect((await el('r2')).nombreRed).toBe('Red BT trafo P4'); // la otra red no cambia
+    // Simbología del cajetín y leyenda de la lámina de propuesta: una entrada por red
+    await expect(page.locator('#dib-cajetin text', { hasText: /^Red BT trafo P1$/ })).toHaveCount(1);
+    await expect(page.locator('#dib-cajetin text', { hasText: /^Red BT trafo P4$/ })).toHaveCount(1);
+    const svg = await page.evaluate(async () => (await import('/js/domain/propuesta.js')).svgPropuesta((await import('/js/state.js')).state.dibujo));
+    expect(svg).toContain('>Red BT trafo P1<'); expect(svg).toContain('>Red BT trafo P4<');
+    expect(svg).toContain('stroke="#2563eb"'); // la red del trafo P4 con su color también en el plano
+    expect(errores).toEqual([]);
+  });
+
   test('proyectos: se guardan en la base para el equipo, se marcan los cambios sin guardar y se vuelven a abrir', async ({ page }) => {
     const errores = []; page.on('pageerror', e => errores.push(e.message));
     await page.setViewportSize({ width: 1280, height: 1100 });

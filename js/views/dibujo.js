@@ -4,7 +4,7 @@
 // imagen y exportar. En el celular las herramientas van en una tira abajo y las propiedades en una hoja que se abre.
 import { cargarBorrador, partesSVG, viewBoxDib, zoomPct } from '../actions/dibujo.js';
 import { COLORES, GROSORES, SIMBOLOS, TAM_TEXTO } from '../domain/dibujo.js';
-import { ACCIONES_PUNTO, ESTILOS_ETIQUETA, fmtMetros, metrosTramo, metrosVano, nombreRed, nombresVanos, TIPOS_TRAMO } from '../domain/plano.js';
+import { ACCIONES_PUNTO, COLORES_RED, redDe, ESTILOS_ETIQUETA, fmtMetros, metrosTramo, metrosVano, nombreRed, nombresVanos, TIPOS_TRAMO } from '../domain/plano.js';
 import { ALTURAS_POSTE, CALIBRES, ESTRUCTURAS, grupoEstructurasDe, nombreEstructura, TIPOS_CONDUCTOR } from '../domain/red.js';
 import { ACCIONES, accionDe, kvaTexto, metrosTraslado, trabajos, trabajosOcultos } from '../domain/propuesta.js';
 import { state } from '../state.js';
@@ -38,7 +38,6 @@ const I = {
   ajustes: ic('<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>'),
 };
 // Colores para distinguir redes del mismo tipo (además del color propio de cada tipo)
-const COLORES_RED = ['#a21caf', '#2563eb', '#dc2626', '#ea580c', '#16a34a', '#0891b2', '#7c3aed', '#ca8a04', '#111827'];
 const NOMBRE_TIPO = { polilinea: 'Tramo de red', simbolo: 'Símbolo', etiqueta: 'Etiqueta de punto', cota: 'Cota', texto: 'Texto', flecha: 'Flecha', linea: 'Línea', rect: 'Rectángulo', elipse: 'Círculo', trazo: 'Trazo libre', leyenda: 'Leyenda', tabla: 'Tabla' };
 const AYUDA = {
   seleccionar: 'Toca un elemento para seleccionarlo y arrastrarlo; los metros de los vanos también se arrastran. Supr borra y Ctrl+Z deshace.',
@@ -196,8 +195,10 @@ function panel(d, sel, h, p) {
     let html = '';
     if (d.tramo === sel.id) html += seccion('', `${nota(AYUDA.tramo)}<button class="b b-p" onclick="terminarTramoDib()"><i class="ic ic-check"></i> Terminar tramo</button>`);
     html += seccion('Tipo de red', tiposTramo(sel.tramo));
-    html += seccion('Color de la red', `${coloresRed(sel.colorRed, sel.tramo)}${nota('Para distinguir redes del mismo tipo (por ejemplo, de dos transformadores). Cada color sale aparte en la simbología.')}`);
-    html += seccion('Nombre en la simbología', `<input id="dib-nombre-red" value="${esc(sel.nombreRed || '')}" placeholder="${esc(TIPOS_TRAMO[sel.tramo]?.nombre || '')}" oninput="setNombreRedDib(this.value)" onchange="finEdicionDib()">`);
+    const nRed = redDe(d.elementos, sel.id, 14 * Math.max(1, p.w / 1600)).length;
+    const toda = nRed > 1 ? ` Se aplica a toda la red conectada (${nRed} tramos).` : '';
+    html += seccion('Color de la red', `${coloresRed(sel.colorRed, sel.tramo)}${nota('Para distinguir redes del mismo tipo (por ejemplo, de dos transformadores). Cada color sale aparte en la simbología y en la lámina de propuesta.' + toda)}`);
+    html += seccion('Nombre de la red', `<input id="dib-nombre-red" value="${esc(sel.nombreRed || '')}" placeholder="${esc(TIPOS_TRAMO[sel.tramo]?.nombre || '')}" oninput="setNombreRedDib(this.value)" onchange="finEdicionDib()">${nota('Ej. "Red BT trafo P4". Sale en la simbología y en la leyenda de la lámina de propuesta.' + toda)}`);
     html += seccion('Conductor', `${controlesConductor(sel.conductor, { id: 'dib-cond', fn: (c, v) => `setConductorDib('${c}', ${v})` })}<div class="page-sub">Los tramos que traces después salen con este conductor.</div>`);
     html += seccionPropuesta(sel, d);
     html += seccion('Grosor', tamano('Grosor de la línea'));

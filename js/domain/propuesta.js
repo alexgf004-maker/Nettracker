@@ -342,8 +342,17 @@ function reemplazos(elementos, w) {
 function leyendaFlotante(elementos, { x, y, conMarca, limpio = false }) {
   const items = [];
   const hay = f => elementos.some(f);
-  if (hay(e => e.tipo === 'polilinea' && e.tramo !== 'acometida' && !accionDe(e))) items.push(['linea', PALETA.existente, 'Existente']);
-  if (hay(e => e.tipo === 'polilinea' && ['instalar', 'reemplazar'].includes(accionDe(e)))) items.push(['gruesa', PALETA.nuevo, 'Nuevo']);
+  // Lo existente, una entrada por red (con su color y su nombre si se le pusieron); si es una sola sin nombre, "Existente"
+  const redes = [];
+  elementos.filter(e => e.tipo === 'polilinea' && e.tramo !== 'acometida' && e.tramo !== 'retirar' && !accionDe(e)).forEach(e => {
+    const color = limpio && e.colorRed ? e.colorRed : PALETA.existente; const nombre = String(e.nombreRed || '').trim();
+    if (!redes.some(r => r.color === color && r.nombre === nombre)) redes.push({ color, nombre });
+  });
+  const variasRedes = redes.length > 1;
+  redes.forEach(r => items.push(['linea', r.color, r.nombre || (variasRedes ? `Existente${r.color !== PALETA.existente ? '' : ' (sin nombre)'}` : 'Existente')]));
+  // Lo nuevo de una red con nombre lo dice (sigue en turquesa)
+  const nuevasConNombre = [...new Set(elementos.filter(e => e.tipo === 'polilinea' && ['instalar', 'reemplazar'].includes(accionDe(e)) && String(e.nombreRed || '').trim()).map(e => e.nombreRed.trim()))];
+  if (hay(e => e.tipo === 'polilinea' && ['instalar', 'reemplazar'].includes(accionDe(e)))) items.push(['gruesa', PALETA.nuevo, nuevasConNombre.length === 1 ? `Nuevo · ${nuevasConNombre[0]}` : 'Nuevo']);
   if (hay(e => e.tipo === 'polilinea' && accionDe(e) === 'retirar')) items.push(['guion', PALETA.retirar, 'Se retira']);
   if (hay(e => e.tipo === 'polilinea' && e.tramo === 'acometida')) items.push(['punteada', '#0f172a', 'Acometida']);
   simbologiaUsada(elementos).filter(s => s.clase === 'simbolo').forEach(s => items.push(['simbolo', s.color, s.nombre, s.simbolo]));
