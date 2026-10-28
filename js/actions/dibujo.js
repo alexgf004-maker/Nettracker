@@ -578,6 +578,8 @@ export function setColorRedDib(c) {
   render();
 }
 // Nombre de la red en la simbología y los totales (opcional)
+// Nota de un símbolo de red (p. ej. el medidor del usuario): sale junto a él
+export function setNotaDib(v) { const el = seleccionado(); if (el?.tipo !== 'simbolo') return; editar(e => { const t = String(v || ''); const { nota, ...resto } = e; return t.trim() ? { ...resto, nota: t } : resto; }); }
 export function setNombreRedDib(v) {
   const d = dib(); const el = seleccionado(); if (el?.tipo !== 'polilinea') return;
   if (textoMemorizado !== el.id) { memorizar(); textoMemorizado = el.id; }

@@ -8,7 +8,7 @@ const NOMBRES = [
   'setHerramientaDib', 'setLaminaDib', 'setPrefijoDib', 'setSimboloDib', 'setTamTextoDib', 'setTipoTramoDib', 'subirFondoDib', 'tablaEncabezadoDib',
   'tablaFilasDib', 'terminarTramoDib', 'textoDib',
   'setAlturaDib', 'agregarEstructuraDib', 'agregarEstructuraEscritaDib', 'quitarEstructuraDib', 'setConductorDib', 'setCalibreVanoDib',
-  'escalarTodoDib', 'girarTodoDib', 'anclarMedidasDib', 'setOpacidadFondoDib',
+  'escalarTodoDib', 'girarTodoDib', 'anclarMedidasDib', 'setNotaDib', 'setOpacidadFondoDib',
   'grupoEstructurasUI', 'buscarEstructuras',
   'metrosASuLugarDib', 'setColorRedDib', 'setNombreRedDib', 'setTamanoDib', 'setTamNuevosDib', 'togglePanelDib', 'abrirPanelMovilDib', 'zoomDib', 'ajustarVistaDib', 'ampliarDib', 'dibRueda',
   'setAccionDib', 'setDetalleAccionDib', 'setKvaDib', 'setReemplazoConductorDib', 'setReemplazoAlturaDib', 'agregarReemplazoEstructuraDib', 'agregarReemplazoEstructuraEscritaDib', 'quitarReemplazoEstructuraDib', 'setReemplazoKvaDib', 'marcarTrasladoDib', 'cancelarTrasladoDib', 'quitarTrasladoDib', 'setTrabajoDib', 'ocultarTrabajoDib', 'agregarTrabajoDib', 'setTrabajoExtraDib', 'quitarTrabajoExtraDib', 'descargarPropuestaDib',

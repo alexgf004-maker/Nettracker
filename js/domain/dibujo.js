@@ -184,7 +184,7 @@ function trazosTramo(d, color, ancho, dash) {
 // SVG de un elemento. sel: tiradores de edición; ui: tamaño de tiradores; escala y distancias: metros por vano
 // ver: qué datos técnicos salen en el plano (calibre de los vanos, altura y estructuras de los postes)
 // datoEn(x, y): datos del poste en ese punto (para la etiqueta que apunta a él); conEtiqueta(x, y): hay una etiqueta ahí
-export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias = false, ver = {}, datoEn = null, conEtiqueta = null } = {}) {
+export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias = false, ver = {}, datoEn = null, conEtiqueta = null, radioEn = null } = {}) {
   const st = `stroke="${el.color}" stroke-width="${el.grosor || 3}" fill="none" stroke-linecap="round" stroke-linejoin="round"`;
   const id = `data-id="${el.id}"`;
   let s = '';
@@ -262,8 +262,11 @@ export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias
       const linea = est && fondo.toLowerCase() !== '#ffffff' && fondo.toLowerCase() !== '#facc15' ? fondo : NEGRO;
       const m = medidaEtiqueta(el, datoEn?.(el.tx, el.ty) || ''); const [sx, sy] = salidaEtiqueta(el, m);
       const lw = r1(Math.max(1.5, el.tam * 0.09));
-      const guia = Math.hypot(el.tx - sx, el.ty - sy) > el.tam * 0.5
-        ? `<line x1="${r1(sx)}" y1="${r1(sy)}" x2="${r1(el.tx)}" y2="${r1(el.ty)}" stroke="#ffffff" stroke-width="${r1(lw * 3.4)}" stroke-linecap="round"/><line x1="${r1(sx)}" y1="${r1(sy)}" x2="${r1(el.tx)}" y2="${r1(el.ty)}" stroke="${linea}" stroke-width="${r1(lw * 1.4)}" stroke-linecap="round"/><circle cx="${r1(el.tx)}" cy="${r1(el.ty)}" r="${r1(el.tam * 0.2)}" fill="${linea}" stroke="#ffffff" stroke-width="${lw}"/>` : '';
+      // Si apunta a un símbolo, la línea llega hasta su borde (sin el punto en la punta) para no taparlo
+      const rs = radioEn?.(el.tx, el.ty) || 0; const L = Math.hypot(el.tx - sx, el.ty - sy);
+      const ex = rs && L > rs ? el.tx - ((el.tx - sx) / L) * rs * 0.85 : el.tx; const ey = rs && L > rs ? el.ty - ((el.ty - sy) / L) * rs * 0.85 : el.ty;
+      const guia = L > el.tam * 0.5 && L > rs
+        ? `<line x1="${r1(sx)}" y1="${r1(sy)}" x2="${r1(ex)}" y2="${r1(ey)}" stroke="#ffffff" stroke-width="${r1(lw * 3.4)}" stroke-linecap="round"/><line x1="${r1(sx)}" y1="${r1(sy)}" x2="${r1(ex)}" y2="${r1(ey)}" stroke="${linea}" stroke-width="${r1(lw * 1.4)}" stroke-linecap="round"/>${rs ? '' : `<circle cx="${r1(el.tx)}" cy="${r1(el.ty)}" r="${r1(el.tam * 0.2)}" fill="${linea}" stroke="#ffffff" stroke-width="${lw}"/>`}` : '';
       const borde = fondo.toLowerCase() === '#ffffff' ? NEGRO : '#ffffff';
       const franja = m.sub ? `<rect x="${r1(el.x + lw)}" y="${r1(el.y + m.hNombre)}" width="${r1(m.w - lw * 2)}" height="${r1(m.h - m.hNombre - lw)}" rx="${r1(el.tam * 0.22)}" fill="#ffffff"/><text x="${r1(el.x + m.w / 2)}" y="${r1(el.y + m.hNombre + m.ts * 1.02)}" text-anchor="middle" font-size="${r1(m.ts)}" font-weight="700" font-family="${FUENTE}" fill="${NEGRO}">${esc(m.sub)}</text>` : '';
       s = `<g ${id}>${guia}<rect x="${r1(el.x)}" y="${r1(el.y)}" width="${r1(m.w)}" height="${r1(m.h)}" rx="${r1(el.tam * 0.32)}" fill="${fondo}" stroke="${m.sub && fondo.toLowerCase() !== '#ffffff' ? fondo : borde}" stroke-width="${r1(lw * 1.3)}" filter="url(#dib-sombra)"/>${m.lineas.map((l, i) => `<text x="${r1(el.x + m.w / 2)}" y="${r1(el.y + m.pad * 0.4 + el.tam * (i + 1) * 1.2 - el.tam * 0.25)}" text-anchor="middle" font-size="${el.tam}" font-weight="700" font-family="${FUENTE}" fill="${tinta}">${esc(l) || ' '}</text>`).join('')}${franja}</g>`;
@@ -341,7 +344,7 @@ export function simbologiaUsada(elementos) {
   const estilos = [...new Set(elementos.filter(e => e.tipo === 'etiqueta' && ESTILOS_ETIQUETA[e.estilo]?.prefijo).map(e => e.estilo))];
   estilos.forEach(k => {
     const ej = elementos.find(e => e.tipo === 'etiqueta' && e.estilo === k);
-    out.push({ clase: 'etiqueta', estilo: k, ejemplo: nombrePunto(ej?.texto) || ESTILOS_ETIQUETA[k].prefijo, nombre: ESTILOS_ETIQUETA[k].nombre });
+    out.push({ clase: 'etiqueta', estilo: k, ejemplo: nombrePunto(ej?.texto).split(/[,;\s]/)[0] || ESTILOS_ETIQUETA[k].prefijo, nombre: ESTILOS_ETIQUETA[k].nombre }); // solo el nombre corto ("P3"), para que quepa
   });
   return out;
 }
@@ -439,6 +442,10 @@ function svgCajetin(d, y0) {
 
 // Datos del poste con lo que se cambia en la propuesta: "35' · RS3 → 40' · TS3" (y los kVA de un transformador)
 function textoConCambio(el, ver) {
+  const nota = String(el.nota || '').trim();
+  return [textoConCambioPoste(el, ver), nota].filter(Boolean).join(' · ');
+}
+function textoConCambioPoste(el, ver) {
   const hoy = textoPoste(el, ver); const r = el.accion === 'reemplazar' ? el.reemplazo : null;
   const kva = t => ((t || []).filter(Boolean).length ? `${t.filter(Boolean).join(' + ')} kVA` : '');
   if (!r) return hoy;
@@ -470,12 +477,27 @@ export function svgLamina(d, { pantalla = false, ui = 1 } = {}) {
   const l = d.lamina || {};
   const ver = { calibre: l.verCalibre !== false, altura: l.verAltura !== false, estructuras: l.verEstructuras !== false, acometidas: l.verAcometidas !== false };
   // Un poste con etiqueta lleva sus datos dentro de la etiqueta (un solo rótulo por poste, sin encimarse)
-  const postes = d.elementos.filter(e => e.tipo === 'simbolo' && SIMBOLOS[e.simbolo]?.grupo === 'red').map(e => ({ x: e.x + 30 * e.escala, y: e.y + 30 * e.escala, texto: textoConCambio(e, ver) })).filter(p => p.texto);
-  const puntas = d.elementos.filter(e => e.tipo === 'etiqueta').map(e => [e.tx, e.ty]);
+  const simbolosRed = d.elementos.filter(e => e.tipo === 'simbolo' && SIMBOLOS[e.simbolo]?.grupo === 'red');
+  // Datos de cada punto (si hay poste y transformador en el mismo lugar, juntos en el mismo rótulo)
   const cerca = (a, x, y) => Math.hypot(a[0] - x, a[1] - y) < 2;
+  const postes = [];
+  simbolosRed.forEach(e => {
+    const x = e.x + 30 * e.escala; const y = e.y + 30 * e.escala; const texto = textoConCambio(e, ver);
+    const p = postes.find(q => cerca([q.x, q.y], x, y));
+    if (p) { p.r = Math.max(p.r, 30 * e.escala); if (texto && !p.texto.includes(texto)) p.texto = [p.texto, texto].filter(Boolean).join(' · '); } else postes.push({ x, y, r: 30 * e.escala, texto });
+  });
+  const puntas = d.elementos.filter(e => e.tipo === 'etiqueta').map(e => [e.tx, e.ty]);
   const opts = { escala: d.escala, distancias: l.distanciasEnTramos !== false, ver,
-    datoEn: (x, y) => postes.find(p => cerca([p.x, p.y], x, y))?.texto || '', conEtiqueta: (x, y) => puntas.some(p => cerca(p, x, y)) };
-  const capa = definiciones(d.elementos) + d.elementos.map(e => svgElemento(e, { ...opts, sel: pantalla && e.id === d.sel, ui })).join('') + flechasTraslado(d.elementos, w)
+    datoEn: (x, y) => postes.find(p => cerca([p.x, p.y], x, y))?.texto || '', conEtiqueta: (x, y) => puntas.some(p => cerca(p, x, y)),
+    // La línea guía de una etiqueta termina en el borde del símbolo (no lo cruza ni lo tapa)
+    radioEn: (x, y) => postes.find(p => cerca([p.x, p.y], x, y))?.r || 0 };
+  // Orden de dibujo: primero las líneas, encima los postes, luego transformadores y demás símbolos, y arriba los textos
+  // (así un transformador sobre el poste no queda tapado). Dentro de cada capa se respeta el orden ("Al frente").
+  // El seleccionado va al final para que sus tiradores se puedan tocar.
+  const capaDe = e => (['polilinea', 'trazo', 'linea', 'flecha', 'rect', 'elipse'].includes(e.tipo) ? 0 : e.tipo === 'simbolo' ? (['poste', 'poste_nuevo'].includes(e.simbolo) ? 1 : 2) : 3);
+  const orden = d.elementos.map((e, i) => [e, i]).sort((a, b) => capaDe(a[0]) - capaDe(b[0]) || a[1] - b[1]).map(([e]) => e);
+  if (pantalla && d.sel) { const k = orden.findIndex(e => e.id === d.sel); if (k >= 0) orden.push(...orden.splice(k, 1)); }
+  const capa = definiciones(d.elementos) + orden.map(e => svgElemento(e, { ...opts, sel: pantalla && e.id === d.sel, ui })).join('') + flechasTraslado(d.elementos, w)
     + (pantalla && d.iman ? `<circle class="dib-iman" cx="${r1(d.iman[0])}" cy="${r1(d.iman[1])}" r="${r1(8 * ui)}"/>` : '')
     + (pantalla && d.calibracion ? `<line x1="${r1(d.calibracion.x1)}" y1="${r1(d.calibracion.y1)}" x2="${r1(d.calibracion.x2)}" y2="${r1(d.calibracion.y2)}" stroke="#f97316" stroke-width="${r1(4 * ui)}" stroke-dasharray="${r1(10 * ui)} ${r1(6 * ui)}"/>` : '');
   const marco = `<rect x="0" y="0" width="${w}" height="${h}" fill="none" stroke="#0f2a43" stroke-width="${r1(3 * w / 1600)}"/>`;
