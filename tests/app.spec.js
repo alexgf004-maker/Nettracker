@@ -4235,6 +4235,44 @@ test.describe('Herramienta Dibujar', () => {
     expect(errores).toEqual([]);
   });
 
+  test('transformador sobre el poste encima de las líneas, la etiqueta no lo tapa y el usuario lleva una nota', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    await page.setViewportSize({ width: 1280, height: 900 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await page.evaluate(() => localStorage.removeItem('nettracker_dibujo'));
+    await nav(page, 'Dibujar');
+    await page.evaluate(async () => {
+      const a = await import('/js/actions/dibujo.js');
+      // El trafo y el poste se pusieron antes que el tramo (en el arreglo van primero)
+      a.cargarEnDibujo({ elementos: [
+        { id: 'tr', tipo: 'simbolo', simbolo: 'trafo', color: '#15803d', grosor: 3, escala: 0.6, rot: 0, x: 782, y: 432 },
+        { id: 'p3', tipo: 'simbolo', simbolo: 'poste', color: '#111827', grosor: 3, escala: 0.6, rot: 0, x: 782, y: 432, altura: 35 },
+        { id: 't1', tipo: 'polilinea', tramo: 'bt', color: '#000', grosor: 6, puntos: [[300, 300], [800, 450], [1300, 600]], metros: {} },
+        { id: 'u', tipo: 'simbolo', simbolo: 'usuario', color: '#dc2626', grosor: 3, escala: 0.8, rot: 0, x: 1000, y: 700 },
+        { id: 'e', tipo: 'etiqueta', estilo: 'existente', texto: 'P3, DS10379', tam: 28, tx: 800, ty: 450, x: 900, y: 250 },
+      ], escala: 0.1 });
+      (await import('/js/views/render.js')).render();
+    });
+    // Orden de dibujo: tramo, poste, trafo y usuario, etiqueta
+    const orden = await page.evaluate(() => [...document.querySelectorAll('#dib-capa > [data-id]')].map(g => g.dataset.id));
+    expect(orden).toEqual(['t1', 'p3', 'tr', 'u', 'e']);
+    // La guía de la etiqueta termina en el borde del símbolo (sin el punto encima)
+    const guia = await page.evaluate(() => { const l = document.querySelectorAll('#dib-capa [data-id="e"] line')[1]; return [Number(l.getAttribute('x2')), Number(l.getAttribute('y2'))]; });
+    expect(Math.hypot(guia[0] - 800, guia[1] - 450)).toBeGreaterThan(10);
+    expect(await page.locator('#dib-capa [data-id="e"] circle').count()).toBe(0);
+    // Nota del usuario: se escribe en el panel y sale junto al símbolo
+    await page.evaluate(async () => { const { state } = await import('/js/state.js'); const { render } = await import('/js/views/render.js'); state.dibujo.sel = 'u'; render(); });
+    await expect(page.locator('.dib-panel')).not.toContainText('Datos del poste');
+    await page.locator('#dib-nota').fill('Medidor 12345678'); await page.locator('#dib-nota').press('Tab');
+    await expect(page.locator('#dib-capa [data-id="u"] text', { hasText: 'Medidor 12345678' })).toHaveCount(1);
+    const svg = await page.evaluate(async () => (await import('/js/domain/propuesta.js')).svgPropuesta((await import('/js/state.js')).state.dibujo));
+    expect(svg).toContain('Medidor 12345678');
+    // La simbología usa solo el nombre corto del punto
+    await expect(page.locator('#dib-cajetin text', { hasText: /^P3$/ })).toHaveCount(1);
+    expect(errores).toEqual([]);
+  });
+
   test('proyectos: se guardan en la base para el equipo, se marcan los cambios sin guardar y se vuelven a abrir', async ({ page }) => {
     const errores = []; page.on('pageerror', e => errores.push(e.message));
     await page.setViewportSize({ width: 1280, height: 1100 });

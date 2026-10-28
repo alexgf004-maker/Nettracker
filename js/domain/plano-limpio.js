@@ -169,6 +169,7 @@ export function planoLimpio(d, elementos, { x, y, w, h, vista, accion = () => nu
       const kva = (s.el.trafos || []).filter(Boolean);
       if (kva.length && !resto.some(t => /kva/i.test(t))) sub.push({ t: `${s.nuevo ? 'Trafo nuevo ' : 'Trafo '}${kva.length > 1 ? kva.join(' + ') : kva[0]} kVA`, nuevo: s.nuevo });
       if (s.el.detalleAccion) sub.push({ t: s.el.detalleAccion, nuevo: true });
+      if (String(s.el.nota || '').trim()) sub.push({ t: String(s.el.nota).trim(), nuevo: false }); // nota del símbolo (p. ej. el medidor del usuario)
     });
     // Lo de hoy que se cambia, tachado en rojo debajo de lo nuevo
     g.forEach(s => { if (s.el._antes) sub.push({ t: s.el._antes, antes: true }); });
