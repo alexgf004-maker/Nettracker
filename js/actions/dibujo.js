@@ -339,6 +339,15 @@ export function dibPointerDown(ev) {
     const sim = SIMBOLOS[d.simbolo];
     // Tocar un poste (o símbolo de red) que ya está lo selecciona y se puede arrastrar; no se pone otro encima
     const existente = sim?.grupo === 'red' && simboloCerca(x, y);
+    // Transformador sobre un poste que ya está: el poste pasa a ser poste con transformador (un solo punto, con su
+    // nombre, altura y estructuras) y queda con su etiqueta para la referencia eléctrica, los kVA y el comentario
+    if (existente && ES_TRAFO.includes(d.simbolo) && ['poste', 'poste_nuevo'].includes(existente.simbolo)) {
+      const simbolo = existente.simbolo === 'poste_nuevo' && d.simbolo === 'trafo' ? 'trafo_nuevo' : d.simbolo; // en un poste proyectado, el trafo también lo es
+      reemplazar({ ...existente, simbolo, color: SIMBOLOS[simbolo].color });
+      d.sel = existente.id; d.herramienta = 'seleccionar'; etiquetaDe(seleccionado());
+      guardarBorrador(); render(); enfocarDatosTrafo();
+      return;
+    }
     if (existente) {
       d.historial.pop(); d.sel = existente.id;
       memorizar();
@@ -350,7 +359,9 @@ export function dibPointerDown(ev) {
     const escala = (sim?.grupo === 'red' ? 0.6 * (d.tamNuevos || 1) : 1.5) * escalaBase();
     el = { id: base.id, tipo: 'simbolo', simbolo: d.simbolo, color: sim?.color || d.color, grosor: base.grosor, escala, rot: 0, x: x - 30 * escala, y: y - 30 * escala };
     d.elementos.push(el); d.sel = el.id;
+    if (ES_TRAFO.includes(d.simbolo)) etiquetaDe(el);
     guardarBorrador(); repintar(); render();
+    if (ES_TRAFO.includes(d.simbolo)) enfocarDatosTrafo();
     return;
   }
   d.elementos.push(el); d.sel = el.id;
@@ -574,6 +585,21 @@ export function setLaminaDib(campo, valor) {
 // Color de la red: del tramo seleccionado o, sin selección, de los tramos nuevos (null = el de su tipo)
 // Color y nombre de la red: se aplican a toda la red conectada al tramo seleccionado
 const tolRed = () => 14 * Math.max(1, tamano(dib()).w / 1600);
+
+// ── Transformadores: van con su etiqueta (nombre del punto; debajo, referencia eléctrica, kVA y comentario) ──
+const ES_TRAFO = ['trafo', 'trafo_nuevo', 'banco'];
+function etiquetaDe(el) {
+  const d = dib(); const [cx, cy] = centroSimbolo(el);
+  if (d.elementos.some(e => e.tipo === 'etiqueta' && Math.hypot(e.tx - cx, e.ty - cy) < 3)) return;
+  const estilo = el.simbolo === 'trafo_nuevo' ? 'proyectado' : 'existente'; const tam = Math.round(19 * escalaBase());
+  d.elementos.push({ id: nuevoId(), tipo: 'etiqueta', estilo, texto: siguienteEtiqueta(d.elementos, ESTILOS_ETIQUETA[estilo].prefijo), tam, tx: cx, ty: cy, x: cx + tam * 1.4, y: cy - tam * 4.6 });
+}
+// Al poner un transformador se escribe ahí mismo su referencia (o los kVA si es proyectado)
+function enfocarDatosTrafo() { const i = document.getElementById('dib-ref') || document.getElementById('dib-kva'); if (i) i.focus(); }
+export function setReferenciaDib(v) {
+  const t = String(v || '').trim().toUpperCase();
+  cambiarSel(el => { const { referencia, ...resto } = el; return t ? { ...resto, referencia: t } : resto; });
+}
 
 // ── Seccionamiento de la red BT (domain/seccionar.js) ──
 // Corta la red en p (un poste o un punto de la línea): pone el símbolo y lo deja seleccionado para elegir el lado que

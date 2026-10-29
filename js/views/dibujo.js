@@ -3,7 +3,7 @@
 // libre, panel de propiedades a la derecha (lo seleccionado o la herramienta activa) y arriba el proyecto, deshacer,
 // imagen y exportar. En el celular las herramientas van en una tira abajo y las propiedades en una hoja que se abre.
 import { cargarBorrador, partesSVG, viewBoxDib, zoomPct } from '../actions/dibujo.js';
-import { COLORES, GROSORES, SIMBOLOS, TAM_TEXTO } from '../domain/dibujo.js';
+import { COLORES, GROSORES, pideReferencia, SIMBOLOS, TAM_TEXTO } from '../domain/dibujo.js';
 import { ACCIONES_PUNTO, COLORES_RED, redDe, ESTILOS_ETIQUETA, fmtMetros, metrosTramo, metrosVano, nombreRed, nombresVanos, TIPOS_TRAMO } from '../domain/plano.js';
 import { ALTURAS_POSTE, CALIBRES, ESTRUCTURAS, grupoEstructurasDe, nombreEstructura, TIPOS_CONDUCTOR } from '../domain/red.js';
 import { ACCIONES, ACCIONES_ELEGIBLES, accionDe, kvaTexto, metrosTraslado, trabajos, trabajosOcultos } from '../domain/propuesta.js';
@@ -190,7 +190,7 @@ function cabeceraPanel(d, sel, h, p) {
     const extremos = [n[0]?.split(' → ')[0], n.at(-1)?.split(' → ')[1]].filter(Boolean);
     sub = [`${n.length} ${n.length === 1 ? 'vano' : 'vanos'}`, extremos.length === 2 ? extremos.join(' → ') : '', t !== null ? fmtMetros(t) : ''].filter(Boolean).join(' · ');
   } else if (esCorte(sel)) { const l = ladosDe(d.elementos, sel, 14 * Math.max(1, p.w / 1600)).find(x => x.ids.includes(sel.lado)); sub = l ? `${l.hacia ? `Hacia ${l.hacia}` : 'Un lado'} pasa a ${sel.alimenta ? `trafo ${sel.alimenta}` : 'otro trafo'}` : 'Falta elegir el lado que cambia'; }
-  else if (sel?.tipo === 'simbolo') sub = [sel.altura ? `${sel.altura}'` : '', (sel.estructuras || []).join(' / '), kvaTexto(sel.trafos), sel.nota].filter(Boolean).join(' · ');
+  else if (sel?.tipo === 'simbolo') sub = [sel.referencia, sel.altura ? `${sel.altura}'` : '', (sel.estructuras || []).join(' / '), kvaTexto(sel.trafos), sel.nota].filter(Boolean).join(' · ');
   else if (sel?.tipo === 'etiqueta') sub = ESTILOS_ETIQUETA[sel.estilo]?.nombre || '';
   else if (!sel && h === 'seleccionar') sub = 'Datos de la lámina, cajetín y propuesta';
   const quitar = sel && d.tramo !== sel.id;
@@ -331,9 +331,12 @@ function panel(d, sel, h, p) {
     const esTrafo = ['trafo', 'trafo_nuevo', 'banco'].includes(sel.simbolo);
     const conPoste = ['poste', 'poste_nuevo', 'trafo', 'trafo_nuevo', 'banco', 'puente'].includes(sel.simbolo);
     let html = '';
-    if (red) html += seccion('Datos', (esTrafo ? fila('kVA', `<input id="dib-kva" value="${esc((sel.trafos || []).join(', '))}" placeholder="Ej. 37.5 o 25, 25, 25" title="Uno por transformador" onchange="setKvaDib(this.value)">`, 'dib-kva') : '')
-      + fila('Nota', `<input id="dib-nota" value="${esc(sel.nota || '')}" placeholder="${sel.simbolo === 'usuario' ? 'Ej. Medidor 12345678' : 'Ej. Medidor, número de trafo…'}" oninput="setNotaDib(this.value)" onchange="finEdicionDib()">`, 'dib-nota')
-      + nota(esTrafo ? 'Uno por transformador, separados por coma. La nota sale junto al símbolo (o en su etiqueta).' : 'Sale junto al símbolo (o en su etiqueta) y en la lámina de propuesta.'));
+    // Transformador: referencia eléctrica (obligatoria en los existentes: si falta, se avisa en rojo), kVA y comentario
+    const faltaRef = pideReferencia(sel) && !String(sel.referencia || '').trim();
+    if (red) html += seccion(esTrafo ? `Transformador${faltaRef ? ' <span class="dib-falta">Falta referencia</span>' : ''}` : 'Datos', (esTrafo ? fila('Referencia', `<input id="dib-ref" class="${faltaRef ? 'dib-input-falta' : ''}" value="${esc(sel.referencia || '')}" placeholder="${pideReferencia(sel) ? 'Ej. DS102277 (obligatoria)' : 'Ej. DS102277'}" onchange="setReferenciaDib(this.value)" onkeydown="if (event.key === 'Enter') this.blur()">`, 'dib-ref')
+        + fila('kVA', `<input id="dib-kva" value="${esc((sel.trafos || []).join(', '))}" placeholder="Ej. 37.5 o 25, 25, 25" title="Uno por transformador" onchange="setKvaDib(this.value)">`, 'dib-kva') : '')
+      + fila(esTrafo ? 'Comentario' : 'Nota', `<input id="dib-nota" value="${esc(sel.nota || '')}" placeholder="${sel.simbolo === 'usuario' ? 'Ej. Medidor 12345678' : esTrafo ? 'Ej. sobrecargado al 118 %' : 'Ej. Medidor, poste deteriorado…'}" oninput="setNotaDib(this.value)" onchange="finEdicionDib()">`, 'dib-nota')
+      + nota(esTrafo ? 'Salen en la etiqueta del punto, debajo del nombre. kVA: uno por transformador, separados por coma (banco).' : 'Sale junto al símbolo (o en su etiqueta) y en la lámina de propuesta.'));
     if (red && conPoste) html += seccion('Poste', posteCompacto(sel, { id: 'dib-poste', altura: 'setAlturaDib', agregar: 'agregarEstructuraDib', quitar: 'quitarEstructuraDib', escrita: 'agregarEstructuraEscritaDib', clave: sel.id, grupo: grupoEstructurasDe(tramosEnPoste(d, sel)) }));
     if (red) html += seccionPropuesta(sel, d);
     const tolP = 14 * Math.max(1, p.w / 1600); const cx = sel.x + 30 * sel.escala; const cy = sel.y + 30 * sel.escala;
