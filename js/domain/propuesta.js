@@ -9,13 +9,18 @@ import { caja, SIMBOLOS, simbologiaUsada, svgLamina } from './dibujo.js';
 import { metrosTramo, metrosVano, nombrePunto, TIPOS_TRAMO } from './plano.js';
 import { conductorVano } from './red.js';
 import { planoLimpio, simbolo as simboloLimpio } from './plano-limpio.js';
+import { conEstructuraCorte, esCorte, estructurasCorte, ladosDe, posteEn } from './seccionar.js';
 
 export const ACCIONES = {
   instalar: { nombre: 'Instalar', tinta: '#0e7490', fondo: '#cffafe' },
   reemplazar: { nombre: 'Reemplazar', tinta: '#4338ca', fondo: '#e0e7ff' },
   retirar: { nombre: 'Retirar', tinta: '#be123c', fondo: '#ffe4e6' },
   trasladar: { nombre: 'Trasladar', tinta: '#b45309', fondo: '#fef3c7' },
+  // Solo del símbolo de seccionamiento (no se elige en el panel)
+  seccionar: { nombre: 'Seccionar', tinta: '#b91c1c', fondo: '#fee2e2' },
 };
+// Acciones que se eligen para un elemento en "En la propuesta"
+export const ACCIONES_ELEGIBLES = Object.fromEntries(Object.entries(ACCIONES).filter(([k]) => k !== 'seccionar'));
 // Colores de la lámina de propuesta: lo existente en gris pizarra, lo nuevo en turquesa y lo que se retira en rojo
 export const PALETA = { existente: '#334155', nuevo: '#0e7490', retirar: '#e11d48', fondo: '#f4f1ea' };
 const NUEVOS = ['poste_nuevo', 'trafo_nuevo'];
@@ -28,6 +33,7 @@ const fmt = (n, dec = 1) => (Math.round(n * 10 ** dec) / 10 ** dec).toLocaleStri
 
 // Acción de un elemento en la propuesta (null: existente, sin cambio)
 export function accionDe(el) {
+  if (esCorte(el)) return 'seccionar';
   if (el.accion === 'existente') return null;
   if (el.accion && ACCIONES[el.accion]) return el.accion;
   if (el.tipo === 'simbolo' && NUEVOS.includes(el.simbolo)) return 'instalar';
@@ -83,8 +89,16 @@ export function elementosPropuestos(elementos, tol = 12) {
   const movidos = elementos.filter(el => trasladoDe(el)).map(el => ({ id: el.id, desde: centro(el), hasta: trasladoDe(el) }));
   const cerca = ([x, y], m) => Math.hypot(m.desde[0] - x, m.desde[1] - y) <= tol;
   const mover = p => { const m = movidos.find(q => cerca(p, q)); return m ? [...m.hasta] : p; };
+  // Poste donde se secciona: TS → CS (lo de hoy tachado)
+  const cortes = elementos.filter(esCorte);
+  const conCorte = e => {
+    const c = cortes.find(k => posteEn([e], k, tol) === e); const nuevas = c && conEstructuraCorte(e, c); if (!nuevas) return e;
+    const antes = estructurasCorte(e.estructuras).antes.join(' / ');
+    return { ...e, estructuras: nuevas, _antes: [e._antes, antes].filter(Boolean).join(' · ') };
+  };
   return elementos.map(el => {
     let e = conReemplazo(el);
+    if (cortes.length && e.tipo === 'simbolo') e = conCorte(e);
     if (!movidos.length) return e;
     const m = movidos.find(q => q.id === el.id);
     if (m) return { ...e, x: e.x + m.hasta[0] - m.desde[0], y: e.y + m.hasta[1] - m.desde[1], _traslado: { desde: m.desde, hasta: m.hasta } };
@@ -97,6 +111,17 @@ export function elementosPropuestos(elementos, tol = 12) {
 // Trabajo que sale de un elemento: { id, accion, texto, cantidad, ancla }
 function trabajoDe(el, d, tol) {
   const accion = accionDe(el); if (!accion) return null;
+  // Seccionamiento: "Seccionar red BT en P3 (TS3 → CS3); hacia P4 pasa al trafo P6"
+  if (accion === 'seccionar') {
+    const pt = nombreEn(d.elementos, centro(el), tol); const poste = posteEn(d.elementos, el, tol);
+    const cambio = conEstructuraCorte(poste, el) ? estructurasCorte(poste.estructuras) : null;
+    const lado = ladosDe(d.elementos, el, tol).find(l => l.ids.includes(el.lado));
+    let texto = `Seccionar red BT${pt ? ` en ${pt}` : ''}${cambio ? ` (${cambio.antes.join(' / ')} → ${cambio.despues.join(' / ')})` : ''}`;
+    if (lado && el.alimenta) texto += `; ${lado.hacia ? `hacia ${lado.hacia} ` : ''}pasa al trafo ${el.alimenta}`;
+    if (el.detalleAccion) texto += `: ${el.detalleAccion}`;
+    const [cx, cy] = centro(el); const s = 30 * el.escala;
+    return { id: el.id, accion, texto, cantidad: '1 u', ancla: [cx + s * 1.45, cy - s * 1.45] };
+  }
   if (el.tipo === 'simbolo') {
     const k = el.simbolo; const pt = nombreEn(d.elementos, centro(el), tol);
     const datos = [el.altura ? `${el.altura}'` : '', (el.estructuras || []).length ? `con ${el.estructuras.join(' / ')}` : ''].filter(Boolean).join(' ');
@@ -195,6 +220,12 @@ export function cantidades(d) {
   d.elementos.filter(conAccion).forEach(hoy => {
     const acc = accionDe(hoy); if (!acc) return;
     const el = conReemplazo(hoy);
+    if (acc === 'seccionar') {
+      sumar('Seccionamiento de red BT', 'u', 1);
+      const poste = posteEn(d.elementos, el, tolDe(d));
+      if (conEstructuraCorte(poste, el)) estructurasCorte(poste.estructuras).despues.forEach(c => sumar(`Estructura ${c}`, 'u', 1));
+      return;
+    }
     if (el.tipo === 'simbolo') {
       const k = el.simbolo;
       if (esPoste(k)) {
@@ -271,10 +302,12 @@ export function elementosActuales(elementos) {
   const enNuevo = e => e.tipo === 'etiqueta' && (e.estilo === 'proyectado' || puntas.some(([x, y]) => Math.hypot(e.tx - x, e.ty - y) < 3));
   // Acometidas que salen de un poste nuevo (p. ej. la trasladada) tampoco existen hoy
   const deNuevo = el => el.tipo === 'polilinea' && el.tramo === 'acometida' && el.puntos.some(([px, py]) => puntas.some(([x, y]) => Math.hypot(px - x, py - y) < 3));
-  return elementos.filter(el => !nuevos.includes(el) && !enNuevo(el) && !deNuevo(el)).map(el => {
+  // Hoy no hay corte: la red seccionada se ve como una sola (con su color y nombre de antes)
+  return elementos.filter(el => !nuevos.includes(el) && !enNuevo(el) && !deNuevo(el) && !esCorte(el)).map(el => {
     if (!conAccion(el)) return el;
-    const { detalleAccion, reemplazo, traslado, ...sinDetalle } = el;
+    const { detalleAccion, reemplazo, traslado, redAntes, ...sinDetalle } = el;
     const r = { ...sinDetalle, accion: 'existente' };
+    if (redAntes) { delete r.colorRed; delete r.nombreRed; if (redAntes.colorRed) r.colorRed = redAntes.colorRed; if (redAntes.nombreRed) r.nombreRed = redAntes.nombreRed; }
     if (el.tipo === 'polilinea' && el.tramo === 'retirar') r.tramo = 'bt';
     return r;
   });

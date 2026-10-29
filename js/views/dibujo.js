@@ -6,7 +6,8 @@ import { cargarBorrador, partesSVG, viewBoxDib, zoomPct } from '../actions/dibuj
 import { COLORES, GROSORES, SIMBOLOS, TAM_TEXTO } from '../domain/dibujo.js';
 import { ACCIONES_PUNTO, COLORES_RED, redDe, ESTILOS_ETIQUETA, fmtMetros, metrosTramo, metrosVano, nombreRed, nombresVanos, TIPOS_TRAMO } from '../domain/plano.js';
 import { ALTURAS_POSTE, CALIBRES, ESTRUCTURAS, grupoEstructurasDe, nombreEstructura, TIPOS_CONDUCTOR } from '../domain/red.js';
-import { ACCIONES, accionDe, kvaTexto, metrosTraslado, trabajos, trabajosOcultos } from '../domain/propuesta.js';
+import { ACCIONES, ACCIONES_ELEGIBLES, accionDe, kvaTexto, metrosTraslado, trabajos, trabajosOcultos } from '../domain/propuesta.js';
+import { esCorte, estructurasCorte, ladosDe, posteEn, trafosDe } from '../domain/seccionar.js';
 import { state } from '../state.js';
 import { escapeHtml, fmtDate } from '../utils.js';
 
@@ -42,10 +43,12 @@ const I = {
   mas3: ic('<circle cx="5" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="19" cy="12" r="1.3" fill="currentColor"/>'),
   duplicar: ic('<rect x="8" y="8" width="12" height="12" rx="2"/><rect x="4" y="4" width="12" height="12" rx="2"/>', 18),
   borrar: ic('<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>', 18),
+  corte: ic('<path d="M2 12h6M16 12h6"/><path d="M9 5v14M15 5v14" stroke-width="2.6"/>'),
   lamina: ic('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 15h18M9 15v5"/>', 18),
 };
 // Herramientas de red que se ven siempre; los demás símbolos van en "Más símbolos"
 const RED_PRINCIPALES = ['poste', 'poste_nuevo', 'trafo', 'trafo_nuevo', 'usuario'];
+// (el seccionamiento tiene su propio botón: "Seccionar red")
 // Nombre corto en la columna de herramientas (el completo sale al pasar el mouse)
 const CORTO = { 'Seleccionar y mover': 'Seleccionar', 'Transformador existente': 'Trafo existente', 'Transformador proyectado': 'Trafo proyectado', 'Seccionador / cuchilla': 'Seccionador', 'Banco de transformadores': 'Banco de trafos', 'Etiqueta de punto': 'Etiqueta' };
 // Teclas rápidas de las herramientas (se manejan en actions/dibujo.js)
@@ -77,7 +80,7 @@ export function renderDibujar() {
   html += barraHerramientas(d, h);
 
   // ── Lienzo (con una indicación corta arriba de lo que se puede hacer) ──
-  const pista = sel && h === 'seleccionar' ? PISTA_SEL[sel.tipo] || 'Arrástralo para moverlo · Supr para borrar' : AYUDA[h] || (!d.fondo && !d.elementos.length ? 'Empieza con "Imagen de fondo" (la captura del mapa) o elige una herramienta a la izquierda' : '');
+  const pista = h === 'simbolo' && d.simbolo === 'seccionamiento' ? 'Toca el poste donde se corta la red BT (o el punto de la línea)' : sel && h === 'seleccionar' ? PISTA_SEL[sel.tipo] || 'Arrástralo para moverlo · Supr para borrar' : AYUDA[h] || (!d.fondo && !d.elementos.length ? 'Empieza con "Imagen de fondo" (la captura del mapa) o elige una herramienta a la izquierda' : '');
   html += `<div class="dib-lienzo">${pista ? `<div class="dib-pista">${esc(pista)}</div>` : ''}<svg id="dib-svg" class="dib-svg herr-${h}" viewBox="${viewBoxDib(d)}" onwheel="dibRueda(event)" onpointerdown="dibPointerDown(event)" onpointermove="dibPointerMove(event)" onpointerup="dibPointerUp(event)" onpointercancel="dibPointerUp(event)"><rect width="${p.w}" height="${p.H}" fill="#ffffff"/>${p.fondo}<g id="dib-capa">${p.capa}</g><g id="dib-cajetin">${p.cajetin}</g></svg>
     <input type="file" accept="image/*" hidden class="dib-soltar" aria-hidden="true" onchange="subirFondoDib(this.files); this.value=''">
     <button class="dib-abrir-panel" onclick="abrirPanelMovilDib(true)">${I.ajustes}<span>${esc(tituloPanel(d, sel, h))}</span></button></div>`;
@@ -163,11 +166,11 @@ function barraHerramientas(d, h) {
   const esUnifilar = h === 'simbolo' && SIMBOLOS[d.simbolo]?.grupo === 'diagrama';
   const grupo = (t, cuerpo) => `<div class="dib-herr-grupo"><small>${t}</small><div>${cuerpo}</div></div>`;
   const simb = k => btn(SIMBOLOS[k].nombre, mini(k), h === 'simbolo' && d.simbolo === k, `setSimboloDib('${k}')`, TECLA[k] || '');
-  const extras = SIMBOLOS_RED.filter(k => !RED_PRINCIPALES.includes(k));
+  const extras = SIMBOLOS_RED.filter(k => !RED_PRINCIPALES.includes(k) && k !== 'seccionamiento');
   const verExtras = state.dibMasSimbolos || (h === 'simbolo' && extras.includes(d.simbolo));
   return `<nav class="dib-herramientas" aria-label="Herramientas">
     ${grupo('', btn('Seleccionar y mover', I.seleccionar, h === 'seleccionar', "setHerramientaDib('seleccionar')", 'V'))}
-    ${grupo('Red', btn('Tramo de red', I.tramo, h === 'tramo', "setHerramientaDib('tramo')", 'T') + RED_PRINCIPALES.map(simb).join('')
+    ${grupo('Red', btn('Tramo de red', I.tramo, h === 'tramo', "setHerramientaDib('tramo')", 'T') + RED_PRINCIPALES.map(simb).join('') + btn('Seccionar red', I.corte, h === 'simbolo' && d.simbolo === 'seccionamiento', "setSimboloDib('seccionamiento')")
       + (verExtras ? extras.map(simb).join('') : '') + btn(verExtras ? 'Menos símbolos' : 'Más símbolos…', I.mas3, false, 'masSimbolosDib()'))}
     ${grupo('Anotar', btn('Etiqueta de punto', I.etiqueta, h === 'etiqueta', "setHerramientaDib('etiqueta')", 'E') + btn('Cota de medida', I.cota, h === 'cota', "setHerramientaDib('cota')", 'C')
       + btn('Texto', I.texto, h === 'texto', "setHerramientaDib('texto')", 'X') + btn('Flecha', I.flecha, h === 'flecha', "setHerramientaDib('flecha')"))}
@@ -185,7 +188,8 @@ function cabeceraPanel(d, sel, h, p) {
     const n = nombresVanos(sel, d.elementos, 14 * Math.max(1, p.w / 1600)); const t = metrosTramo(sel, d.escala);
     const extremos = [n[0]?.split(' → ')[0], n.at(-1)?.split(' → ')[1]].filter(Boolean);
     sub = [`${n.length} ${n.length === 1 ? 'vano' : 'vanos'}`, extremos.length === 2 ? extremos.join(' → ') : '', t !== null ? fmtMetros(t) : ''].filter(Boolean).join(' · ');
-  } else if (sel?.tipo === 'simbolo') sub = [sel.altura ? `${sel.altura}'` : '', (sel.estructuras || []).join(' / '), kvaTexto(sel.trafos), sel.nota].filter(Boolean).join(' · ');
+  } else if (esCorte(sel)) { const l = ladosDe(d.elementos, sel, 14 * Math.max(1, p.w / 1600)).find(x => x.ids.includes(sel.lado)); sub = l ? `${l.hacia ? `Hacia ${l.hacia}` : 'Un lado'} pasa a ${sel.alimenta ? `trafo ${sel.alimenta}` : 'otro trafo'}` : 'Falta elegir el lado que cambia'; }
+  else if (sel?.tipo === 'simbolo') sub = [sel.altura ? `${sel.altura}'` : '', (sel.estructuras || []).join(' / '), kvaTexto(sel.trafos), sel.nota].filter(Boolean).join(' · ');
   else if (sel?.tipo === 'etiqueta') sub = ESTILOS_ETIQUETA[sel.estilo]?.nombre || '';
   else if (!sel && h === 'seleccionar') sub = 'Datos de la lámina, cajetín y propuesta';
   const quitar = sel && d.tramo !== sel.id;
@@ -319,6 +323,7 @@ function panel(d, sel, h, p) {
       + (d.conductor ? nota(`Sale con ${esc([d.conductor.calibre, d.conductor.tipo].filter(Boolean).join(' '))}; se cambia al seleccionar el tramo.`) : '')) + apariencia(fila('Grosor', grosores()), 'grosor');
   }
 
+  if (esCorte(sel)) return panelCorte(d, sel, p, { tamano, acciones, alFrente, nota });
   // Símbolo seleccionado: datos, poste, propuesta y apariencia
   if (sel?.tipo === 'simbolo') {
     const red = SIMBOLOS[sel.simbolo]?.grupo === 'red';
@@ -330,7 +335,10 @@ function panel(d, sel, h, p) {
       + nota(esTrafo ? 'Uno por transformador, separados por coma. La nota sale junto al símbolo (o en su etiqueta).' : 'Sale junto al símbolo (o en su etiqueta) y en la lámina de propuesta.'));
     if (red && conPoste) html += seccion('Poste', posteCompacto(sel, { id: 'dib-poste', altura: 'setAlturaDib', agregar: 'agregarEstructuraDib', quitar: 'quitarEstructuraDib', escrita: 'agregarEstructuraEscritaDib', clave: sel.id, grupo: grupoEstructurasDe(tramosEnPoste(d, sel)) }));
     if (red) html += seccionPropuesta(sel, d);
-    html += acciones(`<button class="b b-g" onclick="girarDib()">Girar 90°</button>${sel.desfase ? '<button class="b b-g" onclick="metrosASuLugarDib()">Datos a su lugar</button>' : ''}`);
+    const tolP = 14 * Math.max(1, p.w / 1600); const cx = sel.x + 30 * sel.escala; const cy = sel.y + 30 * sel.escala;
+    const corte = conPoste && d.elementos.find(e => esCorte(e) && Math.hypot(e.x + 30 * e.escala - cx, e.y + 30 * e.escala - cy) <= tolP);
+    const enRedBT = conPoste && !corte && d.elementos.some(e => e.tipo === 'polilinea' && !/^mt|acometida|retirar/.test(e.tramo) && e.puntos?.some(([px, py]) => Math.hypot(px - cx, py - cy) <= tolP));
+    html += acciones(`<button class="b b-g" onclick="girarDib()">Girar 90°</button>${sel.desfase ? '<button class="b b-g" onclick="metrosASuLugarDib()">Datos a su lugar</button>' : ''}${enRedBT ? `<button class="b b-g" onclick="seccionarAquiDib()">${I.corte} Seccionar la red aquí</button>` : ''}${corte ? `<button class="b b-g" onclick="seleccionarDib('${corte.id}')">${I.corte} Ver el seccionamiento</button>` : ''}`);
     html += apariencia(tamano() + (red ? nota('Los que pongas después salen de este tamaño.') : fila('Color', colores())) + `<div class="dib-acciones-el">${alFrente}</div>`, red ? 'tamaño' : 'tamaño y color');
     return html;
   }
@@ -379,6 +387,26 @@ function panel(d, sel, h, p) {
   return panelLamina(d);
 }
 
+// Seccionamiento seleccionado: qué lado pasa a otro transformador, cuál lo alimenta y la estructura del poste
+function panelCorte(d, c, p, { tamano, acciones, alFrente, nota }) {
+  const tol = 14 * Math.max(1, p.w / 1600);
+  const lados = ladosDe(d.elementos, c, tol); const lado = lados.find(l => l.ids.includes(c.lado));
+  const poste = posteEn(d.elementos, c, tol); const cambio = estructurasCorte(poste?.estructuras);
+  const trafos = trafosDe(d.elementos, tol);
+  let html = seccion('Lado que pasa a otro trafo', lados.length < 2
+    ? nota('Aquí llega una sola red: el corte tiene que quedar entre dos partes de la red.')
+    : `<div class="dib-acciones-prop dib-lados">${lados.map(l => `<button class="dib-chip ${lado === l ? 'activo' : ''}" onclick="seccionarLadoDib('${l.tramo}')">Hacia ${esc(l.hacia || `el lado ${lados.indexOf(l) + 1}`)}</button>`).join('')}</div>
+      ${fila('Lo alimenta', lista('dib-corte-trafo', trafos.map(t => [t.nombre, t.texto]), c.alimenta, 'alimentaCorteDib(', { vacio: 'Elige el transformador', otro: 'Otro (escribir)…', aria: 'Transformador que lo alimenta' }), 'dib-corte-trafo')}
+      ${nota(lado ? `Ese lado toma otro color${c.alimenta ? ` y queda como "Red BT trafo ${esc(c.alimenta)}"` : ''}. En la situación actual se ve como una sola red.` : 'Elige el lado que cambia: toma otro color y el nombre de su transformador.')}`);
+  html += seccion('Poste', !poste ? nota('El corte está a media línea (sin poste).')
+    : cambio.antes.length ? `<label class="insp-check"><input type="checkbox" id="dib-corte-estr" ${c.cambiaEstructura !== false ? 'checked' : ''} onchange="estructuraCorteDib(this.checked)"><span>Cambiar ${esc(cambio.antes.join(' / '))} por <b>${esc(cambio.despues.join(' / '))}</b> (corte secundario)</span></label>`
+      : nota('El poste no tiene estructura TS o TD para cambiar a corte. Si cambia otra, ponla en el poste con "Reemplazar".'));
+  const t = trabajos(d).find(x => x.id === c.id);
+  html += seccion('En la propuesta', `${t ? `<div class="dib-trabajo-prev"><b>${t.n}</b> ${esc(t.texto)}</div>` : ''}<div class="field"><label>Nota (opcional)</label><input id="dib-detalle-accion" value="${esc(c.detalleAccion || '')}" placeholder="Ej. por sobrecarga del trafo P1" oninput="setDetalleAccionDib(this.value)" onchange="finEdicionDib()"></div>`);
+  html += acciones('<button class="b b-g" onclick="girarDib()">Girar 90°</button>');
+  return html + apariencia(tamano() + `<div class="dib-acciones-el">${alFrente}</div>`, 'tamaño');
+}
+
 // Qué se hace con el elemento en la propuesta (para la lámina de propuesta: trabajos, cantidades y colores)
 // Qué hace cada acción (se lee debajo de los botones al elegirla)
 const AYUDA_ACCION = {
@@ -393,7 +421,7 @@ function seccionPropuesta(sel, d) {
   const tramo = sel.tipo === 'polilinea';
   const op = (k, t) => `<button class="dib-chip ${actual === k ? 'activo' : ''}" onclick="setAccionDib('${k}')">${t}</button>`;
   // Trasladar es para postes y símbolos (la red los sigue); en un tramo solo si ya lo tenía
-  const opciones = Object.entries(ACCIONES).filter(([k]) => k !== 'trasladar' || !tramo || actual === 'trasladar');
+  const opciones = Object.entries(ACCIONES_ELEGIBLES).filter(([k]) => k !== 'trasladar' || !tramo || actual === 'trasladar');
   let html = `<div class="dib-lista dib-acciones-prop">${op('existente', 'Sin cambio')}${opciones.map(([k, a]) => op(k, a.nombre)).join('')}</div>
     <div class="page-sub dib-ayuda-accion">${AYUDA_ACCION[actual]}</div>`;
   // Reemplazar: qué se pone en su lugar (con los mismos botones de siempre)

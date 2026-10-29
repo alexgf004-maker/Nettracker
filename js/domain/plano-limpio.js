@@ -39,8 +39,10 @@ const Tachado = (x, y, t, { tam, color = C.retirar, anc = 'middle', rot = 0 }) =
 
 // Símbolos de red simplificados, del mismo tamaño en cualquier dibujo (cx, cy en la lámina)
 // (también se usan en la leyenda de la lámina; e: tamaño)
-export function simbolo(k, cx, cy, { nuevo, color }, e = K) {
+export function simbolo(k, cx, cy, { nuevo, color, rot = 0 }, e = K) {
   const c = nuevo ? C.nuevo : color; const q = v => r1(v * e);
+  // Seccionamiento: corta la línea (hueco blanco) con dos barras rojas de través
+  if (k === 'seccionamiento') return `<g transform="rotate(${r1(rot)} ${r1(cx)} ${r1(cy)})"><rect x="${r1(cx - 6 * e)}" y="${r1(cy - 9 * e)}" width="${q(12)}" height="${q(18)}" fill="#ffffff"/><g stroke="${C.retirar}" stroke-width="${q(3)}" stroke-linecap="round"><line x1="${r1(cx - 4 * e)}" y1="${r1(cy - 9 * e)}" x2="${r1(cx - 4 * e)}" y2="${r1(cy + 9 * e)}"/><line x1="${r1(cx + 4 * e)}" y1="${r1(cy - 9 * e)}" x2="${r1(cx + 4 * e)}" y2="${r1(cy + 9 * e)}"/></g></g>`;
   if (k === 'poste' || k === 'poste_nuevo') return nuevo ? `<circle cx="${r1(cx)}" cy="${r1(cy)}" r="${q(5.5)}" fill="#ffffff" stroke="${C.nuevo}" stroke-width="${q(2.6)}"/>` : `<circle cx="${r1(cx)}" cy="${r1(cy)}" r="${q(4.6)}" fill="${C.existente}" stroke="#ffffff" stroke-width="${q(1.6)}"/>`;
   if (k === 'trafo' || k === 'trafo_nuevo') return `<path d="M${r1(cx)} ${r1(cy - 10 * e)} L${r1(cx + 9 * e)} ${r1(cy + 6 * e)} L${r1(cx - 9 * e)} ${r1(cy + 6 * e)} Z" fill="${nuevo ? '#ffffff' : C.existente}" stroke="${nuevo ? C.nuevo : '#ffffff'}" stroke-width="${q(nuevo ? 2.2 : 1.5)}" stroke-linejoin="round"/>${nuevo ? `<text x="${r1(cx)}" y="${r1(cy + 4 * e)}" text-anchor="middle" font-family="${FUENTE}" font-size="${q(8)}" font-weight="800" fill="${C.nuevo}">N</text>` : ''}`;
   if (k === 'usuario') return `<path d="M${r1(cx)} ${r1(cy + 2 * e)} C${r1(cx - 10 * e)} ${r1(cy - 10 * e)} ${r1(cx - 8 * e)} ${r1(cy - 22 * e)} ${r1(cx)} ${r1(cy - 22 * e)} C${r1(cx + 8 * e)} ${r1(cy - 22 * e)} ${r1(cx + 10 * e)} ${r1(cy - 10 * e)} ${r1(cx)} ${r1(cy + 2 * e)} Z" fill="${C.retirar}" stroke="#ffffff" stroke-width="${q(1.5)}"/><circle cx="${r1(cx)}" cy="${r1(cy - 13 * e)}" r="${q(3.4)}" fill="#ffffff"/>`;
@@ -92,7 +94,7 @@ export function planoLimpio(d, elementos, { x, y, w, h, vista, accion = () => nu
   let sims = '';
   const datosSim = simbolos.map(el => {
     const [cx, cy] = P([el.x + 30 * el.escala, el.y + 30 * el.escala]);
-    const acc = accion(el); const nuevo = acc === 'instalar' || acc === 'reemplazar' || acc === 'trasladar' || /_nuevo$/.test(el.simbolo);
+    const acc = accion(el); const nuevo = acc !== 'seccionar' && (acc === 'instalar' || acc === 'reemplazar' || acc === 'trasladar' || /_nuevo$/.test(el.simbolo));
     // Traslado: dónde está hoy (círculo punteado) y una flecha hasta su lugar nuevo
     if (el._traslado) {
       const [ax, ay] = P(el._traslado.desde); const L = Math.hypot(cx - ax, cy - ay) || 1; const ux = (cx - ax) / L; const uy = (cy - ay) / L;
@@ -101,7 +103,7 @@ export function planoLimpio(d, elementos, { x, y, w, h, vista, accion = () => nu
       if (L > r0 + 14 * K) sims += `<line x1="${r1(ax + ux * (r0 + 2 * K))}" y1="${r1(ay + uy * (r0 + 2 * K))}" x2="${r1(bx - ux * q * 0.6)}" y2="${r1(by - uy * q * 0.6)}" stroke="${C.traslado}" stroke-width="${r1(2.2 * K)}" stroke-dasharray="${r1(6 * K)} ${r1(4 * K)}"/><path d="M${r1(bx)} ${r1(by)} L${r1(bx - ux * q * 1.6 - uy * q)} ${r1(by - uy * q * 1.6 + ux * q)} L${r1(bx - ux * q * 1.6 + uy * q)} ${r1(by - uy * q * 1.6 - ux * q)} Z" fill="${C.traslado}"/>`;
       ocupados.push({ x: ax - r0, y: ay - r0, w: r0 * 2, h: r0 * 2 });
     }
-    sims += simbolo(el.simbolo, cx, cy, { nuevo, color: SIMBOLOS[el.simbolo]?.color || C.existente });
+    sims += simbolo(el.simbolo, cx, cy, { nuevo, color: SIMBOLOS[el.simbolo]?.color || C.existente, rot: el.rot || 0 });
     if (acc === 'retirar' || acc === 'reemplazar') { const q = 9 * K; sims += `<g stroke="${C.retirar}" stroke-width="${r1(2.6 * K)}" stroke-linecap="round"><line x1="${r1(cx - q)}" y1="${r1(cy - q)}" x2="${r1(cx + q)}" y2="${r1(cy + q)}"/><line x1="${r1(cx + q)}" y1="${r1(cy - q)}" x2="${r1(cx - q)}" y2="${r1(cy + q)}"/></g>`; }
     ocupados.push(cajaSimbolo(el.simbolo, cx, cy));
     return { el, cx, cy, nuevo };
@@ -173,7 +175,8 @@ export function planoLimpio(d, elementos, { x, y, w, h, vista, accion = () => nu
     });
     // Lo de hoy que se cambia, tachado en rojo debajo de lo nuevo
     g.forEach(s => { if (s.el._antes) sub.push({ t: s.el._antes, antes: true }); });
-    return { cx: s0.cx, cy: s0.cy, nuevo: g.every(s => s.nuevo), nombre, sub, destacado: et?.estilo === 'destacado' || g.some(s => s.el.simbolo === 'usuario') };
+    if (g.some(s => s.el.simbolo === 'seccionamiento')) sub.push({ t: 'Seccionamiento', corte: true });
+    return { cx: s0.cx, cy: s0.cy, nuevo: g.filter(s => s.el.simbolo !== 'seccionamiento').every(s => s.nuevo), nombre, sub, destacado: et?.estilo === 'destacado' || g.some(s => s.el.simbolo === 'usuario') };
   }).filter(p => p.nombre || p.sub.length);
   // Etiquetas sueltas (no apuntan a un símbolo)
   etiquetas.filter(e => !usadas.has(e)).forEach(e => {
@@ -201,7 +204,7 @@ export function planoLimpio(d, elementos, { x, y, w, h, vista, accion = () => nu
     if (o.lejos > 1) { const qx = Math.max(o.caja.x, Math.min(p.cx, o.caja.x + o.caja.w)); const qy = Math.max(o.caja.y, Math.min(p.cy, o.caja.y + o.caja.h)); rotulos += `<line x1="${r1(p.cx)}" y1="${r1(p.cy)}" x2="${r1(qx)}" y2="${r1(qy)}" stroke="#64748b" stroke-width="1.2"/>`; }
     if (p.destacado) rotulos += `<rect x="${r1(o.caja.x - 6)}" y="${r1(o.caja.y - 4)}" width="${r1(o.caja.w + 12)}" height="${r1(lh + 7)}" rx="7" fill="#fde047"/>`;
     rotulos += T(tx, o.caja.y + tn * 0.9, p.nombre, { tam: tn, peso: 800, color: p.nuevo ? C.nuevo : C.texto, anc: o.anc });
-    p.sub.forEach((l, i) => { const yy = o.caja.y + tn + 2 + (i + 1) * (ts + 2.5) - 3 * K; rotulos += l.antes ? Tachado(tx, yy, l.t, { tam: ts, anc: o.anc }) : T(tx, yy, l.t, { tam: ts, peso: 600, color: l.nuevo ? C.nuevo : C.sub, anc: o.anc }); });
+    p.sub.forEach((l, i) => { const yy = o.caja.y + tn + 2 + (i + 1) * (ts + 2.5) - 3 * K; rotulos += l.antes ? Tachado(tx, yy, l.t, { tam: ts, anc: o.anc }) : T(tx, yy, l.t, { tam: ts, peso: l.corte ? 800 : 600, color: l.corte ? C.retirar : l.nuevo ? C.nuevo : C.sub, anc: o.anc }); });
   });
 
   // ── Marcas de los trabajos: junto a su elemento, sin taparlo ──

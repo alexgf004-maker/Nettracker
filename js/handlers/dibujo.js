@@ -10,7 +10,7 @@ const NOMBRES = [
   'setAlturaDib', 'agregarEstructuraDib', 'agregarEstructuraEscritaDib', 'quitarEstructuraDib', 'setConductorDib', 'setCalibreVanoDib',
   'escalarTodoDib', 'girarTodoDib', 'anclarMedidasDib', 'setNotaDib', 'setOpacidadFondoDib',
   'grupoEstructurasUI', 'buscarEstructuras',
-  'metrosASuLugarDib', 'setColorRedDib', 'setNombreRedDib', 'setTamanoDib', 'setTamNuevosDib', 'togglePanelDib', 'cerrarMenusDib', 'verLaminaDib', 'verCajetinDib', 'masSimbolosDib', 'aparienciaDib', 'estrAbiertaDib', 'abrirPanelMovilDib', 'zoomDib', 'ajustarVistaDib', 'ampliarDib', 'dibRueda',
+  'metrosASuLugarDib', 'setColorRedDib', 'setNombreRedDib', 'setTamanoDib', 'setTamNuevosDib', 'togglePanelDib', 'cerrarMenusDib', 'verLaminaDib', 'verCajetinDib', 'masSimbolosDib', 'aparienciaDib', 'seccionarAquiDib', 'seleccionarDib', 'seccionarLadoDib', 'alimentaCorteDib', 'estructuraCorteDib', 'estrAbiertaDib', 'abrirPanelMovilDib', 'zoomDib', 'ajustarVistaDib', 'ampliarDib', 'dibRueda',
   'setAccionDib', 'setDetalleAccionDib', 'setKvaDib', 'setReemplazoConductorDib', 'setReemplazoAlturaDib', 'agregarReemplazoEstructuraDib', 'agregarReemplazoEstructuraEscritaDib', 'quitarReemplazoEstructuraDib', 'setReemplazoKvaDib', 'marcarTrasladoDib', 'cancelarTrasladoDib', 'quitarTrasladoDib', 'setTrabajoDib', 'ocultarTrabajoDib', 'agregarTrabajoDib', 'setTrabajoExtraDib', 'quitarTrabajoExtraDib', 'descargarPropuestaDib',
   'setVistaProyectosDib', 'guardarProyectoDib', 'guardarComoProyectoDib', 'abrirProyectoDib', 'eliminarProyectoDib', 'soltarProyectoDib',
 ];
