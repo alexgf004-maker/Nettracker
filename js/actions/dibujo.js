@@ -108,7 +108,10 @@ function pegadosA([cx, cy], excluir) {
 }
 
 // ── Repintado directo del SVG (durante el arrastre) ──
-export const partesSVG = d => svgLamina(d, { pantalla: true, ui: uiDe(d) });
+// En el editor el cajetín se ve solo si se pide ("Ver el cajetín" o al editar la lámina); al exportar va siempre (si está activo)
+const conCajetinPantalla = d => d.lamina?.activa !== false && (!!state.dibCajetin || verLamina());
+const verLamina = () => !!state.dibVerLamina;
+export const partesSVG = d => svgLamina(conCajetinPantalla(d) ? d : { ...d, lamina: { ...(d.lamina || {}), activa: false } }, { pantalla: true, ui: uiDe(d) });
 function repintar() {
   const p = partesSVG(dib());
   const capa = document.getElementById('dib-capa'); if (capa) capa.innerHTML = p.capa;
@@ -128,7 +131,7 @@ function punto(ev) {
 // con "Seleccionar" (con zoom), con la rueda del mouse apretada o con la barra espaciadora.
 let vista = null;
 const svgEl = () => document.getElementById('dib-svg');
-function laminaCompleta(d = dib()) { const { w, h } = tamano(d); return { w, h: h + (d.lamina?.activa !== false ? altoCajetin(d) : 0) }; }
+function laminaCompleta(d = dib()) { const { w, h } = tamano(d); return { w, h: h + (conCajetinPantalla(d) ? altoCajetin(d) : 0) }; }
 // Toda la lámina con la proporción del lienzo en pantalla (centrada)
 function cajaBase() {
   const f = laminaCompleta(); const r = svgEl()?.getBoundingClientRect();
@@ -438,7 +441,7 @@ export function quitarEscalaDib() {
 // ── Barra de herramientas ──
 export function setHerramientaDib(h) {
   const d = dib(); if (!d) return;
-  cerrarTramo(); d.calibracion = null; d.herramienta = h;
+  cerrarTramo(); d.calibracion = null; d.herramienta = h; state.dibVerLamina = false;
   if (h !== 'seleccionar') d.sel = null;
   render();
 }
@@ -477,7 +480,7 @@ export function setTipoTramoDib(t) {
   const el = seleccionado(); if (el?.tipo === 'polilinea') { memorizar(); reemplazar({ ...el, tramo: t }); guardarBorrador(); }
   render();
 }
-export function setSimboloDib(s) { const d = dib(); if (!d) return; cerrarTramo(); d.simbolo = s; d.herramienta = 'simbolo'; d.sel = null; render(); }
+export function setSimboloDib(s) { const d = dib(); if (!d) return; cerrarTramo(); d.simbolo = s; d.herramienta = 'simbolo'; d.sel = null; state.dibVerLamina = false; render(); }
 export function setColorDib(c) {
   const d = dib(); if (!d) return; d.color = c;
   const el = seleccionado(); if (el && el.tipo !== 'polilinea' && el.tipo !== 'etiqueta') { memorizar(); reemplazar({ ...el, color: c }); guardarBorrador(); }
@@ -604,6 +607,19 @@ export function setTamanoDib(f) {
 // Tamaño de los postes nuevos (sin selección)
 export function setTamNuevosDib(f) { const d = dib(); if (!d) return; d.tamNuevos = Math.max(0.3, Math.min(5, (d.tamNuevos || 1) * f)); render(); }
 // Panel de propiedades: abierto o cerrado (en el celular es una hoja que se abre desde abajo)
+// Barra de arriba: menús (Archivo, Imagen de fondo, Exportar) que se cierran al elegir o al tocar fuera
+export function cerrarMenusDib(salvo = null) { document.querySelectorAll('.dib-menu[open]').forEach(m => { if (m !== salvo) m.open = false; }); }
+document.addEventListener('click', ev => { const m = ev.target.closest?.('.dib-menu'); cerrarMenusDib(m); });
+// La lista se ubica debajo de su botón sin salirse de la pantalla (la barra de arriba se desplaza y la cortaría)
+document.addEventListener('toggle', ev => {
+  const m = ev.target; if (!m.classList?.contains('dib-menu') || !m.open) return;
+  const r = m.querySelector('summary').getBoundingClientRect(); const lista = m.querySelector('.dib-menu-lista');
+  lista.style.top = `${r.bottom}px`; lista.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - lista.offsetWidth - 8))}px`;
+}, true);
+// "Lámina": datos de la lámina y cajetín en el panel (se ve el cajetín mientras tanto)
+export function verLaminaDib() { const d = dib(); cerrarTramo(); d.sel = null; d.herramienta = 'seleccionar'; state.dibVerLamina = !state.dibVerLamina; if (state.dibVerLamina) { state.dibPanel = true; state.dibPanelMovil = true; } vista = null; render(); }
+export function verCajetinDib(v) { state.dibCajetin = !!v; vista = null; render(); }
+export function masSimbolosDib() { state.dibMasSimbolos = !state.dibMasSimbolos; render(); }
 export function togglePanelDib() { state.dibPanel = state.dibPanel === false; render(); }
 export function abrirPanelMovilDib(v) { state.dibPanelMovil = v; render(); }
 
@@ -908,6 +924,9 @@ document.addEventListener('keydown', ev => {
   if (!ev.ctrlKey && !ev.metaKey && (k === '-' || k === '_')) { zoomA(0.8); return; }
   if (!ev.ctrlKey && !ev.metaKey && k === '0') { ajustarVistaDib(); return; }
   if (!ev.ctrlKey && !ev.metaKey && !ev.altKey && k === 'v') { setHerramientaDib('seleccionar'); return; }
+  // Teclas de las herramientas (se ven en la columna de la izquierda)
+  const herr = { t: 'tramo', e: 'etiqueta', c: 'cota', x: 'texto' }; const simb = { p: 'poste', r: 'trafo', u: 'usuario' };
+  if (!ev.ctrlKey && !ev.metaKey && !ev.altKey && !dib().tramo && (herr[k] || simb[k])) { herr[k] ? setHerramientaDib(herr[k]) : setSimboloDib(simb[k]); return; }
   if (dib().tramo && (k === 'enter' || k === 'escape')) { ev.preventDefault(); terminarTramoDib(); return; }
   if ((ev.ctrlKey || ev.metaKey) && k === 'z') { ev.preventDefault(); ev.shiftKey ? rehacerDib() : deshacerDib(); } else if ((ev.ctrlKey || ev.metaKey) && k === 'y') { ev.preventDefault(); rehacerDib(); } else if ((k === 'delete' || k === 'backspace') && dib().sel) { ev.preventDefault(); borrarDib(); } else if (k === 'escape') { dib().sel = null; render(); }
 });

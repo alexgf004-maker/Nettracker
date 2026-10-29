@@ -36,7 +36,18 @@ const I = {
   imagen: ic('<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/>'),
   panel: ic('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/>'),
   ajustes: ic('<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>'),
+  chev: ic('<path d="M6 9l6 6 6-6"/>', 16),
+  ancla: ic('<circle cx="12" cy="5" r="2"/><path d="M12 7v14M5 12a7 7 0 0014 0"/>', 18),
+  exportar: ic('<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>', 18),
+  mas3: ic('<circle cx="5" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="19" cy="12" r="1.3" fill="currentColor"/>'),
+  lamina: ic('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 15h18M9 15v5"/>', 18),
 };
+// Herramientas de red que se ven siempre; los demás símbolos van en "Más símbolos"
+const RED_PRINCIPALES = ['poste', 'poste_nuevo', 'trafo', 'trafo_nuevo', 'usuario'];
+// Nombre corto en la columna de herramientas (el completo sale al pasar el mouse)
+const CORTO = { 'Seleccionar y mover': 'Seleccionar', 'Transformador existente': 'Trafo existente', 'Transformador proyectado': 'Trafo proyectado', 'Seccionador / cuchilla': 'Seccionador', 'Banco de transformadores': 'Banco de trafos', 'Etiqueta de punto': 'Etiqueta' };
+// Teclas rápidas de las herramientas (se manejan en actions/dibujo.js)
+const TECLA = { seleccionar: 'V', tramo: 'T', poste: 'P', trafo: 'R', usuario: 'U', etiqueta: 'E', cota: 'C', texto: 'X' };
 // Colores para distinguir redes del mismo tipo (además del color propio de cada tipo)
 const NOMBRE_TIPO = { polilinea: 'Tramo de red', simbolo: 'Símbolo', etiqueta: 'Etiqueta de punto', cota: 'Cota', texto: 'Texto', flecha: 'Flecha', linea: 'Línea', rect: 'Rectángulo', elipse: 'Círculo', trazo: 'Trazo libre', leyenda: 'Leyenda', tabla: 'Tabla' };
 const AYUDA = {
@@ -63,56 +74,105 @@ export function renderDibujar() {
   html += '<div class="dib-cuerpo">';
   html += barraHerramientas(d, h);
 
-  // ── Lienzo ──
-  const zoom = `<div class="dib-zoom"><button class="dib-btn dib-btn-chico" title="Alejar" aria-label="Alejar" onclick="zoomDib(0.8)">${I.menos}</button>
-    <span id="dib-zoom-pct">${zoomPct()} %</span>
-    <button class="dib-btn dib-btn-chico" title="Acercar" aria-label="Acercar" onclick="zoomDib(1.25)">${I.mas}</button>
-    <button class="b b-l" onclick="ajustarVistaDib()">Ajustar</button>
-    <button class="b ${state.dibAmpliado ? 'b-p' : 'b-g'}" onclick="ampliarDib()">${state.dibAmpliado ? 'Salir de pantalla completa' : 'Pantalla completa'}</button></div>`;
-  const ayuda = `<div class="dib-panel-ayuda">${esc(sel && h === 'seleccionar' ? `${NOMBRE_TIPO[sel.tipo] || ''} seleccionado. Arrástralo para moverlo; sus propiedades están en el panel.` : AYUDA[h] || '')}${!d.fondo && !d.elementos.length ? ' Empieza subiendo la captura del mapa (arriba, "Subir imagen").' : ''}</div>`;
-  html += `<div class="dib-lienzo">${zoom}<svg id="dib-svg" class="dib-svg herr-${h}" viewBox="${viewBoxDib(d)}" onwheel="dibRueda(event)" onpointerdown="dibPointerDown(event)" onpointermove="dibPointerMove(event)" onpointerup="dibPointerUp(event)" onpointercancel="dibPointerUp(event)"><rect width="${p.w}" height="${p.H}" fill="#ffffff"/>${p.fondo}<g id="dib-capa">${p.capa}</g><g id="dib-cajetin">${p.cajetin}</g></svg>
+  // ── Lienzo (con una indicación corta arriba de lo que se puede hacer) ──
+  const pista = sel && h === 'seleccionar' ? PISTA_SEL[sel.tipo] || 'Arrástralo para moverlo · Supr para borrar' : AYUDA[h] || (!d.fondo && !d.elementos.length ? 'Empieza con "Imagen de fondo" (la captura del mapa) o elige una herramienta a la izquierda' : '');
+  html += `<div class="dib-lienzo">${pista ? `<div class="dib-pista">${esc(pista)}</div>` : ''}<svg id="dib-svg" class="dib-svg herr-${h}" viewBox="${viewBoxDib(d)}" onwheel="dibRueda(event)" onpointerdown="dibPointerDown(event)" onpointermove="dibPointerMove(event)" onpointerup="dibPointerUp(event)" onpointercancel="dibPointerUp(event)"><rect width="${p.w}" height="${p.H}" fill="#ffffff"/>${p.fondo}<g id="dib-capa">${p.capa}</g><g id="dib-cajetin">${p.cajetin}</g></svg>
+    <input type="file" accept="image/*" hidden class="dib-soltar" aria-hidden="true" onchange="subirFondoDib(this.files); this.value=''">
     <button class="dib-abrir-panel" onclick="abrirPanelMovilDib(true)">${I.ajustes}<span>${esc(tituloPanel(d, sel, h))}</span></button></div>`;
 
   html += `<aside class="dib-panel" aria-label="Propiedades"><div class="dib-panel-cab"><b>${esc(tituloPanel(d, sel, h))}</b>
     <button class="dib-btn dib-btn-chico dib-cerrar-movil" title="Cerrar" aria-label="Cerrar propiedades" onclick="abrirPanelMovilDib(false)">✕</button></div>
-    ${ayuda}<div class="dib-panel-cuerpo">${panel(d, sel, h, p)}</div></aside>`;
+    <div class="dib-panel-cuerpo">${panel(d, sel, h, p)}</div></aside>`;
   html += '</div>';
+  html += barraEstado(d);
   if (state.dibProyectos === 'lista') html += `<div class="modal-overlay dib-modal" onclick="if (event.target === this) setVistaProyectosDib(null)"><div class="modal hoja">${listaProyectos(d)}</div></div>`;
   if (state.dibProyectos === 'guardar') html += `<div class="modal-overlay dib-modal" onclick="if (event.target === this) setVistaProyectosDib(null)"><div class="modal hoja">${formGuardar()}</div></div>`;
   return html + '</div>';
 }
 
-// ── Barra superior: proyecto, deshacer, imagen, exportar ──
+// Qué se puede hacer con lo seleccionado (una línea arriba del dibujo)
+const PISTA_SEL = {
+  polilinea: 'Arrastra la línea para moverla o un vértice para acomodarlo · los metros también se arrastran · Supr borra',
+  simbolo: 'Arrastra el símbolo (se lleva lo que tiene pegado) · Supr borra',
+  etiqueta: 'Arrastra la etiqueta; el punto azul es a dónde apunta · Supr borra',
+};
+
+// Menú desplegable de la barra de arriba (se cierra al elegir o al tocar fuera)
+const menu = (etiqueta, items, { clase = 'b-g', titulo = '' } = {}) => `<details class="dib-menu"><summary class="b ${clase}" title="${esc(titulo)}">${etiqueta}${I.chev}</summary><div class="dib-menu-lista">${items.filter(Boolean).join('')}</div></details>`;
+const item = (texto, accion, { sub = '', deshabilitado = false } = {}) => `<button class="dib-menu-item" onclick="cerrarMenusDib(); ${accion}" ${deshabilitado ? 'disabled' : ''}><span>${texto}</span>${sub ? `<small>${sub}</small>` : ''}</button>`;
+
+// ── Barra superior: el dibujo y su estado, Archivo, deshacer, imagen de fondo, medidas, lámina y exportar ──
 function barraSuperior(d) {
   const n = Object.keys(state.dibujos || {}).length;
-  const proyecto = d.proyecto
-    ? `<span class="dib-proy-nombre" title="${esc(d.proyecto.referencia || '')}"><b>${esc(d.proyecto.nombre)}</b>${d.proyecto.referencia ? ` · ${esc(d.proyecto.referencia)}` : ''}</span>
-      <span class="tg ${d.sinGuardar ? 'ambar' : 'verde'}">${d.sinGuardar ? 'Cambios sin guardar' : 'Guardado'}</span>
-      <button class="b ${d.sinGuardar ? 'b-p' : 'b-g'}" onclick="guardarProyectoDib()">Guardar</button>`
-    : `<span class="page-sub dib-borrador">Borrador${d.elementos.length || d.fondo ? ' sin guardar' : ''}</span><button class="b b-p" onclick="guardarProyectoDib()">Guardar como proyecto</button>`;
+  const nombre = d.proyecto?.nombre || d.lamina?.subtitulo || d.lamina?.titulo || 'Dibujo nuevo';
+  const estado = d.proyecto ? (d.sinGuardar ? ['ambar', 'Cambios sin guardar'] : ['verde', 'Guardado']) : ['gris', 'Borrador'];
   const btn = (t, i, acc, extra = '') => `<button class="dib-btn" title="${t}" aria-label="${t}" onclick="${acc}" ${extra}>${i}</button>`;
+  const archivo = menu('Archivo', [
+    item(d.proyecto ? 'Guardar' : 'Guardar como proyecto', 'guardarProyectoDib()', { sub: d.proyecto ? esc(d.proyecto.nombre) : 'Para el equipo, en la base' }),
+    item(`Abrir proyecto${n ? ` (${n})` : ''}`, "setVistaProyectosDib('lista')"),
+    d.proyecto ? item('Cerrar proyecto', 'soltarProyectoDib()', { sub: 'El dibujo queda como borrador' }) : '',
+    item('Nuevo dibujo', 'nuevoLienzoDib()'),
+  ]);
+  const fondo = menu(`${I.imagen}<span class="dib-menu-txt">Imagen de fondo</span>`, [
+    `<label class="dib-menu-item dib-subir" onclick="cerrarMenusDib()"><span>${d.fondo ? 'Cambiar la imagen' : 'Subir imagen'}</span><small>Captura del mapa, foto o plano (también se puede arrastrar o pegar)</small><input type="file" accept="image/*" hidden onchange="subirFondoDib(this.files); this.value=''"></label>`,
+    d.elementos.length ? item('Mover o girar todo', "setHerramientaDib('encajar')", { sub: 'Encajar el dibujo sobre la imagen (los metros no cambian)' }) : '',
+    d.fondo ? item('Quitar imagen', 'quitarFondoDib()') : '',
+  ], { titulo: 'Imagen de fondo' });
+  const anclar = d.elementos.some(e => e.tipo === 'polilinea')
+    ? `<button class="b ${d.lamina?.anclarMedidas ? 'b-on' : 'b-g'} dib-anclar-btn" aria-pressed="${d.lamina?.anclarMedidas ? 'true' : 'false'}" onclick="anclarMedidasDib(${!d.lamina?.anclarMedidas})" title="${d.lamina?.anclarMedidas ? 'Los metros están anclados: al mover un poste no cambian. Toca para soltarlos.' : 'Anclar los metros de los vanos para mover los postes sin que cambien'}">${I.ancla}<span class="dib-menu-txt">${d.lamina?.anclarMedidas ? 'Medidas ancladas' : 'Anclar medidas'}</span></button>` : '';
+  const exportar = menu(`${I.exportar}<span class="dib-menu-txt">Exportar</span>`, [
+    item('Descargar PNG', 'descargarDib()', { sub: 'La lámina con su cajetín' }),
+    item('Copiar imagen', 'copiarDib()', { sub: 'Para pegar en Word o en un correo' }),
+    item('Láminas de propuesta en PDF', "descargarPropuestaDib('pdf')", { sub: 'Comparación y propuesta, carta horizontal' }),
+    item('Láminas de propuesta en PNG', "descargarPropuestaDib('png')"),
+  ], { clase: 'b-p', titulo: 'Exportar' });
   return `<div class="dib-superior">
-    <div class="dib-proyecto">${proyecto}<button class="b b-g" aria-label="Proyectos guardados${n ? ` (${n})` : ''}" title="Proyectos guardados" onclick="setVistaProyectosDib('lista')">Proyectos${n ? ` (${n})` : ''}</button>${d.proyecto ? '<button class="b b-l" onclick="soltarProyectoDib()">Cerrar proyecto</button>' : ''}</div>
-    <div class="dib-sup-grupo">${btn('Deshacer', I.deshacer, 'deshacerDib()', d.historial.length ? '' : 'disabled')}${btn('Rehacer', I.rehacer, 'rehacerDib()', d.rehacer.length ? '' : 'disabled')}</div>
-    <div class="dib-sup-grupo"><label class="b b-g dib-subir" title="${d.fondo ? 'Cambiar imagen' : 'Subir imagen'}">${I.imagen}<span>${d.fondo ? 'Cambiar imagen' : 'Subir imagen'}</span><input type="file" accept="image/*" hidden onchange="subirFondoDib(this.files); this.value=''"></label>${d.elementos.length && d.herramienta !== 'encajar' ? `<button class="b b-g" onclick="setHerramientaDib('encajar')" title="Mover, girar o cambiar el tamaño de todo el dibujo a la vez (los metros no cambian)">Mover o girar todo</button>` : ''}${d.elementos.some(e => e.tipo === 'polilinea') ? `<button class="b ${d.lamina?.anclarMedidas ? 'b-p' : 'b-g'} dib-anclar-btn" aria-pressed="${d.lamina?.anclarMedidas ? 'true' : 'false'}" onclick="anclarMedidasDib(${!d.lamina?.anclarMedidas})" title="${d.lamina?.anclarMedidas ? 'Los metros están anclados: al mover un poste no cambian. Toca para soltarlos.' : 'Anclar los metros de los vanos para mover los postes sin que cambien'}">${d.lamina?.anclarMedidas ? 'Medidas ancladas' : 'Anclar medidas'}</button>` : ''}</div>
-    <div class="dib-sup-grupo dib-sup-fin"><button class="b b-p" onclick="descargarDib()"><i class="ic ic-descargar"></i> Descargar PNG</button><button class="b b-g" onclick="copiarDib()">Copiar</button><button class="b b-l" onclick="nuevoLienzoDib()">Nuevo</button>
+    <div class="dib-proyecto"><span class="dib-proy-nombre" title="${esc(d.proyecto?.referencia || nombre)}"><b>${esc(nombre)}</b></span><span class="tg ${estado[0]}">${estado[1]}</span>${d.proyecto && d.sinGuardar ? '<button class="b b-p" onclick="guardarProyectoDib()">Guardar</button>' : ''}</div>
+    ${archivo}
+    <div class="dib-sup-grupo">${btn('Deshacer (Ctrl+Z)', I.deshacer, 'deshacerDib()', d.historial.length ? '' : 'disabled')}${btn('Rehacer (Ctrl+Y)', I.rehacer, 'rehacerDib()', d.rehacer.length ? '' : 'disabled')}</div>
+    <span class="dib-sep"></span>
+    ${fondo}${anclar}
+    <div class="dib-sup-grupo dib-sup-fin">
+      <button class="b ${state.dibVerLamina ? 'b-on' : 'b-g'}" aria-pressed="${state.dibVerLamina ? 'true' : 'false'}" onclick="verLaminaDib()" title="Datos de la lámina, cajetín y lámina de propuesta">${I.lamina}<span class="dib-menu-txt">Lámina</span></button>
+      ${exportar}
       ${btn(state.dibPanel === false ? 'Mostrar propiedades' : 'Ocultar propiedades', I.panel, 'togglePanelDib()', 'class="dib-btn dib-toggle-panel"')}</div>
   </div>`;
 }
 
-// ── Herramientas (columna a la izquierda; tira abajo en el celular) ──
+// ── Barra de estado (abajo): escala, medidas, qué hay en el dibujo, cajetín y zoom ──
+function barraEstado(d) {
+  const cuenta = (f, uno, varios) => { const n = d.elementos.filter(f).length; return n ? `${n} ${n === 1 ? uno : varios}` : ''; };
+  const resumen = [cuenta(e => e.tipo === 'simbolo' && ['poste', 'poste_nuevo'].includes(e.simbolo), 'poste', 'postes'), cuenta(e => e.tipo === 'polilinea', 'tramo', 'tramos'), cuenta(e => e.tipo === 'simbolo' && e.simbolo === 'usuario', 'usuario', 'usuarios')].filter(Boolean).join(' · ');
+  return `<div class="dib-estado">
+    <button class="dib-est-item" onclick="setHerramientaDib('calibrar')" title="${d.escala ? 'Recalibrar la escala' : 'Calibrar la escala'}">${d.escala ? `Escala <b>1 m = ${(1 / d.escala).toFixed(1)} px</b>` : '<span class="tg ambar">Sin escala</span> Calibrar'}</button>
+    ${d.lamina?.anclarMedidas ? '<span class="dib-est-pill">Medidas ancladas</span>' : ''}
+    ${resumen ? `<span class="dib-est-item dib-est-resumen">${resumen}</span>` : ''}
+    <label class="dib-est-item dib-est-check"><input type="checkbox" id="dib-ver-cajetin" ${state.dibCajetin || state.dibVerLamina ? 'checked' : ''} ${state.dibVerLamina ? 'disabled' : ''} onchange="verCajetinDib(this.checked)"> Ver el cajetín</label>
+    <div class="dib-zoom"><button class="dib-btn dib-btn-chico" title="Alejar (−)" aria-label="Alejar" onclick="zoomDib(0.8)">${I.menos}</button>
+      <span id="dib-zoom-pct">${zoomPct()} %</span>
+      <button class="dib-btn dib-btn-chico" title="Acercar (+)" aria-label="Acercar" onclick="zoomDib(1.25)">${I.mas}</button>
+      <button class="b b-l" onclick="ajustarVistaDib()" title="Ver todo (0)">Ajustar</button>
+      <button class="b ${state.dibAmpliado ? 'b-p' : 'b-g'}" onclick="ampliarDib()">${state.dibAmpliado ? 'Salir de pantalla completa' : 'Pantalla completa'}</button></div>
+  </div>`;
+}
+
+// ── Herramientas (columna a la izquierda, con su nombre; tira de íconos abajo en el celular) ──
 function barraHerramientas(d, h) {
-  const btn = (titulo, icono, activo, accion) => `<button class="dib-btn ${activo ? 'activo' : ''}" title="${titulo}" aria-label="${titulo}" onclick="${accion}">${icono}</button>`;
+  const btn = (titulo, icono, activo, accion, tecla = '') => `<button class="dib-btn dib-herr ${activo ? 'activo' : ''}" title="${titulo}${tecla ? ` (${tecla})` : ''}" aria-label="${titulo}${tecla ? ` (${tecla})` : ''}" onclick="${accion}">${icono}<span class="dib-herr-nombre">${CORTO[titulo] || titulo}</span>${tecla ? `<kbd>${tecla}</kbd>` : ''}</button>`;
   const esUnifilar = h === 'simbolo' && SIMBOLOS[d.simbolo]?.grupo === 'diagrama';
   const grupo = (t, cuerpo) => `<div class="dib-herr-grupo"><small>${t}</small><div>${cuerpo}</div></div>`;
+  const simb = k => btn(SIMBOLOS[k].nombre, mini(k), h === 'simbolo' && d.simbolo === k, `setSimboloDib('${k}')`, TECLA[k] || '');
+  const extras = SIMBOLOS_RED.filter(k => !RED_PRINCIPALES.includes(k));
+  const verExtras = state.dibMasSimbolos || (h === 'simbolo' && extras.includes(d.simbolo));
   return `<nav class="dib-herramientas" aria-label="Herramientas">
-    ${grupo('', btn('Seleccionar y mover (V)', I.seleccionar, h === 'seleccionar', "setHerramientaDib('seleccionar')"))}
-    ${grupo('Red', btn('Tramo de red', I.tramo, h === 'tramo', "setHerramientaDib('tramo')") + SIMBOLOS_RED.map(k => btn(SIMBOLOS[k].nombre, mini(k), h === 'simbolo' && d.simbolo === k, `setSimboloDib('${k}')`)).join(''))}
-    ${grupo('Anotar', btn('Etiqueta de punto (P1, W1…)', I.etiqueta, h === 'etiqueta', "setHerramientaDib('etiqueta')") + btn('Cota (medir distancia)', I.cota, h === 'cota', "setHerramientaDib('cota')")
-      + btn('Texto', I.texto, h === 'texto', "setHerramientaDib('texto')") + btn('Flecha', I.flecha, h === 'flecha', "setHerramientaDib('flecha')"))}
-    ${grupo('Libre', btn('Línea', I.linea, h === 'linea', "setHerramientaDib('linea')") + btn('Rectángulo', I.rect, h === 'rect', "setHerramientaDib('rect')") + btn('Círculo', I.elipse, h === 'elipse', "setHerramientaDib('elipse')")
-      + btn('Trazo libre', I.trazo, h === 'trazo', "setHerramientaDib('trazo')") + btn('Símbolos de unifilar', I.unifilar, esUnifilar, `setSimboloDib('${SIMBOLOS[d.simbolo]?.grupo === 'diagrama' ? d.simbolo : 'transformador'}')`))}
-    ${grupo('Escala', btn(d.escala ? 'Recalibrar la escala' : 'Calibrar la escala', I.calibrar, h === 'calibrar', "setHerramientaDib('calibrar')"))}
+    ${grupo('', btn('Seleccionar y mover', I.seleccionar, h === 'seleccionar', "setHerramientaDib('seleccionar')", 'V'))}
+    ${grupo('Red', btn('Tramo de red', I.tramo, h === 'tramo', "setHerramientaDib('tramo')", 'T') + RED_PRINCIPALES.map(simb).join('')
+      + (verExtras ? extras.map(simb).join('') : '') + btn(verExtras ? 'Menos símbolos' : 'Más símbolos…', I.mas3, false, 'masSimbolosDib()'))}
+    ${grupo('Anotar', btn('Etiqueta de punto', I.etiqueta, h === 'etiqueta', "setHerramientaDib('etiqueta')", 'E') + btn('Cota de medida', I.cota, h === 'cota', "setHerramientaDib('cota')", 'C')
+      + btn('Texto', I.texto, h === 'texto', "setHerramientaDib('texto')", 'X') + btn('Flecha', I.flecha, h === 'flecha', "setHerramientaDib('flecha')"))}
+    ${grupo('Dibujo libre', btn('Línea', I.linea, h === 'linea', "setHerramientaDib('linea')") + btn('Rectángulo', I.rect, h === 'rect', "setHerramientaDib('rect')") + btn('Círculo', I.elipse, h === 'elipse', "setHerramientaDib('elipse')")
+      + btn('Lápiz (trazo libre)', I.trazo, h === 'trazo', "setHerramientaDib('trazo')") + btn('Unifilar', I.unifilar, esUnifilar, `setSimboloDib('${SIMBOLOS[d.simbolo]?.grupo === 'diagrama' ? d.simbolo : 'transformador'}')`))}
+    ${grupo('Escala', btn(d.escala ? 'Recalibrar escala' : 'Calibrar escala', I.calibrar, h === 'calibrar', "setHerramientaDib('calibrar')"))}
   </nav>`;
 }
 
@@ -357,7 +417,7 @@ function panelLamina(d) {
   if (d.fondo) html += seccion('Imagen de fondo', `<label class="dib-opacidad">Más tenue para que la red se lea encima<input id="dib-opacidad" type="range" min="0.2" max="1" step="0.05" value="${d.fondoOpacidad || 1}" oninput="setOpacidadFondoDib(this.value)"></label>
     <div class="dib-acciones-el">${d.elementos.length ? `<button class="b b-g" onclick="setHerramientaDib('encajar')">Encajar el dibujo sobre la imagen</button>` : ''}<button class="b b-l" onclick="quitarFondoDib()">Quitar imagen</button></div>`);
   html += seccionLaminaPropuesta(d);
-  html += seccion('Atajos', '<div class="page-sub">V seleccionar · Supr borrar · Ctrl+Z deshacer · + / − zoom · 0 ajustar · barra espaciadora + arrastrar para moverte · Ctrl + rueda zoom · Esc soltar</div>');
+  html += seccion('Atajos', '<div class="page-sub">V seleccionar · T tramo · P poste · R transformador · U usuario · E etiqueta · C cota · X texto · Supr borrar · Ctrl+Z deshacer · + / − zoom · 0 ajustar · barra espaciadora + arrastrar para moverte · Ctrl + rueda zoom · Esc soltar</div>');
   return html;
 }
 
