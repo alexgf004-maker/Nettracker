@@ -619,6 +619,9 @@ document.addEventListener('toggle', ev => {
 // "Lámina": datos de la lámina y cajetín en el panel (se ve el cajetín mientras tanto)
 export function verLaminaDib() { const d = dib(); cerrarTramo(); d.sel = null; d.herramienta = 'seleccionar'; state.dibVerLamina = !state.dibVerLamina; if (state.dibVerLamina) { state.dibPanel = true; state.dibPanelMovil = true; } vista = null; render(); }
 export function verCajetinDib(v) { state.dibCajetin = !!v; vista = null; render(); }
+// La sección Apariencia del panel queda abierta o cerrada para los siguientes (sin redibujar)
+export function aparienciaDib(v) { state.dibApariencia = !!v; }
+export function estrAbiertaDib(clave, v) { if (v) state.dibEstrAbierta = clave; else if (state.dibEstrAbierta === clave) state.dibEstrAbierta = null; }
 export function masSimbolosDib() { state.dibMasSimbolos = !state.dibMasSimbolos; render(); }
 export function togglePanelDib() { state.dibPanel = state.dibPanel === false; render(); }
 export function abrirPanelMovilDib(v) { state.dibPanelMovil = v; render(); }

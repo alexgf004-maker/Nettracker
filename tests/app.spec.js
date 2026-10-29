@@ -3682,12 +3682,13 @@ test.describe('Herramienta Dibujar', () => {
     await chip('Reemplazar').click();
     await expect(page.locator('.dib-ayuda-accion')).toContainText('Elige abajo lo nuevo');
     await expect(page.locator('.dib-reemplazo')).toContainText('Hoy: #4 ACSR');
-    await page.locator('.dib-reemplazo .dib-op', { hasText: '#2' }).first().click();
-    await page.locator('.dib-reemplazo .dib-op', { hasText: 'Triplex' }).click();
+    await page.locator('#dib-remp-calibre').selectOption('#2');
+    await page.locator('#dib-remp-tipo').selectOption('Triplex');
     // P2: poste de 40' con TS3 (escrita) y P1: transformador de 50 kVA
     await sel("e.tipo === 'simbolo' && e.simbolo === 'poste' && e.altura === 35");
     await chip('Reemplazar').click();
-    await page.locator('.dib-reemplazo .dib-op', { hasText: "40'" }).click();
+    await page.locator('#dib-remp-altura').selectOption('40');
+    await page.locator('.dib-reemplazo .dib-agregar-estr summary').click();
     await page.fill('#dib-remp-estr-otra', 'ts3'); await page.locator('.dib-reemplazo .dib-estr-otra button').click();
     await sel("e.tipo === 'simbolo' && e.simbolo === 'trafo'");
     await chip('Reemplazar').click();
@@ -3800,7 +3801,7 @@ test.describe('Herramienta Dibujar', () => {
     await tocar(page, 1000, 200);
     // Tramo BT existente: los toques cerca de los postes se ajustan a su centro
     await page.getByRole('button', { name: 'Tramo de red' }).click();
-    await page.locator('.dib-chip', { hasText: 'Red BT existente' }).click();
+    await page.locator('#dib-tipo-red').selectOption({ label: 'Red BT existente' });
     for (const [x, y] of postes) await tocar(page, x + 6, y - 5);
     await page.getByRole('button', { name: 'Terminar tramo' }).click();
     const d = await page.evaluate(async () => (await import('/js/state.js')).state.dibujo.elementos.find(e => e.tipo === 'polilinea').puntos.map(p => p.map(Math.round)));
@@ -3839,7 +3840,7 @@ test.describe('Herramienta Dibujar', () => {
     // Cambiar el tipo del tramo seleccionado cambia su estilo y la simbología
     await page.getByRole('button', { name: 'Seleccionar y mover (V)' }).click();
     await tocar(page, 400, 450);
-    await page.locator('.dib-chip', { hasText: 'Red BT proyectada' }).click();
+    await page.locator('#dib-tipo-red').selectOption({ label: 'Red BT proyectada' });
     await expect(exacto('Red BT proyectada')).toHaveCount(1);
     await expect(exacto('Red BT existente')).toHaveCount(0);
     // PNG de la lámina completa (imagen + cajetín)
@@ -3883,7 +3884,7 @@ test.describe('Herramienta Dibujar', () => {
     await expect(page.locator('#dib-cajetin text', { hasText: 'Escribe los metros de los vanos o calibra' })).toHaveCount(1);
     await page.getByRole('button', { name: 'Seleccionar y mover (V)' }).click();
     await tocar(page, 400, 450);
-    await expect(page.locator('.dib-sec', { hasText: 'Metros por vano' })).toContainText('Vano 1: P1 → punto 2');
+    await expect(page.locator('.dib-tabla-vanos .dib-tv-fila').first()).toContainText('P1 → punto 2');
     await page.locator('#dib-vano-1').fill('20'); await page.locator('#dib-vano-2').fill('30.5');
     await page.locator('#dib-vano-2').press('Tab');
     await expect(page.locator('#dib-capa text', { hasText: '20.0 m' })).toHaveCount(1);
@@ -3947,6 +3948,44 @@ test.describe('Herramienta Dibujar', () => {
     // Al salir de Dibujar el menú de la app vuelve a tener nombres
     await nav(page, 'Inicio');
     await expect(page.locator('nav.bottom-nav .nav-label').first()).toBeVisible();
+  });
+
+  test('panel de propiedades: cabecera con resumen, Duplicar y Borrar, listas con "Otro…", tabla de vanos y Apariencia plegable', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await page.evaluate(() => localStorage.removeItem('nettracker_dibujo'));
+    await nav(page, 'Dibujar');
+    await subirImagen(page, 1600, 900);
+    await page.getByRole('button', { name: 'Tramo de red (T)' }).click();
+    await tocar(page, 300, 400); await tocar(page, 700, 400); await tocar(page, 1100, 400);
+    await page.getByRole('button', { name: 'Terminar tramo' }).click();
+    // Cabecera: tipo de red y resumen de los vanos
+    await expect(page.locator('.dib-panel-cab')).toContainText('2 vanos');
+    await expect(page.locator('.dib-tabla-vanos .dib-tv-fila')).toHaveCount(2);
+    // Calibre escrito con "Otro…"
+    await page.locator('#dib-cond-calibre').selectOption('__otro');
+    await page.locator('#dib-cond-calibre-otra').fill('#3/0'); await page.locator('#dib-cond-calibre-otra').press('Enter');
+    await expect(page.locator('#dib-cond-calibre')).toHaveValue('#3/0');
+    // Apariencia cerrada; al abrirla queda abierta para lo siguiente
+    await expect(page.getByRole('button', { name: 'Al frente' })).toBeHidden();
+    await page.locator('.dib-apariencia summary').click();
+    await expect(page.getByRole('button', { name: 'Al frente' })).toBeVisible();
+    // Duplicar y Borrar desde la cabecera
+    await page.locator('.dib-panel-cab').getByRole('button', { name: 'Duplicar' }).click();
+    const tramos = () => page.evaluate(async () => (await import('/js/state.js')).state.dibujo.elementos.filter(e => e.tipo === 'polilinea').length);
+    expect(await tramos()).toBe(2);
+    await expect(page.getByRole('button', { name: 'Al frente' })).toBeVisible();
+    await page.locator('.dib-panel-cab').getByRole('button', { name: 'Borrar' }).click();
+    expect(await tramos()).toBe(1);
+    // Poste: altura en lista y la lista de estructuras se abre con "Agregar estructura"
+    await page.getByRole('button', { name: 'Poste existente (P)' }).click();
+    await tocar(page, 1300, 700);
+    await expect(page.locator('#dib-poste-buscar')).toBeHidden();
+    await page.locator('.dib-agregar-estr summary').click();
+    await page.locator('#dib-poste-lista .dib-estr-op[data-q^="rs3 "]').click();
+    await expect(page.locator('#dib-poste-buscar')).toBeVisible(); // sigue abierta para agregar otra
+    await expect(page.locator('.dib-panel-cab')).toContainText('RS3');
   });
 
   test('zoom: acercar y dibujar en el lugar correcto, desplazar el fondo, Ctrl + rueda, pellizco con dos dedos y pantalla completa', async ({ page }) => {
@@ -4066,6 +4105,7 @@ test.describe('Herramienta Dibujar', () => {
     e = await elementos();
     expect(e).toHaveLength(1);
     await expect(page.locator('.dib-panel-cab')).toContainText('Poste existente');
+    await page.locator('.dib-apariencia summary').click();
     await page.getByRole('button', { name: 'Más grande' }).click();
     await page.getByRole('button', { name: 'Más grande' }).click();
     e = await elementos();
@@ -4107,7 +4147,8 @@ test.describe('Herramienta Dibujar', () => {
     await subirImagen(page, 1600, 900);
     await page.getByRole('button', { name: 'Poste existente' }).click();
     await tocar(page, 400, 400);
-    await page.locator('#dib-poste-altura').fill('40'); await page.locator('#dib-poste-altura').press('Tab');
+    await page.locator('#dib-poste-altura').selectOption('40');
+    await page.locator('.dib-agregar-estr summary').click();
     // Sin tramos llegando al poste se abre Secundaria; un toque agrega la estructura
     await page.locator('#dib-poste-lista .dib-estr-op[data-q^="rs3 "]').click();
     await expect(page.locator('#dib-capa text', { hasText: "40' · RS3" })).toHaveCount(1);
@@ -4117,8 +4158,8 @@ test.describe('Herramienta Dibujar', () => {
     await page.getByRole('button', { name: 'Tramo de red' }).click();
     await tocar(page, 400, 400); await tocar(page, 900, 400); await tocar(page, 900, 800);
     await page.getByRole('button', { name: 'Terminar tramo' }).click();
-    await page.locator('.dib-panel .dib-op', { hasText: /^#1\/0$/ }).click();
-    await page.locator('.dib-panel .dib-op', { hasText: /^Triplex$/ }).click();
+    await page.locator('#dib-cond-calibre').selectOption('#1/0');
+    await page.locator('#dib-cond-tipo').selectOption('Triplex');
     await page.locator('#dib-vano-cal-2').selectOption('#2');
     await expect(page.locator('#dib-capa text', { hasText: /^#1\/0 Tpx$/ })).toHaveCount(1);
     await expect(page.locator('#dib-capa text', { hasText: /^#2 Tpx$/ })).toHaveCount(1);
@@ -4129,7 +4170,7 @@ test.describe('Herramienta Dibujar', () => {
     await page.getByRole('button', { name: 'Tramo de red' }).click();
     await tocar(page, 200, 700); await tocar(page, 600, 700);
     await page.getByRole('button', { name: 'Terminar tramo' }).click();
-    await expect(page.locator('.dib-panel .dib-op.activo', { hasText: /^#1\/0$/ })).toHaveCount(1);
+    await expect(page.locator('#dib-cond-calibre')).toHaveValue('#1/0');
     expect(errores).toEqual([]);
   });
 
@@ -4282,7 +4323,8 @@ test.describe('Herramienta Dibujar', () => {
     expect(await el('r3')).toMatchObject({ nombreRed: 'Trafo P4', colorRed: '#2563eb' });
     // Renombrar desde el panel cambia toda la red conectada
     await page.evaluate(async () => { const { state } = await import('/js/state.js'); const { render } = await import('/js/views/render.js'); state.dibujo.sel = 'r3'; render(); });
-    await expect(page.locator('.dib-panel')).toContainText('Se aplica a toda la red conectada (2 tramos)');
+    await expect(page.locator('.dib-panel')).toContainText('2 tramos conectados');
+    await expect(page.locator('.dib-panel')).toContainText('Se aplican a toda la red conectada');
     await page.locator('#dib-nombre-red').fill('Red BT trafo P4'); await page.locator('#dib-nombre-red').press('Tab');
     expect((await el('r2')).nombreRed).toBe('Red BT trafo P4');
     await page.evaluate(async () => { const { state } = await import('/js/state.js'); const { render } = await import('/js/views/render.js'); state.dibujo.sel = 'r1'; render(); });
