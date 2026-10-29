@@ -176,7 +176,10 @@ export function planoLimpio(d, elementos, { x, y, w, h, vista, accion = () => nu
     // Lo de hoy que se cambia, tachado en rojo debajo de lo nuevo
     g.forEach(s => { if (s.el._antes) sub.push({ t: s.el._antes, antes: true }); });
     if (g.some(s => s.el.simbolo === 'seccionamiento')) sub.push({ t: 'Seccionamiento', corte: true });
-    return { cx: s0.cx, cy: s0.cy, nuevo: g.filter(s => s.el.simbolo !== 'seccionamiento').every(s => s.nuevo), nombre, sub, destacado: et?.estilo === 'destacado' || g.some(s => s.el.simbolo === 'usuario') };
+    // Referencia eléctrica del transformador junto al nombre: "P2: DS102277"
+    const ref = g.map(s => String(s.el.referencia || '').trim()).find(Boolean) || '';
+    const conRef = ref && !resto.some(t => t.includes(ref)) && !nombre.includes(ref) ? (nombre ? `${nombre}: ${ref}` : ref) : nombre;
+    return { cx: s0.cx, cy: s0.cy, nuevo: g.filter(s => s.el.simbolo !== 'seccionamiento').every(s => s.nuevo), nombre: conRef, sub, destacado: et?.estilo === 'destacado' || g.some(s => s.el.simbolo === 'usuario') };
   }).filter(p => p.nombre || p.sub.length);
   // Etiquetas sueltas (no apuntan a un símbolo)
   etiquetas.filter(e => !usadas.has(e)).forEach(e => {

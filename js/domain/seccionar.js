@@ -126,6 +126,6 @@ export function conEstructuraCorte(poste, corte) {
 export function trafosDe(elementos, tol) {
   return elementos.filter(e => e.tipo === 'simbolo' && ['trafo', 'trafo_nuevo', 'banco'].includes(e.simbolo)).map(e => {
     const n = nombreEn(elementos, centro(e), tol); const kva = (e.trafos || []).filter(Boolean); const kt = kva.length ? `${kva.join(' + ')} kVA` : '';
-    return { id: e.id, nombre: n || (kt ? `de ${kt}` : 'sin nombre'), texto: [n || 'Trafo', kt, /_nuevo$/.test(e.simbolo) ? 'proyectado' : ''].filter(Boolean).join(' · ') };
+    return { id: e.id, nombre: n || (kt ? `de ${kt}` : 'sin nombre'), texto: [n || 'Trafo', e.referencia, kt, /_nuevo$/.test(e.simbolo) ? 'proyectado' : ''].filter(Boolean).join(' · ') };
   });
 }

@@ -3643,7 +3643,7 @@ test.describe('Herramienta Dibujar', () => {
     for (const t of ['TRABAJOS A EJECUTAR', 'CANTIDADES DE OBRA', 'Cambiar conductor a #2 Triplex', 'Col. Las Brisas', '2/2', 'David García']) expect(r.prop).toContain(t);
     for (const t of ['1 · SITUACIÓN ACTUAL', '2 · SITUACIÓN PROPUESTA', 'PROBLEMA ENCONTRADO', '104 V en demanda máxima', 'tensión dentro de tolerancia', '1/2']) expect(r.comp).toContain(t);
     // Plano en estilo de presentación: un rótulo por poste (con su transformador nuevo) y metros en recuadro con el conductor debajo
-    for (const t of ['Trafo 37.5 kVA', '>31.5 m<', '>#2 Triplex<', '>40.0 m<', '>#4 ACSR<']) expect(r.prop).toContain(t);
+    for (const t of ['Trafo nuevo 37.5 kVA', '>31.5 m<', '>#2 Triplex<', '>40.0 m<', '>#4 ACSR<']) expect(r.prop).toContain(t);
     expect(r.prop).not.toContain('rotate('); // metros derechos, en recuadro (como en el editor)
     expect(r.prop.match(/>P3</g)).toHaveLength(1);
     expect(r.actual).not.toContain('trafo_nuevo'); expect(r.actual).not.toContain('poste_nuevo');
@@ -3808,7 +3808,7 @@ test.describe('Herramienta Dibujar', () => {
     expect(d).toEqual(postes);
     // Metros por vano sobre el tramo: √(400²+100²) × 0.125 = 51.5 m
     await expect(page.locator('#dib-capa text', { hasText: '51.5 m' })).toHaveCount(2);
-    // Etiquetas: P1 en el primer poste; W1 (estilo proyectado) en el tercero
+    // Etiquetas: P1 en el primer poste; W2 (estilo proyectado) en el tercero (W1 es la del transformador proyectado, que se pone sola)
     await page.getByRole('button', { name: 'Etiqueta de punto (E)' }).click();
     await tocar(page, 205, 495);
     await page.locator('#dib-texto').fill('P1: DS111267'); await page.locator('#dib-texto').press('Tab');
@@ -3816,11 +3816,11 @@ test.describe('Herramienta Dibujar', () => {
     await page.locator('.dib-chip', { hasText: 'Punto proyectado' }).click();
     await expect(page.locator('#dib-prefijo')).toHaveValue('W');
     await tocar(page, 995, 305);
-    await expect(page.locator('#dib-capa text', { hasText: /^W1$/ })).toHaveCount(1);
-    // Distancias automáticas en el cajetín: P1 – W1 = 103.1 m y el total del tipo
+    await expect(page.locator('#dib-capa text', { hasText: /^W2$/ })).toHaveCount(1);
+    // Distancias automáticas en el cajetín: P1 – W2 = 103.1 m y el total del tipo
     await page.locator('#dib-ver-cajetin').check();
     const caj = page.locator('#dib-cajetin');
-    await expect(caj.locator('text', { hasText: 'P1 – W1' })).toHaveCount(1);
+    await expect(caj.locator('text', { hasText: 'P1 – W2' })).toHaveCount(1);
     await expect(caj.locator('text', { hasText: /^103\.1$/ })).toHaveCount(2); // tramo y total
     await expect(caj.locator('text', { hasText: 'Total red BT existente' })).toHaveCount(1);
     // Simbología: solo lo usado
@@ -3878,20 +3878,20 @@ test.describe('Herramienta Dibujar', () => {
     await tocar(page, 1000, 300);
     // Texto rápido: conserva el nombre del punto
     await page.locator('.dib-acciones .dib-chip', { hasText: 'Seccionar red BT' }).click();
-    await expect(page.locator('#dib-capa text', { hasText: 'P2: Seccionar red BT' })).toHaveCount(1);
+    await expect(page.locator('#dib-capa text', { hasText: 'P3: Seccionar red BT' })).toHaveCount(1);
     // Sin escala no hay metros; se escriben por vano al seleccionar el tramo
     await page.locator('#dib-ver-cajetin').check();
     await expect(page.locator('#dib-cajetin text', { hasText: 'Escribe los metros de los vanos o calibra' })).toHaveCount(1);
     await page.getByRole('button', { name: 'Seleccionar y mover (V)' }).click();
     await tocar(page, 400, 450);
-    await expect(page.locator('.dib-tabla-vanos .dib-tv-fila').first()).toContainText('P1 → punto 2');
+    await expect(page.locator('.dib-tabla-vanos .dib-tv-fila').first()).toContainText('P2 → punto 2');
     await page.locator('#dib-vano-1').fill('20'); await page.locator('#dib-vano-2').fill('30.5');
     await page.locator('#dib-vano-2').press('Tab');
     await expect(page.locator('#dib-capa text', { hasText: '20.0 m' })).toHaveCount(1);
     await expect(page.locator('#dib-capa text', { hasText: '30.5 m' })).toHaveCount(1);
     await page.locator('#dib-ver-cajetin').check();
     const caj = page.locator('#dib-cajetin');
-    await expect(caj.locator('text', { hasText: 'P1 – P2' })).toHaveCount(1);
+    await expect(caj.locator('text', { hasText: 'P2 – P3' })).toHaveCount(1);
     await expect(caj.locator('text', { hasText: /^50\.5$/ })).toHaveCount(2); // trecho y total
     await expect(caj.locator('text', { hasText: /^Banco de transformadores$/ })).toHaveCount(1);
     await expect(page.locator('.dib-panel')).toContainText('Total 50.5 m');
@@ -4056,6 +4056,51 @@ test.describe('Herramienta Dibujar', () => {
         vanos: { v1: { a: 'a', b: 'b', tramo: 'bt', orden: 1 }, v2: { a: 'b', b: 'c', tramo: 'bt', orden: 2 } } };
       return m.aDibujo(L).elementos.filter(e => e.simbolo === 'seccionamiento').length; });
     expect(lev).toBe(1);
+  });
+
+  test('transformador sobre un poste: se fusionan en un punto con su etiqueta, referencia eléctrica (obligatoria en los existentes), kVA y comentario', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await page.evaluate(async () => {
+      const ad = await import('/js/actions/dibujo.js');
+      ad.cargarEnDibujo({ escala: 0.16, elementos: [
+        { id: 't1', tipo: 'polilinea', tramo: 'bt', color: '#000', grosor: 6, puntos: [[300, 450], [700, 450]] },
+        { id: 'p1', tipo: 'simbolo', simbolo: 'poste', color: '#111827', grosor: 3, escala: 0.6, rot: 0, x: 282, y: 432, altura: 35, estructuras: ['TS3'] },
+        { id: 'p2', tipo: 'simbolo', simbolo: 'poste', color: '#111827', grosor: 3, escala: 0.6, rot: 0, x: 682, y: 432 },
+        { id: 'e1', tipo: 'etiqueta', estilo: 'existente', texto: 'P1', tam: 19, tx: 300, ty: 450, x: 330, y: 360 },
+      ] });
+    });
+    await nav(page, 'Dibujar');
+    const d = () => page.evaluate(async () => (await import('/js/state.js')).state.dibujo.elementos);
+    // Trafo existente sobre P1: el mismo punto pasa a poste con transformador (conserva altura y estructuras), sin otra etiqueta
+    await page.getByRole('button', { name: 'Transformador existente (R)' }).click();
+    await tocar(page, 302, 451);
+    let e = await d();
+    expect(e.filter(x => x.tipo === 'simbolo')).toHaveLength(2);
+    expect(e.find(x => x.id === 'p1')).toMatchObject({ simbolo: 'trafo', altura: 35, estructuras: ['TS3'] });
+    expect(e.filter(x => x.tipo === 'etiqueta')).toHaveLength(1);
+    // Sin referencia: aviso en rojo en el panel y en la etiqueta (no impide exportar)
+    await expect(page.locator('.dib-panel .dib-falta')).toHaveText('Falta referencia');
+    await expect(page.locator('#dib-capa text', { hasText: /^Falta referencia$/ })).toHaveCount(1);
+    await expect(page.locator('#dib-ref')).toBeFocused();
+    await page.locator('#dib-ref').fill('ds102277'); await page.locator('#dib-ref').press('Enter');
+    await page.locator('#dib-kva').fill('37.5'); await page.locator('#dib-kva').press('Tab');
+    await page.locator('#dib-nota').fill('Sobrecargado'); await page.locator('#dib-nota').press('Tab');
+    await expect(page.locator('.dib-panel .dib-falta')).toHaveCount(0);
+    // La etiqueta: "P1: DS102277" y debajo los datos del poste, los kVA y el comentario
+    for (const t of [/^P1: DS102277$/, /^35' · TS3$/, /^Trafo 37\.5 kVA$/, /^Sobrecargado$/]) await expect(page.locator('#dib-capa text', { hasText: t })).toHaveCount(1);
+    // Un trafo proyectado suelto: lleva su etiqueta (W1) y no pide referencia
+    await page.getByRole('button', { name: 'Transformador proyectado' }).click();
+    await tocar(page, 1000, 250);
+    e = await d();
+    expect(e.filter(x => x.tipo === 'etiqueta').map(x => x.texto)).toEqual(['P1', 'W1']);
+    await expect(page.locator('.dib-panel .dib-falta')).toHaveCount(0);
+    // En la propuesta: la referencia va en el rótulo y en el trabajo del transformador existente
+    await page.evaluate(async () => { const { state } = await import('/js/state.js'); state.dibujo.elementos.find(x => x.id === 'p1').accion = 'retirar'; });
+    const r = await page.evaluate(async () => { const { state } = await import('/js/state.js'); const m = await import('/js/domain/propuesta.js'); return { t: m.trabajos(state.dibujo).map(x => x.texto), svg: m.svgComparacion(state.dibujo) }; });
+    expect(r.t).toContain('Transformador DS102277 37.5 kVA en P1');
+    for (const t of ['P1: DS102277', 'Trafo 37.5 kVA']) expect(r.svg).toContain(t);
   });
 
   test('zoom: acercar y dibujar en el lugar correcto, desplazar el fondo, Ctrl + rueda, pellizco con dos dedos y pantalla completa', async ({ page }) => {
@@ -4672,7 +4717,7 @@ test.describe('Levantamiento en campo', () => {
     expect(dom.textos).toEqual(['Trafo 25 kVA', 'Banco 3 × 50 kVA', 'Banco 25 + 50 kVA', '']);
     expect(dom.simbolos).toEqual(['trafo', 'banco', 'trafo_nuevo', 'poste', 'usuario']);
     expect(dom.lamina).toEqual(['trafo', 'banco']);
-    expect(dom.etiquetas).toEqual(['P1\nTrafo 25 kVA', 'P2\nBanco 3 × 50 kVA']);
+    expect(dom.etiquetas).toEqual(['P1', 'P2']); // los kVA los pone Dibujar debajo del nombre (con la referencia)
     expect(dom.kml).toContain('Trafo 25 kVA');
 
     // En campo: varios vanos cortos de 6 m; las distancias que se enciman no se muestran

@@ -116,7 +116,7 @@ function hojaPunto(sel, l) {
     <div class="lev-punto-cab">${mini(simboloPunto(sel), 28)}<div><b>${esc(sel.nombre || 'Punto')}</b><span>${esc(SIMBOLOS[sel.tipo]?.nombre || '')}</span></div>${info ? `<span class="tg gris">${esc(info)}</span>` : ''}</div>
     <div class="lev-acciones lev-acciones-punto"><button class="b b-p" onclick="seguirDesdeLev()">Seguir desde aquí</button><button class="b b-g" onclick="unirConLev()">Unir con otro punto</button><button class="b b-g" onclick="moverAGpsLev()">Mover a mi ubicación</button><button class="b b-l dib-borrar" onclick="borrarPuntoLev()">Borrar</button></div>
     <div class="lev-lista">
-      ${fila('Transformador', sel.trafos?.length ? esc(textoTrafos(sel.trafos)) : nada, 'trafos', 'aria-label="Transformador sobre el poste"')}
+      ${fila('Transformador', sel.trafos?.length ? esc([sel.referencia, textoTrafos(sel.trafos)].filter(Boolean).join(' · ')) : nada, 'trafos', 'aria-label="Transformador sobre el poste"')}
       ${fila('Altura', sel.altura ? esc(textoAltura(sel.altura)) : nada, 'altura', 'aria-label="Altura del poste"')}
       ${fila('Estructuras', sel.estructuras?.length ? esc(textoEstructuras(sel.estructuras).replace(/ \/ /g, ', ')) : nada, 'estructuras', 'aria-label="Estructuras del poste"')}
       ${fila('Tipo', `${mini(sel.tipo)}${esc(SIMBOLOS[sel.tipo]?.nombre || '')}`, 'tipoDelPunto', 'aria-label="Tipo del punto"')}
@@ -146,6 +146,7 @@ function panelPunto(sel, l) {
       ${filaC('Nota', `<input id="lev-p-nota" value="${esc(sel.nota || '')}" placeholder="Ej. poste de madera deteriorado" onchange="datoPuntoLev('nota', this.value)">`, 'lev-p-nota')}
       <div class="lev-lista">${corteLev(sel)}</div></section>
     <section class="dib-sec"><h4>Transformador <span class="dib-sec-extra">${esc(textoTrafos(trafos))}</span></h4>
+      ${filaC('Referencia', `<input id="lev-p-referencia" value="${esc(sel.referencia || '')}" placeholder="Ej. DS102277" onchange="datoPuntoLev('referencia', this.value.toUpperCase())">`, 'lev-p-referencia')}
       ${filaC('Unidades', `<div class="dib-estructuras">${trafos.map((k, i) => `<span class="dib-estr">${esc(k)} kVA<button aria-label="Quitar ${esc(k)} kVA" onclick="quitarTrafoLev(${i})">✕</button></span>`).join('') || '<span class="page-sub">Ninguno</span>'}</div>`)}
       ${filaC('Agregar', listaC('lev-p-kva', KVA_TRAFO.map(k => [k, `${k} kVA`]), '', 'agregarTrafoLev(', { vacio: 'kVA…', aria: 'Agregar transformador (kVA)' }))}
       <div class="page-sub">Para un banco, agrega uno por cada unidad.</div></section>
@@ -200,7 +201,8 @@ function ventanaElegir(l, u, sel, vanos, actual) {
     // Uno o varios transformadores sobre el poste: cada toque agrega una unidad con esos kVA (varias = banco)
     titulo = `Transformador en ${esc(sel.nombre || 'poste')}`; listo = true;
     const lista = sel.trafos || [];
-    cuerpo = `<div class="dib-estructuras lev-trafos">${lista.length ? lista.map((k, i) => `<span class="dib-estr">${esc(k)} kVA<button aria-label="Quitar ${esc(k)} kVA" onclick="quitarTrafoLev(${i})">✕</button></span>`).join('') : '<span class="page-sub">Sin transformador</span>'}</div>
+    cuerpo = `<div class="field lev-trafo-ref"><label for="lev-p-referencia">Referencia eléctrica${sel.tipo === 'poste_nuevo' || sel.tipo === 'trafo_nuevo' ? '' : ' (obligatoria si ya existe)'}</label><input id="lev-p-referencia" value="${esc(sel.referencia || '')}" placeholder="Ej. DS102277" autocapitalize="characters" onchange="datoPuntoLev('referencia', this.value.toUpperCase())"></div>
+      <div class="dib-estructuras lev-trafos">${lista.length ? lista.map((k, i) => `<span class="dib-estr">${esc(k)} kVA<button aria-label="Quitar ${esc(k)} kVA" onclick="quitarTrafoLev(${i})">✕</button></span>`).join('') : '<span class="page-sub">Sin transformador</span>'}</div>
       ${lista.length ? `<div class="lev-trafo-texto">${esc(textoTrafos(lista))}</div>` : ''}
       <div class="lev-trafo-sub">Toca los kVA para agregar un transformador (para un banco, agrega uno por cada unidad)</div>
       <div class="lev-kva">${KVA_TRAFO.map(k => `<button class="b b-g" onclick="agregarTrafoLev('${k}')">${k}</button>`).join('')}</div>

@@ -127,16 +127,18 @@ function trabajoDe(el, d, tol) {
     const datos = [el.altura ? `${el.altura}'` : '', (el.estructuras || []).length ? `con ${el.estructuras.join(' / ')}` : ''].filter(Boolean).join(' ');
     let texto;
     const r = reemplazoDe(el); const nombre = SIMBOLOS[k]?.nombre.replace(/ (existente|proyectado)$/i, '') || 'Elemento';
-    const trafo = k === 'banco' ? 'Banco de transformadores' : 'Transformador';
+    const ref = String(el.referencia || '').trim();
+    const trafo = `${k === 'banco' ? 'Banco de transformadores' : 'Transformador'}${ref ? ` ${ref}` : ''}`;
+    const trafoMin = `${k === 'banco' ? 'banco de transformadores' : 'transformador'}${ref ? ` ${ref}` : ''}`;
     if (accion === 'trasladar') {
       // "Trasladar poste P5 6.5 m" (los metros con escala y el lugar marcado)
       const m = metrosTraslado(el, d.escala);
-      texto = `Trasladar ${esPoste(k) ? 'poste' : esTrafo(k) ? trafo.toLowerCase() : nombre.toLowerCase()}${pt ? ` ${pt}` : ''}${m !== null ? ` ${fmt(m)} m` : ''}`;
+      texto = `Trasladar ${esPoste(k) ? 'poste' : esTrafo(k) ? trafoMin : nombre.toLowerCase()}${pt ? ` ${pt}` : ''}${m !== null ? ` ${fmt(m)} m` : ''}`;
     } else if (r && esPoste(k) && (r.altura !== undefined || r.estructuras)) {
       // "Cambiar poste 35' con RS3 por 40' con TS3 (P2)"
       const nuevo = { altura: r.altura !== undefined ? r.altura : el.altura, estructuras: r.estructuras || el.estructuras };
       texto = `Cambiar poste${datos ? ` ${datos}` : ''} por ${datosPoste(nuevo) || 'otro'}${pt ? ` (${pt})` : ''}`;
-    } else if (r && esTrafo(k) && r.trafos) texto = `Cambiar ${trafo.toLowerCase()}${kvaTexto(el.trafos) ? ` ${kvaTexto(el.trafos)}` : ''} por ${kvaTexto(r.trafos)}${pt ? ` en ${pt}` : ''}`;
+    } else if (r && esTrafo(k) && r.trafos) texto = `Cambiar ${trafoMin}${kvaTexto(el.trafos) ? ` ${kvaTexto(el.trafos)}` : ''} por ${kvaTexto(r.trafos)}${pt ? ` en ${pt}` : ''}`;
     else if (esPoste(k)) texto = `Poste ${datos}${pt ? ` (${pt})` : ''}`.replace(/\s+/g, ' ').trim();
     else if (esTrafo(k)) texto = `${trafo}${kvaTexto(el.trafos) ? ` ${kvaTexto(el.trafos)}` : ''}${pt ? ` en ${pt}` : ''}`;
     else texto = `${nombre}${pt ? ` en ${pt}` : ''}`;

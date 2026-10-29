@@ -98,7 +98,7 @@ export function aDibujo(lev, { ancho = 1600, alto = 1000, margen = 140 } = {}) {
     const [x, y] = pos[p.id]; const escala = p.tipo === 'usuario' ? 0.8 : 0.6;
     const sim = simboloPunto(p);
     elementos.push({ id: id(), tipo: 'simbolo', simbolo: sim, color: SIMBOLO_COLOR[sim] || '#111827', grosor: 3, escala, rot: 0, x: x - 30 * escala, y: y - 30 * escala,
-      ...(p.altura ? { altura: Number(p.altura) } : {}), ...(p.estructuras?.length ? { estructuras: [...p.estructuras] } : {}), ...(p.trafos?.length ? { trafos: [...p.trafos] } : {}) });
+      ...(p.altura ? { altura: Number(p.altura) } : {}), ...(p.estructuras?.length ? { estructuras: [...p.estructuras] } : {}), ...(p.trafos?.length ? { trafos: [...p.trafos] } : {}), ...(p.referencia ? { referencia: p.referencia } : {}) });
     // Seccionamiento marcado en campo: el corte ya llega puesto (de través al primer vano; el lado se elige en Dibujar)
     if (p.seccionar) {
       const v = listaVanos(lev).find(q => (q.a === p.id || q.b === p.id) && pos[q.a] && pos[q.b]);
@@ -113,7 +113,8 @@ export function aDibujo(lev, { ancho = 1600, alto = 1000, margen = 140 } = {}) {
   const difAng = (a, b) => { const d = Math.abs(a - b) % (2 * Math.PI); return d > Math.PI ? 2 * Math.PI - d : d; };
   puntos.forEach(p => {
     const [x, y] = pos[p.id];
-    const texto = [p.nombre, textoTrafos(p.trafos), p.nota].filter(Boolean).join('\n');
+    // (la referencia y los kVA del transformador los pone Dibujar debajo del nombre, con los datos del punto)
+    const texto = [p.nombre, p.nota].filter(Boolean).join('\n');
     if (!texto) return;
     const proyectado = p.tipo === 'poste_nuevo' || p.tipo === 'trafo_nuevo';
     const tam = 22; const m = medidaEtiqueta({ texto, tam }, textoPoste(p));
@@ -139,7 +140,7 @@ const SIMBOLO_COLOR = { puente: '#0f766e', poste: '#111827', poste_nuevo: '#2563
 export function kmlLevantamiento(lev, nombresTipo = {}) {
   const x = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const puntos = listaPuntos(lev);
-  const pm = puntos.map(p => `<Placemark><name>${x(p.nombre || '')}</name><description>${x([nombresTipo[p.tipo] || p.tipo, textoTrafos(p.trafos), p.altura ? `${p.altura}'` : '', (p.estructuras || []).join(' / '), p.nota, p.acc ? `Precisión ±${Math.round(p.acc)} m` : ''].filter(Boolean).join(' · '))}</description><Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`).join('');
+  const pm = puntos.map(p => `<Placemark><name>${x(p.nombre || '')}</name><description>${x([nombresTipo[p.tipo] || p.tipo, p.referencia, textoTrafos(p.trafos), p.altura ? `${p.altura}'` : '', (p.estructuras || []).join(' / '), p.nota, p.acc ? `Precisión ±${Math.round(p.acc)} m` : ''].filter(Boolean).join(' · '))}</description><Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`).join('');
   const ln = listaVanos(lev).map(v => {
     const a = lev.puntos?.[v.a]; const b = lev.puntos?.[v.b]; if (!a || !b) return '';
     const m = metrosDeVano(lev, v);

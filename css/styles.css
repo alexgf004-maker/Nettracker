@@ -1600,6 +1600,8 @@ button.dib-est-item { cursor: pointer; } button.dib-est-item:hover { color: var(
 .dib-acciones-prop .dib-chip { justify-content: center; border: 0; border-radius: 0; padding: 7px 4px; font-size: 12.5px; }
 .dib-acciones-prop .dib-chip.activo { background: var(--primary-light); }
 .dib-apariencia { border-top: 1px solid var(--border); }
+.dib-falta { text-transform: none; letter-spacing: 0; color: #dc2626; font-weight: 800; font-size: 11.5px; }
+.dib-fila-c input.dib-input-falta { border: 1.5px solid #dc2626; background: #fef2f2; }
 .dib-lados { grid-template-columns: repeat(2, 1fr); margin-bottom: 10px; }
 .dib-trabajo-prev { display: flex; gap: 8px; align-items: baseline; font-size: 13px; background: #fef2f2; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
 .dib-trabajo-prev b { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: #0f172a; color: #fff; font-size: 11px; }
