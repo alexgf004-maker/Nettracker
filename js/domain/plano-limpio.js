@@ -169,16 +169,17 @@ export function planoLimpio(d, elementos, { x, y, w, h, vista, accion = () => nu
     resto.forEach(t => sub.push({ t, nuevo: g.every(s => s.nuevo) }));
     g.forEach(s => {
       const kva = (s.el.trafos || []).filter(Boolean);
-      const ref = String(s.el.referencia || '').trim(); // referencia eléctrica del transformador (DS102277)
-      if (kva.length && !resto.some(t => /kva/i.test(t))) sub.push({ t: `${ref ? `${ref} · ` : ''}${s.nuevo ? 'Trafo nuevo ' : 'Trafo '}${kva.length > 1 ? kva.join(' + ') : kva[0]} kVA`, nuevo: s.nuevo });
-      else if (ref && !resto.some(t => t.includes(ref))) sub.push({ t: ref, nuevo: s.nuevo });
+      if (kva.length && !resto.some(t => /kva/i.test(t))) sub.push({ t: `${s.nuevo ? 'Trafo nuevo ' : 'Trafo '}${kva.length > 1 ? kva.join(' + ') : kva[0]} kVA`, nuevo: s.nuevo });
       if (s.el.detalleAccion) sub.push({ t: s.el.detalleAccion, nuevo: true });
       if (String(s.el.nota || '').trim()) sub.push({ t: String(s.el.nota).trim(), nuevo: false }); // nota del símbolo (p. ej. el medidor del usuario)
     });
     // Lo de hoy que se cambia, tachado en rojo debajo de lo nuevo
     g.forEach(s => { if (s.el._antes) sub.push({ t: s.el._antes, antes: true }); });
     if (g.some(s => s.el.simbolo === 'seccionamiento')) sub.push({ t: 'Seccionamiento', corte: true });
-    return { cx: s0.cx, cy: s0.cy, nuevo: g.filter(s => s.el.simbolo !== 'seccionamiento').every(s => s.nuevo), nombre, sub, destacado: et?.estilo === 'destacado' || g.some(s => s.el.simbolo === 'usuario') };
+    // Referencia eléctrica del transformador junto al nombre: "P2: DS102277"
+    const ref = g.map(s => String(s.el.referencia || '').trim()).find(Boolean) || '';
+    const conRef = ref && !resto.some(t => t.includes(ref)) && !nombre.includes(ref) ? (nombre ? `${nombre}: ${ref}` : ref) : nombre;
+    return { cx: s0.cx, cy: s0.cy, nuevo: g.filter(s => s.el.simbolo !== 'seccionamiento').every(s => s.nuevo), nombre: conRef, sub, destacado: et?.estilo === 'destacado' || g.some(s => s.el.simbolo === 'usuario') };
   }).filter(p => p.nombre || p.sub.length);
   // Etiquetas sueltas (no apuntan a un símbolo)
   etiquetas.filter(e => !usadas.has(e)).forEach(e => {

@@ -187,7 +187,7 @@ function trazosTramo(d, color, ancho, dash) {
 // SVG de un elemento. sel: tiradores de edición; ui: tamaño de tiradores; escala y distancias: metros por vano
 // ver: qué datos técnicos salen en el plano (calibre de los vanos, altura y estructuras de los postes)
 // datoEn(x, y): datos del poste en ese punto (para la etiqueta que apunta a él); conEtiqueta(x, y): hay una etiqueta ahí
-export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias = false, ver = {}, datoEn = null, conEtiqueta = null, radioEn = null, pantalla = false } = {}) {
+export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias = false, ver = {}, datoEn = null, refEn = null, conEtiqueta = null, radioEn = null, pantalla = false } = {}) {
   const st = `stroke="${el.color}" stroke-width="${el.grosor || 3}" fill="none" stroke-linecap="round" stroke-linejoin="round"`;
   const id = `data-id="${el.id}"`;
   let s = '';
@@ -251,7 +251,7 @@ export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias
       const dibujo = `<g transform="translate(${r1(el.x)} ${r1(el.y)}) scale(${el.escala}) rotate(${el.rot || 0} 30 30)" color="${el.color}" stroke="${el.color}" stroke-width="${r1(sw * (el.grosor || 3) / 3)}" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="0" y="0" width="60" height="60" fill="transparent" stroke="none"/>${sim.svg}</g>`;
       // Altura y estructuras del poste debajo de él (se arrastran como los metros)
       const centro = [el.x + 30 * el.escala, el.y + 30 * el.escala];
-      const datos = conEtiqueta?.(...centro) ? '' : textoConCambio(el, { altura: ver.altura !== false, estructuras: ver.estructuras !== false }, pantalla).replace(/\n/g, ' · ').replace(/!!/g, '');
+      const datos = conEtiqueta?.(...centro) ? '' : textoConCambio(el, { altura: ver.altura !== false, estructuras: ver.estructuras !== false }, pantalla, true).replace(/\n/g, ' · ').replace(/!!/g, '');
       // Por defecto arriba a la derecha del símbolo (lejos de los tramos que entran por los lados)
       const tam = Math.max(15, 27 * el.escala); const ancho = String(datos).length * tam * 0.6 + tam;
       const cx = el.x + 60 * el.escala + ancho / 2; const cy = el.y - tam * 0.4;
@@ -259,6 +259,9 @@ export function svgElemento(el, { sel = false, ui = 1, escala = null, distancias
       break;
     }
     case 'etiqueta': {
+      // La referencia del transformador del punto va junto al nombre: "P2: DS102277" (si la etiqueta no la dice ya)
+      const ref = refEn?.(el.tx, el.ty) || '';
+      if (ref && !String(el.texto || '').includes(ref)) { const ls = String(el.texto || '').split('\n'); ls[0] = `${ls[0]}: ${ref}`; el = { ...el, texto: ls.join('\n') }; }
       // Chip redondeado con línea guía hasta el punto
       const est = ESTILOS_ETIQUETA[el.estilo] || null;
       const fondo = est ? est.fondo : el.fondo || '#ffffff'; const tinta = est ? est.texto : NEGRO;
@@ -452,17 +455,20 @@ function svgCajetin(d, y0) {
 const ES_TRAFO = ['trafo', 'trafo_nuevo', 'banco'];
 const textoKva = t => { const k = (t || []).filter(Boolean); return !k.length ? '' : k.length === 1 ? `Trafo ${k[0]} kVA` : `Banco ${k.every(x => x === k[0]) ? `${k.length} × ${k[0]}` : k.join(' + ')} kVA`; };
 export const pideReferencia = el => ES_TRAFO.includes(el?.simbolo) && el.simbolo !== 'trafo_nuevo' && el.accion !== 'instalar';
-function textoTrafo(el, pantalla) {
+// La referencia va junto al nombre del punto ("P2: DS102277"); aquí, los kVA. conRef: sin etiqueta, va al inicio
+function textoTrafo(el, pantalla, conRef) {
   if (!ES_TRAFO.includes(el.simbolo)) return '';
   const ref = String(el.referencia || '').trim();
   const kva = el.accion === 'reemplazar' && el.reemplazo?.trafos ? '' : textoKva(el.trafos); // el cambio de kVA ya va en el renglón del poste
   if (!ref && pantalla && pideReferencia(el)) return `!!Falta referencia${kva ? ` · ${kva}` : ''}`;
-  return [ref, kva].filter(Boolean).join(' · ');
+  return [conRef ? ref : '', kva].filter(Boolean).join(' · ');
 }
-function textoConCambio(el, ver, pantalla = false) {
+function textoConCambio(el, ver, pantalla = false, conRef = false) {
   const nota = String(el.nota || '').trim();
-  return [textoConCambioPoste(el, ver), textoTrafo(el, pantalla), nota].filter(Boolean).join('\n');
+  return [textoConCambioPoste(el, ver), textoTrafo(el, pantalla, conRef), nota].filter(Boolean).join('\n');
 }
+// Referencia del transformador de un punto (para ponerla junto al nombre en su etiqueta)
+export const referenciaDe = el => (ES_TRAFO.includes(el?.simbolo) ? String(el.referencia || '').trim() : '');
 function textoConCambioPoste(el, ver) {
   const hoy = textoPoste(el, ver); const r = el.accion === 'reemplazar' ? el.reemplazo : null;
   const kva = t => ((t || []).filter(Boolean).length ? `${t.filter(Boolean).join(' + ')} kVA` : '');
@@ -502,11 +508,12 @@ export function svgLamina(d, { pantalla = false, ui = 1 } = {}) {
   simbolosRed.forEach(e => {
     const x = e.x + 30 * e.escala; const y = e.y + 30 * e.escala; const texto = textoConCambio(e, ver, pantalla);
     const p = postes.find(q => cerca([q.x, q.y], x, y));
-    if (p) { p.r = Math.max(p.r, 30 * e.escala); if (texto && !p.texto.includes(texto)) p.texto = [p.texto, texto].filter(Boolean).join('\n'); } else postes.push({ x, y, r: 30 * e.escala, texto });
+    const ref = referenciaDe(e);
+    if (p) { p.r = Math.max(p.r, 30 * e.escala); p.ref ||= ref; if (texto && !p.texto.includes(texto)) p.texto = [p.texto, texto].filter(Boolean).join('\n'); } else postes.push({ x, y, r: 30 * e.escala, texto, ref });
   });
   const puntas = d.elementos.filter(e => e.tipo === 'etiqueta').map(e => [e.tx, e.ty]);
   const opts = { escala: d.escala, distancias: l.distanciasEnTramos !== false, ver, pantalla,
-    datoEn: (x, y) => postes.find(p => cerca([p.x, p.y], x, y))?.texto || '', conEtiqueta: (x, y) => puntas.some(p => cerca(p, x, y)),
+    datoEn: (x, y) => postes.find(p => cerca([p.x, p.y], x, y))?.texto || '', refEn: (x, y) => postes.find(p => cerca([p.x, p.y], x, y))?.ref || '', conEtiqueta: (x, y) => puntas.some(p => cerca(p, x, y)),
     // La línea guía de una etiqueta termina en el borde del símbolo (no lo cruza ni lo tapa)
     radioEn: (x, y) => postes.find(p => cerca([p.x, p.y], x, y))?.r || 0 };
   // Orden de dibujo: primero las líneas, encima los postes, luego transformadores y demás símbolos, y arriba los textos

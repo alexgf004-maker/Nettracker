@@ -4088,8 +4088,8 @@ test.describe('Herramienta Dibujar', () => {
     await page.locator('#dib-kva').fill('37.5'); await page.locator('#dib-kva').press('Tab');
     await page.locator('#dib-nota').fill('Sobrecargado'); await page.locator('#dib-nota').press('Tab');
     await expect(page.locator('.dib-panel .dib-falta')).toHaveCount(0);
-    // La etiqueta: P1 y debajo los datos del poste, la referencia con los kVA y el comentario
-    for (const t of [/^P1$/, /^35' · TS3$/, /^DS102277 · Trafo 37\.5 kVA$/, /^Sobrecargado$/]) await expect(page.locator('#dib-capa text', { hasText: t })).toHaveCount(1);
+    // La etiqueta: "P1: DS102277" y debajo los datos del poste, los kVA y el comentario
+    for (const t of [/^P1: DS102277$/, /^35' · TS3$/, /^Trafo 37\.5 kVA$/, /^Sobrecargado$/]) await expect(page.locator('#dib-capa text', { hasText: t })).toHaveCount(1);
     // Un trafo proyectado suelto: lleva su etiqueta (W1) y no pide referencia
     await page.getByRole('button', { name: 'Transformador proyectado' }).click();
     await tocar(page, 1000, 250);
@@ -4100,7 +4100,7 @@ test.describe('Herramienta Dibujar', () => {
     await page.evaluate(async () => { const { state } = await import('/js/state.js'); state.dibujo.elementos.find(x => x.id === 'p1').accion = 'retirar'; });
     const r = await page.evaluate(async () => { const { state } = await import('/js/state.js'); const m = await import('/js/domain/propuesta.js'); return { t: m.trabajos(state.dibujo).map(x => x.texto), svg: m.svgComparacion(state.dibujo) }; });
     expect(r.t).toContain('Transformador DS102277 37.5 kVA en P1');
-    expect(r.svg).toContain('DS102277 · Trafo 37.5 kVA');
+    for (const t of ['P1: DS102277', 'Trafo 37.5 kVA']) expect(r.svg).toContain(t);
   });
 
   test('zoom: acercar y dibujar en el lugar correcto, desplazar el fondo, Ctrl + rueda, pellizco con dos dedos y pantalla completa', async ({ page }) => {
