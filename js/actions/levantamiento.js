@@ -473,3 +473,6 @@ export function descargarKmlLev() {
 
 // Para las pruebas y la pantalla: el mapa ya montado (o null)
 export const mapaLev = () => mapa;
+
+// Al pasar de celular a compu (o al revés) cambia cómo se editan los datos del panel
+window.matchMedia?.('(min-width: 901px)').addEventListener?.('change', () => { if (state.tab === 'levantamiento' && state.levId) render(); });

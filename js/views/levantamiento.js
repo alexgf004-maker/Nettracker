@@ -4,12 +4,15 @@ import { acometidasLevantamiento, KVA_TRAFO, listaPuntos, listaVanos, metrosDeVa
 import { fmtMetros, TIPOS_TRAMO } from '../domain/plano.js';
 import { balanceAcometidas, CALIBRES, grupoEstructurasDe, textoAcometidas, textoAltura, textoEstructuras, TIPOS_ACOMETIDA, TIPOS_CONDUCTOR } from '../domain/red.js';
 import { state } from '../state.js';
-import { controlesConductor, selectorAltura, selectorEstructuras } from './dibujo.js';
+import { controlesConductor, fila as filaC, lista as listaC, posteCompacto, selectorAltura, selectorEstructuras } from './dibujo.js';
 import { escapeHtml, fmtDate } from '../utils.js';
 import { heroSeccion } from './componentes.js';
 
 const esc = s => escapeHtml(s ?? '');
 const mini = (k, t = 20) => { const s = SIMBOLOS[k] || SIMBOLOS.poste; const c = s.color || 'currentColor'; return `<svg viewBox="-2 -2 64 64" width="${t}" height="${t}" color="${c}" stroke="${c}" stroke-width="4" fill="none">${s.svg}</svg>`; };
+// En la compu (panel a la derecha) los datos se editan ahí mismo con listas y campos, como en Dibujar;
+// en el celular siguen las filas que abren una ventana con botones grandes de un toque
+export const enCompu = () => !!window.matchMedia?.('(min-width: 901px)').matches;
 const muestra = k => { const t = TIPOS_TRAMO[k]; return `<svg viewBox="0 0 30 10" width="30" height="10"><line x1="2" y1="5" x2="28" y2="5" stroke="${t.color}" stroke-width="${4 * t.ancho}" stroke-linecap="round" ${t.dash ? `stroke-dasharray="${t.dash.split(' ').map(v => v * 4).join(' ')}"` : ''}/></svg>`; };
 
 export function renderLevantamientos() {
@@ -60,6 +63,7 @@ function renderDetalle(id, l) {
   html += `<div class="lev-top"><button class="lev-top-btn" aria-label="Volver a los levantamientos" title="Levantamientos" onclick="cerrarLevantamiento()">${ICONO.atras}</button>
     <div class="lev-top-nombre"><b>${esc(l.nombre)}</b><small>${r.puntos} puntos · ${r.vanos} vanos${r.vanos ? ` · ${fmtMetros(r.metros)}` : ''}</small></div>
     <span id="lev-gps" class="tg gris">Buscando señal GPS…</span>
+    ${vanos.length ? `<div class="lev-top-pc"><button class="b b-g" onclick="descargarKmlLev()" title="KML para Google Earth">Google Earth (KML)</button><button class="b b-p" onclick="pasarADibujarLev()" title="Pasar a Dibujar como lámina">Pasar a Dibujar</button></div>` : ''}
     <button class="lev-top-btn" aria-label="Quitar el último" title="Quitar el último punto" onclick="deshacerUltimoLev()" ${puntos.length ? '' : 'disabled'}>${ICONO.deshacer}</button></div>`;
 
   html += '<div class="lev-cuerpo">';
@@ -77,7 +81,7 @@ function renderDetalle(id, l) {
   // En el celular la hoja se baja con el asa para dejar casi todo el mapa (quedan las pestañas)
   html += `<section class="lev-hoja" aria-label="Controles del levantamiento"><button class="lev-asa" aria-label="${u.hojaMin ? 'Subir la hoja' : 'Bajar la hoja'}" onclick="setLev('hojaMin', ${!u.hojaMin})"><i></i></button><div class="lev-tabs">${pest('marcar', 'Marcar')}${pest('punto', sel ? esc(sel.nombre || 'Punto') : 'Punto', !sel)}${pest('vanos', `Vanos (${vanos.length})`)}${pest('mas', 'Más')}
       ${abierta ? '<button class="lev-tab-cerrar" aria-label="Cerrar" onclick="setHojaLev(\'marcar\')">✕</button>' : ''}</div>
-    <div class="lev-hoja-cuerpo" data-hoja="${hoja}${hoja === 'punto' ? u.sel : ''}" onscroll="guardarScrollLev(this)">${hoja === 'punto' ? hojaPunto(sel, l) : hoja === 'vanos' ? hojaVanos(l, vanos) : hoja === 'mas' ? hojaMas(l, u) : hojaMarcar(l, u, vanos, actual)}</div></section>`;
+    <div class="lev-hoja-cuerpo" data-hoja="${hoja}${hoja === 'punto' ? u.sel : ''}" onscroll="guardarScrollLev(this)">${hoja === 'punto' ? (enCompu() ? panelPunto(sel, l) : hojaPunto(sel, l)) : hoja === 'vanos' ? (enCompu() ? panelVanos(l, vanos) : hojaVanos(l, vanos)) : hoja === 'mas' ? hojaMas(l, u) : hojaMarcar(l, u, vanos, actual)}</div></section>`;
   html += '</div>' + ventanaElegir(l, u, sel, vanos, actual);
   return html + '</div>';
 }
@@ -86,12 +90,19 @@ function renderDetalle(id, l) {
 const fila = (k, valor, abrir, extra = '') => `<button class="lev-op" onclick="abrirPickerLev('${abrir}')" ${extra}><span class="lev-op-k">${k}</span><span class="lev-op-v">${valor}</span><span class="lev-op-f" aria-hidden="true">›</span></button>`;
 
 function hojaMarcar(l, u, vanos, actual) {
-  let html = `<div class="lev-lista">
+  const pc = enCompu();
+  let html = pc ? `<section class="dib-sec lev-marcar-pc">
+    ${filaC('Punto', `<div class="dib-con-muestra">${mini(u.tipo)}<select id="lev-tipo" aria-label="Tipo de punto" onchange="elegirLev('tipo', this.value)">${TIPOS_PUNTO.map(k => `<option value="${k}" ${u.tipo === k ? 'selected' : ''}>${esc(SIMBOLOS[k].nombre)}</option>`).join('')}</select></div>`, 'lev-tipo')}
+    ${filaC('Vano', `<div class="dib-con-muestra">${muestra(u.tramo)}<select id="lev-tramo" aria-label="Tipo de vano" onchange="elegirLev('tramo', this.value)">${Object.entries(TIPOS_TRAMO).map(([k, t]) => `<option value="${k}" ${u.tramo === k ? 'selected' : ''}>${esc(t.nombre)}</option>`).join('')}</select></div>`, 'lev-tramo')}
+    ${filaC('Marcar con', `<div class="segmento dib-seg"><button class="${u.modo === 'gps' ? 'active' : ''}" aria-label="Marcar con GPS" onclick="setLev('modo', 'gps')">GPS</button><button class="${u.modo === 'tocar' ? 'active' : ''}" aria-label="Tocando el mapa" onclick="setLev('modo', 'tocar')">Tocar mapa</button></div>`)}
+    ${filaC('Unir', `<label class="insp-check"><input type="checkbox" id="lev-unir" ${u.unir ? 'checked' : ''} onchange="setLev('unir', this.checked)"><span>Al anterior${actual ? ` (${esc(actual.nombre)})` : ''}</span></label>`)}
+  </section>` : `<div class="lev-lista">
     ${fila('Punto', `${mini(u.tipo)}${esc(SIMBOLOS[u.tipo]?.nombre || '')}`, 'tipoPunto', 'aria-label="Tipo de punto"')}
     ${fila('Vano', `${muestra(u.tramo)}${esc(TIPOS_TRAMO[u.tramo]?.nombre || '')}`, 'tipoVano', 'aria-label="Tipo de vano"')}
     <div class="lev-op lev-op-sin"><span class="lev-op-k">Marcar con</span><div class="segmento lev-seg"><button class="${u.modo === 'gps' ? 'active' : ''}" aria-label="Marcar con GPS" onclick="setLev('modo', 'gps')">GPS</button><button class="${u.modo === 'tocar' ? 'active' : ''}" aria-label="Tocando el mapa" onclick="setLev('modo', 'tocar')">Tocar mapa</button></div></div>
     <label class="lev-op lev-op-sin"><span class="lev-op-k">Unir al anterior</span><span class="lev-op-v">${actual && u.unir ? esc(actual.nombre) : ''}</span><input type="checkbox" class="lev-switch" id="lev-unir" ${u.unir ? 'checked' : ''} onchange="setLev('unir', this.checked)"></label>
-  </div>
+  </div>`;
+  html += `
   <div class="lev-accion page-sub">${u.modo === 'gps' ? `Párate junto al poste y toca "Poste aquí".${actual && u.unir ? ` Se une a ${esc(actual.nombre)}.` : ''}` : `Toca el mapa donde está el punto.${actual && u.unir ? ` Se une a ${esc(actual.nombre)}.` : ''}`}</div>`;
   html += bloqueAcometidas(l, u, vanos, actual);
   return html;
@@ -113,6 +124,46 @@ function hojaPunto(sel, l) {
       ${fila('Nota', sel.nota ? esc(sel.nota) : nada, 'nota', 'aria-label="Nota del punto"')}
     </div>
     <div class="page-sub">Para corregir la posición, arrastra el punto en el mapa.</div></div>`;
+}
+
+// Punto en la compu: todo a la vista y se edita ahí mismo
+function panelPunto(sel, l) {
+  if (!sel) return '';
+  const info = [sel.manual ? 'Marcado en el mapa' : sel.acc ? `GPS ±${Math.round(sel.acc)} m` : '', sel.movido ? 'ajustado' : ''].filter(Boolean).join(' · ');
+  const tramos = listaVanos(l).filter(v => v.a === sel.id || v.b === sel.id).map(v => v.tramo);
+  const trafos = sel.trafos || [];
+  return `<div class="lev-panel lev-panel-pc">
+    <div class="lev-punto-cab">${mini(simboloPunto(sel), 28)}<div><b>${esc(sel.nombre || 'Punto')}</b><span>${esc([SIMBOLOS[sel.tipo]?.nombre, info].filter(Boolean).join(' · '))}</span></div>
+      <button class="dib-btn dib-btn-chico dib-borrar" title="Borrar el punto" aria-label="Borrar" onclick="borrarPuntoLev()"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button></div>
+    <div class="lev-acciones lev-acciones-punto"><button class="b b-p" onclick="seguirDesdeLev()">Seguir desde aquí</button><button class="b b-g" onclick="unirConLev()">Unir con otro punto</button><button class="b b-g" onclick="moverAGpsLev()">Mover a mi ubicación</button></div>
+    <section class="dib-sec"><h4>Punto</h4>
+      ${filaC('Nombre', `<input id="lev-p-nombre" value="${esc(sel.nombre || '')}" placeholder="Ej. P3" onchange="datoPuntoLev('nombre', this.value)">`, 'lev-p-nombre')}
+      ${filaC('Tipo', `<select id="lev-p-tipo" aria-label="Tipo del punto" onchange="datoPuntoLev('tipo', this.value)">${TIPOS_PUNTO.map(k => `<option value="${k}" ${sel.tipo === k ? 'selected' : ''}>${esc(SIMBOLOS[k].nombre)}</option>`).join('')}</select>`, 'lev-p-tipo')}
+      ${filaC('Nota', `<input id="lev-p-nota" value="${esc(sel.nota || '')}" placeholder="Ej. poste de madera deteriorado" onchange="datoPuntoLev('nota', this.value)">`, 'lev-p-nota')}</section>
+    <section class="dib-sec"><h4>Transformador <span class="dib-sec-extra">${esc(textoTrafos(trafos))}</span></h4>
+      ${filaC('Unidades', `<div class="dib-estructuras">${trafos.map((k, i) => `<span class="dib-estr">${esc(k)} kVA<button aria-label="Quitar ${esc(k)} kVA" onclick="quitarTrafoLev(${i})">✕</button></span>`).join('') || '<span class="page-sub">Ninguno</span>'}</div>`)}
+      ${filaC('Agregar', listaC('lev-p-kva', KVA_TRAFO.map(k => [k, `${k} kVA`]), '', 'agregarTrafoLev(', { vacio: 'kVA…', aria: 'Agregar transformador (kVA)' }))}
+      <div class="page-sub">Para un banco, agrega uno por cada unidad.</div></section>
+    <section class="dib-sec"><h4>Poste</h4>${posteCompacto(sel, { id: 'lev-poste', altura: 'alturaPuntoLev', agregar: 'agregarEstructuraLev', quitar: 'quitarEstructuraLev', escrita: 'agregarEstructuraEscritaLev', clave: `lev-${sel.id}`, grupo: grupoEstructurasDe(tramos) })}</section>
+    <div class="page-sub">Para corregir la posición, arrastra el punto en el mapa.</div></div>`;
+}
+
+// Vanos en la compu: una tarjeta corta por vano con listas
+function panelVanos(l, vanos) {
+  if (!vanos.length) return '<div class="page-sub">Todavía no hay vanos: marca dos postes seguidos.</div>';
+  return `${vanos.map(v => {
+    const a = l.puntos?.[v.a]; const b = l.puntos?.[v.b]; const m = metrosDeVano(l, v);
+    const gps = a && b ? metrosDeVano(l, { ...v, metros: null }).metros : null;
+    return `<div class="lev-vano lev-vano-pc"><div class="lev-vano-nombre">${muestra(v.tramo)}<b>${esc(a?.nombre || '?')} – ${esc(b?.nombre || '?')}</b>
+        <span class="tg ${m.origen === 'medido' ? 'verde' : 'gris'}">${fmtMetros(m.metros)} ${m.origen === 'medido' ? 'medido' : 'GPS'}</span>${textoAcometidas(v.acom) ? `<span class="tg azul">${esc(textoAcometidas(v.acom))}</span>` : ''}
+        <button class="lev-vano-quitar" aria-label="Quitar vano" title="Quitar vano" onclick="borrarVanoLev('${v.id}')">✕</button></div>
+      <div class="lev-vano-grid">
+        <label><span>Metros medidos</span><input id="lev-v-${v.id}" inputmode="decimal" value="${v.metros ?? ''}" placeholder="${gps !== null ? `GPS ${gps.toFixed(1)}` : 'm'}" onchange="datoVanoLev('${v.id}', 'metros', this.value)" aria-label="Metros medidos"></label>
+        <label><span>Tipo de vano</span><select onchange="datoVanoLev('${v.id}', 'tramo', this.value)" aria-label="Tipo de vano">${Object.entries(TIPOS_TRAMO).map(([k, t]) => `<option value="${k}" ${v.tramo === k ? 'selected' : ''}>${esc(t.nombre)}</option>`).join('')}</select></label>
+        <label><span>Calibre</span>${listaC(`lev-v-${v.id}-calibre`, CALIBRES.map(x => [x, x]), v.calibre, `conductorVanoLev('${v.id}', 'calibre', `, { aria: 'Calibre' })}</label>
+        <label><span>Conductor</span>${listaC(`lev-v-${v.id}-tipo`, TIPOS_CONDUCTOR.map(x => [x, x]), v.conductor, `conductorVanoLev('${v.id}', 'tipo', `, { otro: '', aria: 'Conductor' })}</label></div></div>`;
+  }).join('')}
+    <div class="page-sub">La distancia sale del GPS (3 a 10 m de precisión con buena señal). Si mediste el vano con cinta o telémetro, escríbelo: manda sobre el GPS.</div>`;
 }
 
 // Ventana para elegir un solo dato (encima de la hoja). Las de una opción se cierran al elegir.
@@ -196,7 +247,8 @@ function bloqueAcometidas(l, u, vanos, actual) {
   if (!actual && !vanos.length) return '';
   const donde = elegido ? `${esc(nombre(l.vanos[elegido].a))} – ${esc(nombre(l.vanos[elegido].b))}` : `Próximo vano desde ${esc(actual?.nombre || '')}`;
   return `<div class="lev-acom"><div class="lev-acom-titulo">Acometidas</div>
-    <button class="lev-op" onclick="abrirPickerLev('vanoAcom')" aria-label="Vano donde se cuentan"><span class="lev-op-k">Contando en</span><span class="lev-op-v" id="lev-acom-vano">${donde}</span><span class="lev-op-f" aria-hidden="true">›</span></button>
+    ${enCompu() ? filaC('Contando en', `<select id="lev-acom-donde" aria-label="Vano donde se cuentan" onchange="elegirLev('vanoAcom', this.value)">${actual ? `<option value="" ${!elegido ? 'selected' : ''}>Próximo vano desde ${esc(actual.nombre)}</option>` : !elegido ? '<option value="" selected disabled>Elige el vano</option>' : ''}${vanos.slice().reverse().map(v => `<option value="${v.id}" ${elegido === v.id ? 'selected' : ''}>${esc(nombre(v.a))} – ${esc(nombre(v.b))}${textoAcometidas(v.acom) ? ` (${esc(textoAcometidas(v.acom))})` : ''}</option>`).join('')}</select><span id="lev-acom-vano" hidden>${donde}</span>`, 'lev-acom-donde')
+      : `<button class="lev-op" onclick="abrirPickerLev('vanoAcom')" aria-label="Vano donde se cuentan"><span class="lev-op-k">Contando en</span><span class="lev-op-v" id="lev-acom-vano">${donde}</span><span class="lev-op-f" aria-hidden="true">›</span></button>`}
     <div class="lev-acom-botones">${TIPOS_ACOMETIDA.map(x => `<div class="lev-acom-tipo"><button class="lev-acom-mas" onclick="sumarAcometidaLev('${x.k}', 1)" aria-label="Sumar acometida ${x.nombre}"><span>${x.nombre}</span><b class="lev-acom-n" id="lev-acom-${x.k}">${Number(cuenta[x.k]) || 0}</b><small>toca para sumar</small></button>
       <button class="lev-acom-menos" onclick="sumarAcometidaLev('${x.k}', -1)" aria-label="Restar acometida ${x.nombre}">− 1</button></div>`).join('')}</div>
     ${b.total ? `<div class="lev-acom-total"><span>Total del levantamiento: fase A <b>${b.faseA}</b> · fase B <b>${b.faseB}</b></span><span class="${b.dif ? 'lev-acom-dif' : 'lev-acom-ok'}">${b.mayor ? `Diferencia ${b.dif} (más en ${b.mayor})` : 'Balanceadas'}</span></div>` : ''}</div>`;
