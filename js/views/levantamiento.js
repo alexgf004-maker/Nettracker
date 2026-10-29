@@ -122,9 +122,13 @@ function hojaPunto(sel, l) {
       ${fila('Tipo', `${mini(sel.tipo)}${esc(SIMBOLOS[sel.tipo]?.nombre || '')}`, 'tipoDelPunto', 'aria-label="Tipo del punto"')}
       ${fila('Nombre', esc(sel.nombre || ''), 'nombre', 'aria-label="Nombre del punto"')}
       ${fila('Nota', sel.nota ? esc(sel.nota) : nada, 'nota', 'aria-label="Nota del punto"')}
+      ${corteLev(sel)}
     </div>
     <div class="page-sub">Para corregir la posición, arrastra el punto en el mapa.</div></div>`;
 }
+
+// Seccionamiento en el punto: aquí se cortaría la red BT (en Dibujar llega puesto y ahí se elige el lado que cambia)
+const corteLev = sel => `<label class="lev-op lev-op-sin"><span class="lev-op-k">Seccionar la red aquí</span><span class="lev-op-v">${sel.seccionar ? 'Corte de la red BT' : ''}</span><input type="checkbox" class="lev-switch" id="lev-p-corte" ${sel.seccionar ? 'checked' : ''} onchange="seccionarPuntoLev(this.checked)"></label>`;
 
 // Punto en la compu: todo a la vista y se edita ahí mismo
 function panelPunto(sel, l) {
@@ -139,7 +143,8 @@ function panelPunto(sel, l) {
     <section class="dib-sec"><h4>Punto</h4>
       ${filaC('Nombre', `<input id="lev-p-nombre" value="${esc(sel.nombre || '')}" placeholder="Ej. P3" onchange="datoPuntoLev('nombre', this.value)">`, 'lev-p-nombre')}
       ${filaC('Tipo', `<select id="lev-p-tipo" aria-label="Tipo del punto" onchange="datoPuntoLev('tipo', this.value)">${TIPOS_PUNTO.map(k => `<option value="${k}" ${sel.tipo === k ? 'selected' : ''}>${esc(SIMBOLOS[k].nombre)}</option>`).join('')}</select>`, 'lev-p-tipo')}
-      ${filaC('Nota', `<input id="lev-p-nota" value="${esc(sel.nota || '')}" placeholder="Ej. poste de madera deteriorado" onchange="datoPuntoLev('nota', this.value)">`, 'lev-p-nota')}</section>
+      ${filaC('Nota', `<input id="lev-p-nota" value="${esc(sel.nota || '')}" placeholder="Ej. poste de madera deteriorado" onchange="datoPuntoLev('nota', this.value)">`, 'lev-p-nota')}
+      <div class="lev-lista">${corteLev(sel)}</div></section>
     <section class="dib-sec"><h4>Transformador <span class="dib-sec-extra">${esc(textoTrafos(trafos))}</span></h4>
       ${filaC('Unidades', `<div class="dib-estructuras">${trafos.map((k, i) => `<span class="dib-estr">${esc(k)} kVA<button aria-label="Quitar ${esc(k)} kVA" onclick="quitarTrafoLev(${i})">✕</button></span>`).join('') || '<span class="page-sub">Ninguno</span>'}</div>`)}
       ${filaC('Agregar', listaC('lev-p-kva', KVA_TRAFO.map(k => [k, `${k} kVA`]), '', 'agregarTrafoLev(', { vacio: 'kVA…', aria: 'Agregar transformador (kVA)' }))}

@@ -133,7 +133,7 @@ function icono(p, { actual, sel }) {
   const kva = textoTrafos(p.trafos).replace(/^Trafo |^Banco /, '');
   return L.divIcon({
     className: 'lev-icono', iconSize: [44, 44], iconAnchor: [22, 22], // zona táctil grande para el dedo
-    html: `<div class="lev-punto ${actual ? 'actual' : ''} ${sel ? 'sel' : ''}"><svg viewBox="-4 -4 68 68" width="26" height="26" color="${c}" stroke="${c}" stroke-width="3" fill="none">${s.svg}</svg><span>${String(p.nombre || '').replace(/</g, '&lt;')}${kva ? `<em>${kva.replace(/</g, '&lt;')}</em>` : ''}</span></div>`,
+    html: `<div class="lev-punto ${actual ? 'actual' : ''} ${sel ? 'sel' : ''}"><svg viewBox="-4 -4 68 68" width="26" height="26" color="${c}" stroke="${c}" stroke-width="3" fill="none">${s.svg}</svg><span>${String(p.nombre || '').replace(/</g, '&lt;')}${kva ? `<em>${kva.replace(/</g, '&lt;')}</em>` : ''}${p.seccionar ? '<em class="lev-corte">Corte</em>' : ''}</span></div>`,
   });
 }
 function dibujarRed() {
@@ -340,6 +340,11 @@ export function moverAGpsLev() {
   const u = ui(); const g = state.gps; if (!u?.sel) return;
   if (!g?.lat) return showToast('Esperando señal GPS…');
   update(ref(db, ruta(state.levId, 'puntos/' + u.sel)), { lat: g.lat, lng: g.lng, acc: Math.round(g.acc * 10) / 10, movido: true });
+}
+// Seccionamiento: aquí se corta la red BT (llega puesto al pasar a Dibujar)
+export function seccionarPuntoLev(v) {
+  const u = ui(); if (!u?.sel) return;
+  update(ref(db, ruta(state.levId, 'puntos/' + u.sel)), { seccionar: v ? true : null });
 }
 export function datoPuntoLev(campo, valor) {
   const u = ui(); if (!u?.sel) return;

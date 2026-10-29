@@ -24,18 +24,22 @@ const distSeg = ([px, py], [ax, ay], [bx, by]) => {
   return Math.hypot(px - ax - k * dx, py - ay - k * dy);
 };
 // ¿Dos tramos se tocan? (un vértice de uno sobre el otro: en una punta o a media línea)
-export function seTocan(a, b, tol = 12) {
+// cortes: puntos donde la red está seccionada (ahí tocarse no une)
+export function seTocan(a, b, tol = 12, cortes = []) {
+  const libre = p => !cortes.some(c => Math.hypot(p[0] - c[0], p[1] - c[1]) <= tol);
   const sobre = (p, t) => t.puntos.length === 1 ? Math.hypot(p[0] - t.puntos[0][0], p[1] - t.puntos[0][1]) <= tol : t.puntos.slice(1).some((q, i) => distSeg(p, t.puntos[i], q) <= tol);
-  return a.puntos.some(p => sobre(p, b)) || b.puntos.some(p => sobre(p, a));
+  return a.puntos.some(p => libre(p) && sobre(p, b)) || b.puntos.some(p => libre(p) && sobre(p, a));
 }
-// Ids de los tramos de la misma red que `id` (conectados entre sí, de la misma familia)
+// Puntos donde se secciona la red (centro de los símbolos de seccionamiento; domain/seccionar.js)
+export const cortesDe = elementos => elementos.filter(e => e.tipo === 'simbolo' && e.simbolo === 'seccionamiento').map(e => [e.x + 30 * e.escala, e.y + 30 * e.escala]);
+// Ids de los tramos de la misma red que `id` (conectados entre sí, de la misma familia; un seccionamiento las separa)
 export function redDe(elementos, id, tol = 12) {
   const tramos = elementos.filter(e => e.tipo === 'polilinea' && e.puntos?.length);
   const ini = tramos.find(e => e.id === id); const fam = ini && familiaTramo(ini.tramo);
   if (!fam) return ini ? [ini.id] : [];
   const misma = tramos.filter(e => familiaTramo(e.tramo) === fam);
-  const red = [ini]; const cola = [ini];
-  while (cola.length) { const t = cola.shift(); misma.forEach(o => { if (!red.includes(o) && seTocan(t, o, tol)) { red.push(o); cola.push(o); } }); }
+  const red = [ini]; const cola = [ini]; const cortes = cortesDe(elementos);
+  while (cola.length) { const t = cola.shift(); misma.forEach(o => { if (!red.includes(o) && seTocan(t, o, tol, cortes)) { red.push(o); cola.push(o); } }); }
   return red.map(e => e.id);
 }
 

@@ -99,6 +99,12 @@ export function aDibujo(lev, { ancho = 1600, alto = 1000, margen = 140 } = {}) {
     const sim = simboloPunto(p);
     elementos.push({ id: id(), tipo: 'simbolo', simbolo: sim, color: SIMBOLO_COLOR[sim] || '#111827', grosor: 3, escala, rot: 0, x: x - 30 * escala, y: y - 30 * escala,
       ...(p.altura ? { altura: Number(p.altura) } : {}), ...(p.estructuras?.length ? { estructuras: [...p.estructuras] } : {}), ...(p.trafos?.length ? { trafos: [...p.trafos] } : {}) });
+    // Seccionamiento marcado en campo: el corte ya llega puesto (de través al primer vano; el lado se elige en Dibujar)
+    if (p.seccionar) {
+      const v = listaVanos(lev).find(q => (q.a === p.id || q.b === p.id) && pos[q.a] && pos[q.b]);
+      let g = v ? (Math.atan2(pos[v.b][1] - pos[v.a][1], pos[v.b][0] - pos[v.a][0]) * 180) / Math.PI : 0; if (g > 90) g -= 180; if (g <= -90) g += 180;
+      elementos.push({ id: id(), tipo: 'simbolo', simbolo: 'seccionamiento', color: '#dc2626', grosor: 3, escala, rot: Math.round(g * 10) / 10, x: x - 30 * escala, y: y - 30 * escala });
+    }
   });
   // Etiquetas: nombre y nota (en dos líneas) hacia el lado más libre de vanos, dentro de la lámina
   const vecinos = {};

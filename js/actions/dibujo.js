@@ -10,6 +10,7 @@ import { hoyLocal } from '../domain/trabajo.js';
 import { state } from '../state.js';
 import { abrirDoc, showToast } from '../ui.js';
 import { svgComparacion, svgPropuesta } from '../domain/propuesta.js';
+import { esCorte, ladosDe, seccionar } from '../domain/seccionar.js';
 import { alRedibujar, render } from '../views/render.js';
 
 const CLAVE = 'nettracker_dibujo';
@@ -93,9 +94,12 @@ function marcaBreve() { clearTimeout(quitarMarca); quitarMarca = setTimeout(() =
 // Centro de un símbolo y lo que tiene pegado (vértices de tramos y puntas de etiquetas en ese punto)
 const centroSimbolo = el => [el.x + 30 * el.escala, el.y + 30 * el.escala];
 // El símbolo de red más cercano a (x, y), si el toque cae sobre él
+// (si en el mismo lugar hay dos, p. ej. el poste y su seccionamiento, tocar otra vez el seleccionado da el otro)
 function simboloCerca(x, y) {
-  return dib().elementos.filter(e => e.tipo === 'simbolo' && SIMBOLOS[e.simbolo]?.grupo === 'red')
-    .map(e => ({ e, dist: Math.hypot(centroSimbolo(e)[0] - x, centroSimbolo(e)[1] - y) })).filter(o => o.dist <= Math.max(tolIman * 0.7, 30 * o.e.escala)).sort((a, b) => a.dist - b.dist)[0]?.e || null;
+  const c = dib().elementos.filter(e => e.tipo === 'simbolo' && SIMBOLOS[e.simbolo]?.grupo === 'red')
+    .map(e => ({ e, dist: Math.hypot(centroSimbolo(e)[0] - x, centroSimbolo(e)[1] - y) })).filter(o => o.dist <= Math.max(tolIman * 0.7, 30 * o.e.escala)).sort((a, b) => a.dist - b.dist);
+  if (c[1] && c[0].e.id === dib().sel && Math.hypot(centroSimbolo(c[0].e)[0] - centroSimbolo(c[1].e)[0], centroSimbolo(c[0].e)[1] - centroSimbolo(c[1].e)[1]) < 2) return c[1].e;
+  return c[0]?.e || null;
 }
 function pegadosA([cx, cy], excluir) {
   const out = [];
@@ -329,6 +333,8 @@ export function dibPointerDown(ev) {
     const inp = document.getElementById('dib-texto'); if (inp) { inp.focus(); inp.select(); }
     return;
   } else if (h === 'simbolo') {
+    // Seccionar la red: en el poste o en el punto de la línea que se toca
+    if (d.simbolo === 'seccionamiento') { if (!seccionarEn([x, y])) d.historial.pop(); return; }
     // Símbolos de red en tamaño de plano; los de unifilar más grandes. Con el color propio del símbolo si lo trae
     const sim = SIMBOLOS[d.simbolo];
     // Tocar un poste (o símbolo de red) que ya está lo selecciona y se puede arrastrar; no se pone otro encima
@@ -568,6 +574,63 @@ export function setLaminaDib(campo, valor) {
 // Color de la red: del tramo seleccionado o, sin selección, de los tramos nuevos (null = el de su tipo)
 // Color y nombre de la red: se aplican a toda la red conectada al tramo seleccionado
 const tolRed = () => 14 * Math.max(1, tamano(dib()).w / 1600);
+
+// ── Seccionamiento de la red BT (domain/seccionar.js) ──
+// Corta la red en p (un poste o un punto de la línea): pone el símbolo y lo deja seleccionado para elegir el lado que
+// pasa a otro transformador. Devuelve false si ahí no hay red BT.
+function seccionarEn(p) {
+  const d = dib(); const tol = Math.max(tolIman, tolRed());
+  const ya = d.elementos.find(e => esCorte(e) && Math.hypot(centroSimbolo(e)[0] - p[0], centroSimbolo(e)[1] - p[1]) <= tol);
+  if (ya) { d.sel = ya.id; d.herramienta = 'seleccionar'; render(); return false; }
+  const r = seccionar(d.elementos, p, tol, nuevoId);
+  if (!r) { showToast('Toca sobre la red BT: en el poste donde se corta o sobre la línea'); return false; }
+  const escala = 0.6 * (d.tamNuevos || 1) * escalaBase();
+  const el = { id: nuevoId(), tipo: 'simbolo', simbolo: 'seccionamiento', color: SIMBOLOS.seccionamiento.color, grosor: 3, escala, rot: r.angulo, x: r.punto[0] - 30 * escala, y: r.punto[1] - 30 * escala };
+  d.elementos = [...r.elementos, el]; d.sel = el.id; d.herramienta = 'seleccionar';
+  guardarBorrador(); render();
+  return true;
+}
+// Desde el panel del poste: "Seccionar la red aquí"
+export function seccionarAquiDib() {
+  const el = seleccionado(); if (el?.tipo !== 'simbolo') return;
+  memorizar(); if (!seccionarEn(centroSimbolo(el))) dib().historial.pop();
+}
+// Lado del corte que pasa a otro transformador: toma otro color y el nombre de su trafo (lo de antes queda en
+// redAntes para la situación actual y para devolverlo si se cambia de lado o se quita el corte)
+function ladoDe(elementos, c, id) { return ladosDe(elementos, c, tolRed()).find(l => l.ids.includes(id)) || null; }
+function restaurarLado(elementos, c) {
+  const lado = c.lado && ladoDe(elementos, c, c.lado); if (!lado) return elementos;
+  return elementos.map(e => {
+    if (!lado.ids.includes(e.id) || !e.redAntes) return e;
+    const { redAntes, colorRed, nombreRed, ...resto } = e;
+    return { ...resto, ...(redAntes.colorRed ? { colorRed: redAntes.colorRed } : {}), ...(redAntes.nombreRed ? { nombreRed: redAntes.nombreRed } : {}) };
+  });
+}
+function aplicarLado(elementos, c) {
+  const lado = c.lado && ladoDe(elementos, c, c.lado); if (!lado) return elementos;
+  // Un color que no use otra red BT del dibujo
+  const usados = new Set(elementos.filter(e => e.tipo === 'polilinea' && familiaTramo(e.tramo) === 'bt' && !lado.ids.includes(e.id)).map(e => e.colorRed || TIPOS_TRAMO[e.tramo]?.color));
+  const color = elementos.find(e => lado.ids.includes(e.id) && e.redAntes)?.colorRed || COLORES_RED.find(k => !usados.has(k)) || COLORES_RED[1];
+  return elementos.map(e => {
+    if (!lado.ids.includes(e.id)) return e;
+    const redAntes = e.redAntes || { colorRed: e.colorRed || null, nombreRed: e.nombreRed || null };
+    const { nombreRed, ...resto } = e;
+    return { ...resto, redAntes, colorRed: color, ...(c.alimenta ? { nombreRed: `Red BT trafo ${c.alimenta}` } : {}) };
+  });
+}
+function cambiarCorte(fn) {
+  const d = dib(); const c = seleccionado(); if (!esCorte(c)) return;
+  memorizar();
+  const nuevo = fn({ ...c });
+  let els = restaurarLado(d.elementos, c);
+  els = els.map(e => (e.id === c.id ? nuevo : e));
+  d.elementos = aplicarLado(els, nuevo);
+  guardarBorrador(); render();
+}
+export function seleccionarDib(id) { const d = dib(); if (!d?.elementos.some(e => e.id === id)) return; d.sel = id; d.herramienta = 'seleccionar'; render(); }
+export function seccionarLadoDib(tramoId) { cambiarCorte(c => ({ ...c, lado: tramoId })); }
+export function alimentaCorteDib(nombre) { const v = String(nombre || '').trim(); cambiarCorte(c => { const { alimenta, ...resto } = c; return v ? { ...resto, alimenta: v } : resto; }); }
+export function estructuraCorteDib(v) { cambiarCorte(c => ({ ...c, cambiaEstructura: !!v })); }
 const enLaRed = el => new Set(redDe(dib().elementos, el.id, tolRed()));
 export function setColorRedDib(c) {
   const d = dib(); if (!d) return; c = c || null;
@@ -733,7 +796,9 @@ export function duplicarDib() {
 }
 export function borrarDib() {
   const d = dib(); if (!d?.sel) return;
-  memorizar(); d.elementos = d.elementos.filter(e => e.id !== d.sel); d.sel = null;
+  memorizar();
+  const c = seleccionado(); if (esCorte(c)) d.elementos = restaurarLado(d.elementos, c);
+  d.elementos = d.elementos.filter(e => e.id !== d.sel); d.sel = null;
   if (d.tramo && !d.elementos.some(e => e.id === d.tramo)) d.tramo = null;
   guardarBorrador(); render();
 }

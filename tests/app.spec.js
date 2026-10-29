@@ -3988,6 +3988,75 @@ test.describe('Herramienta Dibujar', () => {
     await expect(page.locator('.dib-panel-cab')).toContainText('RS3');
   });
 
+  test('seccionamiento de carga: corta la red en un poste, un lado pasa a otro trafo, TS a CS y la situación actual como una sola red', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await page.evaluate(async () => {
+      const ad = await import('/js/actions/dibujo.js');
+      const P = [[200, 450], [450, 450], [700, 450], [950, 450], [1200, 450]];
+      const s = (id, simbolo, [x, y], extra = {}) => ({ id, tipo: 'simbolo', simbolo, color: '#111827', grosor: 3, escala: 0.6, rot: 0, x: x - 18, y: y - 18, ...extra });
+      const et = (id, t, [x, y], estilo = 'existente') => ({ id, tipo: 'etiqueta', estilo, texto: t, tam: 19, tx: x, ty: y, x: x + 10, y: y - 70 });
+      ad.cargarEnDibujo({ escala: 0.16, elementos: [
+        { id: 't1', tipo: 'polilinea', tramo: 'bt', color: '#000', grosor: 6, puntos: P, metros: { 3: 41 }, conductor: { calibre: '#2', tipo: 'Triplex' } },
+        { id: 't2', tipo: 'polilinea', tramo: 'bt_nueva', color: '#000', grosor: 6, puntos: [[1200, 450], [1300, 650]] },
+        s('p1', 'trafo', P[0], { trafos: ['25'] }), s('p2', 'poste', P[1], { estructuras: ['TS3'] }), s('p3', 'poste', P[2], { altura: 35, estructuras: ['TS3'] }),
+        s('p4', 'poste', P[3]), s('p5', 'poste', P[4]), s('p6', 'trafo_nuevo', [1300, 650], { trafos: ['37.5'] }),
+        et('e1', 'P1', P[0]), et('e2', 'P2', P[1]), et('e3', 'P3', P[2]), et('e4', 'P4', P[3]), et('e5', 'P5', P[4]), et('e6', 'P6', [1300, 650], 'proyectado'),
+      ] });
+    });
+    await nav(page, 'Dibujar');
+    const d = () => page.evaluate(async () => { const { state } = await import('/js/state.js'); return JSON.parse(JSON.stringify(state.dibujo.elementos)); });
+    const pr = f => page.evaluate(async src => { const { state } = await import('/js/state.js'); const m = await import('/js/domain/propuesta.js'); return new Function('m', 'd', `return ${src}`)(m, state.dibujo); }, f);
+    // Seccionar red: se toca el poste P3; el tramo se parte ahí (los metros del vano 3 siguen con su vano)
+    await page.getByRole('button', { name: 'Seccionar red' }).click();
+    await tocar(page, 703, 452);
+    let e = await d();
+    const tramos = e.filter(x => x.tipo === 'polilinea' && x.tramo === 'bt');
+    expect(tramos.map(t => t.puntos.length)).toEqual([3, 3]);
+    expect(tramos[1].metros).toEqual({ 1: 41 });
+    expect(e.filter(x => x.simbolo === 'seccionamiento')).toHaveLength(1);
+    await expect(page.locator('.dib-panel-cab')).toContainText('Falta elegir el lado que cambia');
+    // El lado hacia P4 pasa al trafo P6: otro color y su nombre en toda esa red (también lo proyectado)
+    await page.getByRole('button', { name: 'Hacia P4' }).click();
+    await page.locator('#dib-corte-trafo').selectOption('P6');
+    e = await d();
+    const der = e.filter(x => x.tipo === 'polilinea' && x.id !== 't1');
+    expect(der.every(t => t.nombreRed === 'Red BT trafo P6' && t.colorRed && t.redAntes)).toBe(true);
+    expect(e.find(x => x.id === 't1').colorRed).toBeUndefined();
+    await expect(page.locator('.dib-panel-cab')).toContainText('Hacia P4 pasa a trafo P6');
+    // Trabajo y cantidades: TS3 → CS3 en el poste del corte
+    expect(await pr("m.trabajos(d).map(t => t.texto)")).toContain('Seccionar red BT en P3 (TS3 → CS3); hacia P4 pasa al trafo P6');
+    expect(await pr("m.cantidades(d).map(f => f.material + ' ' + f.texto)")).toEqual(expect.arrayContaining(['Estructura CS3 1 u', 'Seccionamiento de red BT 1 u']));
+    expect(await pr("m.elementosPropuestos(d.elementos).find(x => x.id === 'p3')")).toMatchObject({ estructuras: ['CS3'], _antes: 'TS3' });
+    // Situación actual: sin el corte y como una sola red (sin el color ni el nombre nuevos)
+    const act = await pr("m.elementosActuales(d.elementos)");
+    expect(act.some(x => x.simbolo === 'seccionamiento')).toBe(false);
+    expect(act.filter(x => x.tipo === 'polilinea' && x.tramo === 'bt').every(t => !t.colorRed && !t.nombreRed)).toBe(true);
+    // Sin cambio de estructura
+    await page.locator('#dib-corte-estr').uncheck();
+    expect(await pr("m.trabajos(d).map(t => t.texto)")).toContain('Seccionar red BT en P3; hacia P4 pasa al trafo P6');
+    // Otro lado: el de P4 vuelve a como estaba y cambia el de P2
+    await page.getByRole('button', { name: 'Hacia P2' }).click();
+    e = await d();
+    expect(e.find(x => x.id === 't1')).toMatchObject({ nombreRed: 'Red BT trafo P6' });
+    expect(e.filter(x => x.tipo === 'polilinea' && x.id !== 't1').every(t => !t.colorRed && !t.nombreRed && !t.redAntes)).toBe(true);
+    // Quitar el corte devuelve la red como estaba
+    await page.locator('.dib-panel-cab').getByRole('button', { name: 'Borrar' }).click();
+    e = await d();
+    expect(e.filter(x => x.tipo === 'polilinea').every(t => !t.colorRed && !t.nombreRed && !t.redAntes)).toBe(true);
+    // Desde el panel del poste también se secciona
+    await page.evaluate(async () => { const { state } = await import('/js/state.js'); state.dibujo.sel = 'p2'; (await import('/js/views/render.js')).render(); });
+    await page.getByRole('button', { name: 'Seccionar la red aquí' }).click();
+    await expect(page.locator('.dib-panel-cab')).toContainText('Seccionamiento de red');
+    // En Levantamiento el punto marcado "Seccionar la red aquí" llega a Dibujar con el corte puesto
+    const lev = await page.evaluate(async () => { const m = await import('/js/domain/levantamiento.js');
+      const L = { nombre: 'X', puntos: { a: { lat: 13.5, lng: -88.87, nombre: 'P1', tipo: 'poste', orden: 1 }, b: { lat: 13.5, lng: -88.8696, nombre: 'P2', tipo: 'poste', seccionar: true, orden: 2 }, c: { lat: 13.5, lng: -88.8692, nombre: 'P3', tipo: 'poste', orden: 3 } },
+        vanos: { v1: { a: 'a', b: 'b', tramo: 'bt', orden: 1 }, v2: { a: 'b', b: 'c', tramo: 'bt', orden: 2 } } };
+      return m.aDibujo(L).elementos.filter(e => e.simbolo === 'seccionamiento').length; });
+    expect(lev).toBe(1);
+  });
+
   test('zoom: acercar y dibujar en el lugar correcto, desplazar el fondo, Ctrl + rueda, pellizco con dos dedos y pantalla completa', async ({ page }) => {
     const errores = []; page.on('pageerror', e => errores.push(e.message));
     await page.setViewportSize({ width: 1280, height: 900 });
