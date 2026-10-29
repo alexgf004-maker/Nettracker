@@ -79,16 +79,16 @@ export function renderDibujar() {
   html += '<div class="dib-cuerpo">';
   html += barraHerramientas(d, h);
 
-  // ── Lienzo (con una indicación corta arriba de lo que se puede hacer) ──
+  // ── Lienzo (la indicación de qué se puede hacer va en la barra de abajo, sin tapar el dibujo) ──
   const pista = h === 'simbolo' && d.simbolo === 'seccionamiento' ? 'Toca el poste donde se corta la red BT (o el punto de la línea)' : sel && h === 'seleccionar' ? PISTA_SEL[sel.tipo] || 'Arrástralo para moverlo · Supr para borrar' : AYUDA[h] || (!d.fondo && !d.elementos.length ? 'Empieza con "Imagen de fondo" (la captura del mapa) o elige una herramienta a la izquierda' : '');
-  html += `<div class="dib-lienzo">${pista ? `<div class="dib-pista">${esc(pista)}</div>` : ''}<svg id="dib-svg" class="dib-svg herr-${h}" viewBox="${viewBoxDib(d)}" onwheel="dibRueda(event)" onpointerdown="dibPointerDown(event)" onpointermove="dibPointerMove(event)" onpointerup="dibPointerUp(event)" onpointercancel="dibPointerUp(event)"><rect width="${p.w}" height="${p.H}" fill="#ffffff"/>${p.fondo}<g id="dib-capa">${p.capa}</g><g id="dib-cajetin">${p.cajetin}</g></svg>
+  html += `<div class="dib-lienzo"><svg id="dib-svg" class="dib-svg herr-${h}" viewBox="${viewBoxDib(d)}" onwheel="dibRueda(event)" onpointerdown="dibPointerDown(event)" onpointermove="dibPointerMove(event)" onpointerup="dibPointerUp(event)" onpointercancel="dibPointerUp(event)"><rect width="${p.w}" height="${p.H}" fill="#ffffff"/>${p.fondo}<g id="dib-capa">${p.capa}</g><g id="dib-cajetin">${p.cajetin}</g></svg>
     <input type="file" accept="image/*" hidden class="dib-soltar" aria-hidden="true" onchange="subirFondoDib(this.files); this.value=''">
     <button class="dib-abrir-panel" onclick="abrirPanelMovilDib(true)">${I.ajustes}<span>${esc(tituloPanel(d, sel, h))}</span></button></div>`;
 
   html += `<aside class="dib-panel" aria-label="Propiedades">${cabeceraPanel(d, sel, h, p)}
     <div class="dib-panel-cuerpo">${panel(d, sel, h, p)}</div></aside>`;
   html += '</div>';
-  html += barraEstado(d);
+  html += barraEstado(d, pista);
   if (state.dibProyectos === 'lista') html += `<div class="modal-overlay dib-modal" onclick="if (event.target === this) setVistaProyectosDib(null)"><div class="modal hoja">${listaProyectos(d)}</div></div>`;
   if (state.dibProyectos === 'guardar') html += `<div class="modal-overlay dib-modal" onclick="if (event.target === this) setVistaProyectosDib(null)"><div class="modal hoja">${formGuardar()}</div></div>`;
   return html + '</div>';
@@ -144,13 +144,14 @@ function barraSuperior(d) {
 }
 
 // ── Barra de estado (abajo): escala, medidas, qué hay en el dibujo, cajetín y zoom ──
-function barraEstado(d) {
+function barraEstado(d, pista = '') {
   const cuenta = (f, uno, varios) => { const n = d.elementos.filter(f).length; return n ? `${n} ${n === 1 ? uno : varios}` : ''; };
   const resumen = [cuenta(e => e.tipo === 'simbolo' && ['poste', 'poste_nuevo'].includes(e.simbolo), 'poste', 'postes'), cuenta(e => e.tipo === 'polilinea', 'tramo', 'tramos'), cuenta(e => e.tipo === 'simbolo' && e.simbolo === 'usuario', 'usuario', 'usuarios')].filter(Boolean).join(' · ');
   return `<div class="dib-estado">
     <button class="dib-est-item" onclick="setHerramientaDib('calibrar')" title="${d.escala ? 'Recalibrar la escala' : 'Calibrar la escala'}">${d.escala ? `Escala <b>1 m = ${(1 / d.escala).toFixed(1)} px</b>` : '<span class="tg ambar">Sin escala</span> Calibrar'}</button>
     ${d.lamina?.anclarMedidas ? '<span class="dib-est-pill">Medidas ancladas</span>' : ''}
     ${resumen ? `<span class="dib-est-item dib-est-resumen">${resumen}</span>` : ''}
+    ${pista ? `<span class="dib-est-pista" title="${esc(pista)}">${esc(pista)}</span>` : ''}
     <label class="dib-est-item dib-est-check"><input type="checkbox" id="dib-ver-cajetin" ${state.dibCajetin || state.dibVerLamina ? 'checked' : ''} ${state.dibVerLamina ? 'disabled' : ''} onchange="verCajetinDib(this.checked)"> Ver el cajetín</label>
     <div class="dib-zoom"><button class="dib-btn dib-btn-chico" title="Alejar (−)" aria-label="Alejar" onclick="zoomDib(0.8)">${I.menos}</button>
       <span id="dib-zoom-pct">${zoomPct()} %</span>

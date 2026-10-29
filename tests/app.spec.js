@@ -3944,7 +3944,8 @@ test.describe('Herramienta Dibujar', () => {
     await expect(page.locator('#dib-svg')).not.toHaveAttribute('viewBox', '0 0 800 400');
     await page.getByRole('button', { name: 'Tramo de red (T)' }).click();
     await expect(page.locator('#dib-svg')).toHaveAttribute('viewBox', '0 0 800 400');
-    await expect(page.locator('.dib-pista')).toBeVisible();
+    await expect(page.locator('.dib-est-pista')).toContainText('Toca cada poste del recorrido'); // la indicación va abajo, sin tapar el dibujo
+    await expect(page.locator('.dib-lienzo .dib-est-pista')).toHaveCount(0);
     // Al salir de Dibujar el menú de la app vuelve a tener nombres
     await nav(page, 'Inicio');
     await expect(page.locator('nav.bottom-nav .nav-label').first()).toBeVisible();
