@@ -3560,9 +3560,14 @@ test.describe('Herramienta Dibujar', () => {
   // Imagen de fondo hecha en el navegador (w×h) y subida con el botón
   async function subirImagen(page, w, h) {
     const png = await page.evaluate(([w, h]) => { const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.fillStyle = '#e5e7eb'; x.fillRect(0, 0, w, h); return c.toDataURL('image/png').split(',')[1]; }, [w, h]);
-    await page.locator('label', { hasText: /Subir imagen|Cambiar imagen/ }).locator('input').setInputFiles({ name: 'mapa.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
+    await page.locator('label', { hasText: /Subir imagen|Cambiar la imagen/ }).locator('input').setInputFiles({ name: 'mapa.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
     await expect(page.locator('#dib-svg')).toHaveAttribute('viewBox', new RegExp(`^0 0 ${w} `));
   }
+  // Opción de un menú de la barra de arriba (Archivo, Imagen de fondo, Exportar)
+  const menuDib = async (page, menu, opcion) => {
+    await page.locator('.dib-menu > summary', { hasText: menu }).click();
+    await page.locator('.dib-menu[open] .dib-menu-item', { hasText: opcion }).first().click();
+  };
   // Coordenadas de pantalla de un punto del plano (en píxeles de la imagen)
   // (se sube al inicio para que la barra fija no tape el lienzo)
   // (se lleva el punto al centro de la ventana para que la barra fija no lo tape)
@@ -3763,12 +3768,12 @@ test.describe('Herramienta Dibujar', () => {
     await page.locator('#dib-lam-activa').uncheck();
     await expect(page.locator('#dib-svg')).toHaveAttribute('viewBox', '0 0 800 400');
     const descarga = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Descargar PNG' }).click();
+    await menuDib(page, 'Exportar', 'Descargar PNG');
     const buf = require('fs').readFileSync(await (await descarga).path());
     expect(buf.slice(1, 4).toString()).toBe('PNG');
     expect([buf.readUInt32BE(16), buf.readUInt32BE(20)]).toEqual([2400, 1200]); // al triple de resolución
     page.once('dialog', dl => dl.accept());
-    await page.getByRole('button', { name: 'Nuevo' }).click();
+    await menuDib(page, 'Archivo', 'Nuevo dibujo');
     await expect(page.locator('#dib-capa [data-id]')).toHaveCount(0);
     expect(errores).toEqual([]);
   });
@@ -3838,7 +3843,7 @@ test.describe('Herramienta Dibujar', () => {
     await expect(exacto('Red BT existente')).toHaveCount(0);
     // PNG de la lámina completa (imagen + cajetín)
     const descarga = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Descargar PNG' }).click();
+    await menuDib(page, 'Exportar', 'Descargar PNG');
     const dl = await descarga;
     expect(dl.suggestedFilename()).toMatch(/^referencia_electrica-\d{4}-\d{2}-\d{2}\.png$/);
     const buf = require('fs').readFileSync(await dl.path());
@@ -4132,7 +4137,7 @@ test.describe('Herramienta Dibujar', () => {
       ], escala: 0.1 });
       (await import('/js/views/render.js')).render();
     });
-    await page.getByRole('button', { name: 'Mover o girar todo' }).click();
+    await menuDib(page, 'Imagen de fondo', 'Mover o girar todo');
     await expect(page.locator('.dib-panel-cab')).toContainText('Encajar el dibujo sobre la imagen');
     await page.getByRole('button', { name: 'Girar el dibujo 90° a la derecha' }).click();
     const est = () => page.evaluate(async () => { const d = (await import('/js/state.js')).state.dibujo; const by = id => d.elementos.find(e => e.id === id); return { t: by('t').puntos, s2: [by('s2').x + 18, by('s2').y + 18], e: by('e'), escala: d.escala }; });
@@ -4285,7 +4290,7 @@ test.describe('Herramienta Dibujar', () => {
     await tocar(page, 200, 500); await tocar(page, 1000, 500);
     await page.getByRole('button', { name: 'Terminar tramo' }).click();
     // Guardar como proyecto: nombre y referencia
-    await page.getByRole('button', { name: 'Guardar como proyecto' }).click();
+    await menuDib(page, 'Archivo', 'Guardar como proyecto');
     await page.locator('#dib-proy-nombre').fill('Propuesta Col. Prueba');
     await page.locator('#dib-proy-ref').fill('WO-1');
     await page.getByRole('button', { name: 'Guardar', exact: true }).click();
@@ -4306,9 +4311,9 @@ test.describe('Herramienta Dibujar', () => {
     esc = await app.escrituras();
     expect(esc.filter(([op, r]) => op === 'set' && /^dibujos\/[^/]+$/.test(r)).map(([, r]) => r)).toEqual([meta[1], meta[1]]);
     // Nuevo dibujo y volver a abrir el proyecto desde la lista
-    await page.getByRole('button', { name: 'Nuevo', exact: true }).click();
+    await menuDib(page, 'Archivo', 'Nuevo dibujo');
     await expect(page.locator('.dib-proyecto')).toContainText('Borrador');
-    await page.getByRole('button', { name: /Proyectos guardados \(1\)/ }).click();
+    await menuDib(page, 'Archivo', 'Abrir proyecto (1)');
     await expect(page.locator('.dib-proy-card')).toContainText('WO-1');
     await page.locator('.dib-proy-card').getByRole('button', { name: 'Abrir' }).click();
     await expect(page.locator('.dib-proyecto')).toContainText('Propuesta Col. Prueba');

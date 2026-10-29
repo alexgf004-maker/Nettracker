@@ -58,7 +58,7 @@ export function renderHeader() {
 
 function navBtn([tab, label, icono], extra = '') {
   const activo = state.tab === tab;
-  return `<button class="nav-btn ${extra} ${activo ? 'active' : ''}" onclick="switchTab('${tab}')">
+  return `<button class="nav-btn ${extra} ${activo ? 'active' : ''}" title="${label}" onclick="switchTab('${tab}')">
       <i class="nav-icon ic ic-${icono}"></i><span class="nav-label">${label}</span>
     </button>`;
 }
