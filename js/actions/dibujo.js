@@ -610,11 +610,14 @@ export function setTamNuevosDib(f) { const d = dib(); if (!d) return; d.tamNuevo
 // Barra de arriba: menús (Archivo, Imagen de fondo, Exportar) que se cierran al elegir o al tocar fuera
 export function cerrarMenusDib(salvo = null) { document.querySelectorAll('.dib-menu[open]').forEach(m => { if (m !== salvo) m.open = false; }); }
 document.addEventListener('click', ev => { const m = ev.target.closest?.('.dib-menu'); cerrarMenusDib(m); });
-// La lista se ubica debajo de su botón sin salirse de la pantalla (la barra de arriba se desplaza y la cortaría)
-document.addEventListener('toggle', ev => {
-  const m = ev.target; if (!m.classList?.contains('dib-menu') || !m.open) return;
-  const r = m.querySelector('summary').getBoundingClientRect(); const lista = m.querySelector('.dib-menu-lista');
-  lista.style.top = `${r.bottom}px`; lista.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - lista.offsetWidth - 8))}px`;
+// La lista se ubica debajo de su botón sin salirse de la pantalla (la barra de arriba se desplaza y la cortaría).
+// Se acomoda al tocar el botón, antes de abrirse: los de la mitad derecha se alinean por la derecha
+document.addEventListener('click', ev => {
+  const sum = ev.target.closest?.('.dib-menu > summary'); if (!sum) return;
+  const r = sum.getBoundingClientRect(); const lista = sum.parentElement.querySelector('.dib-menu-lista'); const derecha = r.left > window.innerWidth / 2;
+  lista.style.top = `${r.bottom}px`;
+  lista.style.left = derecha ? 'auto' : `${Math.max(8, r.left)}px`;
+  lista.style.right = derecha ? `${Math.max(8, window.innerWidth - r.right)}px` : 'auto';
 }, true);
 // "Lámina": datos de la lámina y cajetín en el panel (se ve el cajetín mientras tanto)
 export function verLaminaDib() { const d = dib(); cerrarTramo(); d.sel = null; d.herramienta = 'seleccionar'; state.dibVerLamina = !state.dibVerLamina; if (state.dibVerLamina) { state.dibPanel = true; state.dibPanelMovil = true; } vista = null; render(); }
