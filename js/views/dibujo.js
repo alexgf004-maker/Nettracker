@@ -40,6 +40,8 @@ const I = {
   ancla: ic('<circle cx="12" cy="5" r="2"/><path d="M12 7v14M5 12a7 7 0 0014 0"/>', 18),
   exportar: ic('<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>', 18),
   mas3: ic('<circle cx="5" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="19" cy="12" r="1.3" fill="currentColor"/>'),
+  duplicar: ic('<rect x="8" y="8" width="12" height="12" rx="2"/><rect x="4" y="4" width="12" height="12" rx="2"/>', 18),
+  borrar: ic('<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>', 18),
   lamina: ic('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 15h18M9 15v5"/>', 18),
 };
 // Herramientas de red que se ven siempre; los demás símbolos van en "Más símbolos"
@@ -80,8 +82,7 @@ export function renderDibujar() {
     <input type="file" accept="image/*" hidden class="dib-soltar" aria-hidden="true" onchange="subirFondoDib(this.files); this.value=''">
     <button class="dib-abrir-panel" onclick="abrirPanelMovilDib(true)">${I.ajustes}<span>${esc(tituloPanel(d, sel, h))}</span></button></div>`;
 
-  html += `<aside class="dib-panel" aria-label="Propiedades"><div class="dib-panel-cab"><b>${esc(tituloPanel(d, sel, h))}</b>
-    <button class="dib-btn dib-btn-chico dib-cerrar-movil" title="Cerrar" aria-label="Cerrar propiedades" onclick="abrirPanelMovilDib(false)">✕</button></div>
+  html += `<aside class="dib-panel" aria-label="Propiedades">${cabeceraPanel(d, sel, h, p)}
     <div class="dib-panel-cuerpo">${panel(d, sel, h, p)}</div></aside>`;
   html += '</div>';
   html += barraEstado(d);
@@ -176,6 +177,22 @@ function barraHerramientas(d, h) {
   </nav>`;
 }
 
+// Cabecera del panel: qué es (con su muestra), un resumen y Duplicar / Borrar
+function cabeceraPanel(d, sel, h, p) {
+  const icono = sel?.tipo === 'simbolo' ? mini(sel.simbolo, 30) : sel?.tipo === 'polilinea' ? muestraTramo(sel.tramo, 30, sel.colorRed) : h === 'simbolo' ? mini(d.simbolo, 30) : h === 'tramo' ? muestraTramo(d.tramoTipo, 30, d.colorRed) : '';
+  let sub = '';
+  if (sel?.tipo === 'polilinea' && sel.puntos.length > 1) {
+    const n = nombresVanos(sel, d.elementos, 14 * Math.max(1, p.w / 1600)); const t = metrosTramo(sel, d.escala);
+    const extremos = [n[0]?.split(' → ')[0], n.at(-1)?.split(' → ')[1]].filter(Boolean);
+    sub = [`${n.length} ${n.length === 1 ? 'vano' : 'vanos'}`, extremos.length === 2 ? extremos.join(' → ') : '', t !== null ? fmtMetros(t) : ''].filter(Boolean).join(' · ');
+  } else if (sel?.tipo === 'simbolo') sub = [sel.altura ? `${sel.altura}'` : '', (sel.estructuras || []).join(' / '), kvaTexto(sel.trafos), sel.nota].filter(Boolean).join(' · ');
+  else if (sel?.tipo === 'etiqueta') sub = ESTILOS_ETIQUETA[sel.estilo]?.nombre || '';
+  else if (!sel && h === 'seleccionar') sub = 'Datos de la lámina, cajetín y propuesta';
+  const quitar = sel && d.tramo !== sel.id;
+  return `<div class="dib-panel-cab">${icono ? `<span class="dib-cab-icono">${icono}</span>` : ''}<div class="dib-cab-t"><b>${esc(tituloPanel(d, sel, h))}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>
+    ${quitar ? `<button class="dib-btn dib-btn-chico" title="Duplicar" aria-label="Duplicar" onclick="duplicarDib()">${I.duplicar}</button><button class="dib-btn dib-btn-chico dib-borrar" title="Borrar (Supr)" aria-label="Borrar" onclick="borrarDib()">${I.borrar}</button>` : ''}
+    <button class="dib-btn dib-btn-chico dib-cerrar-movil" title="Cerrar" aria-label="Cerrar propiedades" onclick="abrirPanelMovilDib(false)">✕</button></div>`;
+}
 function tituloPanel(d, sel, h) {
   if (h === 'calibrar') return 'Calibrar la escala';
   if (h === 'encajar') return 'Encajar el dibujo sobre la imagen';
@@ -189,13 +206,32 @@ function tituloPanel(d, sel, h) {
 // ── Panel de propiedades ──
 const seccion = (titulo, cuerpo) => `<section class="dib-sec">${titulo ? `<h4>${titulo}</h4>` : ''}${cuerpo}</section>`;
 const opcion = (v, t, sel) => `<option value="${esc(v)}" ${String(sel ?? '') === String(v) ? 'selected' : ''}>${esc(t)}</option>`;
-// Altura y estructuras de un poste (los mismos controles en Dibujar y en Levantamiento). Todo se elige con un toque:
-// altura en botones (u otra escrita), estructuras por grupo (el de la red que llega al poste) o con el buscador.
-// acc: { id, altura, agregar, quitar, escrita, clave (punto), grupo (por defecto) }
-export function controlesPoste(p, acc) {
-  return `<div class="field"><label>Altura del poste</label>${selectorAltura(p.altura, acc)}</div>
-    <div class="field"><label>Estructuras</label>${selectorEstructuras(p.estructuras, acc)}</div>`;
+// Fila compacta del panel: nombre a la izquierda y el control a la derecha
+const fila = (label, control, para = '') => `<div class="dib-fila-c"><label ${para ? `for="${para}"` : ''}>${label}</label><div>${control}</div></div>`;
+// Lista desplegable con "Otro…" que se cambia por un campo para escribir (lo que no está en la lista también se ve)
+// fn: nombre de la función que recibe el valor (con argumentos previos, ej. "setConductorDib('calibre', ")
+function lista(id, opciones, actual, fn, { vacio = '—', otro = 'Otro…', aria = '' } = {}) {
+  const v = String(actual ?? ''); const fuera = v && !opciones.some(([k]) => String(k) === v);
+  const llamar = val => `${fn}${val})`;
+  return `<select id="${id}" ${aria ? `aria-label="${esc(aria)}"` : ''} onchange="if (this.value === '__otro') { this.hidden = true; const i = this.nextElementSibling; i.hidden = false; i.focus(); } else ${llamar('this.value')}">${opcion('', vacio, v)}${opciones.map(([k, t]) => opcion(k, t, v)).join('')}${fuera ? opcion(v, v, v) : ''}${otro ? `<option value="__otro">${otro}</option>` : ''}</select>${otro ? `<input id="${id}-otra" hidden placeholder="Escribe y Enter" aria-label="${esc(aria || 'Otro')}" onkeydown="if (event.key === 'Enter') this.blur()" onchange="${llamar('this.value')}">` : ''}`;
 }
+// Conductor (calibre y tipo) en listas, para el panel de Dibujar en la compu
+const conductorCompacto = (c, id, fn) => fila('Calibre', lista(`${id}-calibre`, CALIBRES.map(x => [x, x]), c?.calibre, `${fn}('calibre', `, { aria: 'Calibre' }), `${id}-calibre`)
+  + fila('Tipo', lista(`${id}-tipo`, TIPOS_CONDUCTOR.map(x => [x, x]), c?.tipo, `${fn}('tipo', `, { otro: '', aria: 'Tipo de conductor' }), `${id}-tipo`);
+const alturaCompacta = (altura, id, fn) => fila('Altura', lista(`${id}-altura`, ALTURAS_POSTE.map(a => [a, `${a}'`]), altura, `${fn}(`, { otro: 'Otra…', aria: 'Altura del poste en pies' }), `${id}-altura`);
+// Poste en el panel: altura en lista y estructuras con el buscador de siempre
+// (las puestas se ven siempre; la lista para agregar se abre con "Agregar estructura" y se queda abierta en ese poste)
+const posteCompacto = (p, acc) => {
+  const abierta = state.dibEstrAbierta === acc.clave;
+  const puestas = (p.estructuras || []).map((c, i) => `<span class="dib-estr" title="${esc(nombreEstructura(c))}">${esc(c)}<button aria-label="Quitar ${esc(c)}" onclick="${acc.quitar}(${i})">✕</button></span>`).join('');
+  return `${alturaCompacta(p.altura, acc.id, acc.altura)}<div class="dib-fila-c dib-fila-arriba"><label>Estructuras</label><div><div class="dib-estructuras">${puestas || '<span class="page-sub">Ninguna</span>'}</div></div></div>
+    <details class="dib-agregar-estr" ${abierta ? 'open' : ''} ontoggle="estrAbiertaDib('${acc.clave}', this.open)"><summary>${I.mas} Agregar estructura</summary>${selectorEstructuras(p.estructuras, { ...acc, sinPuestas: true })}</details>`;
+};
+// Apariencia: plegable (se recuerda abierta o cerrada)
+const apariencia = (cuerpo, resumen = '') => `<details class="dib-apariencia" ${state.dibApariencia ? 'open' : ''} ontoggle="aparienciaDib(this.open)"><summary>Apariencia${resumen ? ` <small>(${resumen})</small>` : ''}${I.chev}</summary><div class="dib-apariencia-cuerpo">${cuerpo}</div></details>`;
+// Altura y estructuras de un poste en Levantamiento (todo con un toque): altura en botones (u otra escrita),
+// estructuras por grupo (el de la red que llega al poste) o con el buscador.
+// acc: { id, altura, agregar, quitar, escrita, clave (punto), grupo (por defecto) }
 export function selectorAltura(altura, acc) {
   const otraAltura = altura && !ALTURAS_POSTE.includes(Number(altura));
   return `<div class="dib-opciones">${ALTURAS_POSTE.map(a => `<button class="dib-op ${Number(altura) === a ? 'activo' : ''}" onclick="${acc.altura}('${Number(altura) === a ? '' : a}')">${a}'</button>`).join('')}
@@ -204,7 +240,7 @@ export function selectorAltura(altura, acc) {
 export function selectorEstructuras(estructuras, acc) {
   const lista = estructuras || [];
   const g = state.estrGrupo?.clave === acc.clave ? state.estrGrupo.g : acc.grupo || 'sec';
-  return `<div class="dib-estructuras">${lista.map((c, i) => `<span class="dib-estr" title="${esc(nombreEstructura(c))}">${esc(c)}<button aria-label="Quitar ${esc(c)}" onclick="${acc.quitar}(${i})">✕</button></span>`).join('') || '<span class="page-sub">Ninguna todavía</span>'}</div>
+  return `${acc.sinPuestas ? '' : `<div class="dib-estructuras">${lista.map((c, i) => `<span class="dib-estr" title="${esc(nombreEstructura(c))}">${esc(c)}<button aria-label="Quitar ${esc(c)}" onclick="${acc.quitar}(${i})">✕</button></span>`).join('') || '<span class="page-sub">Ninguna todavía</span>'}</div>`}
       <div class="dib-estr-grupos segmento">${ESTRUCTURAS.map(x => `<button class="${g === x.k ? 'active' : ''}" onclick="grupoEstructurasUI('${acc.clave}', '${x.k}')">${x.corto}</button>`).join('')}</div>
       <input id="${acc.id}-buscar" class="dib-estr-buscar" type="search" placeholder="Buscar código o nombre (ej. remate, RS)" aria-label="Buscar estructura" oninput="buscarEstructuras('${acc.id}', this.value)">
       <div class="dib-estr-lista" id="${acc.id}-lista" data-g="${g}">${ESTRUCTURAS.map(x => x.items.map(it => `<button class="dib-estr-op ${lista.includes(it.codigo) ? 'puesta' : ''}" data-g="${x.k}" data-q="${esc((it.codigo + ' ' + it.nombre + ' ' + x.corto).toLowerCase())}" ${x.k === g ? '' : 'hidden'} onclick="${acc.agregar}('${it.codigo}')"><b>${it.codigo}</b><span>${esc(it.nombre)}</span></button>`).join('')).join('')}
@@ -220,7 +256,7 @@ export function controlesConductor(c, acc) {
     <div class="field"><label>Conductor</label><div class="dib-opciones">${TIPOS_CONDUCTOR.map(t => `<button class="dib-op ${c?.tipo === t ? 'activo' : ''}" onclick="${acc.fn('tipo', q(c?.tipo === t ? '' : t))}">${t}</button>`).join('')}</div></div>`;
 }
 function panel(d, sel, h, p) {
-  const tiposTramo = actual => `<div class="dib-lista">${Object.entries(TIPOS_TRAMO).map(([k, t]) => `<button class="dib-chip ${actual === k ? 'activo' : ''}" onclick="setTipoTramoDib('${k}')">${muestraTramo(k)}${t.nombre}</button>`).join('')}</div>`;
+  const tiposTramo = actual => `<div class="dib-con-muestra">${muestraTramo(actual, 26)}<select id="dib-tipo-red" aria-label="Tipo de red" onchange="setTipoTramoDib(this.value)">${Object.entries(TIPOS_TRAMO).map(([k, t]) => opcion(k, t.nombre, actual)).join('')}</select></div>`;
   const coloresRed = (actual, tipo) => `<div class="dib-colores">
       <button class="dib-color-auto ${!actual ? 'activo' : ''}" title="El del tipo" aria-label="Color del tipo de red" onclick="setColorRedDib(null)">${muestraTramo(tipo, 26)}</button>
       ${COLORES_RED.map(c => `<button class="dib-color ${actual === c ? 'activo' : ''}" style="background:${c}" title="Red de este color" aria-label="Red color ${c}" onclick="setColorRedDib('${c}')"></button>`).join('')}
@@ -228,7 +264,9 @@ function panel(d, sel, h, p) {
   const colores = () => `<div class="dib-colores">${COLORES.map(c => `<button class="dib-color ${d.color === c ? 'activo' : ''}" style="background:${c}" title="Color" aria-label="Color ${c}" onclick="setColorDib('${c}')"></button>`).join('')}</div>`;
   const grosores = () => `<div class="dib-colores">${Object.keys(GROSORES).map(g => `<button class="dib-btn dib-btn-chico ${d.grosor === g ? 'activo' : ''}" title="Grosor ${g}" aria-label="Grosor ${g}" onclick="setGrosorDib('${g}')"><span class="dib-grosor" style="height:${GROSORES[g]}px"></span></button>`).join('')}</div>`;
   const tamano = (texto = 'Tamaño') => `<div class="dib-tamano"><span>${texto}</span><button class="dib-btn dib-btn-chico" title="Más chico" aria-label="Más chico" onclick="setTamanoDib(0.85)">${I.menos}</button><button class="dib-btn dib-btn-chico" title="Más grande" aria-label="Más grande" onclick="setTamanoDib(1.18)">${I.mas}</button></div>`;
-  const acciones = (extra = '') => seccion('', `<div class="dib-acciones-el">${extra}<button class="b b-g" onclick="duplicarDib()">Duplicar</button><button class="b b-g" onclick="alFrenteDib()">Al frente</button><button class="b b-l dib-borrar" onclick="borrarDib()">Borrar</button></div>`);
+  // Duplicar y Borrar van en la cabecera del panel; aquí lo demás que se hace con el elemento
+  const acciones = (extra = '') => extra ? seccion('', `<div class="dib-acciones-el">${extra}</div>`) : '';
+  const alFrente = '<button class="b b-g" onclick="alFrenteDib()">Al frente</button>';
   const nota = t => `<div class="page-sub">${t}</div>`;
 
   const opacidad = () => `<label class="dib-opacidad">Imagen de fondo más tenue<input id="dib-opacidad" type="range" min="0.2" max="1" step="0.05" value="${d.fondoOpacidad || 1}" oninput="setOpacidadFondoDib(this.value)"></label>`;
@@ -249,51 +287,58 @@ function panel(d, sel, h, p) {
       : `${nota('Traza una línea sobre algo cuya medida conozcas (la barra de escala del mapa, un vano o una calle medida en Google Maps con clic derecho → Medir distancia); luego escribe cuántos metros mide.')}<div class="dib-acciones-el"><button class="b b-l" onclick="cancelarCalibracionDib()">Cancelar</button></div>`);
   }
 
-  // Tramo seleccionado (o en trazo)
+  // Tramo seleccionado (o en trazo): red, conductor, vanos, propuesta y apariencia
   if (sel?.tipo === 'polilinea') {
     const total = metrosTramo(sel, d.escala);
     let html = '';
     if (d.tramo === sel.id) html += seccion('', `${nota(AYUDA.tramo)}<button class="b b-p" onclick="terminarTramoDib()"><i class="ic ic-check"></i> Terminar tramo</button>`);
-    html += seccion('Tipo de red', tiposTramo(sel.tramo));
     const nRed = redDe(d.elementos, sel.id, 14 * Math.max(1, p.w / 1600)).length;
-    const toda = nRed > 1 ? ` Se aplica a toda la red conectada (${nRed} tramos).` : '';
-    html += seccion('Color de la red', `${coloresRed(sel.colorRed, sel.tramo)}${nota('Para distinguir redes del mismo tipo (por ejemplo, de dos transformadores). Cada color sale aparte en la simbología y en la lámina de propuesta.' + toda)}`);
-    html += seccion('Nombre de la red', `<input id="dib-nombre-red" value="${esc(sel.nombreRed || '')}" placeholder="${esc(TIPOS_TRAMO[sel.tramo]?.nombre || '')}" oninput="setNombreRedDib(this.value)" onchange="finEdicionDib()">${nota('Ej. "Red BT trafo P4". Sale en la simbología y en la leyenda de la lámina de propuesta.' + toda)}`);
-    html += seccion('Conductor', `${controlesConductor(sel.conductor, { id: 'dib-cond', fn: (c, v) => `setConductorDib('${c}', ${v})` })}<div class="page-sub">Los tramos que traces después salen con este conductor.</div>`);
-    html += seccionPropuesta(sel, d);
-    html += seccion('Grosor', tamano('Grosor de la línea'));
+    html += seccion(`Red${nRed > 1 ? ` <span class="dib-sec-extra">${nRed} tramos conectados</span>` : ''}`, fila('Tipo', tiposTramo(sel.tramo), 'dib-tipo-red')
+      + fila('Nombre', `<input id="dib-nombre-red" value="${esc(sel.nombreRed || '')}" placeholder="${esc(TIPOS_TRAMO[sel.tramo]?.nombre || '')}" oninput="setNombreRedDib(this.value)" onchange="finEdicionDib()">`, 'dib-nombre-red')
+      + fila('Color', coloresRed(sel.colorRed, sel.tramo))
+      + nota(`Nombre y color distinguen redes del mismo tipo (por ejemplo, de dos transformadores) y salen aparte en la simbología.${nRed > 1 ? ' Se aplican a toda la red conectada.' : ''}`));
+    html += seccion('Conductor', conductorCompacto(sel.conductor, 'dib-cond', 'setConductorDib') + nota('Los tramos que traces después salen con este conductor.'));
     if (d.tramo !== sel.id && sel.puntos.length > 1) {
       const nombres = nombresVanos(sel, d.elementos, 14 * Math.max(1, p.w / 1600));
-      html += seccion(`Metros por vano <span class="dib-total-tramo">${total !== null ? `Total ${fmtMetros(total)}` : ''}</span>`, `<div class="dib-vanos">${nombres.map((n, k) => {
+      const anclados = sel.metrosAncla && Object.keys(sel.metrosAncla).length;
+      html += seccion(`Vanos <span class="dib-sec-extra">${anclados ? 'Anclados · ' : ''}<span class="dib-total-tramo">${total !== null ? `Total ${fmtMetros(total)}` : ''}</span></span>`, `<div class="dib-tabla-vanos"><div class="dib-tv-cab"><span>Vano</span><span>Calibre</span><span>Metros</span></div>${nombres.map((n, k) => {
         const i = k + 1; const manual = sel.metros?.[i] !== undefined; const anclado = !manual && sel.metrosAncla?.[i] !== undefined;
         const auto = !manual && (anclado || d.escala) ? metrosVano({ ...sel, metros: {} }, i, d.escala) : null;
-        return `<div class="field"><label>Vano ${i}: ${esc(n)}</label><div class="dib-vano-fila"><input id="dib-vano-${i}" inputmode="decimal" value="${manual ? esc(sel.metros[i]) : ''}" placeholder="${auto !== null ? `${auto.toFixed(1)} (${anclado ? 'anclado' : 'con la escala'})` : 'metros'}" oninput="metrosVanoDib(${i}, this.value)" onchange="finVanoDib()">
-          <select id="dib-vano-cal-${i}" aria-label="Calibre del vano ${i}" onchange="setCalibreVanoDib(${i}, this.value)">${opcion('', sel.conductor?.calibre ? `${sel.conductor.calibre} (del tramo)` : 'Calibre', sel.calibres?.[i] || '')}${CALIBRES.map(c => opcion(c, c, sel.calibres?.[i])).join('')}</select></div></div>`;
-      }).join('')}</div>${nota(d.escala ? 'Si escribes los metros de un vano, mandan sobre los de la escala.' : 'Sin escala, escribe los metros de cada vano; salen sobre el tramo y en la tabla de distancias.')}`);
-      html += acciones(Object.keys(sel.desfases || {}).length ? '<button class="b b-g" onclick="metrosASuLugarDib()">Metros a su lugar</button>' : '');
+        return `<div class="dib-tv-fila"><label for="dib-vano-${i}" title="Vano ${i}">${esc(n)}</label>
+          <select id="dib-vano-cal-${i}" aria-label="Calibre del vano ${i}" onchange="setCalibreVanoDib(${i}, this.value)">${opcion('', sel.conductor?.calibre ? `${sel.conductor.calibre}` : '—', sel.calibres?.[i] || '')}${CALIBRES.map(c => opcion(c, c, sel.calibres?.[i])).join('')}</select>
+          <input id="dib-vano-${i}" inputmode="decimal" value="${manual ? esc(sel.metros[i]) : ''}" placeholder="${auto !== null ? auto.toFixed(1) : 'm'}" title="${auto !== null ? `${auto.toFixed(1)} m ${anclado ? '(anclado)' : '(con la escala)'}` : 'Escribe los metros'}" oninput="metrosVanoDib(${i}, this.value)" onchange="finVanoDib()"></div>`;
+      }).join('')}</div>${nota(d.escala || anclados ? 'Los metros en gris salen solos; si escribes uno, manda sobre el de la escala.' : 'Sin escala, escribe los metros de cada vano; salen sobre el tramo y en la tabla de distancias.')}`);
     }
+    html += seccionPropuesta(sel, d);
+    html += acciones(Object.keys(sel.desfases || {}).length ? '<button class="b b-g" onclick="metrosASuLugarDib()">Metros a su lugar</button>' : '');
+    html += apariencia(tamano('Grosor de la línea') + `<div class="dib-acciones-el">${alFrente}</div>`, 'grosor');
     return html;
   }
   if (h === 'tramo') {
-    return seccion('', nota(AYUDA.tramo)) + seccion('Tipo de red', tiposTramo(d.tramoTipo)) + seccion('Color de la red', coloresRed(d.colorRed, d.tramoTipo))
-      + (d.conductor ? seccion('Conductor', nota(`Los tramos nuevos salen con ${esc([d.conductor.calibre, d.conductor.tipo].filter(Boolean).join(' '))}; se cambia al seleccionar el tramo.`)) : '') + seccion('Grosor', grosores());
+    return seccion('Tramo nuevo', fila('Tipo', tiposTramo(d.tramoTipo), 'dib-tipo-red') + fila('Color', coloresRed(d.colorRed, d.tramoTipo))
+      + (d.conductor ? nota(`Sale con ${esc([d.conductor.calibre, d.conductor.tipo].filter(Boolean).join(' '))}; se cambia al seleccionar el tramo.`) : '')) + apariencia(fila('Grosor', grosores()), 'grosor');
   }
 
-  // Símbolo seleccionado
+  // Símbolo seleccionado: datos, poste, propuesta y apariencia
   if (sel?.tipo === 'simbolo') {
     const red = SIMBOLOS[sel.simbolo]?.grupo === 'red';
-    return seccion('', `<div class="dib-simbolo-sel">${mini(sel.simbolo, 34)}<span>${esc(SIMBOLOS[sel.simbolo]?.nombre || '')}</span></div>${tamano()}${red ? nota('Los postes que pongas después salen de este tamaño.') : ''}`)
-      + (red ? seccionPropuesta(sel, d) : '')
-      + (red && ['trafo', 'trafo_nuevo', 'banco'].includes(sel.simbolo) ? seccion('Transformador', `<div class="field"><label>kVA (uno por transformador)</label><input id="dib-kva" value="${esc((sel.trafos || []).join(', '))}" placeholder="Ej. 37.5 o 25, 25, 25" onchange="setKvaDib(this.value)"></div>${nota(kvaTexto(sel.trafos) ? `Sale en la lámina de propuesta como ${esc(kvaTexto(sel.trafos))}.` : 'Sale en los trabajos y las cantidades de la lámina de propuesta.')}`) : '')
-      + (red ? seccion('Nota', `<input id="dib-nota" value="${esc(sel.nota || '')}" placeholder="${sel.simbolo === 'usuario' ? 'Ej. Medidor 12345678' : 'Ej. Medidor, número de trafo…'}" oninput="setNotaDib(this.value)" onchange="finEdicionDib()">${nota('Sale junto al símbolo (o en su etiqueta) y en la lámina de propuesta.')}`) : '')
-      + (red && ['poste', 'poste_nuevo', 'trafo', 'trafo_nuevo', 'banco', 'puente'].includes(sel.simbolo) ? seccion('Datos del poste', controlesPoste(sel, { id: 'dib-poste', altura: 'setAlturaDib', agregar: 'agregarEstructuraDib', quitar: 'quitarEstructuraDib', escrita: 'agregarEstructuraEscritaDib', clave: sel.id, grupo: grupoEstructurasDe(tramosEnPoste(d, sel)) })) : red ? '' : seccion('Color', colores()))
-      + acciones(`<button class="b b-g" onclick="girarDib()">Girar 90°</button>${sel.desfase ? '<button class="b b-g" onclick="metrosASuLugarDib()">Datos a su lugar</button>' : ''}`);
+    const esTrafo = ['trafo', 'trafo_nuevo', 'banco'].includes(sel.simbolo);
+    const conPoste = ['poste', 'poste_nuevo', 'trafo', 'trafo_nuevo', 'banco', 'puente'].includes(sel.simbolo);
+    let html = '';
+    if (red) html += seccion('Datos', (esTrafo ? fila('kVA', `<input id="dib-kva" value="${esc((sel.trafos || []).join(', '))}" placeholder="Ej. 37.5 o 25, 25, 25" title="Uno por transformador" onchange="setKvaDib(this.value)">`, 'dib-kva') : '')
+      + fila('Nota', `<input id="dib-nota" value="${esc(sel.nota || '')}" placeholder="${sel.simbolo === 'usuario' ? 'Ej. Medidor 12345678' : 'Ej. Medidor, número de trafo…'}" oninput="setNotaDib(this.value)" onchange="finEdicionDib()">`, 'dib-nota')
+      + nota(esTrafo ? 'Uno por transformador, separados por coma. La nota sale junto al símbolo (o en su etiqueta).' : 'Sale junto al símbolo (o en su etiqueta) y en la lámina de propuesta.'));
+    if (red && conPoste) html += seccion('Poste', posteCompacto(sel, { id: 'dib-poste', altura: 'setAlturaDib', agregar: 'agregarEstructuraDib', quitar: 'quitarEstructuraDib', escrita: 'agregarEstructuraEscritaDib', clave: sel.id, grupo: grupoEstructurasDe(tramosEnPoste(d, sel)) }));
+    if (red) html += seccionPropuesta(sel, d);
+    html += acciones(`<button class="b b-g" onclick="girarDib()">Girar 90°</button>${sel.desfase ? '<button class="b b-g" onclick="metrosASuLugarDib()">Datos a su lugar</button>' : ''}`);
+    html += apariencia(tamano() + (red ? nota('Los que pongas después salen de este tamaño.') : fila('Color', colores())) + `<div class="dib-acciones-el">${alFrente}</div>`, red ? 'tamaño' : 'tamaño y color');
+    return html;
   }
   if (h === 'simbolo') {
     const red = SIMBOLOS[d.simbolo]?.grupo === 'red';
-    let html = seccion('', `<div class="dib-simbolo-sel">${mini(d.simbolo, 34)}<span>${esc(SIMBOLOS[d.simbolo]?.nombre || '')}</span></div>${nota(AYUDA.simbolo)}`);
+    let html = '';
     if (red) html += seccion('Tamaño de los nuevos', `<div class="dib-tamano"><span>${Math.round((d.tamNuevos || 1) * 100)} %</span><button class="dib-btn dib-btn-chico" aria-label="Nuevos más chicos" title="Más chicos" onclick="setTamNuevosDib(0.85)">${I.menos}</button><button class="dib-btn dib-btn-chico" aria-label="Nuevos más grandes" title="Más grandes" onclick="setTamNuevosDib(1.18)">${I.mas}</button></div>`);
-    else html += seccion('Símbolos de unifilar', `<div class="dib-simbolos">${SIMBOLOS_DIAGRAMA.map(k => `<button class="dib-simbolo ${d.simbolo === k ? 'activo' : ''}" onclick="setSimboloDib('${k}')" title="${SIMBOLOS[k].nombre}">${mini(k, 30)}<span>${SIMBOLOS[k].nombre}</span></button>`).join('')}</div>`) + seccion('Color', colores()) + seccion('Grosor', grosores());
+    else html += seccion('Símbolos de unifilar', `<div class="dib-simbolos">${SIMBOLOS_DIAGRAMA.map(k => `<button class="dib-simbolo ${d.simbolo === k ? 'activo' : ''}" onclick="setSimboloDib('${k}')" title="${SIMBOLOS[k].nombre}">${mini(k, 30)}<span>${SIMBOLOS[k].nombre}</span></button>`).join('')}</div>`) + apariencia(fila('Color', colores()) + fila('Grosor', grosores()), 'color y grosor');
     return html;
   }
 
@@ -302,33 +347,33 @@ function panel(d, sel, h, p) {
   if (sel?.tipo === 'etiqueta') {
     return seccion('Texto', `<textarea id="dib-texto" rows="2" oninput="textoDib(this.value)" onchange="finTextoDib()" placeholder="Ej. P1: DS111267">${esc(sel.texto)}</textarea>${nota('Enter parte el texto en dos líneas.')}`)
       + seccion('Texto rápido', `<div class="dib-acciones">${ACCIONES_PUNTO.map(a => `<button class="dib-chip" onclick="accionEtiquetaDib('${esc(a)}')">${esc(a)}</button>`).join('')}</div>`)
-      + seccion('Estilo', estilos(sel.estilo)) + seccion('', tamano()) + acciones();
+      + seccion('Estilo', estilos(sel.estilo)) + apariencia(tamano() + `<div class="dib-acciones-el">${alFrente}</div>`, 'tamaño');
   }
   if (h === 'etiqueta') {
-    return seccion('', nota(AYUDA.etiqueta)) + seccion('Estilo', estilos(d.estiloEtiqueta))
+    return seccion('Estilo', estilos(d.estiloEtiqueta))
       + seccion('Numeración', `<label class="dib-prefijo">Prefijo <input id="dib-prefijo" value="${esc(d.prefijo)}" maxlength="6" oninput="setPrefijoDib(this.value)"></label>`);
   }
   if (sel?.tipo === 'cota') {
-    return seccion('', nota(d.escala ? `Mide ${fmtMetros(Math.hypot(sel.x2 - sel.x1, sel.y2 - sel.y1) * d.escala)}. Arrastra sus extremos para ajustarla; la medida también se arrastra.` : 'Calibra la escala para ver los metros.') + tamano())
-      + acciones(sel.desfase ? '<button class="b b-g" onclick="metrosASuLugarDib()">Medida a su lugar</button>' : '');
+    return seccion('Medida', nota(d.escala ? `Mide ${fmtMetros(Math.hypot(sel.x2 - sel.x1, sel.y2 - sel.y1) * d.escala)}. Arrastra sus extremos para ajustarla; la medida también se arrastra.` : 'Calibra la escala para ver los metros.'))
+      + acciones(sel.desfase ? '<button class="b b-g" onclick="metrosASuLugarDib()">Medida a su lugar</button>' : '') + apariencia(tamano() + `<div class="dib-acciones-el">${alFrente}</div>`, 'tamaño');
   }
   if (sel?.tipo === 'texto') {
     return seccion('Texto', `<textarea id="dib-texto" rows="2" oninput="textoDib(this.value)" onchange="finTextoDib()" placeholder="Escribe el texto">${esc(sel.texto)}</textarea>`)
-      + seccion('Tamaño', `<div class="dib-acciones-el">${Object.keys(TAM_TEXTO).map(t => `<button class="b ${d.tamTexto === t ? 'b-p' : 'b-g'}" onclick="setTamTextoDib('${t}')">${t[0].toUpperCase() + t.slice(1)}</button>`).join('')}</div>${tamano('Ajuste fino')}`)
-      + seccion('Color', colores()) + acciones();
+      + seccion('Tamaño', `<div class="dib-acciones-el segmento dib-seg">${Object.keys(TAM_TEXTO).map(t => `<button class="${d.tamTexto === t ? 'active' : ''}" onclick="setTamTextoDib('${t}')">${t[0].toUpperCase() + t.slice(1)}</button>`).join('')}</div>`)
+      + apariencia(tamano('Ajuste fino') + fila('Color', colores()) + `<div class="dib-acciones-el">${alFrente}</div>`, 'color');
   }
   if (sel?.tipo === 'leyenda') {
     return seccion('Leyenda', `${sel.entradas.map((e, i) => `<div class="dib-fila"><button class="dib-color" style="background:${e.color}" title="Usar el color elegido" aria-label="Color de la fila ${i + 1}" onclick="leyendaColorDib(${i})"></button>
         <input id="dib-leyenda-${i}" value="${esc(e.texto)}" oninput="leyendaTextoDib(${i}, this.value)" onchange="finEdicionDib()">
         ${sel.entradas.length > 1 ? `<button class="b b-l" onclick="quitarEntradaLeyendaDib(${i})">Quitar</button>` : ''}</div>`).join('')}
-      <button class="b b-g" onclick="agregarEntradaLeyendaDib()"><i class="ic ic-plus"></i> Agregar fila</button>`) + seccion('Color', colores()) + seccion('', tamano()) + acciones();
+      <button class="b b-g" onclick="agregarEntradaLeyendaDib()"><i class="ic ic-plus"></i> Agregar fila</button>`) + apariencia(fila('Color', colores()) + tamano() + `<div class="dib-acciones-el">${alFrente}</div>`, 'color y tamaño');
   }
   if (sel?.tipo === 'tabla') {
     return seccion('Tabla', `${sel.encabezado.map((x, c) => `<div class="field"><label>Encabezado ${c + 1}</label><input id="dib-enc-${c}" value="${esc(x)}" oninput="tablaEncabezadoDib(${c}, this.value)" onchange="finEdicionDib()"></div>`).join('')}
-      <div class="field"><label>Filas: una por línea</label><textarea id="dib-filas" rows="4" oninput="tablaFilasDib(this.value)" onchange="finEdicionDib()">${esc(sel.filas.map(f => f.join(', ')).join('\n'))}</textarea></div>`) + seccion('', tamano()) + acciones();
+      <div class="field"><label>Filas: una por línea</label><textarea id="dib-filas" rows="4" oninput="tablaFilasDib(this.value)" onchange="finEdicionDib()">${esc(sel.filas.map(f => f.join(', ')).join('\n'))}</textarea></div>`) + apariencia(tamano() + `<div class="dib-acciones-el">${alFrente}</div>`, 'tamaño');
   }
-  if (sel) return seccion('Color', colores()) + seccion('Grosor', grosores()) + acciones();
-  if (h !== 'seleccionar') return seccion('', nota(AYUDA[h] || '')) + seccion('Color', colores()) + seccion('Grosor', grosores());
+  if (sel) return seccion('', fila('Color', colores()) + fila('Grosor', grosores()) + `<div class="dib-acciones-el">${alFrente}</div>`);
+  if (h !== 'seleccionar') return seccion('', fila('Color', colores()) + fila('Grosor', grosores()));
 
   // Sin selección: la lámina (cajetín), la escala y la imagen
   return panelLamina(d);
@@ -356,9 +401,9 @@ function seccionPropuesta(sel, d) {
     const r = sel.reemplazo || {};
     const hoy = t => `<div class="page-sub">Hoy: <b>${esc(t || 'sin datos')}</b></div>`;
     let cuerpo = '';
-    if (tramo) cuerpo = hoy([sel.conductor?.calibre, sel.conductor?.tipo].filter(Boolean).join(' ')) + controlesConductor(r.conductor, { id: 'dib-remp', fn: (c, v) => `setReemplazoConductorDib('${c}', ${v})` });
+    if (tramo) cuerpo = hoy([sel.conductor?.calibre, sel.conductor?.tipo].filter(Boolean).join(' ')) + conductorCompacto(r.conductor, 'dib-remp', 'setReemplazoConductorDib');
     else if (['trafo', 'trafo_nuevo', 'banco'].includes(sel.simbolo)) cuerpo = hoy(kvaTexto(sel.trafos)) + `<div class="field"><label>kVA nuevos (uno por transformador)</label><input id="dib-remp-kva" value="${esc((r.trafos || []).join(', '))}" placeholder="Ej. 50 o 25, 25, 25" onchange="setReemplazoKvaDib(this.value)"></div>`;
-    else if (['poste', 'poste_nuevo'].includes(sel.simbolo)) cuerpo = hoy([sel.altura ? `${sel.altura}'` : '', (sel.estructuras || []).join(' / ')].filter(Boolean).join(' · ')) + controlesPoste(r, { id: 'dib-remp', altura: 'setReemplazoAlturaDib', agregar: 'agregarReemplazoEstructuraDib', quitar: 'quitarReemplazoEstructuraDib', escrita: 'agregarReemplazoEstructuraEscritaDib', clave: `${sel.id}-remp`, grupo: grupoEstructurasDe(tramosEnPoste(d, sel)) });
+    else if (['poste', 'poste_nuevo'].includes(sel.simbolo)) cuerpo = hoy([sel.altura ? `${sel.altura}'` : '', (sel.estructuras || []).join(' / ')].filter(Boolean).join(' · ')) + posteCompacto(r, { id: 'dib-remp', altura: 'setReemplazoAlturaDib', agregar: 'agregarReemplazoEstructuraDib', quitar: 'quitarReemplazoEstructuraDib', escrita: 'agregarReemplazoEstructuraEscritaDib', clave: `${sel.id}-remp`, grupo: grupoEstructurasDe(tramosEnPoste(d, sel)) });
     if (cuerpo) html += `<div class="dib-reemplazo"><h5>Se cambia por</h5>${cuerpo}</div>`;
   }
   // Trasladar: dónde queda (un toque en el plano)
