@@ -44,6 +44,8 @@ const I = {
 };
 // Herramientas de red que se ven siempre; los demás símbolos van en "Más símbolos"
 const RED_PRINCIPALES = ['poste', 'poste_nuevo', 'trafo', 'trafo_nuevo', 'usuario'];
+// Nombre corto en la columna de herramientas (el completo sale al pasar el mouse)
+const CORTO = { 'Seleccionar y mover': 'Seleccionar', 'Transformador existente': 'Trafo existente', 'Transformador proyectado': 'Trafo proyectado', 'Seccionador / cuchilla': 'Seccionador', 'Banco de transformadores': 'Banco de trafos', 'Etiqueta de punto': 'Etiqueta' };
 // Teclas rápidas de las herramientas (se manejan en actions/dibujo.js)
 const TECLA = { seleccionar: 'V', tramo: 'T', poste: 'P', trafo: 'R', usuario: 'U', etiqueta: 'E', cota: 'C', texto: 'X' };
 // Colores para distinguir redes del mismo tipo (además del color propio de cada tipo)
@@ -145,7 +147,7 @@ function barraEstado(d) {
     <button class="dib-est-item" onclick="setHerramientaDib('calibrar')" title="${d.escala ? 'Recalibrar la escala' : 'Calibrar la escala'}">${d.escala ? `Escala <b>1 m = ${(1 / d.escala).toFixed(1)} px</b>` : '<span class="tg ambar">Sin escala</span> Calibrar'}</button>
     ${d.lamina?.anclarMedidas ? '<span class="dib-est-pill">Medidas ancladas</span>' : ''}
     ${resumen ? `<span class="dib-est-item dib-est-resumen">${resumen}</span>` : ''}
-    <label class="dib-est-item dib-est-check"><input type="checkbox" id="dib-ver-cajetin" ${state.dibCajetin ? 'checked' : ''} onchange="verCajetinDib(this.checked)"> Ver el cajetín</label>
+    <label class="dib-est-item dib-est-check"><input type="checkbox" id="dib-ver-cajetin" ${state.dibCajetin || state.dibVerLamina ? 'checked' : ''} ${state.dibVerLamina ? 'disabled' : ''} onchange="verCajetinDib(this.checked)"> Ver el cajetín</label>
     <div class="dib-zoom"><button class="dib-btn dib-btn-chico" title="Alejar (−)" aria-label="Alejar" onclick="zoomDib(0.8)">${I.menos}</button>
       <span id="dib-zoom-pct">${zoomPct()} %</span>
       <button class="dib-btn dib-btn-chico" title="Acercar (+)" aria-label="Acercar" onclick="zoomDib(1.25)">${I.mas}</button>
@@ -156,7 +158,7 @@ function barraEstado(d) {
 
 // ── Herramientas (columna a la izquierda, con su nombre; tira de íconos abajo en el celular) ──
 function barraHerramientas(d, h) {
-  const btn = (titulo, icono, activo, accion, tecla = '') => `<button class="dib-btn dib-herr ${activo ? 'activo' : ''}" title="${titulo}${tecla ? ` (${tecla})` : ''}" aria-label="${titulo}${tecla ? ` (${tecla})` : ''}" onclick="${accion}">${icono}<span class="dib-herr-nombre">${titulo}</span>${tecla ? `<kbd>${tecla}</kbd>` : ''}</button>`;
+  const btn = (titulo, icono, activo, accion, tecla = '') => `<button class="dib-btn dib-herr ${activo ? 'activo' : ''}" title="${titulo}${tecla ? ` (${tecla})` : ''}" aria-label="${titulo}${tecla ? ` (${tecla})` : ''}" onclick="${accion}">${icono}<span class="dib-herr-nombre">${CORTO[titulo] || titulo}</span>${tecla ? `<kbd>${tecla}</kbd>` : ''}</button>`;
   const esUnifilar = h === 'simbolo' && SIMBOLOS[d.simbolo]?.grupo === 'diagrama';
   const grupo = (t, cuerpo) => `<div class="dib-herr-grupo"><small>${t}</small><div>${cuerpo}</div></div>`;
   const simb = k => btn(SIMBOLOS[k].nombre, mini(k), h === 'simbolo' && d.simbolo === k, `setSimboloDib('${k}')`, TECLA[k] || '');
@@ -166,7 +168,7 @@ function barraHerramientas(d, h) {
     ${grupo('', btn('Seleccionar y mover', I.seleccionar, h === 'seleccionar', "setHerramientaDib('seleccionar')", 'V'))}
     ${grupo('Red', btn('Tramo de red', I.tramo, h === 'tramo', "setHerramientaDib('tramo')", 'T') + RED_PRINCIPALES.map(simb).join('')
       + (verExtras ? extras.map(simb).join('') : '') + btn(verExtras ? 'Menos símbolos' : 'Más símbolos…', I.mas3, false, 'masSimbolosDib()'))}
-    ${grupo('Anotar', btn('Etiqueta de punto', I.etiqueta, h === 'etiqueta', "setHerramientaDib('etiqueta')", 'E') + btn('Cota (medida)', I.cota, h === 'cota', "setHerramientaDib('cota')", 'C')
+    ${grupo('Anotar', btn('Etiqueta de punto', I.etiqueta, h === 'etiqueta', "setHerramientaDib('etiqueta')", 'E') + btn('Cota de medida', I.cota, h === 'cota', "setHerramientaDib('cota')", 'C')
       + btn('Texto', I.texto, h === 'texto', "setHerramientaDib('texto')", 'X') + btn('Flecha', I.flecha, h === 'flecha', "setHerramientaDib('flecha')"))}
     ${grupo('Dibujo libre', btn('Línea', I.linea, h === 'linea', "setHerramientaDib('linea')") + btn('Rectángulo', I.rect, h === 'rect', "setHerramientaDib('rect')") + btn('Círculo', I.elipse, h === 'elipse', "setHerramientaDib('elipse')")
       + btn('Lápiz (trazo libre)', I.trazo, h === 'trazo', "setHerramientaDib('trazo')") + btn('Unifilar', I.unifilar, esUnifilar, `setSimboloDib('${SIMBOLOS[d.simbolo]?.grupo === 'diagrama' ? d.simbolo : 'transformador'}')`))}

@@ -3739,14 +3739,14 @@ test.describe('Herramienta Dibujar', () => {
     await expect(page.locator('#dib-capa marker#punta-2563eb')).toHaveCount(1);
     await page.getByRole('button', { name: 'Rectángulo' }).click();
     await arrastrar(page, [480, 200], [720, 360]);
-    await page.getByRole('button', { name: 'Texto', exact: true }).click();
+    await page.getByRole('button', { name: 'Texto (X)', exact: true }).click();
     await pantalla(page, 80, 200);
     const y0 = (await page.locator('#dib-svg').boundingBox()).y;
     await tocar(page, 80, 200);
     expect((await page.locator('#dib-svg').boundingBox()).y).toBe(y0); // al seleccionar, el lienzo no se mueve
     await page.locator('#dib-texto').fill('Tablero general'); await page.locator('#dib-texto').press('Tab');
     await expect(page.locator('#dib-capa text')).toContainText('Tablero general');
-    await page.getByRole('button', { name: 'Símbolos de unifilar' }).click();
+    await page.getByRole('button', { name: 'Unifilar' }).click();
     await page.locator('.dib-simbolo', { hasText: 'Transformador' }).click();
     await tocar(page, 600, 100);
     await page.getByRole('button', { name: 'Girar 90°' }).click();
@@ -3808,15 +3808,16 @@ test.describe('Herramienta Dibujar', () => {
     // Metros por vano sobre el tramo: √(400²+100²) × 0.125 = 51.5 m
     await expect(page.locator('#dib-capa text', { hasText: '51.5 m' })).toHaveCount(2);
     // Etiquetas: P1 en el primer poste; W1 (estilo proyectado) en el tercero
-    await page.getByRole('button', { name: 'Etiqueta de punto (P1, W1…)' }).click();
+    await page.getByRole('button', { name: 'Etiqueta de punto (E)' }).click();
     await tocar(page, 205, 495);
     await page.locator('#dib-texto').fill('P1: DS111267'); await page.locator('#dib-texto').press('Tab');
-    await page.getByRole('button', { name: 'Etiqueta de punto (P1, W1…)' }).click();
+    await page.getByRole('button', { name: 'Etiqueta de punto (E)' }).click();
     await page.locator('.dib-chip', { hasText: 'Punto proyectado' }).click();
     await expect(page.locator('#dib-prefijo')).toHaveValue('W');
     await tocar(page, 995, 305);
     await expect(page.locator('#dib-capa text', { hasText: /^W1$/ })).toHaveCount(1);
     // Distancias automáticas en el cajetín: P1 – W1 = 103.1 m y el total del tipo
+    await page.locator('#dib-ver-cajetin').check();
     const caj = page.locator('#dib-cajetin');
     await expect(caj.locator('text', { hasText: 'P1 – W1' })).toHaveCount(1);
     await expect(caj.locator('text', { hasText: /^103\.1$/ })).toHaveCount(2); // tramo y total
@@ -3832,7 +3833,7 @@ test.describe('Herramienta Dibujar', () => {
     await page.locator('#dib-lam-titulo').fill('Referencia eléctrica');
     await expect(caj.locator('text', { hasText: 'REFERENCIA ELÉCTRICA' })).toHaveCount(1);
     // Cota entre dos postes (se ajusta a ellos): 400 px × 0.125 = 50.0 m… en diagonal √(400²+100²) = 51.5 m
-    await page.getByRole('button', { name: 'Cota (medir distancia)' }).click();
+    await page.getByRole('button', { name: 'Cota de medida (C)' }).click();
     await arrastrar(page, [604, 396], [996, 304]);
     await expect(page.locator('.dib-panel')).toContainText('Mide 51.5 m');
     // Cambiar el tipo del tramo seleccionado cambia su estilo y la simbología
@@ -3861,6 +3862,7 @@ test.describe('Herramienta Dibujar', () => {
     await page.evaluate(() => localStorage.removeItem('nettracker_dibujo'));
     await nav(page, 'Dibujar');
     await subirImagen(page, 1600, 900);
+    await page.getByRole('button', { name: 'Más símbolos…' }).click();
     await page.getByRole('button', { name: 'Banco de transformadores' }).click();
     await tocar(page, 300, 200);
     const postes = [[200, 500], [600, 400], [1000, 300]];
@@ -3869,14 +3871,15 @@ test.describe('Herramienta Dibujar', () => {
     await page.getByRole('button', { name: 'Tramo de red' }).click();
     for (const [x, y] of postes) await tocar(page, x, y);
     await page.getByRole('button', { name: 'Terminar tramo' }).click();
-    await page.getByRole('button', { name: 'Etiqueta de punto (P1, W1…)' }).click();
+    await page.getByRole('button', { name: 'Etiqueta de punto (E)' }).click();
     await tocar(page, 200, 500);
-    await page.getByRole('button', { name: 'Etiqueta de punto (P1, W1…)' }).click();
+    await page.getByRole('button', { name: 'Etiqueta de punto (E)' }).click();
     await tocar(page, 1000, 300);
     // Texto rápido: conserva el nombre del punto
     await page.locator('.dib-acciones .dib-chip', { hasText: 'Seccionar red BT' }).click();
     await expect(page.locator('#dib-capa text', { hasText: 'P2: Seccionar red BT' })).toHaveCount(1);
     // Sin escala no hay metros; se escriben por vano al seleccionar el tramo
+    await page.locator('#dib-ver-cajetin').check();
     await expect(page.locator('#dib-cajetin text', { hasText: 'Escribe los metros de los vanos o calibra' })).toHaveCount(1);
     await page.getByRole('button', { name: 'Seleccionar y mover (V)' }).click();
     await tocar(page, 400, 450);
@@ -3885,6 +3888,7 @@ test.describe('Herramienta Dibujar', () => {
     await page.locator('#dib-vano-2').press('Tab');
     await expect(page.locator('#dib-capa text', { hasText: '20.0 m' })).toHaveCount(1);
     await expect(page.locator('#dib-capa text', { hasText: '30.5 m' })).toHaveCount(1);
+    await page.locator('#dib-ver-cajetin').check();
     const caj = page.locator('#dib-cajetin');
     await expect(caj.locator('text', { hasText: 'P1 – P2' })).toHaveCount(1);
     await expect(caj.locator('text', { hasText: /^50\.5$/ })).toHaveCount(2); // trecho y total
@@ -3895,6 +3899,56 @@ test.describe('Herramienta Dibujar', () => {
     await expect(page.locator('.toast')).toContainText('solo el número');
     expect(errores).toEqual([]);
   });
+  test('pantalla en la compu: menú de íconos, herramientas con nombre y tecla, menús de arriba, barra de estado y cajetín a pedido', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await page.evaluate(() => localStorage.removeItem('nettracker_dibujo'));
+    await nav(page, 'Dibujar');
+    // El menú de la app queda como columna de íconos (el nombre al pasar el mouse)
+    expect((await page.locator('nav.bottom-nav').boundingBox()).width).toBeLessThan(90);
+    await expect(page.locator('nav.bottom-nav .nav-label').first()).toBeHidden();
+    await expect(page.locator('nav.bottom-nav button[title="Dibujar"]')).toHaveCount(1);
+    // Herramientas con su nombre a la vista; "Más símbolos…" muestra los demás
+    await expect(page.locator('.dib-herr', { hasText: 'Tramo de red' }).locator('.dib-herr-nombre')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Seccionador / cuchilla' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Más símbolos…' }).click();
+    await expect(page.getByRole('button', { name: 'Seccionador / cuchilla' })).toHaveCount(1);
+    // Teclas rápidas
+    await page.keyboard.press('t'); await expect(page.locator('.dib-herr.activo')).toContainText('Tramo de red');
+    await page.keyboard.press('p'); await expect(page.locator('.dib-herr.activo')).toContainText('Poste existente');
+    await page.keyboard.press('v'); await expect(page.locator('.dib-herr.activo')).toContainText('Seleccionar');
+    // Menús de arriba: se abren, se cierran al tocar fuera y no se salen de la pantalla
+    await page.locator('.dib-menu > summary', { hasText: 'Exportar' }).click();
+    const lista = page.locator('.dib-menu[open] .dib-menu-lista');
+    await expect(lista).toContainText('Láminas de propuesta en PDF');
+    const caja = await lista.boundingBox();
+    expect(caja.x + caja.width).toBeLessThanOrEqual(1440);
+    await page.locator('.dib-estado').click({ position: { x: 5, y: 5 } });
+    await expect(page.locator('.dib-menu[open]')).toHaveCount(0);
+    // Imagen: la barra de estado dice la escala y lo que hay; el cajetín no se ve hasta pedirlo (al exportar va igual)
+    await subirImagen(page, 800, 400);
+    await expect(page.locator('#dib-svg')).toHaveAttribute('viewBox', '0 0 800 400');
+    await expect(page.locator('.dib-estado')).toContainText('Sin escala');
+    await page.getByRole('button', { name: 'Poste existente (P)' }).click();
+    await tocar(page, 200, 200); await tocar(page, 500, 200);
+    await expect(page.locator('.dib-estado')).toContainText('2 postes');
+    await page.locator('#dib-ver-cajetin').check();
+    await expect(page.locator('#dib-svg')).not.toHaveAttribute('viewBox', '0 0 800 400');
+    await page.locator('#dib-ver-cajetin').uncheck();
+    await expect(page.locator('#dib-svg')).toHaveAttribute('viewBox', '0 0 800 400');
+    // "Lámina" abre sus datos en el panel y muestra el cajetín mientras tanto
+    await page.getByRole('button', { name: /^Lámina/ }).click();
+    await expect(page.locator('#dib-lam-titulo')).toBeVisible();
+    await expect(page.locator('#dib-svg')).not.toHaveAttribute('viewBox', '0 0 800 400');
+    await page.getByRole('button', { name: 'Tramo de red (T)' }).click();
+    await expect(page.locator('#dib-svg')).toHaveAttribute('viewBox', '0 0 800 400');
+    await expect(page.locator('.dib-pista')).toBeVisible();
+    // Al salir de Dibujar el menú de la app vuelve a tener nombres
+    await nav(page, 'Inicio');
+    await expect(page.locator('nav.bottom-nav .nav-label').first()).toBeVisible();
+  });
+
   test('zoom: acercar y dibujar en el lugar correcto, desplazar el fondo, Ctrl + rueda, pellizco con dos dedos y pantalla completa', async ({ page }) => {
     const errores = []; page.on('pageerror', e => errores.push(e.message));
     await page.setViewportSize({ width: 1280, height: 900 });
@@ -3984,10 +4038,12 @@ test.describe('Herramienta Dibujar', () => {
     t = await tramo();
     expect(t.desfases).toBeUndefined();
     // Puente al vuelo: cae sobre la línea (imán) y sale en la simbología del cajetín
+    await page.getByRole('button', { name: 'Más símbolos…' }).click();
     await page.getByRole('button', { name: 'Puente al vuelo' }).click();
     await tocar(page, 400, 488);
     const p = await page.evaluate(async () => (await import('/js/state.js')).state.dibujo.elementos.filter(e => e.simbolo === 'puente').map(e => [Math.round(e.x + 30 * e.escala), Math.round(e.y + 30 * e.escala)]));
     expect(p).toEqual([[400, 500]]);
+    await page.locator('#dib-ver-cajetin').check();
     await expect(page.locator('#dib-cajetin text', { hasText: 'Puente al vuelo' })).toHaveCount(1);
     expect(errores).toEqual([]);
   });
@@ -4034,6 +4090,7 @@ test.describe('Herramienta Dibujar', () => {
     expect(tramos.map(t => t.colorRed || null)).toEqual([null, '#2563eb']);
     expect(tramos[1].nombreRed).toBe('Red BT trafo 2');
     const caj = page.locator('#dib-cajetin');
+    await page.locator('#dib-ver-cajetin').check();
     await expect(caj.locator('text', { hasText: /^Red BT existente$/ })).toHaveCount(1);
     await expect(caj.locator('text', { hasText: /^Red BT trafo 2$/ })).toHaveCount(1);
     await expect(page.locator('#dib-capa path[stroke="#2563eb"]')).toHaveCount(1);
@@ -4232,6 +4289,7 @@ test.describe('Herramienta Dibujar', () => {
     await page.locator('#dib-nombre-red').fill('Red BT trafo P1'); await page.locator('#dib-nombre-red').press('Tab');
     expect((await el('r2')).nombreRed).toBe('Red BT trafo P4'); // la otra red no cambia
     // Simbología del cajetín y leyenda de la lámina de propuesta: una entrada por red
+    await page.locator('#dib-ver-cajetin').check();
     await expect(page.locator('#dib-cajetin text', { hasText: /^Red BT trafo P1$/ })).toHaveCount(1);
     await expect(page.locator('#dib-cajetin text', { hasText: /^Red BT trafo P4$/ })).toHaveCount(1);
     const svg = await page.evaluate(async () => (await import('/js/domain/propuesta.js')).svgPropuesta((await import('/js/state.js')).state.dibujo));
@@ -4274,6 +4332,7 @@ test.describe('Herramienta Dibujar', () => {
     const svg = await page.evaluate(async () => (await import('/js/domain/propuesta.js')).svgPropuesta((await import('/js/state.js')).state.dibujo));
     expect(svg).toContain('Medidor 12345678');
     // La simbología usa solo el nombre corto del punto
+    await page.locator('#dib-ver-cajetin').check();
     await expect(page.locator('#dib-cajetin text', { hasText: /^P3$/ })).toHaveCount(1);
     expect(errores).toEqual([]);
   });
@@ -4344,7 +4403,7 @@ test.describe('Herramienta Dibujar', () => {
     let e = await estado();
     expect(e.filter(x => x.tipo === 'simbolo').map(x => x.c)).toEqual([[600, 500], [1000, 500]]);
     // Etiqueta al poste del extremo: su punta se pega al centro
-    await page.getByRole('button', { name: 'Etiqueta de punto (P1, W1…)' }).click();
+    await page.getByRole('button', { name: 'Etiqueta de punto (E)' }).click();
     await tocar(page, 1006, 494);
     // Mover el poste del extremo arrastra el vértice del tramo y la punta de la etiqueta
     await page.getByRole('button', { name: 'Seleccionar y mover (V)' }).click();
@@ -4464,6 +4523,7 @@ test.describe('Levantamiento en campo', () => {
     // Pasar a Dibujar: lámina con escala exacta, tramos y etiquetas
     await page.getByRole('button', { name: 'Pasar a Dibujar (lámina)' }).click();
     await expect(page.locator('#dib-svg')).toHaveCount(1);
+    await page.locator('#dib-ver-cajetin').check();
     await expect(page.locator('#dib-cajetin text', { hasText: /^P1 – P2$/ })).toHaveCount(1);
     await expect(page.locator('#dib-cajetin text', { hasText: /^32\.0$/ })).toHaveCount(1);
     await expect(page.locator('#dib-cajetin text', { hasText: 'LEVANTAMIENTO DE RED' })).toHaveCount(1);
@@ -4654,6 +4714,7 @@ test.describe('Levantamiento en campo', () => {
     await page.getByRole('button', { name: 'Pasar a Dibujar (lámina)' }).click();
     await expect(page.locator('#dib-capa text', { hasText: 'Acom. A:2 B:1 240:1' })).toHaveCount(1);
     const caj = page.locator('#dib-cajetin');
+    await page.locator('#dib-ver-cajetin').check();
     await expect(caj.locator('text', { hasText: /^Cant\.$/ })).toHaveCount(1); // tabla de acometidas
     await expect(caj.locator('text', { hasText: '1 (más en A)' })).toHaveCount(1);
     expect(errores).toEqual([]);
