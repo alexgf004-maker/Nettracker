@@ -120,7 +120,7 @@ function barraSuperior(d) {
     d.fondo ? item('Quitar imagen', 'quitarFondoDib()') : '',
   ], { titulo: 'Imagen de fondo' });
   const anclar = d.elementos.some(e => e.tipo === 'polilinea')
-    ? `<button class="b ${d.lamina?.anclarMedidas ? 'b-on' : 'b-g'} dib-anclar-btn" aria-pressed="${d.lamina?.anclarMedidas ? 'true' : 'false'}" onclick="anclarMedidasDib(${!d.lamina?.anclarMedidas})" title="${d.lamina?.anclarMedidas ? 'Los metros están anclados: al mover un poste no cambian. Toca para soltarlos.' : 'Anclar los metros de los vanos para mover los postes sin que cambien'}">${I.ancla}<span class="dib-menu-txt">${d.lamina?.anclarMedidas ? 'Medidas ancladas' : 'Anclar medidas'}</span></button>` : '';
+    ? `<button class="b ${d.lamina?.anclarMedidas ? 'b-on' : 'b-g'} dib-anclar-btn" aria-label="${d.lamina?.anclarMedidas ? 'Medidas ancladas' : 'Anclar medidas'}" aria-pressed="${d.lamina?.anclarMedidas ? 'true' : 'false'}" onclick="anclarMedidasDib(${!d.lamina?.anclarMedidas})" title="${d.lamina?.anclarMedidas ? 'Los metros están anclados: al mover un poste no cambian. Toca para soltarlos.' : 'Anclar los metros de los vanos para mover los postes sin que cambien'}">${I.ancla}<span class="dib-menu-txt">${d.lamina?.anclarMedidas ? 'Medidas ancladas' : 'Anclar medidas'}</span></button>` : '';
   const exportar = menu(`${I.exportar}<span class="dib-menu-txt">Exportar</span>`, [
     item('Descargar PNG', 'descargarDib()', { sub: 'La lámina con su cajetín' }),
     item('Copiar imagen', 'copiarDib()', { sub: 'Para pegar en Word o en un correo' }),
@@ -207,10 +207,10 @@ function tituloPanel(d, sel, h) {
 const seccion = (titulo, cuerpo) => `<section class="dib-sec">${titulo ? `<h4>${titulo}</h4>` : ''}${cuerpo}</section>`;
 const opcion = (v, t, sel) => `<option value="${esc(v)}" ${String(sel ?? '') === String(v) ? 'selected' : ''}>${esc(t)}</option>`;
 // Fila compacta del panel: nombre a la izquierda y el control a la derecha
-const fila = (label, control, para = '') => `<div class="dib-fila-c"><label ${para ? `for="${para}"` : ''}>${label}</label><div>${control}</div></div>`;
+export const fila = (label, control, para = '') => `<div class="dib-fila-c"><label ${para ? `for="${para}"` : ''}>${label}</label><div>${control}</div></div>`;
 // Lista desplegable con "Otro…" que se cambia por un campo para escribir (lo que no está en la lista también se ve)
 // fn: nombre de la función que recibe el valor (con argumentos previos, ej. "setConductorDib('calibre', ")
-function lista(id, opciones, actual, fn, { vacio = '—', otro = 'Otro…', aria = '' } = {}) {
+export function lista(id, opciones, actual, fn, { vacio = '—', otro = 'Otro…', aria = '' } = {}) {
   const v = String(actual ?? ''); const fuera = v && !opciones.some(([k]) => String(k) === v);
   const llamar = val => `${fn}${val})`;
   return `<select id="${id}" ${aria ? `aria-label="${esc(aria)}"` : ''} onchange="if (this.value === '__otro') { this.hidden = true; const i = this.nextElementSibling; i.hidden = false; i.focus(); } else ${llamar('this.value')}">${opcion('', vacio, v)}${opciones.map(([k, t]) => opcion(k, t, v)).join('')}${fuera ? opcion(v, v, v) : ''}${otro ? `<option value="__otro">${otro}</option>` : ''}</select>${otro ? `<input id="${id}-otra" hidden placeholder="Escribe y Enter" aria-label="${esc(aria || 'Otro')}" onkeydown="if (event.key === 'Enter') this.blur()" onchange="${llamar('this.value')}">` : ''}`;
@@ -221,7 +221,7 @@ const conductorCompacto = (c, id, fn) => fila('Calibre', lista(`${id}-calibre`, 
 const alturaCompacta = (altura, id, fn) => fila('Altura', lista(`${id}-altura`, ALTURAS_POSTE.map(a => [a, `${a}'`]), altura, `${fn}(`, { otro: 'Otra…', aria: 'Altura del poste en pies' }), `${id}-altura`);
 // Poste en el panel: altura en lista y estructuras con el buscador de siempre
 // (las puestas se ven siempre; la lista para agregar se abre con "Agregar estructura" y se queda abierta en ese poste)
-const posteCompacto = (p, acc) => {
+export const posteCompacto = (p, acc) => {
   const abierta = state.dibEstrAbierta === acc.clave;
   const puestas = (p.estructuras || []).map((c, i) => `<span class="dib-estr" title="${esc(nombreEstructura(c))}">${esc(c)}<button aria-label="Quitar ${esc(c)}" onclick="${acc.quitar}(${i})">✕</button></span>`).join('');
   return `${alturaCompacta(p.altura, acc.id, acc.altura)}<div class="dib-fila-c dib-fila-arriba"><label>Estructuras</label><div><div class="dib-estructuras">${puestas || '<span class="page-sub">Ninguna</span>'}</div></div></div>

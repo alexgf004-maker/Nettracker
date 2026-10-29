@@ -539,10 +539,10 @@ label.btn-accion { cursor: pointer; }
   .modal-overlay > .modal-ancha { max-width: 1000px !important; }
 
   /* En Dibujar el menú de la app queda como una columna de íconos, para dejarle espacio al lienzo */
-  body:has(.dib-app) { --sidebar: 72px; }
-  body:has(.dib-app) .bottom-nav { padding: 12px 8px; overflow-y: auto; scrollbar-width: none; }
-  body:has(.dib-app) .nav-label, body:has(.dib-app) .nav-seccion { display: none; }
-  body:has(.dib-app) .nav-btn { justify-content: center; padding: 11px 0; }
+  body:has(.dib-app), body:has(.lev-app) { --sidebar: 72px; }
+  body:has(.dib-app) .bottom-nav, body:has(.lev-app) .bottom-nav { padding: 12px 8px; overflow-y: auto; scrollbar-width: none; }
+  body:has(.dib-app) .nav-label, body:has(.dib-app) .nav-seccion, body:has(.lev-app) .nav-label, body:has(.lev-app) .nav-seccion { display: none; }
+  body:has(.dib-app) .nav-btn, body:has(.lev-app) .nav-btn { justify-content: center; padding: 11px 0; }
 }
 
 /* ─────────────── REDISEÑO DE CAMPAÑAS (mismo lenguaje visual que Daily-log) ─────────────── */
@@ -1639,6 +1639,18 @@ button.dib-est-item { cursor: pointer; } button.dib-est-item:hover { color: var(
 .lev-app .lev-flotante { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 500; }
 .lev-flotante-info { background: rgba(15,23,42,.8); color: #fff; font-size: 14px; font-weight: 700; padding: 10px 18px; border-radius: 999px; white-space: nowrap; }
 .lev-asa { display: none; }
+.lev-top-pc { display: flex; gap: 6px; align-items: center; }
+.lev-top-pc .b { padding: 7px 12px; font-size: 13px; }
+.lev-panel-pc .lev-punto-cab { display: flex; align-items: center; gap: 10px; }
+.lev-panel-pc .lev-punto-cab > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.lev-panel-pc .lev-punto-cab .dib-btn { border: 1px solid var(--border); }
+.lev-panel-pc .lev-acciones-punto { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
+.lev-panel-pc .lev-acciones-punto .b { padding: 7px 10px; font-size: 12.5px; }
+.lev-vano-pc .lev-vano-nombre { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lev-vano-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; margin-top: 8px; }
+.lev-vano-grid label { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lev-vano-grid label > span { font-size: 11px; font-weight: 600; color: var(--text3); }
+.lev-vano-grid input, .lev-vano-grid select { width: 100%; height: 34px; padding: 4px 8px; font-size: 13px; }
 .lev-hoja { width: 380px; flex: 0 0 380px; background: var(--white); border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
 .lev-tabs { display: flex; gap: 2px; padding: 6px 6px 0; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; flex: 0 0 auto; }
 .lev-tab { flex: 1 0 auto; border: 0; background: none; padding: 10px 10px; font: inherit; font-size: 14px; font-weight: 700; color: var(--text3); border-bottom: 3px solid transparent; cursor: pointer; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1675,6 +1687,7 @@ button.dib-est-item { cursor: pointer; } button.dib-est-item:hover { color: var(
 .lev-vano-campos label { display: flex; flex-direction: column; gap: 2px; font-size: 11px; font-weight: 700; color: var(--text3); min-width: 0; }
 .lev-vano-campos input, .lev-vano-campos select { width: 100%; min-width: 0; height: 38px; padding: 4px 10px; font-size: 14px; }
 @media (max-width: 900px) {
+  .lev-top-pc { display: none; }
   .lev-cuerpo { flex-direction: column; }
   .lev-hoja { width: auto; flex: 0 0 auto; border-left: 0; border-top: 1px solid var(--border); border-radius: 16px 16px 0 0; box-shadow: 0 -8px 24px -12px rgba(15,23,42,.35); max-height: 54%; }
   .lev-fila { flex-wrap: nowrap; }

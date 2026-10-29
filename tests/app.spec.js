@@ -4487,7 +4487,7 @@ test.describe('Levantamiento en campo', () => {
     const errores = []; page.on('pageerror', e => errores.push(e.message));
     await context.grantPermissions(['geolocation']);
     await context.setGeolocation({ latitude: 13.5, longitude: -88.87, accuracy: 5 });
-    await page.setViewportSize({ width: 1280, height: 1100 });
+    await page.setViewportSize({ width: 412, height: 1100 });
     app = await abrirApp(page, { leaflet: true });
     await cerrarAlerta(page);
     await nav(page, 'Levantamiento');
@@ -4579,6 +4579,7 @@ test.describe('Levantamiento en campo', () => {
     await expect(page.locator('#dib-capa text', { hasText: "35' · 23TS3 / TS3" })).toHaveCount(1);
     await expect(page.locator('#dib-capa [data-chip] text', { hasText: /^#2 ACSR$/ })).toHaveCount(3); // debajo de los metros; los vanos siguientes heredan el conductor
     // Se pueden ocultar desde la lámina
+    await page.setViewportSize({ width: 1280, height: 1100 }); // en la compu el panel de la lámina está a la vista
     await page.locator('#dib-lam-verEstructuras').uncheck();
     await expect(page.locator('#dib-capa text', { hasText: /^35'$/ })).toHaveCount(1);
     await page.locator('#dib-lam-verCalibre').uncheck();
@@ -4612,7 +4613,7 @@ test.describe('Levantamiento en campo', () => {
     for (let i = 0; i < 5; i++) vanos['v' + i] = { a: 'p' + i, b: 'p' + (i + 1), tramo: 'bt', orden: i + 1 };
     puntos.p6 = { lat: 13.5, lng: -88.868, nombre: 'P7', tipo: 'poste', orden: 7 }; vanos.v5 = { a: 'p0', b: 'p6', tramo: 'bt', orden: 6 }; // uno largo (216 m): su distancia cabe con holgura lejos de los nombres
     datos.levantamientos = { L1: { nombre: 'Cortos', puntos, vanos, creado: { fecha: '2026-10-01', por: 'David García' } } };
-    await page.setViewportSize({ width: 1280, height: 1100 });
+    await page.setViewportSize({ width: 412, height: 1100 });
     app = await abrirApp(page, { datos, leaflet: true });
     await cerrarAlerta(page);
     await nav(page, 'Levantamiento');
@@ -4693,6 +4694,7 @@ test.describe('Levantamiento en campo', () => {
     await context.grantPermissions(['geolocation']);
     await context.setGeolocation({ latitude: 13.5, longitude: -88.87, accuracy: 4 });
     await page.setViewportSize({ width: 1280, height: 1100 });
+    await page.setViewportSize({ width: 412, height: 1000 }); // en el celular: datos con ventanas de un toque
     app = await abrirApp(page, { leaflet: true });
     await cerrarAlerta(page);
     await nav(page, 'Levantamiento');
@@ -4725,7 +4727,7 @@ test.describe('Levantamiento en campo', () => {
     expect(top).toBeGreaterThan(0);
     await page.getByRole('button', { name: 'Restar acometida 120 B' }).click();
     await expect(page.locator('#lev-acom-b')).toHaveText('0');
-    await page.setViewportSize({ width: 1280, height: 1100 });
+    await page.setViewportSize({ width: 412, height: 1000 });
     await expect(page.locator('#lev-acom-d')).toHaveText('1');
     await context.setGeolocation({ latitude: 13.50027, longitude: -88.87, accuracy: 4 });
     await expect(page.locator('#lev-gps')).toHaveText('GPS ±4 m');
@@ -4760,6 +4762,39 @@ test.describe('Levantamiento en campo', () => {
     await expect(caj.locator('text', { hasText: /^Cant\.$/ })).toHaveCount(1); // tabla de acometidas
     await expect(caj.locator('text', { hasText: '1 (más en A)' })).toHaveCount(1);
     expect(errores).toEqual([]);
+  });
+
+  test('en la compu: menú de íconos, datos del punto y de los vanos en el panel con listas, y salidas arriba', async ({ page }) => {
+    const datos = JSON.parse(JSON.stringify(fixture));
+    datos.levantamientos = { L1: { nombre: 'Compu', creado: { fecha: '2026-10-01', por: 'David García' }, puntos: {
+      a: { lat: 13.5, lng: -88.87, nombre: 'P1', tipo: 'poste', orden: 1 }, b: { lat: 13.5, lng: -88.8696, nombre: 'P2', tipo: 'poste', orden: 2 } },
+      vanos: { v1: { a: 'a', b: 'b', tramo: 'bt', orden: 1 } } } };
+    await page.setViewportSize({ width: 1440, height: 900 });
+    app = await abrirApp(page, { datos, leaflet: true });
+    await cerrarAlerta(page);
+    await nav(page, 'Levantamiento');
+    await page.locator('.lev-card', { hasText: 'Compu' }).click();
+    expect((await page.locator('nav.bottom-nav').boundingBox()).width).toBeLessThan(90);
+    await expect(page.locator('.lev-top-pc').getByRole('button', { name: 'Pasar a Dibujar' })).toBeVisible();
+    // Marcar: tipo de punto y de vano en listas
+    await page.locator('#lev-tipo').selectOption('poste_nuevo');
+    await expect(page.locator('#lev-tipo')).toHaveValue('poste_nuevo');
+    // Punto: se edita en el panel, sin ventanas
+    await page.locator('.leaflet-marker-icon', { hasText: 'P2' }).click();
+    await page.locator('#lev-poste-altura').selectOption('40');
+    await page.locator('#lev-p-kva').selectOption('50');
+    await page.locator('#lev-p-nota').fill('Retenida floja'); await page.locator('#lev-p-nota').press('Tab');
+    await expect(page.locator('.lev-elegir')).toHaveCount(0);
+    const punto = async () => page.evaluate(async () => (await import('/js/state.js')).state.levantamientos.L1.puntos.b);
+    await expect.poll(punto).toMatchObject({ altura: 40, trafos: ['50'], nota: 'Retenida floja' });
+    await page.locator('.dib-agregar-estr summary').click();
+    await page.locator('#lev-poste-estr-otra').fill('TS3'); await page.locator('#lev-poste-estr-otra').press('Enter');
+    await expect.poll(async () => (await punto()).estructuras).toEqual(['TS3']);
+    // Vanos: calibre y conductor en listas
+    await pestana(page, 'Vanos');
+    await page.locator('#lev-v-v1-calibre').selectOption('#2');
+    await page.locator('#lev-v-v1-tipo').selectOption('Triplex');
+    await expect.poll(async () => page.evaluate(async () => (await import('/js/state.js')).state.levantamientos.L1.vanos.v1)).toMatchObject({ calibre: '#2', conductor: 'Triplex' });
   });
 
   test('pasar a Dibujar con el mapa de la zona de fondo (calles o satélite), alineado con los postes', async ({ page }) => {
