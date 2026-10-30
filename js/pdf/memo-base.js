@@ -3,19 +3,27 @@
 // el PDF del celular lo cortaban en los bordes).
 // Cada plantilla arma su cuerpo con estos bloques y los envuelve con docMemo().
 
-const LOGO = `<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="2" width="18" height="20" rx="2" stroke="white" stroke-width="1.8" fill="none"/><path d="M8 7h8M8 10h5" stroke="white" stroke-width="1.5" stroke-linecap="round"/><path d="M12 14l-2 4h4l-2 4" stroke="#7dd3fc" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 const ONDA = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='120' viewBox='0 0 240 120'%3E%3Cpath d='M0 60 Q30 10 60 60 T120 60 T180 60 T240 60' fill='none' stroke='%23ffffff' stroke-opacity='.16' stroke-width='2'/%3E%3Cpath d='M0 75 Q30 35 60 75 T120 75 T180 75 T240 75' fill='none' stroke='%23ffffff' stroke-opacity='.07' stroke-width='1.5'/%3E%3C/svg%3E")`;
 
-// Impresión: carta con márgenes. Va aparte para ponérsela también a los memos ya guardados como HTML (despachos)
+// Impresión: carta. Va aparte para ponérsela también a los memos ya guardados como HTML (despachos).
+// La hoja de impresión no tiene margen (así el navegador no agrega la fecha, el título ni el enlace arriba y abajo): el
+// margen de 12 mm lo pone la propia hoja y se repite en cada página. Las tablas largas se parten entre páginas (antes
+// la sección entera pasaba a la página siguiente y dejaba la primera casi vacía), sin separar el título de la tabla.
+// Sin el logo de la app (pedido del equipo).
 export const ESTILO_IMPRESION = `
-  @page { size: letter; margin: 12mm; }
-  @page apaisada { size: letter landscape; margin: 12mm; }
+  @page { size: letter; margin: 0; }
+  @page apaisada { size: letter landscape; margin: 0; }
   @media print {
     body { background: #fff; }
     .barra { display: none; }
-    .hoja { margin: 0; box-shadow: none; width: auto; min-height: 254mm; } /* carta (279.4 mm) menos los márgenes */
-    .hoja.apaisada { page: apaisada; min-height: 190mm; }
+    .hoja { margin: 0; box-shadow: none; width: auto; min-height: 278mm; padding: 12mm; -webkit-box-decoration-break: clone; box-decoration-break: clone; } /* el pie al fondo de la hoja (carta: 279.4 mm) */
+    .hoja.apaisada { page: apaisada; min-height: 214mm; }
+    .marca-logo { display: none; }
+    .sec:has(table) { break-inside: auto; }
+    .sec-tit { break-after: avoid; }
+    table thead { display: table-header-group; }
+    .firmas, .ffirmas, .pie { break-inside: avoid; }
     .enc { border-radius: 12px; padding: 22px 26px 18px; }
     .meta > div { padding: 9px 26px; }
     .cuerpo { padding: 22px 0 8px; }
@@ -169,7 +177,6 @@ export function docMemo({ titulo, tipo, meta = [], cuerpo, pie = '', rojo = fals
 <div class="${clases}">
   <div class="enc${rojo ? ' rojo' : ''}">
     ${logo ? `<div class="marca marca-img"><img src="${logo}" alt=""><div class="marca-sub">${subtitulo}</div></div>` : `<div class="marca">
-      <div class="marca-logo">${LOGO}</div>
       <div><div class="marca-nombre">CPT INNOVA</div><div class="marca-sub">${subtitulo}</div></div>
     </div>`}
     <div class="titulo"><div class="titulo-eti">${etiqueta}</div><div class="titulo-tipo">${tipo}</div></div>

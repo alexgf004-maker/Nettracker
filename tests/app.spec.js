@@ -1169,7 +1169,8 @@ test('memos firmados en pantalla: préstamo, despacho a Campos y equipo dañado;
   let html = (await docs())[0];
   expect(html.match(/<img src="data:image\/png;base64,[^"]+" alt="Firma"/g)).toHaveLength(1);
   expect(html).toContain('Firmó: David García');
-  expect(html).toContain('@page { size: letter; margin: 12mm; }'); // carta con márgenes (antes A4 a sangre)
+  expect(html).toContain('@page { size: letter; margin: 0; }'); // carta; el margen lo pone la hoja (así el navegador no imprime el enlace ni la fecha)
+  expect(html).toContain('.marca-logo { display: none; }'); // sin el logo de la app, también en los memos ya guardados
   await page.locator('.modal', { hasText: 'Firmas del memo' }).locator('.modal-cerrar').click();
   await expect(page.locator('.memo-item .btn-firmas')).toHaveText('Firmas 1/2');
 
