@@ -34,44 +34,66 @@ export function renderFechas(c) {
   html += `<details class="ayuda"><summary><i class="ic ic-ayuda"></i> ¿Cómo funciona?</summary><p>Sube el Excel de usuarios seleccionados con la fecha de instalación de cada caso: cada día queda como una Fecha. En cada Fecha pon el retiro y los accesorios, exporta el Excel para Despachos o envíala directo a la carga masiva.${bt ? ' Las cartas se entregan al instalar: genera las de cada Fecha con su día de instalación.' : ''}</p></details>`;
   html += '</div>';
 
-  html += '<div class="boletos fechas-grid">';
+  // Pestañas: cada Fecha con su avance de equipos (y "Sin fecha" si hay casos sin fecha). Se programa una Fecha a la vez
+  const delTab = n => (n === 'sin' ? casos.filter(x => !x.programa?.fecha) : casosDeFecha(casos, n));
+  const conEquipo = lista => lista.filter(x => x.programa?.equipo).length;
+  const sinFechaTodos = casos.filter(x => !x.programa?.fecha).length;
+  state.fechaTab ??= {};
+  if (!state.fechaTab[c.clave] || (state.fechaTab[c.clave] === 'sin' && !sinFechaTodos)) {
+    const pend = FECHAS.find(n => { const l = delTab(n); return l.length && conEquipo(l) < l.length; });
+    state.fechaTab[c.clave] = pend || FECHAS.find(n => delTab(n).length) || (sinFechaTodos ? 'sin' : FECHAS[0]);
+  }
+  const tab = state.fechaTab[c.clave];
+  html += '<div class="fecha-tabs" role="tablist">';
   FECHAS.forEach(n => {
-    const f = g.fechas?.[n] || {};
-    const delGrupo = casosDeFecha(casos, n);
-    const avisos = delGrupo.length ? revisarFecha(delGrupo, f, bt) : [];
+    const f = g.fechas?.[n] || {}; const l = delTab(n); const ok = conEquipo(l);
+    html += `<button class="fecha-tab ${tab === n ? 'activo' : ''} ${l.length ? '' : 'vacio'}" role="tab" aria-selected="${tab === n}" onclick="setFechaTab('${c.clave}', '${n}')">
+      <span class="fecha-tab-k">Fecha ${n}${f.instalacion ? ` · ${fmtDate(f.instalacion).slice(0, 5)}${f.retiro ? ` al ${fmtDate(f.retiro).slice(0, 5)}` : ''}` : ''}</span>
+      <span class="fecha-tab-n">${l.length} ${l.length === 1 ? 'caso' : 'casos'}</span>
+      ${l.length ? `<span class="fecha-tab-barra"><i style="width:${Math.round((ok / l.length) * 100)}%"></i></span><small>${ok === l.length ? 'Todos con equipo' : `${ok} de ${l.length} con equipo`}</small>` : '<small>Sin casos</small>'}</button>`;
+  });
+  if (sinFechaTodos) html += `<button class="fecha-tab sin ${tab === 'sin' ? 'activo' : ''}" role="tab" aria-selected="${tab === 'sin'}" onclick="setFechaTab('${c.clave}', 'sin')"><span class="fecha-tab-k">Sin fecha</span><span class="fecha-tab-n">${sinFechaTodos} ${sinFechaTodos === 1 ? 'caso' : 'casos'}</span><small>${sinFecha ? `${sinFecha} ${bt ? 'por programar' : sinFecha === 1 ? 'listo para medir' : 'listos para medir'}` : 'no se miden'}</small></button>`;
+  html += '</div>';
+
+  const lista = delTab(tab);
+  html += `<div class="fecha-panel ${tab === 'sin' ? 'sin' : 'fecha-card'}">`;
+  if (tab !== 'sin') {
+    const n = tab; const f = g.fechas?.[n] || {};
+    const avisos = lista.length ? revisarFecha(lista, f, bt) : [];
+    const faltan = lista.length - conEquipo(lista);
     // Equipos de la fecha que se pueden descargar (instalados o retirados con la descarga pendiente)
-    const porDescargar = delGrupo.map(x => instalacionDeCaso(x, state.records)).filter(descargable).length;
-    html += `<div class="boleto fecha-card ${delGrupo.length ? '' : 'vacio'}">
-      <div class="boleto-top"><div><div class="boleto-k">Fecha ${n}</div><div class="boleto-t">${f.instalacion ? fmtDate(f.instalacion) : 'Sin fecha'}${f.retiro ? ' al ' + fmtDate(f.retiro) : ''}</div></div>
-        <div class="boleto-n"><b>${delGrupo.length}</b> <span>${delGrupo.length === 1 ? 'caso' : 'casos'}</span></div></div>
-      <div class="boleto-corte"></div>
-      <div class="boleto-campos">
+    const porDescargar = lista.map(x => instalacionDeCaso(x, state.records)).filter(descargable).length;
+    html += `<div class="fecha-cab"><div class="fecha-cab-t"><b>Fecha ${n}</b><span>${lista.length} ${lista.length === 1 ? 'caso' : 'casos'}</span></div>
+      <div class="fecha-campos">
         <div><label>Instalación</label><input type="date" value="${esc(f.instalacion)}" onchange="setDatoFecha('${c.clave}', '${n}', 'instalacion', this.value)"></div>
         <div><label>Retiro</label><input type="date" value="${esc(f.retiro)}" onchange="setDatoFecha('${c.clave}', '${n}', 'retiro', this.value)"></div>
         <div class="ancho"><label>Accesorios</label><input value="${esc(f.accesorios || ACCESORIOS_DEFECTO)}" onchange="setDatoFecha('${c.clave}', '${n}', 'accesorios', this.value)"></div>
       </div>
-      ${avisos.length ? `<div class="boleto-avisos">${avisos.map(esc).join('<br>')}</div>` : ''}
-      <div class="boleto-acciones">
-        <button class="hero-btn blanco" ${delGrupo.length ? '' : 'disabled'} onclick="exportarFecha('${c.clave}', '${n}')"><i class="ic ic-excel"></i> Exportar Excel</button>
-        <button class="hero-btn" ${delGrupo.length ? '' : 'disabled'} onclick="enviarFechaADespachos('${c.clave}', '${n}')"><i class="ic ic-despachos"></i> Enviar a Despachos</button>
-        ${porDescargar ? `<button class="hero-btn" onclick="abrirDescargaFecha('${c.clave}', '${n}')"><i class="ic ic-descargar"></i> Registrar descargas (${porDescargar})</button>` : ''}
-        ${bt ? `<button class="hero-btn" ${delGrupo.length ? '' : 'disabled'} onclick="abrirDocumentos('${c.clave}', 'cartas', '${n}')"><i class="ic ic-correo"></i> ${f.cartas ? 'Cartas de nuevo' : 'Cartas'}</button>` : ''}
-      </div>
-      ${bt && f.cartas ? `<div class="boleto-nota"><i class="ic ic-check"></i> Cartas generadas ${fmtDate(f.cartas.fecha)}${f.cartas.por ? ' · ' + esc(f.cartas.por) : ''}</div>` : ''}
-    </div>`;
-  });
-  html += '</div>';
+      <div class="fecha-acciones">
+        <button class="b b-g" ${lista.length ? '' : 'disabled'} onclick="copiarFecha('${c.clave}', '${n}')"><i class="ic ic-clipboard"></i> Copiar tabla</button>
+        <button class="b b-g" ${lista.length ? '' : 'disabled'} onclick="exportarFecha('${c.clave}', '${n}')"><i class="ic ic-excel"></i> Exportar Excel</button>
+        <button class="b b-p" ${lista.length && !faltan ? '' : 'disabled'} title="${faltan ? `Faltan ${faltan} ${faltan === 1 ? 'equipo' : 'equipos'} por asignar` : ''}" onclick="enviarFechaADespachos('${c.clave}', '${n}')"><i class="ic ic-despachos"></i> Enviar a Despachos</button>
+        ${porDescargar ? `<button class="b b-g" onclick="abrirDescargaFecha('${c.clave}', '${n}')"><i class="ic ic-descargar"></i> Registrar descargas (${porDescargar})</button>` : ''}
+        ${bt ? `<button class="b b-g" ${lista.length ? '' : 'disabled'} onclick="abrirDocumentos('${c.clave}', 'cartas', '${n}')"><i class="ic ic-correo"></i> ${f.cartas ? 'Cartas de nuevo' : 'Cartas'}</button>` : ''}
+      </div></div>`;
+    if (avisos.length || faltan) html += `<div class="boleto-avisos fecha-avisos">${avisos.map(t => `<span class="tg ambar">${esc(t)}</span>`).join('')}${faltan ? `<span class="fecha-aviso-tx">Asigna los equipos que faltan para enviar a Despachos. Al elegir uno, pasa solo al siguiente caso sin equipo.</span>` : ''}</div>`;
+    if (bt && f.cartas) html += `<div class="boleto-nota"><i class="ic ic-check"></i> Cartas generadas ${fmtDate(f.cartas.fecha)}${f.cartas.por ? ' · ' + esc(f.cartas.por) : ''}</div>`;
+  } else html += `<div class="fecha-cab"><div class="fecha-cab-t"><b>Sin fecha</b><span>Elige la Fecha de cada caso en la última columna</span></div></div>`;
 
-  html += `<div class="tabla-caja"><div class="tabla-scroll"><table class="tabla-r tabla-casos tabla-fechas"><thead><tr><th>Código</th>${bt ? '<th>CT/DS</th><th>Medidor</th>' : '<th>Estado</th><th>Multiplicador</th>'}<th>Fecha</th><th>Equipo</th></tr></thead><tbody>`;
-  casos.forEach(x => {
+  if (!lista.length) return html + '<div class="page-sub fecha-vacia">Esta Fecha no tiene casos. Asígnalos desde "Sin fecha" o importa la programación.</div></div>';
+  html += `<div class="tabla-scroll"><table class="tabla-r tabla-casos tabla-fechas"><thead><tr><th>Código</th>${bt ? '<th>CT/DS</th><th>Medidor</th>' : '<th>Tipo de instalación</th><th>Multiplicador ECAMEC</th><th>TI</th><th>Testblock</th>'}<th>Equipo</th><th>Fecha</th></tr></thead><tbody>`;
+  lista.forEach(x => {
     const m = x.mult || {}; const k = calcularMultiplicador(m, redDeCaso(x));
-    const p = x.programa || {};
-    html += `<tr>
+    const p = x.programa || {}; const grupo = grupoDeEstado(m.estado);
+    html += `<tr class="${p.equipo ? 'con-equipo' : ''}">
       <td class="cod"><b>${esc(x.codigo || x.codigoEnte)}</b><small>${esc(x.nombre)}</small></td>
-      ${bt ? `<td data-l="CT/DS">${esc(x.ct) || '—'}</td><td data-l="Medidor" class="num">${esc(x.medidor) || '—'}</td>` : `<td data-l="Estado">${m.estado ? `<span class="tg ${TG_GRUPO[grupoDeEstado(m.estado)]}">${esc(m.estado)}</span>` : '<span class="falta">Sin estado</span>'}</td>
-      <td data-l="Multiplicador" class="num">${esc(k.ecamec) || '—'}<small>${esc(k.ti)}${m.configuracion ? ' · ' + esc(m.configuracion) : ''}</small></td>`}
-      <td data-l="Fecha"><select aria-label="Fecha de ${esc(x.codigo)}" onchange="asignarFecha('${c.clave}', '${x.id}', this.value)"><option value="">—</option>${FECHAS.map(n => `<option value="${n}" ${String(p.fecha || '') === n ? 'selected' : ''}>Fecha ${n}</option>`).join('')}</select></td>
+      ${bt ? `<td data-l="CT/DS">${esc(x.ct) || '—'}</td><td data-l="Medidor" class="num">${esc(x.medidor) || '—'}</td>`
+        : `<td data-l="Tipo">${m.configuracion ? esc(m.configuracion) : '—'}${grupo !== 'listos' ? `<small>${m.estado ? `<span class="tg ${TG_GRUPO[grupo]}">${esc(m.estado)}</span>` : '<span class="falta">Sin estado</span>'}</small>` : ''}</td>
+      <td data-l="ECAMEC" class="num">${k.ecamec ? esc(k.ecamec) : '<span class="tg ambar">Sin multiplicador</span>'}</td>
+      <td data-l="TI" class="num">${esc(k.ti) || '—'}</td>
+      <td data-l="Testblock">${esc(m.testblock) || '—'}</td>`}
       <td data-l="Equipo"><button class="eqf-elegir ${p.equipo ? '' : 'vacio'}" aria-label="Equipo de ${esc(x.codigo)}" onclick="abrirEquipoFecha('${c.clave}', '${x.id}')">${p.equipo ? `<b>${esc(p.equipo)}</b>` : 'Elegir equipo'}<i class="ic ic-chevron-right"></i></button></td>
+      <td data-l="Fecha"><select aria-label="Fecha de ${esc(x.codigo)}" onchange="asignarFecha('${c.clave}', '${x.id}', this.value)"><option value="">—</option>${FECHAS.map(n => `<option value="${n}" ${String(p.fecha || '') === n ? 'selected' : ''}>Fecha ${n}</option>`).join('')}</select></td>
     </tr>`;
   });
   return html + '</tbody></table></div></div>';

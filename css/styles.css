@@ -471,6 +471,35 @@ label.btn-accion { cursor: pointer; }
 .calc-ancho { grid-column: 1 / -1; }
 .fila-importar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .fechas-grid { display: grid; grid-template-columns: 1fr; gap: 0 12px; }
+/* Fechas como pestañas: se programa una a la vez (avance de equipos en cada una) */
+.fecha-tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 14px 0 0; }
+.fecha-tab { display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 10px 12px; border: 1.5px solid var(--border); border-bottom: 0; border-radius: 14px 14px 0 0; background: var(--white); color: var(--text); font: inherit; cursor: pointer; }
+.fecha-tab.activo { background: var(--degradado, linear-gradient(135deg, #0b2e3b, #0e7490)); color: #fff; border-color: #0e7490; }
+.fecha-tab.vacio { opacity: .6; }
+.fecha-tab.sin { border-style: dashed; }
+.fecha-tab-k { font-size: 11px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; opacity: .85; }
+.fecha-tab-n { font-size: 16px; font-weight: 800; }
+.fecha-tab-barra { height: 6px; border-radius: 4px; background: var(--border); overflow: hidden; }
+.fecha-tab.activo .fecha-tab-barra { background: rgba(255,255,255,.25); }
+.fecha-tab-barra i { display: block; height: 100%; background: var(--green, #16a34a); }
+.fecha-tab.activo .fecha-tab-barra i { background: #86efac; }
+.fecha-tab small { font-size: 11.5px; opacity: .85; }
+.fecha-panel { background: var(--white); border: 1.5px solid #0e7490; border-radius: 0 0 14px 14px; padding: 12px 14px; margin-bottom: 16px; }
+.fecha-cab { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.fecha-cab-t { display: flex; flex-direction: column; min-width: 90px; }
+.fecha-cab-t b { font-size: 16px; } .fecha-cab-t span { font-size: 12px; color: var(--text3); }
+.fecha-campos { display: flex; flex-wrap: wrap; gap: 8px; flex: 1 1 420px; }
+.fecha-campos > div { display: flex; flex-direction: column; gap: 3px; }
+.fecha-campos .ancho { flex: 1 1 220px; }
+.fecha-campos label { font-size: 10.5px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; color: var(--text3); }
+.fecha-campos input { height: 36px; padding: 4px 10px; font-size: 13px; }
+.fecha-acciones { display: flex; flex-wrap: wrap; gap: 6px; }
+.fecha-panel .fecha-avisos { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 10px 0 2px; background: none; border: 0; padding: 0; font-size: 12px; }
+.fecha-aviso-tx { color: var(--text3); }
+.fecha-vacia { padding: 16px 4px; }
+.fecha-panel .tabla-scroll { margin-top: 6px; }
+.tabla-fechas tr.con-equipo td { background: #fcfffd; }
+.tabla-fechas td small .tg { margin-top: 3px; }
 .fecha-card .row { gap: 8px; }
 .fecha-card .field { margin-bottom: 8px; }
 .tabla-fechas select { padding: 6px 28px 6px 8px; font-size: 12px; min-width: 110px; }

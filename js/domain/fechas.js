@@ -30,6 +30,15 @@ export function filaFecha(c, fecha = {}, bt = false) {
 // Hoja del Excel: dos filas vacías y el encabezado en la tercera, como las hojas Fecha1/2/3
 export const filasFecha = (casos, fecha, bt = false) => [[], [], bt ? COLUMNAS_FECHA_BT : COLUMNAS_FECHA, ...casos.map(c => filaFecha(c, fecha, bt))];
 
+// Tabla para copiar de una Fecha (encabezado y una fila por caso): lo que se toma al programar
+export function tablaParaCopiar(casos, bt = false) {
+  const enc = bt ? ['Código', 'Transformador', 'Medidor', 'Equipo'] : ['Código', 'Multiplicador ECAMEC', 'TI', 'Tipo de instalación', 'Equipo', 'Testblock'];
+  return [enc, ...casos.map(c => {
+    const m = c.mult || {}; const k = calcularMultiplicador(m, redDeCaso(c)); const eq = c.programa?.equipo || '';
+    return bt ? [c.codigo || c.codigoEnte, c.ct || '', c.medidor || '', eq] : [c.codigo || c.codigoEnte, k.ecamec, k.ti, m.configuracion || '', eq, m.testblock || ''];
+  })];
+}
+
 // Problemas a revisar antes de despachar una fecha (en BT no hay multiplicadores)
 export function revisarFecha(casos, fecha = {}, bt = false) {
   const avisos = [];
