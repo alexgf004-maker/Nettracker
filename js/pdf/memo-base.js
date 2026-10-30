@@ -1,10 +1,33 @@
-// Base común de los memorándums: hoja carta con la identidad de la app (degradado petróleo → turquesa). Al imprimir lleva
-// márgenes de 12 mm y el encabezado va dentro de ellos con esquinas redondeadas (antes iba a sangre y las impresoras y
-// el PDF del celular lo cortaban en los bordes).
+// Base común de los memorándums: hoja carta sobria (encabezado en blanco con una franja turquesa; ver SOBRIO). Al imprimir
+// lleva márgenes de 12 mm puestos por la propia hoja (ver ESTILO_IMPRESION).
 // Cada plantilla arma su cuerpo con estos bloques y los envuelve con docMemo().
 
 
-const ONDA = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='120' viewBox='0 0 240 120'%3E%3Cpath d='M0 60 Q30 10 60 60 T120 60 T180 60 T240 60' fill='none' stroke='%23ffffff' stroke-opacity='.16' stroke-width='2'/%3E%3Cpath d='M0 75 Q30 35 60 75 T120 75 T180 75 T240 75' fill='none' stroke='%23ffffff' stroke-opacity='.07' stroke-width='1.5'/%3E%3C/svg%3E")`;
+
+// Estilo sobrio (pedido del equipo: el encabezado de color gastaba mucha tinta): encabezado en blanco con una franja
+// turquesa arriba (roja en equipo dañado), título en turquesa, datos con líneas finas y tablas con encabezado blanco y
+// filas alternadas en gris (ayudan a seguir la fila en campo). Va aparte para ponérselo también a los memos ya guardados.
+const SOBRIO = `
+  .enc { background: #fff; color: var(--texto); border-top: 5px solid var(--turq); border-bottom: 0; border-radius: 0; padding: 16px 34px 12px; }
+  .enc.rojo { background: #fff; border-top-color: #dc2626; }
+  .enc.rojo .titulo-tipo { color: #b91c1c; }
+  .marca-nombre { font-size: 16px; letter-spacing: 1.5px; color: var(--texto); }
+  .marca-sub, .titulo-eti { opacity: 1; color: var(--texto3); }
+  .titulo-tipo { color: var(--turq); font-size: 20px; }
+  .meta { background: #fff; border-top: 1px solid var(--borde); border-bottom: 1px solid var(--borde); }
+  .meta > div { border-right: 0; }
+  .meta-val { color: var(--texto); }
+  .sec-tit { color: var(--turq); }
+  .sec-tit::before { display: none; }
+  .cuenta { background: #fff; border-color: var(--borde); color: var(--texto2); }
+  table.tabla { border: 0; border-radius: 0; }
+  .tabla th { background: #fff; color: var(--texto2); border-bottom: 1.5px solid var(--texto); }
+  .tabla td { border-top: 1px solid #e2e8f0; }
+  .tabla tbody tr:nth-child(even) td { background: #f1f5f9; }
+  .mov-flecha span { background: var(--turq); }
+  .pie { border-top: 1px solid var(--borde); border-image: none; }
+  .hoja.formal .enc { border-top: 0; border-bottom: 3px double var(--petroleo); }
+  .hoja.formal .titulo-tipo { color: var(--petroleo); }`;
 
 // Impresión: carta. Va aparte para ponérsela también a los memos ya guardados como HTML (despachos).
 // La hoja de impresión no tiene margen (así el navegador no agrega la fecha, el título ni el enlace arriba y abajo): el
@@ -26,9 +49,9 @@ export const ESTILO_IMPRESION = `
     .firmas, .ffirmas, .pie { break-inside: avoid; }
     /* Hoja compacta (asignación de equipos): todo más junto para que unas 20 mediciones quepan en una hoja */
     .hoja.compacta { min-height: 0; padding: 9mm 10mm; }
-    .hoja.compacta .enc { padding: 12px 20px 10px; }
+    .hoja.compacta .enc { padding: 10px 0 8px; }
     .hoja.compacta .titulo-tipo { font-size: 18px; } .hoja.compacta .marca-nombre { font-size: 16px; }
-    .hoja.compacta .meta > div { padding: 5px 20px; }
+    .hoja.compacta .meta > div { padding: 5px 16px 5px 0; }
     .hoja.compacta .cuerpo { padding: 10px 0 4px; }
     .hoja.compacta .intro { font-size: 11px; line-height: 1.45; margin-bottom: 8px; }
     .hoja.compacta .intro-acc { font-size: 10px; margin-top: 2px; }
@@ -40,8 +63,9 @@ export const ESTILO_IMPRESION = `
     .hoja.compacta .firma { padding-top: 34px; }
     .hoja.compacta .firmas { gap: 24px; margin-top: 0; }
     .hoja.compacta .pie { padding: 6px 0 0; }
-    .enc { border-radius: 12px; padding: 22px 26px 18px; }
-    .meta > div { padding: 9px 26px; }
+    ${SOBRIO}
+    .enc { padding: 14px 0 10px; }
+    .meta > div { padding: 8px 16px 8px 0; }
     .cuerpo { padding: 22px 0 8px; }
     .pie { margin: 0; }
   }`;
@@ -57,8 +81,7 @@ const ESTILO = `
   .barra { position: sticky; top: 0; z-index: 2; display: flex; justify-content: center; gap: 10px; padding: 10px; background: rgba(230,237,240,.92); }
   .barra button { font: 700 13px 'Plus Jakarta Sans', Arial, sans-serif; color: #fff; background: linear-gradient(120deg, #0b2e3b, #0e7490 60%, #0891b2); border: 0; border-radius: 10px; padding: 10px 22px; cursor: pointer; }
 
-  .enc { color: #fff; background-image: ${ONDA}, linear-gradient(120deg, #0b2e3b 0%, #0e7490 60%, #0891b2 100%); background-repeat: repeat-x, no-repeat; background-position: right 0 bottom -46px, 0 0; background-size: 240px 120px, auto; padding: 26px 34px 22px; display: flex; justify-content: space-between; align-items: center; gap: 24px; }
-  .enc.rojo { background-image: ${ONDA}, linear-gradient(120deg, #4c0f0f 0%, #991b1b 60%, #dc2626 100%); }
+  .enc { display: flex; justify-content: space-between; align-items: center; gap: 24px; }
   .marca { display: flex; align-items: center; gap: 14px; }
   .marca-logo { width: 50px; height: 50px; border-radius: 14px; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.28); display: flex; align-items: center; justify-content: center; }
   .marca-logo svg { width: 28px; height: 28px; }
@@ -157,6 +180,7 @@ const ESTILO = `
   .ffirma-nom { font-size: 12px; font-weight: 800; min-height: 16px; margin-top: 2px; }
   .ffirma-cargo { font-size: 10.5px; color: var(--texto2); min-height: 14px; }
 
+  ${SOBRIO}
   ${ESTILO_IMPRESION}
   @media print {
     .hoja.formal { min-height: 0; }
