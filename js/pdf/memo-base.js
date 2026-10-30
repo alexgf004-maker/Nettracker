@@ -24,6 +24,22 @@ export const ESTILO_IMPRESION = `
     .sec-tit { break-after: avoid; }
     table thead { display: table-header-group; }
     .firmas, .ffirmas, .pie { break-inside: avoid; }
+    /* Hoja compacta (asignación de equipos): todo más junto para que unas 20 mediciones quepan en una hoja */
+    .hoja.compacta { min-height: 0; padding: 9mm 10mm; }
+    .hoja.compacta .enc { padding: 12px 20px 10px; }
+    .hoja.compacta .titulo-tipo { font-size: 18px; } .hoja.compacta .marca-nombre { font-size: 16px; }
+    .hoja.compacta .meta > div { padding: 5px 20px; }
+    .hoja.compacta .cuerpo { padding: 10px 0 4px; }
+    .hoja.compacta .intro { font-size: 11px; line-height: 1.45; margin-bottom: 8px; }
+    .hoja.compacta .intro-acc { font-size: 10px; margin-top: 2px; }
+    .hoja.compacta .sec { margin-bottom: 10px; }
+    .hoja.compacta .sec-tit { margin-bottom: 5px; font-size: 9.5px; }
+    .hoja.compacta .tabla th { font-size: 7.5px; padding: 4px 5px; letter-spacing: .4px; }
+    .hoja.compacta .tabla td { font-size: 8.5px; padding: 3px 5px; line-height: 1.3; }
+    .hoja.compacta .tabla td.mono, .hoja.compacta .tabla td.c { white-space: nowrap; }
+    .hoja.compacta .firma { padding-top: 34px; }
+    .hoja.compacta .firmas { gap: 24px; margin-top: 0; }
+    .hoja.compacta .pie { padding: 6px 0 0; }
     .enc { border-radius: 12px; padding: 22px 26px 18px; }
     .meta > div { padding: 9px 26px; }
     .cuerpo { padding: 22px 0 8px; }
@@ -96,6 +112,7 @@ const ESTILO = `
   .hoja.compacta .cuerpo { padding: 18px 22px 6px; }
   .hoja.compacta .tabla th { font-size: 8.5px; padding: 6px 7px; }
   .hoja.compacta .tabla td { font-size: 10px; padding: 5px 7px; }
+  .intro-acc { display: inline-block; margin-top: 4px; font-size: 12px; color: var(--texto2); }
 
   .firmas { display: grid; grid-template-columns: repeat(var(--cols, 2), 1fr); gap: 36px; margin-top: 8px; }
   .firma { text-align: center; padding-top: 58px; }

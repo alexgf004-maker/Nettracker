@@ -80,6 +80,10 @@ export function buildMemoCargaMasiva(filas) {
   const origen = state.cargaAreaOrigen;
   const esMT = origen === 'CPT MT' || origen === 'CPT DELSUR';
   const fecha = new Date().toLocaleDateString('es-SV');
+  // Los accesorios casi siempre son los mismos para todos: van una vez arriba de la tabla (así cada fila ocupa un
+  // renglón y unas 20 mediciones caben en una hoja; pedido del equipo)
+  const accesorios = [...new Set(filas.map(r => String(r.accesorios || '').trim()))];
+  const mismosAccesorios = accesorios.length === 1;
   const td = (v, mono, c) => `<td class="${[mono && 'mono', c && 'c'].filter(Boolean).join(' ')}">${v || '—'}</td>`;
   const rows = filas.map((r, i) => '<tr>'
     + `<td class="num">${i + 1}</td>`
@@ -92,16 +96,16 @@ export function buildMemoCargaMasiva(filas) {
     + (esMT ? td(r.multiplicador) + td(r.corrientes) + td(r.conexion) : td(r.notas) + td(r.medidor, true))
     + td(r.fechaInst, false, true)
     + (esMT ? '' : td(r.fechaRetiro, false, true))
-    + td(r.accesorios)
+    + (mismosAccesorios ? '' : td(r.accesorios))
     + '</tr>').join('');
 
   const cuerpo =
-    `<p class="intro">Mediante la presente se notifica la asignación de <b>${filas.length} analizadores de red ECAMEC</b> a <b>Campos y Servicios</b>, los cuales serán usados para las siguientes mediciones.</p>`
+    `<p class="intro">Mediante la presente se notifica la asignación de <b>${filas.length} analizadores de red ECAMEC</b> a <b>Campos y Servicios</b>, los cuales serán usados para las siguientes mediciones.${mismosAccesorios && accesorios[0] ? `<br><span class="intro-acc">Accesorios de cada equipo: <b>${accesorios[0]}</b></span>` : ''}</p>`
     + seccion('Equipos asignados', `<div class="tabla-wrap"><table class="tabla">
       <thead><tr>
         <th>#</th><th>N° SIGET</th><th>Equipo</th><th>Viñeta</th><th>ID usuario</th><th>Nombre del usuario</th><th>Dirección</th>
         ${esMT ? '<th>Multiplicador</th><th>Corrientes</th><th>Conexión</th>' : '<th>Transformador</th><th>Medidor</th>'}
-        <th class="c">F. instalación</th>${esMT ? '' : '<th class="c">F. retiro</th>'}<th>Accesorios</th>
+        <th class="c">F. instalación</th>${esMT ? '' : '<th class="c">F. retiro</th>'}${mismosAccesorios ? '' : '<th>Accesorios</th>'}
       </tr></thead>
       <tbody>${rows}</tbody></table></div>`, cuenta(filas.length))
     + seccion('Firmas de conformidad', firmas([
