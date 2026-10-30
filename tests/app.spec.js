@@ -1781,8 +1781,25 @@ test.describe('Precampaña', () => {
     await cerrarAlerta(page);
     await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('fechas'); });
     await expect(page.locator('.meta')).toContainText('1 caso listo para medir no tiene fecha');
+    // Pestañas: se abre la Fecha 1 (solo sus casos, con lo que se toma al programar); el caso sin fecha está en "Sin fecha"
+    await expect(page.locator('.fecha-tab.activo')).toContainText('Fecha 1');
+    await expect(page.locator('.fecha-tab.activo')).toContainText('Todos con equipo');
+    await expect(page.locator('.tabla-fechas thead')).toContainText('Tipo de instalación');
+    await expect(page.locator('.tabla-fechas tbody tr')).toHaveCount(1);
+    await expect(page.locator('.tabla-fechas tbody tr')).toContainText('Estrella');
+    await expect(page.locator('.tabla-fechas tbody tr')).toContainText('13200/240');
+    await page.locator('.fecha-tab', { hasText: 'Sin fecha' }).click();
     await page.getByLabel('Fecha de CR1O2026201').selectOption('1');
     expect((await app.escrituras()).at(-1)).toEqual(['update', 'campanas/2026-10_CPT-MT/casos/CR1O2026201/programa', { fecha: '1' }]);
+    // La Fecha 1 ahora tiene uno sin equipo y no deja enviar a Despachos
+    await page.locator('.fecha-tab', { hasText: 'Fecha 1' }).click(); // en "Sin fecha" queda el que no se mide
+    await expect(page.locator('.fecha-tab.activo')).toContainText('1 de 2 con equipo');
+    await expect(page.locator('.fecha-card').getByRole('button', { name: 'Enviar a Despachos' })).toBeDisabled();
+    const copia = await page.evaluate(async () => { const { state } = await import('/js/state.js'); const f = await import('/js/domain/fechas.js');
+      const casos = Object.entries(state.campanas['2026-10_CPT-MT'].casos).map(([id, c]) => ({ id, ...c })).filter(c => c.programa?.fecha === '1');
+      return f.tablaParaCopiar(casos); });
+    expect(copia[0]).toEqual(['Código', 'Multiplicador ECAMEC', 'TI', 'Tipo de instalación', 'Equipo', 'Testblock']);
+    expect(copia).toContainEqual(['CR1O2026202', '13200/240', '400/5', 'Estrella', 'SN-101', '']);
     // Elegir el equipo con el buscador
     await page.getByLabel('Equipo de CR1O2026201').click();
     const ventana = page.locator('.eqf-modal');
@@ -1823,6 +1840,24 @@ test.describe('Precampaña', () => {
     await app.ejecutar(() => confirmarCarga());
     const push = (await app.escrituras()).find(([op, ruta]) => op === 'push' && ruta === 'analizadores');
     expect(push[2]).toMatchObject({ caso: 'CR1O2026201', serie: 'SN-105', fechaInstalacion: '2026-10-05', fechaRetiro: '2026-10-13', areaInstalacion: 'Campos y Servicios', areaBeneficiaria: 'CPT MT', lat: '13.7' });
+  });
+
+  test('fechas: al elegir un equipo pasa solo al siguiente caso de la Fecha sin equipo', async ({ page }) => {
+    const datos = conCampana();
+    const mult = { estado: 'Realizado', configuracion: 'Delta', tap: '3', tensionTap: 22900, tensionBT: 240, xMedidor: 20, testblock: 'Sí' };
+    Object.assign(datos.campanas['2026-10_CPT-MT'].casos.CR1O2026201, { mult, programa: { fecha: '1' } });
+    Object.assign(datos.campanas['2026-10_CPT-MT'].casos.CR1O2026202, { mult, programa: { fecha: '1' } });
+    app = await abrirApp(page, { datos });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('fechas'); });
+    await expect(page.locator('.tabla-fechas tbody tr').first()).toContainText('Sí'); // testblock
+    await page.getByLabel('Equipo de CR1O2026201').click();
+    await page.locator('#eq-fecha-buscar').fill('sn-105'); await page.locator('#eq-fecha-buscar').press('Enter');
+    await expect(page.locator('.eqf-modal .modal-titulo')).toHaveText('Equipo para CR1O2026202');
+    await expect(page.locator('#eq-fecha-buscar')).toBeFocused();
+    await page.locator('#eq-fecha-buscar').fill('sn-106'); await page.locator('#eq-fecha-buscar').press('Enter');
+    await expect(page.locator('.eqf-modal')).toHaveCount(0);
+    await expect(page.locator('.fecha-card').getByRole('button', { name: 'Enviar a Despachos' })).toBeEnabled();
   });
 
   test('descargas en bloque desde una Fecha: técnico para todos y fallo por equipo', async ({ page }) => {
@@ -1982,6 +2017,9 @@ test.describe('Precampaña', () => {
     await expect(page.locator('.tabla-fechas thead')).toContainText('CT/DS');
     await expect(page.locator('.tabla-fechas thead')).not.toContainText('Multiplicador');
     await expect(page.locator('.bloque').first()).toContainText('1 caso no tiene fecha');
+    // Se abre la primera Fecha con equipos por asignar (la 2); la 1 ya está completa
+    await expect(page.locator('.fecha-tab.activo')).toContainText('Fecha 2');
+    await page.locator('.fecha-tab', { hasText: 'Fecha 1' }).click();
     const tarjeta = page.locator('.fecha-card').first();
     await expect(tarjeta.locator('.boleto-avisos')).toHaveCount(0); // sin aviso de multiplicador
 
@@ -2002,7 +2040,7 @@ test.describe('Precampaña', () => {
     app = await abrirApp(page, { usuario: 'Francisco Chulo', datos: conCampanaBT() });
     await cerrarAlerta(page);
     const docs = await capturarDocsPrecampana(page);
-    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-BT'); setCampanaVista('fechas'); });
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-BT'); setCampanaVista('fechas'); setFechaTab('2026-10_CPT-BT', '1'); });
     const tarjeta = page.locator('.fecha-card').first();
     await tarjeta.getByRole('button', { name: 'Cartas' }).click();
     await expect(page.locator('.modal-titulo')).toHaveText('Generar cartas · Fecha 1');

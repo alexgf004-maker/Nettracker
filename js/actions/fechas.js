@@ -4,10 +4,10 @@ import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { validarFilaCarga } from './carga.js';
 import { leerArchivo } from './campanas.js';
-import { casosDeFecha, leerProgramacion, planificarFechas, filaFecha, filasFecha } from '../domain/fechas.js';
+import { casosDeFecha, leerProgramacion, planificarFechas, filaFecha, filasFecha, tablaParaCopiar } from '../domain/fechas.js';
 import { ordenarCasos } from '../domain/listados.js';
 import { flujoBT, MESES } from '../domain/trabajo.js';
-import { render } from '../views/render.js';
+import { alRedibujar, render } from '../views/render.js';
 import { darEstilo } from '../excel.js';
 
 const campana = clave => state.campanas?.[clave];
@@ -22,12 +22,44 @@ export function asignarEquipo(clave, id, serie) {
 // Ventana para elegir el equipo de un caso, con buscador (en BT son muchos equipos)
 export function abrirEquipoFecha(clave, id) { state.equipoFecha = { clave, id }; render(); document.getElementById('eq-fecha-buscar')?.focus(); }
 export function cerrarEquipoFecha() { state.equipoFecha = null; render(); }
+// Al elegir el equipo pasa solo al siguiente caso de la misma Fecha que todavía no tiene (para programar seguido)
 export function elegirEquipoFecha(serie) {
   const { clave, id } = state.equipoFecha || {};
   if (!clave) return;
   asignarEquipo(clave, id, serie);
-  state.equipoFecha = null;
+  const fecha = campana(clave)?.casos?.[id]?.programa?.fecha;
+  const lista = fecha && serie ? casosDeFecha(casosDe(clave), fecha) : [];
+  const i = lista.findIndex(c => c.id === id);
+  const siguiente = [...lista.slice(i + 1), ...lista.slice(0, Math.max(0, i))].find(c => c.id !== id && !c.programa?.equipo);
+  state.equipoFecha = siguiente ? { clave, id: siguiente.id } : null;
   render();
+  if (siguiente) document.getElementById('eq-fecha-buscar')?.focus();
+}
+// La ventana del equipo se vuelve a dibujar cuando llega el cambio de la base: el buscador conserva el cursor
+let ventanaDe = null;
+alRedibujar(() => {
+  const id = state.equipoFecha?.id || null;
+  if (id && id !== ventanaDe) document.getElementById('eq-fecha-buscar')?.focus();
+  else if (id && document.activeElement === document.body) document.getElementById('eq-fecha-buscar')?.focus();
+  ventanaDe = id;
+});
+// Pestaña de la Fecha que se está programando
+export function setFechaTab(clave, n) { state.fechaTab = { ...(state.fechaTab || {}), [clave]: n }; render(); }
+
+// Copia la tabla de la Fecha para pegarla en Excel, Word o un correo (código, multiplicador ECAMEC, TI, tipo de
+// instalación, equipo y testblock, en ese orden; en BT, transformador y medidor)
+export async function copiarFecha(clave, n) {
+  const g = campana(clave); const casos = casosDeFecha(casosDe(clave), n);
+  if (!casos.length) return showToast('No hay casos en la Fecha ' + n);
+  const filas = tablaParaCopiar(casos, flujoBT(g.area));
+  const tsv = filas.map(f => f.join('\t')).join('\n');
+  const celda = (t, th) => `<${th ? 'th' : 'td'} style="border:1px solid #999;padding:3px 8px">${String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;')}</${th ? 'th' : 'td'}>`;
+  const html = `<table style="border-collapse:collapse;font-family:Calibri,Arial;font-size:11pt">${filas.map((f, i) => `<tr>${f.map(t => celda(t, !i)).join('')}</tr>`).join('')}</table>`;
+  try {
+    if (window.ClipboardItem) await navigator.clipboard.write([new ClipboardItem({ 'text/plain': new Blob([tsv], { type: 'text/plain' }), 'text/html': new Blob([html], { type: 'text/html' }) })]);
+    else await navigator.clipboard.writeText(tsv);
+    showToast(`Fecha ${n} copiada: ${casos.length} ${casos.length === 1 ? 'caso' : 'casos'}`);
+  } catch { showToast('No se pudo copiar; usa Exportar Excel'); }
 }
 // Filtra la lista sin redibujar (para no perder lo escrito)
 export function buscarEquipoFecha(q) {
@@ -60,6 +92,9 @@ export function enviarFechaADespachos(clave, n) {
   const g = campana(clave);
   const casos = casosDeFecha(casosDe(clave), n);
   if (!casos.length) return showToast('No hay casos en la Fecha ' + n);
+  // Se envía con todos los equipos asignados (confirmado)
+  const faltan = casos.filter(c => !c.programa?.equipo).length;
+  if (faltan) return showToast(`Faltan ${faltan} ${faltan === 1 ? 'equipo' : 'equipos'} por asignar en la Fecha ${n}`);
   state.cargaData = casos.map(c => {
     if (flujoBT(g.area)) {
       // Formato de despacho de BT: transformador (en las notas) y medidor en lugar del multiplicador
