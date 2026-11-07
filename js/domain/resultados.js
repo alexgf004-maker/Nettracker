@@ -42,7 +42,8 @@ export function resultadoCaso(caso, inst) {
   const r = caso.resultado || {};
   const medicion = r.medicion || '';
   const ultima = inst?.descargas?.length ? inst.descargas[inst.descargas.length - 1] : null;
-  const falloDescarga = !medicion && ultima?.medicionOk === false ? (ultima.fallasMedicion || []).join(', ') || 'con fallo' : '';
+  // (también en un resultado anotado a mano: puede ser la razón de que se anotara fallida)
+  const falloDescarga = (!medicion || r.origen !== 'txt') && ultima?.medicionOk === false ? (ultima.fallasMedicion || []).join(', ') || 'con fallo' : '';
   return { medicion, tolerancia: medicion === 'valida' ? r.tolerancia || '' : '', febNoPer: medicion === 'valida' ? r.febNoPer ?? '' : '', nota: r.nota || '', falloDescarga, analisis: r.origen === 'txt' ? r.analisis : null };
 }
 
