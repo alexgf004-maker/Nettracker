@@ -2350,6 +2350,27 @@ test.describe('Precampaña', () => {
     expect(valor['casos/CR1O2026001/resultado']).toMatchObject({ medicion: 'valida', febNoPer: 10, tolerancia: 'fuera', origen: 'txt', analisis: { tipoCaso: 'Regulatorio BT', nivelTension: 120 } });
   });
 
+  test('analizar muchas mediciones: aviso con el avance, no se lanza dos veces y los botones quedan fijos', async ({ page }) => {
+    app = await abrirApp(page, { usuario: 'Francisco Chulo', datos: conCampanaBT() });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-BT'); setCampanaVista('resultados'); });
+    await expect(page.locator('.res-fija')).toHaveCSS('position', 'sticky');
+    const txt = hacerTXT({ v: () => [120, 0, 0] });
+    const r = await page.evaluate(async t => {
+      const archivos = ['CR1O2026001', 'CR1O2026002', 'CR1O2026003'].map(c => ({ nombre: c + '.txt', texto: t }));
+      const p = analizarArchivos('2026-10_CPT-BT', archivos);
+      const aviso = document.getElementById('procesando')?.textContent.replace(/\s+/g, ' ').trim();
+      const segunda = await analizarArchivos('2026-10_CPT-BT', archivos); // mientras tanto no hace nada
+      await p;
+      return { aviso, segunda: segunda ?? null, queda: !!document.getElementById('procesando') };
+    }, txt);
+    expect(r.aviso).toContain('Analizando las mediciones…0 de 3');
+    expect(r.queda).toBe(false);
+    await expect(page.locator('.toast')).toContainText('todavía se están analizando');
+    await expect(page.locator('.modal')).toContainText('Análisis de 3 mediciones');
+    await expect(page.locator('.analisis-pie')).toHaveCSS('position', 'sticky');
+  });
+
   test('BT: con los registros guardados se recalcula igual que con el TXT', async ({ page }) => {
     app = await abrirApp(page);
     const txt = hacerTXT({ v: i => (i % 10 === 0 ? [130, 121.37, 0] : [120.04, 119.96, 0]) });
@@ -2501,10 +2522,10 @@ test.describe('Precampaña', () => {
     const d = await descarga;
     expect(d.suggestedFilename()).toBe('CR1O2026046.txt');
     expect(require('fs').readFileSync(await d.path(), 'utf8')).toBe(comas);
-    // Sin analizar: "Corregir TXT para DELSUR" baja el corregido
+    // Sin analizar: "Corregir TXT" (para DELSUR) baja el corregido
     await app.ejecutar(() => cerrarAnalisis());
     const otra = page.waitForEvent('download');
-    await page.locator('label', { hasText: 'Corregir TXT para DELSUR' }).locator('input').setInputFiles({ name: 'DA1O2026072O00.txt', mimeType: 'text/plain', buffer: Buffer.from(triple) });
+    await page.locator('label', { hasText: 'Corregir TXT' }).locator('input').setInputFiles({ name: 'DA1O2026072O00.txt', mimeType: 'text/plain', buffer: Buffer.from(triple) });
     const d2 = await otra;
     expect(d2.suggestedFilename()).toBe('DA1O2026072O00.txt');
     expect(require('fs').readFileSync(await d2.path(), 'utf8')).toBe(comas);

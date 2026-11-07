@@ -83,6 +83,13 @@ export function renderResultados(c) {
   const visibles = delTipo.filter(FILTRO_RES[filtro]);
   let html = bloqueFT(c, hoy);
 
+  // Analizar y recalcular quedan fijos arriba al bajar por la lista (con 100 casos no hay que volver a subir)
+  html += `<div class="barra-acciones res-fija">
+    <label class="b b-p"><i class="ic ic-subir"></i> Analizar TXT<input type="file" accept=".txt" multiple hidden onchange="analizarTXT('${c.clave}', this.files); this.value=''"></label>
+    ${hayTXTEnMemoria(c.clave) || recalculablesBT(c.clave).length ? `<button class="b b-g" aria-label="Recalcular con los datos actuales" title="Recalcular con los datos actuales" onclick="recalcularTXT('${c.clave}')"><i class="ic ic-repetir"></i> Recalcular</button>` : ''}
+    <label class="b b-g" title="Corregir TXT para DELSUR: pasa los TXT a comas y quita las columnas repetidas"><i class="ic ic-archivo-editar"></i> Corregir TXT<input type="file" accept=".txt" multiple hidden onchange="corregirArchivosTXT(this.files); this.value=''"></label>
+  </div>`;
+
   // 1. Resumen y acciones
   html += '<div class="bloque">';
   html += '<div class="bloque-head"><div class="bloque-titulo">Resultados de la campaña</div></div>';
@@ -94,10 +101,6 @@ export function renderResultados(c) {
       <div class="meta-barra"><i style="width:${Math.min(100, Math.round(n.crValidas * 100 / obligatorios))}%"></i></div><div class="meta-num">${n.crValidas}<small> / ${obligatorios}</small></div></div>`;
   }
   html += `<div class="barra-acciones">
-    <label class="b b-p"><i class="ic ic-subir"></i> Analizar TXT<input type="file" accept=".txt" multiple hidden onchange="analizarTXT('${c.clave}', this.files)"></label>
-    <label class="b b-g" title="Pasa los TXT a comas y quita las columnas repetidas, para subirlos al sistema de DELSUR"><i class="ic ic-archivo-editar"></i> Corregir TXT para DELSUR<input type="file" accept=".txt" multiple hidden onchange="corregirArchivosTXT(this.files); this.value=''"></label>
-    ${hayTXTEnMemoria(c.clave) || recalculablesBT(c.clave).length ? `<button class="b b-g" onclick="recalcularTXT('${c.clave}')"><i class="ic ic-repetir"></i> Recalcular con los datos actuales</button>` : ''}
-    <span class="sep"></span>
     <button class="b b-g" onclick="exportarCuadroResumen('${c.clave}')"><i class="ic ic-excel"></i> Exportar cuadro resumen</button>
     <button class="b b-g" onclick="exportarAnalisis('${c.clave}')"><i class="ic ic-grafica"></i> Exportar análisis (Resumen de la macro)</button>
   </div>`;
@@ -260,7 +263,16 @@ export function renderAnalisisModal() {
       <td>${instalacion}</td><td class="col-dir">${esc(a.detalle)}${a.avisoFormato ? `<br><b class="txt-rojo">${esc(a.avisoFormato)}</b>${imp.desdeSeries ? '' : `<br><button class="b b-g b-chico" onclick="descargarTXTCorregido('${imp.clave}', '${id}')"><i class="ic ic-descargar"></i> TXT corregido</button>`}` : ''}</td></tr>`;
   });
   html += '</tbody></table></div>';
-  html += `<button class="btn btn-primary" ${imp.filas.length ? '' : 'disabled'} onclick="guardarAnalisis()">Guardar resultados</button>`;
-  html += '<button class="btn btn-secondary" onclick="cerrarAnalisis()">Cancelar</button>';
+  // Guardar queda fijo abajo aunque la lista sea larga
+  html += `<div class="analisis-pie"><button class="btn btn-primary" ${imp.filas.length ? '' : 'disabled'} onclick="guardarAnalisis()">Guardar resultados</button>`;
+  html += '<button class="btn btn-secondary" onclick="cerrarAnalisis()">Cancelar</button></div>';
   return html + '</div></div>';
+}
+
+// Aviso mientras se leen o analizan los TXT (el avance se actualiza sin volver a dibujar la página)
+export function renderProcesando() {
+  const p = state.procesando;
+  const pct = Math.round((p.hecho * 100) / (p.total || 1));
+  return `<div class="modal-overlay proc-overlay"><div class="proc-caja" id="procesando" role="status" aria-live="polite"><div class="spinner"></div>
+    <b>${esc(p.titulo)}…</b><span class="proc-num">${p.hecho} de ${p.total}</span><div class="proc-barra"><i style="width:${pct}%"></i></div><small>Puede tardar unos segundos con muchas mediciones</small></div></div>`;
 }
