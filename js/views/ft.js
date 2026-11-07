@@ -49,7 +49,7 @@ export function renderFT() {
       <div class="ft-info"><div class="card-top" style="margin:0"><div><b>${esc(x.codigo)}</b><div class="n">${esc(x.caso.nombre)} · ${x.tipo === 'reclamo' ? 'Reclamo' : nombreCampana(x)} · ${esc(x.area)}</div></div>
           ${x.cerrado ? '<span class="tg verde"><i class="ic ic-check"></i> Cerrado</span>' : x.limite ? tagPlazo(x.limite, hoy) : '<span class="falta">Sin fecha de instalación</span>'}</div>
         ${x.dias !== null && !x.cerrado ? `<div class="ft-dias"><i class="${x.vencido || pct >= 80 ? 'mal' : ''}" style="width:${pct}%"></i></div>
-          <div class="barra-leyenda" style="margin:4px 0 0"><span>Día ${x.dias} de ${DIAS_SOLUCION_FT}</span><span>Instalación ${fmtDate(x.inicio)} · plazo ${fmtDate(x.limite)}</span></div>` : ''}
+          <div class="barra-leyenda" style="margin:4px 0 0"><span>Día ${x.dias} de ${DIAS_SOLUCION_FT}</span><span>${x.inicioTXT ? 'Inicio del TXT' : 'Instalación'} ${fmtDate(x.inicio)} · plazo ${fmtDate(x.limite)}</span></div>` : ''}
         <div class="tags">
           ${x.ft.aviso ? `<span class="tg verde"><i class="ic ic-correo"></i> Aviso enviado ${fmtDate(x.ft.aviso.fecha)}</span>` : '<span class="tg rojo"><i class="ic ic-correo"></i> Falta avisar a DELSUR</span>'}
           ${x.cerrado ? '' : `${x.ft.sistema ? '' : '<span class="tg rojo"><i class="ic ic-subir"></i> Falta subir al sistema</span>'}${x.ft.resumen ? '' : '<span class="tg rojo"><i class="ic ic-correo"></i> Falta enviar Resumen punto medido</span>'}`}
@@ -100,7 +100,7 @@ export function renderFTModal() {
   html += `<div class="modal-head"><div><div class="modal-titulo mono">${esc(x.codigo)}</div><div class="page-sub">${esc(x.caso.nombre)} · FebNoPer ${esc(x.caso.resultado?.febNoPer ?? '—')} %</div></div><button class="modal-cerrar" onclick="cerrarFT()" title="Cerrar">✕</button></div>`;
   if (x.tipo === 'reclamo' && x.instId) html += `<button class="btn btn-secondary" onclick="cerrarFT(); abrirAnalisisReclamo('${x.instId}')"><i class="ic ic-grafica"></i> Ver análisis de la medición</button>`;
   else if (x.caso.resultado?.graficas) html += `<button class="btn btn-secondary" onclick="verGraficas('${clave}', '${id}')"><i class="ic ic-grafica"></i> Ver gráficas de voltaje y corriente</button>`;
-  html += `<div class="panel-fila"><span>Instalación de la medición inicial</span><b>${fmtDate(x.inicio)}</b></div>`;
+  html += `<div class="panel-fila"><span>${x.inicioTXT ? 'Inicio de la medición inicial (según el TXT, sin instalación registrada)' : 'Instalación de la medición inicial'}</span><b>${fmtDate(x.inicio)}</b></div>`;
   html += `<div class="panel-fila"><span>Plazo de ${DIAS_SOLUCION_FT} días</span><b>${fmtDate(x.limite)}${x.dias !== null ? ` · día ${x.dias}` : ''}</b></div>`;
 
   html += '<div class="section-title" style="margin-top:12px">1. Aviso a DELSUR</div>';
