@@ -60,7 +60,7 @@ function bloqueFT(c, hoy) {
     const feb = x.caso.resultado?.febNoPer;
     html += `<div class="ft-item" onclick="abrirFT('${c.clave}', '${x.id}')">
       <div class="ft-pct">${feb === undefined || feb === '' ? '—' : esc(feb) + '%'}<small>FebNoPer</small></div>
-      <div class="ft-info"><b>${esc(x.codigo)}</b><div class="n">${esc(x.caso.nombre)}</div>
+      <div class="ft-info"><b>${esc(x.codigo)}</b><div class="n">${esc(x.caso.nombre)}</div>${x.caso.direccion || x.caso.direccionEnte ? `<div class="ft-dir"><i class="ic ic-mapa"></i> ${esc(x.caso.direccion || x.caso.direccionEnte)}</div>` : ''}
         <div class="tags">${x.cerrado ? '<span class="tg verde"><i class="ic ic-check"></i> Normalizado</span>' : x.ft.aviso ? `<span class="tg verde"><i class="ic ic-correo"></i> Avisado ${fmtDate(x.ft.aviso.fecha)}</span>` : '<span class="tg rojo"><i class="ic ic-correo"></i> Falta avisar a DELSUR</span>'}
           ${x.limite ? `<span class="tg ${x.vencido ? 'rojo' : 'gris'}"><i class="ic ic-reloj"></i> ${x.vencido ? 'Plazo vencido' : `Día ${x.dias} de ${DIAS_SOLUCION_FT} · hasta ${fmtDate(x.limite)}`}</span>` : '<span class="tg gris">Sin instalación registrada</span>'}
           ${x.ft.ruta ? `<span class="tg azul">${esc(x.ft.ruta)}</span>` : ''}</div>

@@ -113,7 +113,7 @@ export function puntosFT(lista, registros) {
     if (lat === null || lng === null) { sinGPS.push(x.codigo); return; }
     const feb = x.caso.resultado?.febNoPer;
     puntos.push({ lat, lng, codigo: x.codigo, febNoPer: feb === undefined || feb === '' ? '' : `${feb} %`, nombre: x.caso.nombre || '',
-      direccion: x.caso.direccionEnte || x.caso.direccion || inst?.lugar || '', area: x.area || '', tipo: x.tipo, plazo: plazoFT(x), limite: x.limite || '' });
+      direccion: x.caso.direccion || x.caso.direccionEnte || inst?.lugar || '', area: x.area || '', tipo: x.tipo, plazo: plazoFT(x), limite: x.limite || '' });
   });
   return { puntos, sinGPS };
 }
