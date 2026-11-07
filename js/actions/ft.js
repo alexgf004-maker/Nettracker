@@ -4,6 +4,9 @@ import { state } from '../state.js';
 import { showToast } from '../ui.js';
 import { hoyLocal } from '../domain/trabajo.js';
 import { render } from '../views/render.js';
+import { kmlFT, puntosFT } from '../domain/ft.js';
+import { listaFTVista } from '../views/ft.js';
+import { bajarTexto } from './resultados.js';
 
 // clave 'reclamo': el FT es de un expediente de reclamo (reclamos/{id}/ft)
 const ruta = (clave, id) => (clave === 'reclamo' ? `reclamos/${id}/ft` : `campanas/${clave}/casos/${id}/ft`);
@@ -48,4 +51,15 @@ export function agregarNotaFT(clave, id) {
 // Resultado de la remedición: solo "normalizado" cierra el caso
 export function setRemedicionFT(clave, id, campo, valor) {
   update(ref(db, ruta(clave, id) + '/remedicion'), { [campo]: valor === '' ? null : valor, ...(campo === 'normalizado' ? { registradoPor: state.sesionUsuario?.nombre || '' } : {}) });
+}
+
+// Lista o mapa en Seguimiento FT
+export function setFTVista(v) { state.ftVista = v === 'mapa' ? 'mapa' : 'lista'; render(); }
+// KML de los FT abiertos (los que se ven, según el área) para importarlo en Google My Maps
+export function bajarKMLFT() {
+  const { puntos, sinGPS } = puntosFT(listaFTVista(), state.records);
+  if (!puntos.length) return showToast('No hay casos FT abiertos con GPS');
+  const f = hoyLocal().split('-').reverse().join('-');
+  bajarTexto(`FT abiertos ${f}.kml`, kmlFT(puntos, `FT abiertos al ${f.replace(/-/g, '/')}`));
+  showToast(`KML con ${puntos.length} ${puntos.length === 1 ? 'caso' : 'casos'}${sinGPS.length ? ` · ${sinGPS.length} sin GPS no van: ${sinGPS.join(', ')}` : ''}`);
 }

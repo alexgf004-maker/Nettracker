@@ -2542,6 +2542,53 @@ test.describe('Precampaña', () => {
     await expect(page.locator('tr', { hasText: 'CR1O2026045' })).toContainText('Anotado a mano por David García el 20/10/2026 · sin nota ni TXT analizado');
   });
 
+  test('FT: los CR después del corte de subida no llevan seguimiento; mapa de los abiertos y KML para My Maps', async ({ page }) => {
+    // MT: se suben los primeros 38 CR válidos. FT en el 5, el 12 y el 33 (se suben) y en el 39 (no se sube)
+    const casos = {};
+    for (let i = 1; i <= 40; i++) {
+      const c = 'CR1O2026' + String(200 + i);
+      casos[c] = caso(c, String(i), { lat: 13.6 + i / 1000, lng: -89.2, resultado: [5, 12, 33, 39].includes(i) ? { medicion: 'valida', tolerancia: 'fuera', febNoPer: i } : { medicion: 'valida', tolerancia: 'dentro', febNoPer: 0 } });
+    }
+    delete casos.CR1O2026233.lat; // sin GPS: no va en el mapa
+    app = await abrirApp(page, { datos: { ...fixture, campanas: { '2026-08_CPT-MT': { anio: 2026, mes: 8, area: 'CPT MT', casos } } } });
+    await cerrarAlerta(page);
+    const r = await page.evaluate(async () => {
+      const { casosFT, kmlFT, noSeSuben, puntosFT } = await import('/js/domain/ft.js');
+      const { state } = await import('/js/state.js');
+      const g = state.campanas['2026-08_CPT-MT'];
+      const lista = casosFT(state.campanas, state.records, '2026-09-01');
+      const { puntos, sinGPS } = puntosFT(lista, state.records);
+      // Sin completar los 38 válidos no hay corte: se siguen todos
+      const sinCorte = { ...g, casos: Object.fromEntries(Object.entries(g.casos).slice(0, 37)) };
+      return { fuera: [...noSeSuben(g)], seguidos: lista.map(x => x.codigo), noSuben: casosFT(state.campanas, state.records, '2026-09-01', { noSuben: true }).map(x => x.codigo),
+        sinCorte: noSeSuben(sinCorte).size, puntos: puntos.map(p => p.codigo), sinGPS, kml: kmlFT(puntos, 'FT') };
+    });
+    expect(r.fuera).toEqual(['CR1O2026239', 'CR1O2026240']);
+    expect(r.seguidos.sort()).toEqual(['CR1O2026205', 'CR1O2026212', 'CR1O2026233']);
+    expect(r.noSuben).toEqual(['CR1O2026239']);
+    expect(r.sinCorte).toBe(0);
+    expect(r.puntos.sort()).toEqual(['CR1O2026205', 'CR1O2026212']);
+    expect(r.sinGPS).toEqual(['CR1O2026233']);
+    expect(r.kml).toContain('<Placemark><name>CR1O2026205 · 5 %</name>');
+    expect(r.kml).toContain('<coordinates>-89.2,13.605,0</coordinates>');
+    expect(r.kml).toContain('COLONIA X, CALLE 1, 12, SANTA TECLA, LA LIBERTAD');
+    // Seguimiento FT: los que no se suben van aparte; el mapa y el KML con los abiertos
+    await app.ejecutar(() => switchTab('ft'));
+    await expect(page.locator('.section-title', { hasText: 'No se suben al sistema (1)' })).toBeVisible();
+    await expect(page.locator('.ft-nosube')).toContainText('CR1O2026239');
+    await expect(page.locator('.hero-kpi', { hasText: 'Abiertos' })).toContainText('3');
+    await page.getByRole('tab', { name: 'Mapa' }).click();
+    await expect(page.locator('.ft-mapa iframe')).toHaveCount(1);
+    await expect(page.locator('.ft-mapa')).toContainText('Sin GPS (no salen en el mapa ni en el KML): CR1O2026233');
+    const descarga = page.waitForEvent('download');
+    await page.getByRole('button', { name: /Bajar KML/ }).click();
+    expect((await descarga).suggestedFilename()).toMatch(/^FT abiertos \d\d-\d\d-\d{4}\.kml$/);
+    // En Resultados de la campaña: aviso informativo
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-08_CPT-MT'); setCampanaVista('resultados'); });
+    await expect(page.locator('.ft-info-nosube')).toContainText('1 CR fuera de tolerancia no se sube al sistema');
+    await expect(page.locator('.ft-bloque .ft-head-t')).toHaveText('3 casos fuera de tolerancia');
+  });
+
   test('perturbaciones: un FT en tensión es solo informativo, sin seguimiento FT', async ({ page }) => {
     const datos = JSON.parse(JSON.stringify(fixture));
     datos.campanas = { '2026-10_CPT-MT': { anio: 2026, mes: 10, area: 'CPT MT', casos: {
