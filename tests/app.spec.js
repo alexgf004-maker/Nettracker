@@ -2587,6 +2587,7 @@ test.describe('Precampaña', () => {
     await app.ejecutar(() => { abrirCampanaTrabajo('2026-08_CPT-MT'); setCampanaVista('resultados'); });
     await expect(page.locator('.ft-info-nosube')).toContainText('1 CR fuera de tolerancia no se sube al sistema');
     await expect(page.locator('.ft-bloque .ft-head-t')).toHaveText('3 casos fuera de tolerancia');
+    await expect(page.locator('.ft-bloque .ft-item', { hasText: 'CR1O2026205' }).locator('.ft-dir')).toHaveText('COLONIA X, CALLE 1, 12, SANTA TECLA, LA LIBERTAD');
   });
 
   test('perturbaciones: un FT en tensión es solo informativo, sin seguimiento FT', async ({ page }) => {
