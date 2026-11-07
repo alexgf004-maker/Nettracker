@@ -6,6 +6,7 @@
 //   (el cálculo de montos todavía no está definido: solo se anota la compensación informada)
 import { corteSubida, CR_OBLIGATORIOS, instalacionDeCaso } from './resultados.js';
 import { ordenarCasos } from './listados.js';
+import { minutosDeFecha } from './analisis.js';
 import { diasEntre, hoyLocal, sumarDias } from './trabajo.js';
 
 export const DIAS_SOLUCION_FT = 90;
@@ -37,6 +38,13 @@ export function perturbacionesFT(g) {
   return Object.entries(g?.casos || {}).filter(([, c]) => esFT(c) && esPerturbacion(c)).map(([id, caso]) => ({ id, caso, codigo: caso.codigo || caso.codigoEnte }));
 }
 
+// Fecha en que empieza la medición según el TXT analizado ('aaaa-mm-dd'), para contar el plazo cuando el caso no
+// tiene instalación registrada en la app (confirmado: BT todavía no registra las instalaciones)
+export function inicioDelTXT(caso) {
+  const m = minutosDeFecha(caso?.resultado?.analisis?.inicio);
+  return m ? new Date(m * 60000).toISOString().slice(0, 10) : null;
+}
+
 // CR que no se suben al sistema (confirmado): se suben, en orden de código, los CR válidos hasta completar los
 // obligatorios (38 en MT, 105 en BT); los que quedan después del corte no llevan seguimiento FT. Mientras no se
 // completan los obligatorios no hay corte y todos los FT se siguen. Devuelve el Set de ids que no se suben.
@@ -60,14 +68,16 @@ export function casosFT(campanas, registros, hoy, { noSuben = false } = {}) {
     for (const [id, caso] of Object.entries(g?.casos || {})) {
       if (!esFT(caso) || esPerturbacion(caso) || fuera.has(id) !== noSuben) continue;
       const inst = instalacionDeCaso(caso, registros);
-      const inicio = inst?.fechaInstalacion || null;
+      // El plazo se cuenta desde la instalación registrada y, si no hay, desde el inicio del TXT
+      const inicioTXT = !inst?.fechaInstalacion && inicioDelTXT(caso);
+      const inicio = inst?.fechaInstalacion || inicioTXT || null;
       const limite = inicio ? sumarDias(inicio, DIAS_SOLUCION_FT) : null;
       const ft = caso.ft || {};
       const codigo = caso.codigo || caso.codigoEnte;
       const remInst = instalacionDeCaso({ codigo: codigoRemedicion(codigo) }, registros);
       const cerrado = ft.remedicion?.normalizado === true;
       lista.push({
-        clave, id, area: g.area, anio: g.anio, mes: g.mes, caso, codigo, ft, inicio, limite,
+        clave, id, area: g.area, anio: g.anio, mes: g.mes, caso, codigo, ft, inicio, limite, inicioTXT: !!inicioTXT,
         dias: inicio ? diasEntre(inicio, (cerrado && ft.remedicion?.fecha) || hoy) : null,
         vencido: !!limite && !cerrado && hoy > limite,
         remedicionInstalada: remInst ? { codigo: remInst.caso, fecha: remInst.fechaInstalacion, retirado: !!remInst.retirado, fechaRetiro: remInst.fechaRetiroReal || null } : null,

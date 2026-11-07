@@ -2542,6 +2542,28 @@ test.describe('Precampaña', () => {
     await expect(page.locator('tr', { hasText: 'CR1O2026045' })).toContainText('Anotado a mano por David García el 20/10/2026 · sin nota ni TXT analizado');
   });
 
+  test('FT sin instalación registrada: el plazo se cuenta desde que empieza el TXT', async ({ page }) => {
+    app = await abrirApp(page);
+    const r = await page.evaluate(async () => {
+      const { casosFT, inicioDelTXT } = await import('/js/domain/ft.js');
+      const res = { medicion: 'valida', tolerancia: 'fuera', febNoPer: 9, origen: 'txt', analisis: { inicio: '05/10/2026 08:00:00' } };
+      const campanas = { '2026-10_CPT-BT': { anio: 2026, mes: 10, area: 'CPT BT', casos: {
+        CR1O2026001: { codigo: 'CR1O2026001', tipo: 'CR', resultado: res },
+        CR1O2026002: { codigo: 'CR1O2026002', tipo: 'CR', resultado: res },
+        CR1O2026003: { codigo: 'CR1O2026003', tipo: 'CR', resultado: { medicion: 'valida', tolerancia: 'fuera', febNoPer: 9 } },
+      } } };
+      const registros = [{ id: 'r1', caso: 'CR1O2026002', fechaInstalacion: '2026-10-01' }];
+      const l = casosFT(campanas, registros, '2026-10-20');
+      const de = c => l.find(x => x.codigo === c);
+      return { a: [de('CR1O2026001').inicio, de('CR1O2026001').inicioTXT, de('CR1O2026001').dias, de('CR1O2026001').limite],
+        b: [de('CR1O2026002').inicio, de('CR1O2026002').inicioTXT], c: [de('CR1O2026003').inicio, de('CR1O2026003').limite], vacio: inicioDelTXT({}) };
+    });
+    expect(r.a).toEqual(['2026-10-05', true, 15, '2027-01-03']);
+    expect(r.b).toEqual(['2026-10-01', false]); // con instalación registrada vale la instalación
+    expect(r.c).toEqual([null, null]); // anotado a mano, sin TXT: sin fecha
+    expect(r.vacio).toBe(null);
+  });
+
   test('FT: los CR después del corte de subida no llevan seguimiento; mapa de los abiertos y KML para My Maps', async ({ page }) => {
     // MT: se suben los primeros 38 CR válidos. FT en el 5, el 12 y el 33 (se suben) y en el 39 (no se sube)
     const casos = {};
