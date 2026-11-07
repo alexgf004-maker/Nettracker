@@ -95,6 +95,7 @@ export function renderResultados(c) {
   }
   html += `<div class="barra-acciones">
     <label class="b b-p"><i class="ic ic-subir"></i> Analizar TXT<input type="file" accept=".txt" multiple hidden onchange="analizarTXT('${c.clave}', this.files)"></label>
+    <label class="b b-g" title="Pasa los TXT a comas y quita las columnas repetidas, para subirlos al sistema de DELSUR"><i class="ic ic-archivo-editar"></i> Corregir TXT para DELSUR<input type="file" accept=".txt" multiple hidden onchange="corregirArchivosTXT(this.files); this.value=''"></label>
     ${hayTXTEnMemoria(c.clave) || recalculablesBT(c.clave).length ? `<button class="b b-g" onclick="recalcularTXT('${c.clave}')"><i class="ic ic-repetir"></i> Recalcular con los datos actuales</button>` : ''}
     <span class="sep"></span>
     <button class="b b-g" onclick="exportarCuadroResumen('${c.clave}')"><i class="ic ic-excel"></i> Exportar cuadro resumen</button>
@@ -247,6 +248,8 @@ export function renderAnalisisModal() {
   const bt = flujoBT(state.campanas?.[imp.clave]?.area);
   if (imp.desdeSeries) html += '<div class="aviso aviso-azul"><i class="ic ic-info"></i> Recalculado con los registros guardados de cada medición, sin los TXT.</div>';
   html += `<div class="page-sub" style="margin:6px 0">${bt ? 'Si en campo la instalación es otra, cámbiala en la columna Instalación: se corrige el caso y se recalcula.' : 'Si una medición sale 100 % FT o fallida por el alimentador, corrígelo en la columna Instalación: se corrige el caso y se recalcula.'}</div>`;
+  const malos = imp.filas.filter(f => f.analisis.avisoFormato).length;
+  if (malos) html += `<div class="aviso aviso-rojo avisos-lista"><i class="ic ic-alerta"></i><div><b>${malos} ${malos === 1 ? 'TXT no tiene' : 'TXT no tienen'} el formato de DELSUR</b> (tabuladores o columnas repetidas). Se analizaron igual; bájalos corregidos para subirlos al sistema.${imp.desdeSeries ? '' : ` <button class="b b-g b-chico" onclick="descargarCorregidosAnalisis()"><i class="ic ic-descargar"></i> Bajar ${malos === 1 ? 'el corregido' : `los ${malos} corregidos`}</button>`}</div></div>`;
   html += '<div class="tabla-wrap"><table class="tabla-casos"><thead><tr><th>Archivo</th><th>Estado</th><th>FebNoPer</th><th>Registros</th><th>Intervalo</th><th>Instalación</th><th>Detalle</th></tr></thead><tbody>';
   imp.filas.forEach(({ id, analisis: a }) => {
     const instalacion = bt
@@ -254,7 +257,7 @@ export function renderAnalisisModal() {
       : `${esc(a.tipoInstalacion)}<input class="sel-instalacion" aria-label="Alimentador de ${esc(a.archivo)}" value="${esc(state.campanas?.[imp.clave]?.casos?.[id]?.alimentador)}" placeholder="Alimentador" onchange="corregirDatoMedicion('${imp.clave}', '${id}', 'alimentador', this.value)"><small>${a.nivelTension || '—'} V · ${esc(a.urbanidad || '—')}</small>`;
     html += `<tr><td class="mono"><b>${esc(a.archivo)}</b></td><td><span class="tag ${CLASE_ESTADO[a.estado]}">${a.estado === 'ADVERTENCIA' ? 'POR REVISAR' : a.estado}</span></td>
       <td class="mono ${typeof a.febNoPer === 'number' && a.febNoPer > UMBRAL_FT ? 'txt-rojo' : ''}">${fnp(a.febNoPer)}</td><td class="mono">${a.registros}</td><td>${esc(a.intervalo)}</td>
-      <td>${instalacion}</td><td class="col-dir">${esc(a.detalle)}${a.avisoFormato ? `<br><b class="txt-rojo">${esc(a.avisoFormato)}</b>` : ''}</td></tr>`;
+      <td>${instalacion}</td><td class="col-dir">${esc(a.detalle)}${a.avisoFormato ? `<br><b class="txt-rojo">${esc(a.avisoFormato)}</b>${imp.desdeSeries ? '' : `<br><button class="b b-g b-chico" onclick="descargarTXTCorregido('${imp.clave}', '${id}')"><i class="ic ic-descargar"></i> TXT corregido</button>`}` : ''}</td></tr>`;
   });
   html += '</tbody></table></div>';
   html += `<button class="btn btn-primary" ${imp.filas.length ? '' : 'disabled'} onclick="guardarAnalisis()">Guardar resultados</button>`;

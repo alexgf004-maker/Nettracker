@@ -57,20 +57,52 @@ export function separadorTXT(texto) {
   const [tab, pc, coma] = [n('\t'), n(';'), n(',')];
   return tab > coma && tab >= pc ? '\t' : pc > coma ? ';' : ',';
 }
-// Aviso para el resultado si el TXT no viene separado por comas ('' si está bien)
+// Columnas repetidas (pedido del equipo): a veces el TXT trae el juego de columnas entero 2 o 3 veces (148 = 2 × 74).
+// enc: encabezado ya separado → { columnas: las de un juego, copias }
+export function columnasRepetidas(enc) {
+  const n = enc.length;
+  for (let p = 2; p <= n / 2; p++) if (!(n % p) && enc.every((h, i) => h === enc[i % p])) return { columnas: p, copias: n / p };
+  return { columnas: n, copias: 1 };
+}
+const celdaDe = sep => (sep === ',' ? c => c.trim() : c => { const t = c.trim(); return /^-?\d+,\d+$/.test(t) ? t.replace(',', '.') : t; });
+const encabezadoDe = (texto, sep) => (String(texto || '').split(/\r?\n/, 1)[0] || '').replace(/^[^\x00-\x7F]+/, '').split(sep).map(celdaDe(sep));
+// Lo que el sistema de DELSUR no acepta: { separador, copias, columnas (las de un juego), total (las del archivo) }
+export function formatoTXT(texto) {
+  const separador = separadorTXT(texto); const enc = encabezadoDe(texto, separador);
+  return { separador, ...columnasRepetidas(enc), total: enc.length };
+}
+// Aviso para el resultado si el TXT no viene como lo acepta DELSUR ('' si está bien)
 export function avisoFormatoTXT(texto) {
-  const sep = separadorTXT(texto);
-  return sep === ',' ? '' : `Formato no válido para DELSUR: el TXT viene separado por ${sep === '\t' ? 'tabuladores' : 'punto y coma'} y el sistema solo acepta comas (vuelve a bajarlo del equipo o conviértelo antes de subirlo)`;
+  const f = formatoTXT(texto); const problemas = [];
+  if (f.separador !== ',') problemas.push(`separado por ${f.separador === '\t' ? 'tabuladores' : 'punto y coma'} (solo acepta comas)`);
+  if (f.copias > 1) problemas.push(`con las columnas repetidas ${f.copias} veces (${f.total} en lugar de ${f.columnas})`);
+  return problemas.length ? `Formato no válido para DELSUR: el TXT viene ${problemas.join(' y ')}. Descarga el TXT corregido antes de subirlo` : '';
+}
+// TXT como lo acepta DELSUR: separado por comas, con punto decimal y un solo juego de columnas. Conserva el orden, las
+// líneas y el fin de línea del archivo. → { texto, cambios: [qué se corrigió] }
+export function corregirTXT(texto) {
+  const original = String(texto || ''); const f = formatoTXT(original);
+  const fin = original.includes('\r\n') ? '\r\n' : '\n';
+  const lineas = original.split(/\r?\n/); const bom = (lineas[0] || '').match(/^[^\x00-\x7F]+/)?.[0] || '';
+  if (bom) lineas[0] = lineas[0].slice(bom.length);
+  const celda = celdaDe(f.separador);
+  const salida = lineas.map(l => (l.trim() === '' ? l : l.split(f.separador).map(celda).slice(0, f.columnas).join(',')));
+  const cambios = [];
+  if (f.separador !== ',') cambios.push(`${f.separador === '\t' ? 'Tabuladores' : 'Punto y coma'} cambiados por comas`);
+  if (f.copias > 1) cambios.push(`Columnas repetidas quitadas: ${f.total} → ${f.columnas}`);
+  return { texto: bom + salida.join(fin), cambios };
 }
 
 // Lee el TXT: quita caracteres raros al inicio (BOM), salta líneas vacías y separa las columnas (por comas, o por el
-// separador que traiga; en ese caso la coma decimal "123,667" se lee como 123.667)
+// separador que traiga; en ese caso la coma decimal "123,667" se lee como 123.667). Si el juego de columnas viene
+// repetido, se queda con uno.
 export function leerTXT(texto) {
   const lineas = String(texto || '').split(/\r?\n/);
   if (lineas.length) lineas[0] = lineas[0].replace(/^[^\x00-\x7F]+/, '');
-  const sep = separadorTXT(lineas[0]);
-  const celda = sep === ',' ? c => c.trim() : c => { const t = c.trim(); return /^-?\d+,\d+$/.test(t) ? t.replace(',', '.') : t; };
-  return lineas.filter(l => l.trim() !== '').map(l => l.split(sep).map(celda));
+  const sep = separadorTXT(lineas[0]); const celda = celdaDe(sep);
+  const filas = lineas.filter(l => l.trim() !== '').map(l => l.split(sep).map(celda));
+  const { columnas, copias } = columnasRepetidas(filas[0] || []);
+  return copias > 1 ? filas.map(f => f.slice(0, columnas)) : filas;
 }
 
 // Tensión de la red a partir del alimentador ("AL013-23000" → 23000)

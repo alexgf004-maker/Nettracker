@@ -2,7 +2,7 @@
 import { db, get, ref, set, update } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
-import { analizarMedicion, filasResumenAnalisis, resultadoDeAnalisis } from '../domain/analisis.js';
+import { analizarMedicion, corregirTXT, filasResumenAnalisis, resultadoDeAnalisis } from '../domain/analisis.js';
 import { analizarMedicionBT, analizarSeriesBT, INSTALACIONES_BT } from '../domain/analisis-bt.js';
 import { codigoConSistema } from '../domain/listados.js';
 import { corteSubida, CR_OBLIGATORIOS, cuadroResumen, ESTADOS_CUADRO } from '../domain/resultados.js';
@@ -133,12 +133,43 @@ export function exportarCuadroResumen(clave) {
 // después de corregir un dato del caso sin volver a subirlos (no se suben a la base de datos).
 const txtEnMemoria = {};
 
+// (conserva la marca BOM del inicio, si la trae, para que el TXT corregido quede igual al del equipo)
 const leerTexto = file => new Promise((resolve, reject) => {
   const reader = new FileReader();
-  reader.onload = e => resolve(e.target.result);
+  reader.onload = e => resolve(new TextDecoder('utf-8', { ignoreBOM: true }).decode(e.target.result));
   reader.onerror = () => reject(reader.error);
-  reader.readAsText(file);
+  reader.readAsArrayBuffer(file);
 });
+
+// ── TXT corregido para DELSUR (pedido del equipo): comas, punto decimal y un solo juego de columnas ──
+// Se baja con el mismo nombre. Lo que ya está bien se deja igual.
+export function bajarTexto(nombre, texto) {
+  const url = URL.createObjectURL(new Blob([texto], { type: 'text/plain' }));
+  const a = document.createElement('a'); a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+function bajarCorregidos(archivos) {
+  const conCambios = archivos.map(a => ({ ...a, c: corregirTXT(a.texto) })).filter(a => a.c.cambios.length);
+  if (!conCambios.length) return showToast(archivos.length === 1 ? 'Ese TXT ya está en el formato de DELSUR' : 'Esos TXT ya están en el formato de DELSUR');
+  // Varios: uno tras otro (el navegador puede preguntar si se permiten varias descargas)
+  conCambios.forEach((a, i) => setTimeout(() => bajarTexto(a.nombre, a.c.texto), i * 400));
+  showToast(conCambios.length === 1 ? `TXT corregido: ${conCambios[0].c.cambios.join(' · ')}` : `${conCambios.length} TXT corregidos`);
+}
+// Desde la vista previa del análisis (el TXT está en memoria)
+export function descargarTXTCorregido(clave, id) {
+  const a = txtEnMemoria[clave]?.[id]; if (!a) return showToast('Vuelve a subir el TXT para corregirlo');
+  bajarCorregidos([a]);
+}
+export function descargarCorregidosAnalisis() {
+  const imp = state.analisisTXT; if (!imp) return;
+  bajarCorregidos(imp.filas.map(f => txtEnMemoria[imp.clave]?.[f.id]).filter(Boolean));
+}
+// Sin analizar: elegir los TXT y bajarlos corregidos
+export async function corregirArchivosTXT(files) {
+  if (!files?.length) return;
+  try { bajarCorregidos(await Promise.all([...files].map(async f => ({ nombre: f.name, texto: await leerTexto(f) })))); }
+  catch (err) { showToast('No se pudo leer el archivo: ' + err.message); }
+}
 
 // archivos: [{ nombre, texto }] (separado de la lectura para poder probarlo sin archivos)
 export function analizarArchivos(clave, archivos) {

@@ -2469,6 +2469,47 @@ test.describe('Precampaña', () => {
     expect(r.serie).toBe(120.5); // las gráficas también
   });
 
+  test('TXT con columnas repetidas (2 o 3 veces): se analiza con un juego y se baja corregido como lo acepta DELSUR', async ({ page }) => {
+    const comas = hacerTXT({ v: () => [120.5, 119.25, 121] });
+    const triple = comas.split('\r\n').map(l => { const c = l.replace(/^\ufeff/, '').split(','); return (l.startsWith('\ufeff') ? '\ufeff' : '') + [...c, ...c, ...c].join('\t'); }).join('\r\n').replace(/(\d)\.(\d)/g, '$1,$2');
+    const doble = comas.split('\r\n').map(l => { const c = l.replace(/^\ufeff/, '').split(','); return (l.startsWith('\ufeff') ? '\ufeff' : '') + [...c, ...c].join(','); }).join('\r\n');
+    const datos = JSON.parse(JSON.stringify(fixture));
+    datos.campanas = { '2026-10_CPT-BT': { anio: 2026, mes: 10, area: 'CPT BT', casos: {
+      CR1O2026046: { codigo: 'CR1O2026046', codigoEnte: 'CR1O2026046', tipo: 'CR', nc: '1', nombre: 'USUARIO TXT', tipoInstalacion: 'TRIFÁSICO', urbanidad: 'U' } } } };
+    app = await abrirApp(page, { datos, usuario: 'Francisco Chulo' });
+    await cerrarAlerta(page);
+    const r = await page.evaluate(async t => {
+      const m = await import('/js/domain/analisis.js'); const { analizarMedicionBT } = await import('/js/domain/analisis-bt.js');
+      const tri = { tipoInstalacion: 'TRIFÁSICO', urbanidad: 'U' };
+      const a = analizarMedicionBT('CR1O2026046.txt', t.doble, tri); const b = analizarMedicionBT('CR1O2026046.txt', t.comas, tri);
+      const c = m.corregirTXT(t.triple);
+      return { formato: m.formatoTXT(t.triple), columnas: a.columnas, estado: [a.estado, b.estado], feb: [a.febNoPer, b.febNoPer], aviso: a.avisoFormato, corregido: c.texto === t.comas, cambios: c.cambios, yaBien: m.corregirTXT(t.comas).cambios };
+    }, { comas, triple, doble });
+    expect(r.formato).toEqual({ separador: '\t', columnas: 74, copias: 3, total: 222 });
+    expect(r.columnas).toBe(74); // sin el aviso de "Número de columnas incorrecto"
+    expect(r.estado).toEqual(['VALIDA', 'VALIDA']); expect(r.feb[0]).toBe(r.feb[1]);
+    expect(r.aviso).toContain('con las columnas repetidas 2 veces (148 en lugar de 74)');
+    expect(r.corregido).toBe(true); // comas, punto decimal, un juego y el mismo fin de línea
+    expect(r.cambios).toEqual(['Tabuladores cambiados por comas', 'Columnas repetidas quitadas: 222 → 74']);
+    expect(r.yaBien).toEqual([]);
+    // En la vista previa del análisis: aviso y botón para bajarlo corregido
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-BT'); setCampanaVista('resultados'); });
+    await page.evaluate(t => analizarArchivos('2026-10_CPT-BT', [{ nombre: 'CR1O2026046.txt', texto: t }]), triple);
+    await expect(page.locator('.aviso-rojo')).toContainText('1 TXT no tiene el formato de DELSUR');
+    const descarga = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'TXT corregido' }).click();
+    const d = await descarga;
+    expect(d.suggestedFilename()).toBe('CR1O2026046.txt');
+    expect(require('fs').readFileSync(await d.path(), 'utf8')).toBe(comas);
+    // Sin analizar: "Corregir TXT para DELSUR" baja el corregido
+    await app.ejecutar(() => cerrarAnalisis());
+    const otra = page.waitForEvent('download');
+    await page.locator('label', { hasText: 'Corregir TXT para DELSUR' }).locator('input').setInputFiles({ name: 'DA1O2026072O00.txt', mimeType: 'text/plain', buffer: Buffer.from(triple) });
+    const d2 = await otra;
+    expect(d2.suggestedFilename()).toBe('DA1O2026072O00.txt');
+    expect(require('fs').readFileSync(await d2.path(), 'utf8')).toBe(comas);
+  });
+
   test('resultado anotado a mano sin TXT: dice quién y cuándo lo anotó', async ({ page }) => {
     const datos = JSON.parse(JSON.stringify(fixture));
     datos.campanas = { '2026-10_CPT-BT': { anio: 2026, mes: 10, area: 'CPT BT', casos: {
