@@ -7,7 +7,7 @@
 // - Si en campo la instalación es otra, se corrige en la app y se recalcula con los registros guardados
 //   (series/{campaña}/{caso}), sin volver a subir el TXT (`analizarSeriesBT`).
 // Funciones puras: reciben el texto del TXT (o los registros guardados) y los datos del caso.
-import { leerTXT, minutosDeFecha } from './analisis.js';
+import { leerTXT, minutosDeFecha, nominalesMezclados } from './analisis.js';
 import { completar } from './series.js';
 
 export const NOMINAL_BT = 120;
@@ -85,7 +85,7 @@ function analizarRegistrosBT(nombre, medicion, datos) {
 
   // ── Intervalos y fases con tensión ──
   let enIntervalo = 0; let totalIntervalos = 0; let anterior = null;
-  const activos = [0, 0, 0];
+  const activos = [0, 0, 0]; const porFase = [[], [], []];
   for (const f of datosF) {
     if (anterior !== null && f.m !== null) {
       if (anterior > 0 && f.m > 0) {
@@ -94,7 +94,7 @@ function analizarRegistrosBT(nombre, medicion, datos) {
       }
     }
     if (f.m !== null) anterior = f.m;
-    tension(f).forEach((v, i) => { if (v > UMBRAL_ACTIVA_V) activos[i]++; });
+    tension(f).forEach((v, i) => { if (v > UMBRAL_ACTIVA_V) { activos[i]++; porFase[i].push(v); } });
   }
   const predominante = totalIntervalos > 0 && enIntervalo / totalIntervalos >= PREDOMINANTE;
   r.intervalo = predominante ? `${reglas.intervalo} min` : `No es ${reglas.intervalo} min`;
@@ -147,6 +147,8 @@ function analizarRegistrosBT(nombre, medicion, datos) {
   if (validos < reglas.minimo) fallar(`Insuficientes registros válidos: ${validos} (mínimo ${reglas.minimo})`);
   if (!predominante) fallar(`Intervalo predominante NO es de ${reglas.intervalo} min`, `Intervalo predominante NO es de ${reglas.intervalo} min. Registros: ${r.registros}`);
   if (validos === 0 && r.registros > 0) fallar('ERROR ALIM. - Todos los registros son inválidos');
+  const mixto = nominalesMezclados(porFase.map((l, i) => (activos[i] / r.registros > UMBRAL_ACTIVA_PCT ? l : [])));
+  if (mixto) fallar(mixto);
   if (!estado) estado = 'VALIDA';
   return { ...r, estado, detalle };
 }

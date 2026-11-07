@@ -2,7 +2,7 @@
 import { ordenarCasos } from '../domain/listados.js';
 import { corteSubida, CR_OBLIGATORIOS, instalacionDeCaso, MEDICION, PERTURBACIONES_A_SUBIR, resultadoCaso, resumenResultados, situacionCaso, subidaPerturbaciones } from '../domain/resultados.js';
 import { agruparCampanas, flujoBT, hoyLocal } from '../domain/trabajo.js';
-import { casosFT, DIAS_SOLUCION_FT } from '../domain/ft.js';
+import { casosFT, DIAS_SOLUCION_FT, perturbacionesFT } from '../domain/ft.js';
 import { state } from '../state.js';
 import { hayTXTEnMemoria, recalculablesBT } from '../actions/resultados.js';
 import { digitoInstalacion, INSTALACIONES_BT } from '../domain/analisis-bt.js';
@@ -40,7 +40,10 @@ const FILTRO_RES = {
 // Bloque rojo con los casos fuera de tolerancia: se penalizan, hay que avisar y remedir en 90 días
 function bloqueFT(c, hoy) {
   const lista = casosFT({ [c.clave]: state.campanas?.[c.clave] }, state.records, hoy);
-  if (!lista.length) return '';
+  // Perturbaciones FT en tensión: solo se informa (no se avisa a DELSUR ni se remide)
+  const pert = perturbacionesFT(state.campanas?.[c.clave]);
+  const info = pert.length ? `<div class="aviso aviso-azul ft-info-pert"><i class="ic ic-info"></i><div><b>${pert.length} ${pert.length === 1 ? 'perturbación salió' : 'perturbaciones salieron'} fuera de tolerancia en tensión</b> (solo informativo, no lleva seguimiento FT): ${pert.map(x => `${esc(x.codigo)}${x.caso.resultado?.febNoPer !== undefined ? ` (${esc(x.caso.resultado.febNoPer)} %)` : ''}`).join(', ')}</div></div>` : '';
+  if (!lista.length) return info;
   const sinAviso = lista.filter(x => !x.ft.aviso && !x.cerrado).length;
   let html = '<div class="ft-bloque">';
   html += `<div class="ft-head"><div class="ft-head-ic"><i class="ic ic-sirena"></i></div><div class="ft-head-tx">
@@ -61,7 +64,7 @@ function bloqueFT(c, hoy) {
       <i class="ic ic-chevron-right" style="color:var(--text3)"></i></div>`;
   });
   html += '<div class="ft-pie"><button class="b b-g" onclick="switchTab(\'ft\')"><i class="ic ic-ft"></i> Ir a Seguimiento FT</button></div>';
-  return html + '</div>';
+  return html + '</div>' + info;
 }
 
 export function renderResultados(c) {

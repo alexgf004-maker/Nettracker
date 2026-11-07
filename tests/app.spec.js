@@ -2423,6 +2423,47 @@ test.describe('Precampaña', () => {
     await expect(modal).toContainText('0 por revisar');
   });
 
+  test('fases con distinto voltaje nominal (estrella programada, delta en campo: 120, 120 y 208 V) es medición fallida, en BT y en MT', async ({ page }) => {
+    const bt = hacerTXT({ n: 1100, paso: 10, columnas: 197, v: () => [121, 119, 208] });
+    const btCR = hacerTXT({ v: () => [121, 119, 208] });
+    const btOk = hacerTXT({ v: () => [121, 118, 124] });
+    const mt = hacerTXT({ v: () => [23000, 23100, 39840] });
+    app = await abrirApp(page);
+    const r = await page.evaluate(async t => {
+      const { analizarMedicionBT } = await import('/js/domain/analisis-bt.js');
+      const { analizarMedicion, resultadoDeAnalisis } = await import('/js/domain/analisis.js');
+      const tri = { tipoInstalacion: 'TRIFÁSICO', urbanidad: 'U' };
+      const pert = analizarMedicionBT('DA1O2026083O00.txt', t.bt, tri);
+      const cr = analizarMedicionBT('CR1O2026001.txt', t.btCR, tri);
+      const ok = analizarMedicionBT('CR1O2026001.txt', t.btOk, tri);
+      const m = analizarMedicion('CR1O2026201.txt', t.mt, { configuracion: 'Estrella', alimentador: 'AL013-23000', urbanidad: 'U' });
+      return { pert: [pert.estado, pert.detalle, resultadoDeAnalisis(pert)], cr: [cr.estado, cr.detalle], ok: ok.estado, mt: [m.estado, m.detalle] };
+    }, { bt, btCR, btOk, mt });
+    expect(r.pert[0]).toBe('FALLIDA');
+    expect(r.pert[1]).toContain('Fases con distinto voltaje nominal (V1 121 V, V2 119 V, V3 208 V)');
+    expect(r.pert[2]).toEqual({ medicion: 'fallida' }); // no queda como FT
+    expect(r.cr).toEqual(['FALLIDA', expect.stringContaining('Fases con distinto voltaje nominal')]);
+    expect(r.ok).toBe('VALIDA'); // un desbalance normal no cuenta
+    expect(r.mt[0]).toBe('FALLIDA');
+    expect(r.mt[1]).toMatch(/V3 39.840 V/);
+  });
+
+  test('perturbaciones: un FT en tensión es solo informativo, sin seguimiento FT', async ({ page }) => {
+    const datos = JSON.parse(JSON.stringify(fixture));
+    datos.campanas = { '2026-10_CPT-MT': { anio: 2026, mes: 10, area: 'CPT MT', casos: {
+      DA1O2026083O00: { codigo: 'DA1O2026083O00', codigoEnte: 'DA1O2026083O00', tipo: 'DA', nc: '1', nombre: 'USUARIO PERTURBACION', resultado: { medicion: 'valida', tolerancia: 'fuera', febNoPer: 12 } },
+      CR1O2026201: { codigo: 'CR1O2026201', codigoEnte: 'CR1O2026201', tipo: 'CR', nc: '2', nombre: 'USUARIO CR', resultado: { medicion: 'valida', tolerancia: 'fuera', febNoPer: 9 } },
+    } } };
+    app = await abrirApp(page, { datos });
+    await cerrarAlerta(page);
+    const ft = await page.evaluate(async () => { const { state } = await import('/js/state.js'); const m = await import('/js/domain/ft.js'); return m.casosFT(state.campanas, state.records, '2026-10-30').map(x => x.codigo); });
+    expect(ft).toEqual(['CR1O2026201']);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('resultados'); });
+    await expect(page.locator('.ft-bloque')).toContainText('1 caso fuera de tolerancia');
+    await expect(page.locator('.ft-info-pert')).toContainText('1 perturbación salió fuera de tolerancia en tensión');
+    await expect(page.locator('.ft-info-pert')).toContainText('DA1O2026083O00 (12 %)');
+  });
+
   test('MT: corregir el alimentador desde el resultado recalcula sin volver a subir el TXT', async ({ page }) => {
     // Medición en 23 kV, pero el caso dice 13.2 kV: sale 100 % FT
     const txt = hacerTXT({ v: () => [23000, 23000, 23000] });
@@ -4868,11 +4909,15 @@ test.describe('Levantamiento en campo', () => {
     await page.setViewportSize({ width: 412, height: 760 });
     // Al cambiar a pantalla de celular la hoja se vuelve a acomodar: se baja hasta el fondo cuando ya se puede
     // (y se espera a que se quede abajo: un redibujo pendiente de las acometidas sumadas no debe moverla después)
+    // (espera a que la hoja deje de crecer: dos lecturas seguidas iguales y al fondo)
+    let previo = -1;
     await expect.poll(async () => {
       await page.locator('.lev-hoja-cuerpo').evaluate(e => { e.scrollTop = e.scrollHeight; e.dispatchEvent(new Event('scroll')); });
       await page.waitForTimeout(300);
-      return hojaScroll();
-    }).toBeGreaterThan(0);
+      const [t, max] = await page.locator('.lev-hoja-cuerpo').evaluate(e => [e.scrollTop, e.scrollHeight - e.clientHeight]);
+      const quieto = t > 0 && t === max && t === previo; previo = t;
+      return quieto;
+    }).toBe(true);
     const abajo = await hojaScroll();
     await page.getByRole('button', { name: 'Sumar acometida 120 B' }).click();
     await expect(page.locator('#lev-acom-b')).toHaveText('1');
