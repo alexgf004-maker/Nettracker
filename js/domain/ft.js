@@ -28,12 +28,20 @@ export function ftDeRemedicion(codigo, listaFT) {
   }) || null;
 }
 
-// Todos los casos FT de las campañas guardadas
+// Perturbaciones (DA armónicas, DF flicker): un FT en tensión es solo informativo, no lleva seguimiento (confirmado)
+export const esPerturbacion = caso => /^D[AF]/i.test(String(caso?.codigo || caso?.codigoEnte || '').trim()) || ['DA', 'DF'].includes(String(caso?.tipo || '').toUpperCase());
+const esFT = caso => caso.resultado?.medicion === 'valida' && caso.resultado?.tolerancia === 'fuera';
+// Perturbaciones que salieron FT en tensión (para mostrarlas como aviso, sin seguimiento)
+export function perturbacionesFT(g) {
+  return Object.entries(g?.casos || {}).filter(([, c]) => esFT(c) && esPerturbacion(c)).map(([id, caso]) => ({ id, caso, codigo: caso.codigo || caso.codigoEnte }));
+}
+
+// Todos los casos FT de las campañas guardadas que llevan seguimiento (no las perturbaciones)
 export function casosFT(campanas, registros, hoy) {
   const lista = [];
   for (const [clave, g] of Object.entries(campanas || {})) {
     for (const [id, caso] of Object.entries(g?.casos || {})) {
-      if (caso.resultado?.medicion !== 'valida' || caso.resultado?.tolerancia !== 'fuera') continue;
+      if (!esFT(caso) || esPerturbacion(caso)) continue;
       const inst = instalacionDeCaso(caso, registros);
       const inicio = inst?.fechaInstalacion || null;
       const limite = inicio ? sumarDias(inicio, DIAS_SOLUCION_FT) : null;

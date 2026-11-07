@@ -13,6 +13,7 @@ import { contarTipos, faltantes } from '../domain/listados.js';
 import { grupoDeEstado, resumenMultiplicadores } from '../domain/multiplicadores.js';
 import { PERTURBACIONES_A_SUBIR, resumenResultados, subidaPerturbaciones } from '../domain/resultados.js';
 import { renderFechas } from './fechas.js';
+import { esPerturbacion } from '../domain/ft.js';
 import { renderMultiplicadores } from './multiplicadores.js';
 import { filasPerturbacionesMes, filasResultados, renderPerturbaciones, renderResultados } from './resultados.js';
 
@@ -70,7 +71,7 @@ export function avanceCampana(c) {
   const filas = casos.length ? filasResultados(c) : [];
   const res = resumenResultados(filas);
   const ft = filas.filter(f => f.resultado.medicion === 'valida' && f.resultado.tolerancia === 'fuera');
-  const ftSinAviso = ft.filter(f => !f.caso.ft?.aviso).length;
+  const ftSinAviso = ft.filter(f => !f.caso.ft?.aviso && !esPerturbacion(f.caso)).length; // las perturbaciones FT solo se informan
   const pasos = [
     ...(bt ? [['casos', 'Listado', casos.length > 0 && !casos.some(x => faltantes(x).length)]] : [
       ['precampana', 'Precampaña', pre.hechos === pre.total],

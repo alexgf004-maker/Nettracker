@@ -12,6 +12,20 @@ export const LIMITE_INVALIDO = 0.7; // registro inválido: fase activa por debaj
 const UMBRAL_FASE_V = 300; // una fase "tiene tensión" si pasa de 300 V
 const UMBRAL_FASE_PCT = 0.3; // … durante más del 30 % de los registros
 
+// Fases con distinto voltaje nominal (confirmado por el equipo: medición fallida, en perturbaciones y en regulación). Pasa
+// cuando se programa en estrella y en campo es delta: llega 120, 120 y 208 V; el sistema de DELSUR solo acepta un nominal.
+// porFase: tensiones de cada fase con tensión ([] si no tiene). Devuelve el detalle o '' si las fases son parejas.
+export const RAZON_NOMINAL_MEZCLADO = 1.3; // 208/120 = 1.73; un desbalance normal no pasa de unos pocos %
+export function nominalesMezclados(porFase) {
+  const mediana = l => { const o = [...l].sort((a, b) => a - b); return o[Math.floor(o.length / 2)]; };
+  const fases = porFase.map((l, i) => (l.length ? { f: i + 1, v: mediana(l) } : null)).filter(Boolean);
+  if (fases.length < 2) return '';
+  const vs = fases.map(x => x.v);
+  if (Math.max(...vs) / Math.min(...vs) <= RAZON_NOMINAL_MEZCLADO) return '';
+  const fmt = v => (v >= 1000 ? `${Math.round(v).toLocaleString('es-SV')} V` : `${Math.round(v)} V`);
+  return `Fases con distinto voltaje nominal (${fases.map(x => `V${x.f} ${fmt(x.v)}`).join(', ')}): en campo la conexión no es la programada (p. ej. delta y no estrella); el sistema de DELSUR solo acepta un voltaje nominal`;
+}
+
 // Reglas por tipo de caso
 export const REGLAS = {
   CR: { tipoCaso: 'Regulatorio', intervalo: 15, columnas: 74, minimo: 576 },
@@ -100,8 +114,9 @@ export function analizarMedicion(nombre, texto, datos = {}) {
   const col = n => enc.findIndex(h => h === n);
   const c1 = col('U1 [V]'); const c2 = col('U2 [V]'); const c3 = col('U3 [V]');
   const valor = (f, c) => (c >= 0 && esNumero(f[c]) ? Number(f[c]) : null);
-  let n1 = 0; let n2 = 0; let n3 = 0;
+  let n1 = 0; let n2 = 0; let n3 = 0; const porFase = [[], [], []];
   for (const f of datosF) {
+    [c1, c2, c3].forEach((c, i) => { const v = valor(f, c) ?? 0; if (v > UMBRAL_FASE_V) porFase[i].push(v); });
     if ((valor(f, c1) ?? 0) > UMBRAL_FASE_V) n1++;
     if ((valor(f, c2) ?? 0) > UMBRAL_FASE_V) n2++;
     if ((valor(f, c3) ?? 0) > UMBRAL_FASE_V) n3++;
@@ -153,10 +168,12 @@ export function analizarMedicion(nombre, texto, datos = {}) {
   r.registrosValidos = total - invalidos;
   r.registrosFT = ft;
 
+  const mixto = nominalesMezclados(porFase.map((l, i) => ([p1, p2, p3][i] > UMBRAL_FASE_PCT ? l : [])));
   // ── Estado final (mismo orden que la macro) ──
   const validos = total - invalidos;
   let estado; let detalle;
   if (total === 0 && r.columnas === 0) { estado = 'FALLIDA'; detalle = 'Archivo TXT vacío o sin datos'; }
+  else if (mixto) { estado = 'FALLIDA'; detalle = mixto; } // la causa de fondo: con un solo nominal los registros salen inválidos o FT
   else if (!encontrado) { estado = 'ADVERTENCIA'; detalle = `Al caso le falta el nivel de tensión (alimentador) y la urbanidad: ${nombreSinExt}`; }
   else if (r.columnas !== reglas.columnas) { estado = 'ADVERTENCIA'; detalle = `Número de columnas incorrecto: ${r.columnas} (se esperan ${reglas.columnas})`; }
   else if (validos < reglas.minimo) { estado = 'FALLIDA'; detalle = `Insuficientes registros válidos: ${validos} (mínimo ${reglas.minimo})`; }
