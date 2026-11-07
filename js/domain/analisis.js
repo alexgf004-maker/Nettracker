@@ -49,11 +49,28 @@ export function minutosDeFecha(texto) {
   return Math.floor(Date.UTC(a, m - 1, d, hh, mm, ss) / 60000);
 }
 
-// Lee el TXT: quita caracteres raros al inicio (BOM), salta líneas vacías y separa por comas
+// Separador de columnas del TXT por el encabezado. El equipo lo baja separado por comas (lo único que acepta el sistema
+// de DELSUR), pero a veces llega con tabuladores (o punto y coma) y antes se leía como una sola columna sin avisar.
+export function separadorTXT(texto) {
+  const enc = String(texto || '').split(/\r?\n/, 1)[0] || '';
+  const n = c => enc.split(c).length - 1;
+  const [tab, pc, coma] = [n('\t'), n(';'), n(',')];
+  return tab > coma && tab >= pc ? '\t' : pc > coma ? ';' : ',';
+}
+// Aviso para el resultado si el TXT no viene separado por comas ('' si está bien)
+export function avisoFormatoTXT(texto) {
+  const sep = separadorTXT(texto);
+  return sep === ',' ? '' : `Formato no válido para DELSUR: el TXT viene separado por ${sep === '\t' ? 'tabuladores' : 'punto y coma'} y el sistema solo acepta comas (vuelve a bajarlo del equipo o conviértelo antes de subirlo)`;
+}
+
+// Lee el TXT: quita caracteres raros al inicio (BOM), salta líneas vacías y separa las columnas (por comas, o por el
+// separador que traiga; en ese caso la coma decimal "123,667" se lee como 123.667)
 export function leerTXT(texto) {
   const lineas = String(texto || '').split(/\r?\n/);
   if (lineas.length) lineas[0] = lineas[0].replace(/^[^\x00-\x7F]+/, '');
-  return lineas.filter(l => l.trim() !== '').map(l => l.split(',').map(c => c.trim()));
+  const sep = separadorTXT(lineas[0]);
+  const celda = sep === ',' ? c => c.trim() : c => { const t = c.trim(); return /^-?\d+,\d+$/.test(t) ? t.replace(',', '.') : t; };
+  return lineas.filter(l => l.trim() !== '').map(l => l.split(sep).map(celda));
 }
 
 // Tensión de la red a partir del alimentador ("AL013-23000" → 23000)
@@ -85,6 +102,7 @@ export function analizarMedicion(nombre, texto, datos = {}) {
   };
 
   const filas = leerTXT(texto);
+  r.avisoFormato = avisoFormatoTXT(texto);
   if (filas.length <= 1) return { ...r, estado: 'FALLIDA', detalle: 'Archivo TXT vacío o sin datos' };
 
   const enc = filas[0];

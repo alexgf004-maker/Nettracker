@@ -37,6 +37,9 @@ const FILTRO_RES = {
   pendiente: f => !f.resultado.medicion && f.situacion.clave !== 'sin_medir',
 };
 
+// Resultado anotado a mano (sin TXT): quién y cuándo, y el fallo de la descarga si lo hubo (así no queda "Fallida" sin más)
+const manual = (res = {}, r) => `<small class="txt-gris">Anotado a mano${res.por ? ` por ${esc(res.por)}` : ''}${res.fecha ? ` el ${fmtDate(res.fecha)}` : ''}${!r.nota && !r.falloDescarga ? ' · sin nota ni TXT analizado' : ''}</small>${r.falloDescarga ? `<small class="txt-ambar">Al descargar: ${esc(r.falloDescarga)}</small>` : ''}`;
+
 // Bloque rojo con los casos fuera de tolerancia: se penalizan, hay que avisar y remedir en 90 días
 function bloqueFT(c, hoy) {
   const lista = casosFT({ [c.clave]: state.campanas?.[c.clave] }, state.records, hoy);
@@ -128,7 +131,7 @@ export function renderResultados(c) {
       <td class="cod"><b>${esc(caso.codigo || caso.codigoEnte)}</b><small>${esc(caso.nombre)}</small>${esCorte ? '<span class="tg azul tg-corte"><i class="ic ic-bandera"></i> Hasta aquí se sube</span>' : ''}${noSube ? '<small>No se sube</small>' : ''}</td>
       <td data-l="Situación"><span class="tag ${CLASE_SITUACION[situacion.clave]}">${esc(situacion.texto)}</span></td>
       <td data-l="Instalación" class="${inst ? '' : 'vacio-m'}">${inst ? `${fmtDate(inst.fechaInstalacion)}<small>${esc(inst.serie)}${inst.fechaRetiroReal ? ' · retiro ' + fmtDate(inst.fechaRetiroReal) : ''}</small>` : '—'}</td>
-      <td data-l="Resultado">${r.medicion ? `${ft ? '<span class="tg ft"><i class="ic ic-sirena"></i> Fuera de tolerancia</span>' : r.medicion === 'valida' && r.tolerancia === 'dentro' ? '<span class="tg verde"><i class="ic ic-check"></i> Dentro de tolerancia</span>' : tagMedicion(r)}${r.analisis ? `<small>${esc(r.analisis.detalle)}</small>` : ''}${r.nota ? `<small>${esc(r.nota)}</small>` : ''}` : situacion.clave === 'sin_medir' ? '<span class="tg gris">No medida</span>' : `<span class="falta">${situacion.clave === 'descargado' ? 'Falta analizar el TXT' : 'Pendiente'}</span>${r.falloDescarga ? `<small class="txt-ambar">Al descargar: ${esc(r.falloDescarga)}</small>` : ''}`}</td>
+      <td data-l="Resultado">${r.medicion ? `${ft ? '<span class="tg ft"><i class="ic ic-sirena"></i> Fuera de tolerancia</span>' : r.medicion === 'valida' && r.tolerancia === 'dentro' ? '<span class="tg verde"><i class="ic ic-check"></i> Dentro de tolerancia</span>' : tagMedicion(r)}${r.analisis ? `<small>${esc(r.analisis.detalle)}</small>${r.analisis.avisoFormato ? `<small class="txt-rojo">${esc(r.analisis.avisoFormato)}</small>` : ''}` : ''}${r.nota ? `<small>${esc(r.nota)}</small>` : ''}${!r.analisis ? manual(caso.resultado, r) : ''}` : situacion.clave === 'sin_medir' ? '<span class="tg gris">No medida</span>' : `<span class="falta">${situacion.clave === 'descargado' ? 'Falta analizar el TXT' : 'Pendiente'}</span>${r.falloDescarga ? `<small class="txt-ambar">Al descargar: ${esc(r.falloDescarga)}</small>` : ''}`}</td>
       <td data-l="FebNoPer" class="num">${r.febNoPer === '' ? '—' : `<span class="${ft ? 'ft-valor' : ''}">${esc(r.febNoPer)} %</span>`}${caso.resultado?.graficas ? `<button class="b-graf" title="Ver gráficas de voltaje y corriente" onclick="event.stopPropagation(); verGraficas('${c.clave}', '${caso.id}')"><i class="ic ic-grafica"></i></button>` : ''}</td>
     </tr>`;
   });
@@ -251,7 +254,7 @@ export function renderAnalisisModal() {
       : `${esc(a.tipoInstalacion)}<input class="sel-instalacion" aria-label="Alimentador de ${esc(a.archivo)}" value="${esc(state.campanas?.[imp.clave]?.casos?.[id]?.alimentador)}" placeholder="Alimentador" onchange="corregirDatoMedicion('${imp.clave}', '${id}', 'alimentador', this.value)"><small>${a.nivelTension || '—'} V · ${esc(a.urbanidad || '—')}</small>`;
     html += `<tr><td class="mono"><b>${esc(a.archivo)}</b></td><td><span class="tag ${CLASE_ESTADO[a.estado]}">${a.estado === 'ADVERTENCIA' ? 'POR REVISAR' : a.estado}</span></td>
       <td class="mono ${typeof a.febNoPer === 'number' && a.febNoPer > UMBRAL_FT ? 'txt-rojo' : ''}">${fnp(a.febNoPer)}</td><td class="mono">${a.registros}</td><td>${esc(a.intervalo)}</td>
-      <td>${instalacion}</td><td class="col-dir">${esc(a.detalle)}</td></tr>`;
+      <td>${instalacion}</td><td class="col-dir">${esc(a.detalle)}${a.avisoFormato ? `<br><b class="txt-rojo">${esc(a.avisoFormato)}</b>` : ''}</td></tr>`;
   });
   html += '</tbody></table></div>';
   html += `<button class="btn btn-primary" ${imp.filas.length ? '' : 'disabled'} onclick="guardarAnalisis()">Guardar resultados</button>`;

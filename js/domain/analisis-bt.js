@@ -7,7 +7,7 @@
 // - Si en campo la instalación es otra, se corrige en la app y se recalcula con los registros guardados
 //   (series/{campaña}/{caso}), sin volver a subir el TXT (`analizarSeriesBT`).
 // Funciones puras: reciben el texto del TXT (o los registros guardados) y los datos del caso.
-import { leerTXT, minutosDeFecha, nominalesMezclados } from './analisis.js';
+import { avisoFormatoTXT, leerTXT, minutosDeFecha, nominalesMezclados } from './analisis.js';
 import { completar } from './series.js';
 
 export const NOMINAL_BT = 120;
@@ -36,16 +36,18 @@ export const digitoInstalacion = tipo => Number(Object.keys(DIGITO_SISTEMA).find
 // nombre: nombre del archivo; texto: contenido; datos: { tipoInstalacion, urbanidad } del caso
 export function analizarMedicionBT(nombre, texto, datos = {}) {
   const filas = leerTXT(texto);
-  if (filas.length <= 1) return analizarRegistrosBT(nombre, null, datos);
+  const avisoFormato = avisoFormatoTXT(texto);
+  const conAviso = a => (avisoFormato ? { ...a, avisoFormato } : a);
+  if (filas.length <= 1) return conAviso(analizarRegistrosBT(nombre, null, datos));
   const enc = filas[0];
   const datosF = filas.slice(1);
   const formatoViejo = enc[0] === 'X-Data';
   const cols = COLUMNAS_U[formatoViejo ? 'viejo' : 'nuevo'].map(n => enc.indexOf(n));
-  return analizarRegistrosBT(nombre, {
+  return conAviso(analizarRegistrosBT(nombre, {
     columnas: enc.length, formatoViejo, inicio: datosF[0][0] || '', fin: datosF[datosF.length - 1][0] || '',
     // m: minutos de la fecha (null si la celda está vacía); u: tensión por fase (0 si no es número)
     filas: datosF.map(f => ({ m: f[0] ? minutosDeFecha(f[0]) : null, u: cols.map(c => (c >= 0 ? numero(f[c]) : 0)) })),
-  }, datos);
+  }, datos));
 }
 
 // Mismo análisis con los registros guardados al analizar el TXT (los de las gráficas): serie = { inicio, fin, t, U };

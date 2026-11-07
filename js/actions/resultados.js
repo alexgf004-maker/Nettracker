@@ -199,7 +199,9 @@ async function analisisCaso(clave, id, c) {
   if (!snap.exists()) return null;
   const previo = c.resultado.analisis || {};
   const nombre = previo.archivo || c.codigo || c.codigoEnte;
-  return bt ? analizarSeriesBT(nombre, snap.val(), previo, datosBT(c)) : analizarMedicion(nombre, txtDesdeSerie(snap.val(), previo.columnas), datosMT(c));
+  const a = bt ? analizarSeriesBT(nombre, snap.val(), previo, datosBT(c)) : analizarMedicion(nombre, txtDesdeSerie(snap.val(), previo.columnas), datosMT(c));
+  // El aviso del formato es del TXT original (los registros guardados no lo tienen)
+  return previo.avisoFormato ? { ...a, avisoFormato: previo.avisoFormato } : a;
 }
 
 // Corrige el alimentador o la urbanidad de un caso desde el resultado (queda como dato corregido a mano, el control

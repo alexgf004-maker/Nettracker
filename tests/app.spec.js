@@ -2448,6 +2448,38 @@ test.describe('Precampaña', () => {
     expect(r.mt[1]).toMatch(/V3 39.840 V/);
   });
 
+  test('TXT separado por tabuladores: se lee igual, con coma decimal, y avisa que DELSUR no lo acepta', async ({ page }) => {
+    const comas = hacerTXT({ v: i => [120.5, 119.25, i % 9 ? 121 : 131.5] });
+    const tabs = comas.split('\r\n').map(l => l.split(',').join('\t')).join('\r\n');
+    const tabsComa = tabs.replace(/(\d)\.(\d)/g, '$1,$2');
+    app = await abrirApp(page);
+    const r = await page.evaluate(async t => {
+      const { analizarMedicionBT } = await import('/js/domain/analisis-bt.js');
+      const { separadorTXT } = await import('/js/domain/analisis.js');
+      const { extraerSeries } = await import('/js/domain/series.js');
+      const tri = { tipoInstalacion: 'TRIFÁSICO', urbanidad: 'U' };
+      const x = n => { const a = analizarMedicionBT('CR1O2026046.txt', t[n], tri); return { estado: a.estado, columnas: a.columnas, feb: a.febNoPer, aviso: a.avisoFormato || '' }; };
+      return { comas: x('comas'), tabs: x('tabs'), tabsComa: x('tabsComa'), sep: [separadorTXT(t.comas), separadorTXT(t.tabs)], serie: extraerSeries(t.tabsComa).U['1'].v[0] };
+    }, { comas, tabs, tabsComa });
+    expect(r.sep).toEqual([',', '\t']);
+    expect(r.comas.aviso).toBe('');
+    expect(r.tabs).toEqual({ ...r.comas, aviso: expect.stringContaining('Formato no válido para DELSUR: el TXT viene separado por tabuladores') });
+    expect(r.tabsComa).toEqual(r.tabs); // "120,5" se lee como 120.5
+    expect(r.tabs.columnas).toBe(74);
+    expect(r.serie).toBe(120.5); // las gráficas también
+  });
+
+  test('resultado anotado a mano sin TXT: dice quién y cuándo lo anotó', async ({ page }) => {
+    const datos = JSON.parse(JSON.stringify(fixture));
+    datos.campanas = { '2026-10_CPT-BT': { anio: 2026, mes: 10, area: 'CPT BT', casos: {
+      CR1O2026045: { codigo: 'CR1O2026045', codigoEnte: 'CR1O2026045', tipo: 'CR', nc: '1', nombre: 'USUARIO A MANO', resultado: { medicion: 'fallida', por: 'David García', fecha: '2026-10-20' } },
+    } } };
+    app = await abrirApp(page, { datos, usuario: 'Francisco Chulo' });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-BT'); setCampanaVista('resultados'); });
+    await expect(page.locator('tr', { hasText: 'CR1O2026045' })).toContainText('Anotado a mano por David García el 20/10/2026 · sin nota ni TXT analizado');
+  });
+
   test('perturbaciones: un FT en tensión es solo informativo, sin seguimiento FT', async ({ page }) => {
     const datos = JSON.parse(JSON.stringify(fixture));
     datos.campanas = { '2026-10_CPT-MT': { anio: 2026, mes: 10, area: 'CPT MT', casos: {
