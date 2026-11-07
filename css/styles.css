@@ -1911,3 +1911,19 @@ button.dib-est-item { cursor: pointer; } button.dib-est-item:hover { color: var(
 /* Arrastrar y soltar archivos: las zonas donde se pueden soltar se marcan mientras se arrastra */
 .zona-archivo { outline: 2px dashed var(--primary); outline-offset: 3px; transition: outline-color .15s, background-color .15s; }
 .zona-archivo-activa { outline-style: solid; background-color: var(--primary-light) !important; }
+
+/* Resultados: Analizar y Recalcular fijos arriba al bajar por la lista */
+.barra-acciones.res-fija { position: sticky; top: var(--alto-header, 60px); z-index: 20; background: var(--bg); padding: 8px 0; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
+/* Vista previa del análisis: Guardar fijo abajo */
+.analisis-pie { position: sticky; bottom: -20px; background: var(--white); margin: 8px -20px -20px; padding: 10px 20px 14px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; z-index: 6; }
+.analisis-pie .btn { margin: 0; }
+/* Aviso mientras se analizan los TXT */
+.proc-overlay { align-items: center; justify-content: center; z-index: 400; }
+.proc-caja { background: var(--white); border-radius: 16px; padding: 22px 26px; width: min(300px, calc(100% - 32px)); display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; box-shadow: var(--shadow-md); }
+.proc-caja b { font-size: 15px; }
+.proc-num { font-size: 13px; color: var(--text2); font-variant-numeric: tabular-nums; }
+.proc-barra { width: 100%; height: 6px; background: var(--primary-light); border-radius: 3px; overflow: hidden; }
+.proc-barra i { display: block; height: 100%; background: var(--primary); transition: width .15s; }
+.proc-caja small { font-size: 11px; color: var(--text3); }
+.barra-acciones.res-fija { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.barra-acciones.res-fija .b { flex: 1 1 0; min-width: 0; justify-content: center; padding: 9px 6px; font-size: 12.5px; gap: 5px; white-space: nowrap; }

@@ -167,17 +167,45 @@ export function descargarCorregidosAnalisis() {
 // Sin analizar: elegir los TXT y bajarlos corregidos
 export async function corregirArchivosTXT(files) {
   if (!files?.length) return;
-  try { bajarCorregidos(await Promise.all([...files].map(async f => ({ nombre: f.name, texto: await leerTexto(f) })))); }
+  try { const archivos = await leerTodos(files); if (archivos) bajarCorregidos(archivos); }
   catch (err) { showToast('No se pudo leer el archivo: ' + err.message); }
 }
+
+// ── PROGRESO ── Con muchas mediciones el análisis tarda: se muestra un aviso con el avance (y no se vuelve a lanzar
+// mientras tanto). Entre archivo y archivo se cede el turno al navegador para que pinte el avance.
+const pausa = () => new Promise(r => setTimeout(r, 0));
+let ultimaPausa = 0;
+async function avance(hecho) {
+  const p = state.procesando; if (!p) return;
+  p.hecho = hecho;
+  const el = typeof document !== 'undefined' && document.getElementById('procesando');
+  if (el) { el.querySelector('.proc-num').textContent = `${hecho} de ${p.total}`; el.querySelector('.proc-barra i').style.width = `${Math.round((hecho * 100) / (p.total || 1))}%`; }
+  if (performance.now() - ultimaPausa > 60) { await pausa(); ultimaPausa = performance.now(); }
+}
+async function conProgreso(titulo, total, trabajo) {
+  if (state.procesando) return showToast('Espera, todavía se están analizando las mediciones');
+  state.procesando = { titulo, hecho: 0, total };
+  render(); await pausa(); ultimaPausa = performance.now();
+  try { return await trabajo(); } finally { state.procesando = null; render(); }
+}
+// files se copia al momento: el FileList del input se vacía al limpiarlo (this.value = '')
+const leerTodos = files => { const lista = [...files]; return conProgreso('Leyendo los TXT', lista.length, async () => {
+  let n = 0;
+  return Promise.all(lista.map(async f => { const texto = await leerTexto(f); await avance(++n); return { nombre: f.name, texto }; }));
+}); };
 
 // archivos: [{ nombre, texto }] (separado de la lectura para poder probarlo sin archivos)
 export function analizarArchivos(clave, archivos) {
   const g = state.campanas?.[clave];
   if (!g) return;
+  return conProgreso('Analizando las mediciones', archivos.length, () => analizar(clave, g, archivos));
+}
+async function analizar(clave, g, archivos) {
   const casos = Object.entries(g.casos || {});
   const filas = []; const sinCaso = [];
+  let hecho = 0;
   for (const a of archivos) {
+    await avance(hecho++);
     const codigo = a.nombre.replace(/\.[^.]*$/, '').trim().toUpperCase();
     const hit = casos.find(([, c]) => (c.codigo || '').toUpperCase() === codigo || (c.codigoEnte || '').toUpperCase() === codigo);
     if (!hit) { sinCaso.push(a.nombre); continue; }
@@ -191,14 +219,13 @@ export function analizarArchivos(clave, archivos) {
   }
   filas.sort((x, y) => x.codigo.localeCompare(y.codigo));
   state.analisisTXT = { clave, filas, sinCaso };
-  render();
 }
 
 export async function analizarTXT(clave, files) {
   if (!files?.length) return;
   try {
-    const archivos = await Promise.all([...files].map(async f => ({ nombre: f.name, texto: await leerTexto(f) })));
-    analizarArchivos(clave, archivos);
+    const archivos = await leerTodos(files);
+    if (archivos) await analizarArchivos(clave, archivos);
   } catch (err) {
     showToast('No se pudieron leer los TXT: ' + err.message);
   }
@@ -269,15 +296,19 @@ export async function corregirDatoMedicion(clave, id, campo, valor) {
 export async function recalcularDesdeSeries(clave) {
   const lista = recalculablesBT(clave);
   if (!lista.length) return showToast('Primero sube los TXT');
-  const filas = []; const sinCaso = [];
-  for (const [id, c] of lista) {
-    const analisis = await analisisCaso(clave, id, c);
-    if (!analisis) { sinCaso.push(c.codigo || c.codigoEnte); continue; }
-    filas.push({ id, codigo: c.codigo || c.codigoEnte, analisis, resultado: resultadoDeAnalisis(analisis), manual: false, seriesMeta: { nominal: analisis.nominal ?? null, tolerancia: analisis.tolerancia ?? null } });
-  }
-  filas.sort((x, y) => x.codigo.localeCompare(y.codigo));
-  state.analisisTXT = { clave, filas, sinCaso, desdeSeries: true };
-  render();
+  return conProgreso('Recalculando las mediciones', lista.length, async () => {
+    const filas = []; const sinCaso = [];
+    let hecho = 0;
+    // Los registros se piden todos a la vez (es lo que más tarda); el cálculo va uno por uno mostrando el avance
+    const analisis = await Promise.all(lista.map(async ([id, c]) => { const a = await analisisCaso(clave, id, c); await avance(++hecho); return a; }));
+    lista.forEach(([id, c], i) => {
+      const a = analisis[i];
+      if (!a) { sinCaso.push(c.codigo || c.codigoEnte); return; }
+      filas.push({ id, codigo: c.codigo || c.codigoEnte, analisis: a, resultado: resultadoDeAnalisis(a), manual: false, seriesMeta: { nominal: a.nominal ?? null, tolerancia: a.tolerancia ?? null } });
+    });
+    filas.sort((x, y) => x.codigo.localeCompare(y.codigo));
+    state.analisisTXT = { clave, filas, sinCaso, desdeSeries: true };
+  });
 }
 
 // La instalación verificada en campo (1 monofásico, 2 bifásico, 3 trifásico) se pone a todos los casos del usuario en la
@@ -338,7 +369,7 @@ export function guardarAnalisis() {
   const series = {};
   imp.filas.forEach(f => { if (f.series) series[f.id] = { ...f.series, nominal: f.analisis.nominal ?? null, tolerancia: f.analisis.tolerancia ?? null, codigo: f.codigo }; });
   if (Object.keys(series).length) update(ref(db, 'series/' + imp.clave), series);
-  update(ref(db, 'campanas/' + imp.clave), datos).then(() => showToast(`${imp.filas.length} mediciones analizadas`));
+  update(ref(db, 'campanas/' + imp.clave), datos).then(() => showToast(`${imp.filas.length} ${imp.filas.length === 1 ? 'medición analizada' : 'mediciones analizadas'}`));
   state.analisisTXT = null;
   render();
 }

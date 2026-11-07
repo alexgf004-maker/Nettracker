@@ -16,7 +16,7 @@ import { renderImportMultModal, renderMultModal } from './multiplicadores.js';
 import { renderGraficasModal } from './graficas.js';
 import { renderAnalisisReclamo, renderGraficar } from './analisis-reclamo.js';
 import { nuevoGraficar } from '../actions/analisis-reclamo.js';
-import { renderAnalisisModal, renderResultadoModal } from './resultados.js';
+import { renderAnalisisModal, renderProcesando, renderResultadoModal } from './resultados.js';
 import { renderFT, renderFTModal } from './ft.js';
 import { renderCampanas, renderRequerimientos } from './trabajo.js';
 import { renderNuevoReclamo, renderPuntoReclamo, renderReclamos } from './expedientes.js';
@@ -104,6 +104,7 @@ export function render() {
   if (state.puntoReclamo) html += renderPuntoReclamo();
   if (state.analisisReclamo) html += renderAnalisisReclamo();
   if (state.graficas) html += renderGraficasModal(); // encima de los demás (se abre desde Resultados o Seguimiento FT)
+  if (state.procesando) html += renderProcesando(); // análisis de TXT en curso
 
   const tabView = TAB_VIEWS[state.tab];
   if (tabView) {
