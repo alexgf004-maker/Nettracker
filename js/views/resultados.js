@@ -45,7 +45,9 @@ function bloqueFT(c, hoy) {
   const lista = casosFT({ [c.clave]: state.campanas?.[c.clave] }, state.records, hoy);
   // Perturbaciones FT en tensión: solo se informa (no se avisa a DELSUR ni se remide)
   const pert = perturbacionesFT(state.campanas?.[c.clave]);
-  const info = pert.length ? `<div class="aviso aviso-azul ft-info-pert"><i class="ic ic-info"></i><div><b>${pert.length} ${pert.length === 1 ? 'perturbación salió' : 'perturbaciones salieron'} fuera de tolerancia en tensión</b> (solo informativo, no lleva seguimiento FT): ${pert.map(x => `${esc(x.codigo)}${x.caso.resultado?.febNoPer !== undefined ? ` (${esc(x.caso.resultado.febNoPer)} %)` : ''}`).join(', ')}</div></div>` : '';
+  const noSuben = casosFT({ [c.clave]: state.campanas?.[c.clave] }, state.records, hoy, { noSuben: true });
+  const infoNoSuben = noSuben.length ? `<div class="aviso aviso-azul ft-info-nosube"><i class="ic ic-info"></i><div><b>${noSuben.length} ${noSuben.length === 1 ? 'CR fuera de tolerancia no se sube' : 'CR fuera de tolerancia no se suben'} al sistema</b> (quedan después de la medición hasta la que se sube; no llevan seguimiento FT): ${noSuben.map(x => `${esc(x.codigo)}${x.caso.resultado?.febNoPer !== undefined ? ` (${esc(x.caso.resultado.febNoPer)} %)` : ''}`).join(', ')}</div></div>` : '';
+  const info = infoNoSuben + (pert.length ? `<div class="aviso aviso-azul ft-info-pert"><i class="ic ic-info"></i><div><b>${pert.length} ${pert.length === 1 ? 'perturbación salió' : 'perturbaciones salieron'} fuera de tolerancia en tensión</b> (solo informativo, no lleva seguimiento FT): ${pert.map(x => `${esc(x.codigo)}${x.caso.resultado?.febNoPer !== undefined ? ` (${esc(x.caso.resultado.febNoPer)} %)` : ''}`).join(', ')}</div></div>` : '');
   if (!lista.length) return info;
   const sinAviso = lista.filter(x => !x.ft.aviso && !x.cerrado).length;
   let html = '<div class="ft-bloque">';

@@ -1,5 +1,5 @@
 // Pestaña Seguimiento FT: casos fuera de tolerancia de todas las campañas, con su plazo de 90 días
-import { DIAS_SOLUCION_FT, ftDeRemedicion, RUTAS_FT } from '../domain/ft.js';
+import { casosFT, DIAS_SOLUCION_FT, ftDeRemedicion, plazoFT, puntosFT, RUTAS_FT } from '../domain/ft.js';
 import { todosFT } from '../domain/expedientes.js';
 import { hoyLocal, nombreCampana } from '../domain/trabajo.js';
 import { state } from '../state.js';
@@ -10,9 +10,13 @@ import { userArea } from '../config.js';
 
 const esc = s => escapeHtml(s ?? '');
 
+// Casos FT que se ven en Seguimiento FT (según el área elegida)
+export const listaFTVista = (hoy = hoyLocal()) => todosFT(state.campanas, state.reclamos, state.records, hoy).filter(x => !areaVista() || x.area === areaVista());
+
 export function renderFT() {
   const hoy = hoyLocal();
-  const lista = todosFT(state.campanas, state.reclamos, state.records, hoy).filter(x => !areaVista() || x.area === areaVista());
+  const lista = listaFTVista(hoy);
+  const noSuben = casosFT(state.campanas, state.records, hoy, { noSuben: true }).filter(x => !areaVista() || x.area === areaVista());
   const abiertos = lista.filter(x => !x.cerrado);
   const cerrados = lista.filter(x => x.cerrado);
   const sinAviso = abiertos.filter(x => !x.ft.aviso).length;
@@ -28,8 +32,15 @@ export function renderFT() {
     </div>
     <div class="hero-acciones page-hero-acciones">${areaHero(state.areaFiltro !== 'todas', userArea())}</div></div>`;
   if (!lista.length) {
-    return html + `<div class="empty"><i class="empty-icon ic ic-ft"></i><div class="empty-text">No hay casos fuera de tolerancia. Aparecen aquí cuando un resultado de campaña o el análisis de un reclamo queda fuera de tolerancia.</div></div></div>`;
+    return html + `<div class="empty"><i class="empty-icon ic ic-ft"></i><div class="empty-text">No hay casos fuera de tolerancia. Aparecen aquí cuando un resultado de campaña o el análisis de un reclamo queda fuera de tolerancia.</div></div>${seccionNoSuben(noSuben)}</div>`;
   }
+  // Lista o mapa de los abiertos; el mapa también se baja como KML para Google My Maps
+  const vista = state.ftVista === 'mapa' && abiertos.length ? 'mapa' : 'lista';
+  if (abiertos.length) {
+    html += `<div class="ft-vista"><div class="seg" role="tablist"><button role="tab" class="${vista === 'lista' ? 'on' : ''}" onclick="setFTVista('lista')"><i class="ic ic-ft"></i> Lista</button><button role="tab" class="${vista === 'mapa' ? 'on' : ''}" onclick="setFTVista('mapa')"><i class="ic ic-mapa"></i> Mapa</button></div>
+      <button class="b b-g" onclick="bajarKMLFT()" title="Archivo para importar en Google My Maps"><i class="ic ic-descargar"></i> Bajar KML (My Maps)</button></div>`;
+  }
+  if (vista === 'mapa') return html + mapaFT(abiertos) + seccionNoSuben(noSuben) + '</div>';
   const tarjeta = x => {
     const pct = x.dias === null ? 0 : Math.min(100, Math.round(x.dias * 100 / DIAS_SOLUCION_FT));
     const feb = x.caso.resultado?.febNoPer;
@@ -50,6 +61,33 @@ export function renderFT() {
   };
   if (abiertos.length) html += `<div class="section-title">Abiertos (${abiertos.length})</div><div class="list">${abiertos.map(tarjeta).join('')}</div>`;
   if (cerrados.length) html += `<div class="section-title" style="margin-top:16px">Cerrados (${cerrados.length})</div><div class="list">${cerrados.map(tarjeta).join('')}</div>`;
+  return html + seccionNoSuben(noSuben) + '</div>';
+}
+
+// CR FT que quedaron después de la medición hasta la que se sube al sistema: solo para verlos, sin seguimiento
+function seccionNoSuben(lista) {
+  if (!lista.length) return '';
+  return `<div class="section-title" style="margin-top:16px">No se suben al sistema (${lista.length})</div>
+    <div class="aviso aviso-azul"><i class="ic ic-info"></i><div>Salieron fuera de tolerancia pero quedan después de la medición hasta la que se sube al sistema: no llevan seguimiento FT.</div></div>
+    <div class="list">${lista.map(x => { const feb = x.caso.resultado?.febNoPer; return `<div class="card ft-card ft-nosube"><div class="ft-item" style="border:none">
+      <div class="ft-pct">${feb === undefined || feb === '' ? '—' : esc(feb) + '%'}<small>FebNoPer</small></div>
+      <div class="ft-info"><b>${esc(x.codigo)}</b><div class="n">${esc(x.caso.nombre)} · ${nombreCampana(x)} · ${esc(x.area)}</div><div class="tags"><span class="tg gris">No se sube · sin seguimiento</span></div></div></div></div>`; }).join('')}</div>`;
+}
+
+// Mapa de los FT abiertos (Leaflet en un iframe, como la pestaña Mapa): color por plazo, código y FebNoPer en cada punto
+function mapaFT(abiertos) {
+  const { puntos, sinGPS } = puntosFT(abiertos, state.records);
+  const n = k => puntos.filter(p => p.plazo.clave === k).length;
+  const leyenda = [['vencido', 'Vencido'], ['por_vencer', 'Por vencer'], ['en_plazo', 'En plazo'], ['sin_fecha', 'Sin fecha']]
+    .map(([k, t]) => n(k) ? `<span><i style="background:${plazoFT({ vencido: k === 'vencido', dias: k === 'sin_fecha' ? null : k === 'por_vencer' ? 90 : 0 }).color}"></i>${t} (${n(k)})</span>` : '').join('');
+  let html = '<div class="ft-mapa">';
+  if (puntos.length) {
+    const datos = JSON.stringify(puntos).replace(/</g, '\\u003c');
+    const doc = `<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'/>\x3cscript src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'><\/script><style>*{margin:0;padding:0}body,html,#map{width:100%;height:100%;font-family:sans-serif}.et{background:#fff;border:1px solid #cbd5e1;border-radius:6px;padding:1px 5px;font-size:10px;font-weight:700;color:#0f172a;box-shadow:none}.et:before{display:none}.pc{font-weight:800;font-size:14px}.pm{font-size:12px;color:#475569;margin-top:2px}<\/style><\/head><body><div id='map'><\/div>\x3cscript>var P=${datos};var map=L.map('map');L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:''}).addTo(map);var b=[];var e=function(s){return String(s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});};P.forEach(function(p){var m=L.circleMarker([p.lat,p.lng],{radius:8,color:'#fff',weight:2,fillColor:p.plazo.color,fillOpacity:1}).addTo(map);m.bindTooltip(e(p.codigo)+(p.febNoPer?' · '+e(p.febNoPer):''),{permanent:true,direction:'right',offset:[8,0],className:'et'});m.bindPopup('<div class=pc>'+e(p.codigo)+'<\/div><div class=pm>FebNoPer: '+e(p.febNoPer||'—')+'<\/div><div class=pm style="color:'+p.plazo.color+';font-weight:700">'+e(p.plazo.texto)+'<\/div><div class=pm>'+e(p.nombre)+'<\/div><div class=pm>'+e(p.direccion)+'<\/div><a href="https://maps.google.com/?q='+p.lat+','+p.lng+'" target=_blank style="font-size:11px">Ver en Google Maps<\/a>');b.push([p.lat,p.lng]);});if(b.length===1)map.setView(b[0],15);else map.fitBounds(b,{paddingTopLeft:[30,30],paddingBottomRight:[150,30]});<\/script><\/body><\/html>`;
+    html += `<iframe title="Mapa de los casos FT" src="data:text/html;charset=utf-8,${encodeURIComponent(doc)}"></iframe>`;
+  } else html += '<div class="empty"><i class="empty-icon ic ic-mapa"></i><div class="empty-text">Ningún caso FT abierto tiene GPS.</div></div>';
+  html += `<div class="ft-mapa-leyenda">${leyenda}</div>`;
+  if (sinGPS.length) html += `<div class="aviso aviso-amarillo"><i class="ic ic-alerta"></i><div>Sin GPS (no salen en el mapa ni en el KML): ${sinGPS.map(esc).join(', ')}</div></div>`;
   return html + '</div>';
 }
 

@@ -19,7 +19,7 @@ import { abrirFirma, agregarItemInspeccion, borrarFirma, cerrarFirma, firmaFin, 
 import { cursorReclamo, salirCursorReclamo, zoomFin, zoomInicio } from '../views/analisis-reclamo.js';
 import { abrirPuntoReclamo, cerrarPuntoReclamo, desvincularPuntoReclamo, registrarPuntoReclamo, setNombrePunto, vincularPuntoReclamo } from '../actions/expedientes.js';
 import { abrirExpediente, abrirNuevoReclamo, cerrarExpediente, cerrarNuevoReclamo, completarCoordenadasReclamo, eliminarExpediente, guardarDatoExpediente, guardarNuevoReclamo, leerCorreoNuevoReclamo, registrarInstalacionReclamo, setCampoNuevoReclamo, setExpedienteVista } from '../actions/expedientes.js';
-import { abrirFT, agregarNotaFT, cerrarFT, marcarAvisoFT, marcarPasoFT, quitarAvisoFT, quitarPasoFT, setCompensacionFT, setRemedicionFT, setRutaFT } from '../actions/ft.js';
+import { abrirFT, agregarNotaFT, bajarKMLFT, setFTVista, cerrarFT, marcarAvisoFT, marcarPasoFT, quitarAvisoFT, quitarPasoFT, setCompensacionFT, setRemedicionFT, setRutaFT } from '../actions/ft.js';
 import { codigoConSistema } from '../domain/listados.js';
 import { state } from '../state.js';
 import { htmlCalculo } from '../views/multiplicadores.js';
@@ -69,7 +69,7 @@ window.setResultadoOpcion = (k, v) => { state.resultadoForm[k] = v; render(); };
 window.setResultadoField = (k, v) => { state.resultadoForm[k] = v; };
 
 // Seguimiento FT
-Object.assign(window, { abrirFT, cerrarFT, marcarAvisoFT, quitarAvisoFT, marcarPasoFT, quitarPasoFT, setRutaFT, setCompensacionFT, agregarNotaFT, setRemedicionFT });
+Object.assign(window, { abrirFT, bajarKMLFT, setFTVista, cerrarFT, marcarAvisoFT, quitarAvisoFT, marcarPasoFT, quitarPasoFT, setRutaFT, setCompensacionFT, agregarNotaFT, setRemedicionFT });
 window.setFTNota = v => { state.ftNota = v; };
 
 // Gráficas de voltaje y corriente
