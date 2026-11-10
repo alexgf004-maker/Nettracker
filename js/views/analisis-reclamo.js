@@ -2,7 +2,7 @@
 // SVG propio, sin librerías. Cada gráfica tiene una sola escala; los límites van como líneas punteadas.
 import {
   analizarArmonicos, analizarTension, ARMONICAS, catalogoSeries, LIMITE_INVALIDO, tituloCombo, CARGA_ALERTA, DATI_LIM, LIMITE_PST, NIVELES, PERC_MAX,
-  campoDeMinutos, factorMultiplicador, leerTension, minutosDeCampo, P_UMBRAL, recortarTXT, revertirTension, textoP95Corriente, TIPOS_RED, VDAT_LIM,
+  campoDeMinutos, cargaPorConfirmar, corregirCarga, factorMultiplicador, leerTension, minutosDeCampo, P_UMBRAL, recortarTXT, revertirTension, textoP95Corriente, TIPOS_RED, VDAT_LIM,
 } from '../domain/reclamo.js';
 import { diagnosticarArmonicos } from '../domain/diagnostico.js';
 import { minutosDeFecha } from '../domain/analisis.js';
@@ -41,14 +41,18 @@ export function calculoReclamo(a = analisisActivo()) {
   const leida = memorizar(memo.lectura, [txtT], () => (txtT ? leerTension(txtT) : null));
   // Multiplicador revertido: la tensión dividida para trabajar con la del secundario
   const rev = factorMultiplicador(p.revertirV);
-  const d = leida && rev ? memorizar(memo.revertida, [leida, rev], () => revertirTension(leida, rev)) : leida;
+  // STOTAL: con el multiplicador revertido o confirmado como proyección, se divide entre el mismo factor
+  const fCarga = rev || factorMultiplicador(p.cargaFactor);
+  const d = leida && (rev || fCarga) ? memorizar(memo.revertida, [leida, rev, fCarga], () => corregirCarga(rev ? revertirTension(leida, rev) : leida, fCarga)) : leida;
+  // Pregunta: la tensión viene en MT y trae STOTAL, sin multiplicador revertido ni respuesta todavía
+  const preguntaCarga = leida && !rev && !p.cargaRevisada ? cargaPorConfirmar(leida, p.relV) : null;
   const t = d ? memorizar(memo.tension, [d, p.fases, p.nominal, p.red, p.kva, p.vll],
     () => analizarTension(d, { fases: p.fases || 3, nominal: Number(p.nominal) || 0, tol, kva: Number(p.kva) || 0, vll: Number(p.vll) || 0 })) : null;
   const arm = memorizar(memo.armonicos, [txtA, p.fases], () => (txtA ? analizarArmonicos(txtA, p.fases || 3) : null));
   // La medición completa (para el aviso del recorte y los límites de las fechas)
   const recortada = desde !== null || hasta !== null;
   const completa = recortada ? memorizar(memo.completa, [a.tension?.texto || a.armonicos?.texto], () => { const tx = a.tension?.texto || a.armonicos?.texto; const l = tx ? leerTension(tx) : null; return l ? { n: l.n, inicio: l.inicio, fin: l.fin } : null; }) : null;
-  return { d, t, arm, tol, recortada, completa };
+  return { d, t, arm, tol, recortada, completa, preguntaCarga };
 }
 
 // Del primer al último registro de los TXT cargados: { desde, hasta } (texto como viene en el TXT)
@@ -284,7 +288,7 @@ function bloqueDatos(p) {
       <div class="field"><label>Relación de corriente (TC)</label><input id="ar-reli" value="${esc(p.relI || '')}" onchange="setParamReclamo('relI', this.value)" placeholder="Ej. 800/5 · para el informe"></div>
     </div>
     <div class="field revertir-mult"><label>Revertir multiplicador de tensión</label><input id="ar-revertir" value="${esc(p.revertirV || '')}" onchange="setParamReclamo('revertirV', this.value)" placeholder="Ej. 22900/240 o 95.42">
-      <div class="page-sub">Si la medición ya viene multiplicada (en MT), la tensión se divide entre este multiplicador para trabajar con la del secundario (BT): gráficas, FebNoPer, proyección de TAP, Excel e informe. La corriente no cambia. Déjalo vacío para usar la medición tal cual.</div></div></div>`;
+      <div class="page-sub">Si la medición ya viene multiplicada (en MT), la tensión se divide entre este multiplicador para trabajar con la del secundario (BT): gráficas, FebNoPer, proyección de TAP, Excel e informe. La corriente no cambia; la STOTAL (cargabilidad) también se divide. Déjalo vacío para usar la medición tal cual.</div></div></div>`;
 }
 
 // Recortar la medición: desde / hasta (fecha y hora), el tramo que se ve en la gráfica o quitar el recorte
@@ -361,9 +365,11 @@ function seccionTension(a, c) {
     html += bloqueGraf(g('pst', 'Flicker PST', 'p.u.', fasesSeries(fases, x => d.PST[x], 'PST'), { desdeCero: true, lineas: [{ valor: LIMITE_PST, nombre: 'Límite PST = 1' }] }), p95);
   }
   const kva = Number(p.kva) || 0;
+  if (d.cargaCorregida && t.S && !kva) html += notaCarga(a, d);
   if (!t.S) html += aviso('El TXT de tensión no trae STOTAL (ni por nombre ni en la columna 75): no se puede graficar la cargabilidad.');
   else if (!kva) html += aviso('Escribe la capacidad del trafo (kVA) para ver la cargabilidad.', 'azul');
   else {
+    if (d.cargaCorregida) html += notaCarga(a, d);
     html += bloqueGraf(g('carga', 'Cargabilidad', 'kVA', [{ nombre: 'STOTAL', color: COLOR_FASE[1], v: t.S }], {
       desdeCero: true, lineas: [{ valor: kva, nombre: `Capacidad ${fmt(kva)} kVA`, tipo: 'trafo' }, { valor: kva * CARGA_ALERTA, nombre: `85 % · ${fmt(kva * CARGA_ALERTA, 1)} kVA`, tipo: 'alerta' }],
     }), `<table class="tabla-est"><thead><tr><th>STOTAL (kVA)</th><th>Valor</th><th>% de la capacidad</th></tr></thead><tbody>${[['Máx', 'max'], ['Prom', 'prom'], ['Mín', 'min']].map(([l, k]) => { const pc = t.carga[k] === null ? null : (t.carga[k] / kva) * 100; return `<tr><td>${l}</td><td>${fmt(t.carga[k], 2)}</td><td class="${pc > 100 ? 'mal' : ''}">${fmt(pc, 1)} %</td></tr>`; }).join('')}</tbody></table>
@@ -513,12 +519,28 @@ export function renderGraficar() {
   return html + `<div class="graf-modal graf-pagina">${cuerpoAnalisis(a, { guardar: false })}</div></div>`;
 }
 
+// Medición de BT con multiplicador de proyección: la app pregunta antes de corregir la cargabilidad
+function preguntaCarga(a, c) {
+  const q = c.preguntaCarga; if (!q) return '';
+  const kva = Number(a.params.kva) || 0; const max = c.t?.carga?.max;
+  const veces = kva && max ? max / kva : 0;
+  return `<div class="aviso aviso-amarillo carga-pregunta"><i class="ic ic-alerta"></i><div>
+    <b>¿Se midió en BT con multiplicador de tensión?</b> La tensión viene en nivel de MT (cerca de ${fmt(q.nominal)} V) y el TXT trae STOTAL. Si se midió en BT y el equipo se programó con un multiplicador para proyectar a MT, la STOTAL sale multiplicada por ese mismo factor y la cargabilidad queda muy alta. Escribe el multiplicador con que se programó.${veces > 1.5 ? ` Ahora la carga máxima es ${fmt(max, 1)} kVA, ${fmt(veces, 1)} veces el trafo de ${fmt(kva)} kVA.` : ''}
+    <div class="carga-pregunta-fila"><label>Multiplicador <input id="ar-carga-factor" value="${esc(q.sugerido)}" placeholder="Ej. 13200/240 o 7240/240"></label>
+      <button class="b b-p b-chico" onclick="confirmarCargaReclamo(document.getElementById('ar-carga-factor').value)">Sí, corregir la cargabilidad</button>
+      <button class="b b-g b-chico" onclick="confirmarCargaReclamo(null)">No, es MT real</button></div></div></div>`;
+}
+function notaCarga(a, d) {
+  const rev = factorMultiplicador(a.params.revertirV);
+  return `<div class="aviso aviso-azul carga-nota"><i class="ic ic-info"></i><div>STOTAL dividida entre ${fmt(d.cargaCorregida, Number.isInteger(Math.round(d.cargaCorregida * 100) / 100) ? 0 : 2)} (${esc(rev ? a.params.revertirV : a.params.cargaFactor)}): ${rev ? 'el multiplicador de tensión está revertido' : 'medición en BT con multiplicador de proyección'}.${rev ? '' : ' <button class="b b-g b-chico" onclick="quitarCargaReclamo()">Quitar la corrección</button>'}</div></div>`;
+}
+
 function cuerpoAnalisis(a, { guardar }) {
   let html = '';
   if (a.error) html += aviso(`No se pudieron cargar los archivos guardados: ${esc(a.error)}`);
   const c = calculoReclamo(a);
   html += bloqueArchivos(a, c);
-  html += bloqueDatos(a.params) + bloqueRecorte(a, c);
+  html += bloqueDatos(a.params) + preguntaCarga(a, c) + bloqueRecorte(a, c);
   if (a.tension || a.armonicos) {
     const vista = a.vista || (a.tension ? 'tension' : 'armonicos');
     html += `<div class="segmento segmento-ancho" style="margin-bottom:12px">
