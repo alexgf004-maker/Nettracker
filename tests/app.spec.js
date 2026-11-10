@@ -3095,6 +3095,39 @@ test.describe('Análisis de reclamos', () => {
     expect((await app.escrituras()).length).toBe(0);
   });
 
+  test('Graficar: medición de BT proyectada a MT con multiplicador: la app pregunta y corrige la cargabilidad', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await nav(page, 'Graficar');
+    await page.locator('.graf-pagina input[type=file]').setInputFiles({ name: 'CR192026100.txt', mimeType: 'text/plain', buffer: Buffer.from(txtTension({ stotal: true })) });
+    await page.locator('#ar-kva').fill('100'); await page.locator('#ar-kva').press('Tab');
+    const carga = () => page.evaluate(async () => (await import('/js/views/analisis-reclamo.js')).calculoReclamo().t.carga.max);
+    // Tensión en 13200 V con STOTAL: pregunta, con 13200/240 propuesto, y avisa que la carga es 4 veces el trafo
+    const pregunta = page.locator('.carga-pregunta');
+    await expect(pregunta).toContainText('¿Se midió en BT con multiplicador de tensión?');
+    await expect(pregunta).toContainText('400.0 kVA, 4.0 veces el trafo de 100 kVA');
+    await expect(page.locator('#ar-carga-factor')).toHaveValue('13200/240');
+    expect(await carga()).toBe(400);
+    await pregunta.getByRole('button', { name: 'Sí, corregir la cargabilidad' }).click();
+    await expect(pregunta).toHaveCount(0);
+    await expect(page.locator('.carga-nota')).toContainText('STOTAL dividida entre 55 (13200/240)');
+    expect(await carga()).toBeCloseTo(400 / 55, 6);
+    const u = await page.evaluate(async () => (await import('/js/views/analisis-reclamo.js')).calculoReclamo().d.U['1'].v.at(-1));
+    expect(u).toBe(13200); // la tensión no cambia
+    // Quitar la corrección: vuelve a preguntar; "No, es MT real" la deja como viene y no pregunta más
+    await page.locator('.carga-nota').getByRole('button', { name: 'Quitar la corrección' }).click();
+    await expect(pregunta).toHaveCount(1);
+    await pregunta.getByRole('button', { name: 'No, es MT real' }).click();
+    await expect(pregunta).toHaveCount(0);
+    expect(await carga()).toBe(400);
+    // Con el multiplicador revertido, la STOTAL también se divide (y no se pregunta)
+    await page.locator('#ar-revertir').fill('13200/240'); await page.locator('#ar-revertir').press('Tab');
+    expect(await carga()).toBeCloseTo(400 / 55, 6);
+    await expect(page.locator('.carga-nota')).toContainText('el multiplicador de tensión está revertido');
+    expect(errores).toEqual([]);
+  });
+
   test('Graficar: revertir un multiplicador para trabajar con la tensión del secundario (y proyectar el TAP con ella)', async ({ page }) => {
     const errores = []; page.on('pageerror', e => errores.push(e.message));
     app = await abrirApp(page);

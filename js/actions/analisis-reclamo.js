@@ -106,6 +106,22 @@ export function setParamReclamo(campo, valor) {
   a.cambios = true;
   render();
 }
+// Cargabilidad de una medición de BT proyectada a MT: factor confirmado (divide STOTAL) o null si es MT real
+export function confirmarCargaReclamo(valor) {
+  const a = analisisActivo(); if (!a) return;
+  if (valor !== null && !factorMultiplicador(valor)) return showToast('Escribe el multiplicador como 13200/240 o como un número (55)');
+  a.params.cargaFactor = valor === null ? '' : String(valor).replace(/\s/g, '');
+  a.params.cargaRevisada = true;
+  a.cambios = true;
+  render();
+}
+// Quitar la corrección: vuelve a preguntar
+export function quitarCargaReclamo() {
+  const a = analisisActivo(); if (!a) return;
+  a.params.cargaFactor = ''; a.params.cargaRevisada = false;
+  a.cambios = true;
+  render();
+}
 // Proyección con cambio de TAP (opcional): params.tapProy = { activo, red, placas[5], actual, propuesta }
 export function setTapReclamo(campo, valor, i = null) {
   const a = analisisActivo(); if (!a) return;

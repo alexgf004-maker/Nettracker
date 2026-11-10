@@ -127,6 +127,23 @@ export function revertirTension(d, factor) {
   return { ...d, U, revertida: factor };
 }
 
+// ── Cargabilidad con multiplicador de proyección (pedido del equipo) ──
+// Si se mide en BT y el equipo se programa con multiplicador de tensión para proyectar a MT (p. ej. 13200/240, con
+// corriente 1/1), el equipo calcula la potencia con la tensión proyectada: STOTAL sale multiplicada por ese factor.
+// Se divide STOTAL entre el factor; la tensión y la corriente no cambian.
+export function corregirCarga(d, factor) {
+  if (!d?.S || !factor) return d;
+  return { ...d, S: d.S.map(x => (x === null ? null : x / factor)), cargaCorregida: factor };
+}
+// ¿Hay que preguntar? Trae STOTAL y la tensión está en nivel de MT (puede ser una medición de BT proyectada).
+// Devuelve { nominal, sugerido } (sugerido: la relación del TP escrita o nominal/240) o null.
+export function cargaPorConfirmar(d, relV) {
+  if (!d?.S) return null;
+  const nominal = sugerirNominal(d.U);
+  if (!nominal || nominal <= 1000) return null;
+  return { nominal, sugerido: factorMultiplicador(relV) ? String(relV).replace(/\s/g, '') : `${nominal}/240` };
+}
+
 // Fases que trae el TXT con tensión (mediana sobre el 5 % de la mayor): sugerencia del tipo de instalación
 export function fasesConTension(U) {
   const mediana = arr => { const s = arr.filter(x => x !== null).sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : 0; };
