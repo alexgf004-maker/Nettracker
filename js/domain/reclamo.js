@@ -136,12 +136,13 @@ export function corregirCarga(d, factor) {
   return { ...d, S: d.S.map(x => (x === null ? null : x / factor)), cargaCorregida: factor };
 }
 // ¿Hay que preguntar? Trae STOTAL y la tensión está en nivel de MT (puede ser una medición de BT proyectada).
-// Devuelve { nominal, sugerido } (sugerido: la relación del TP escrita o nominal/240) o null.
+// Devuelve { nominal, sugerido } o null. sugerido: la relación del TP escrita; si no hay, vacío (el multiplicador no se
+// puede deducir del TXT: con 7240/240 una medición de 228 V sale en 6870 V, que parece de 7620 V).
 export function cargaPorConfirmar(d, relV) {
   if (!d?.S) return null;
   const nominal = sugerirNominal(d.U);
   if (!nominal || nominal <= 1000) return null;
-  return { nominal, sugerido: factorMultiplicador(relV) ? String(relV).replace(/\s/g, '') : `${nominal}/240` };
+  return { nominal, sugerido: factorMultiplicador(relV) ? String(relV).replace(/\s/g, '') : '' };
 }
 
 // Fases que trae el TXT con tensión (mediana sobre el 5 % de la mayor): sugerencia del tipo de instalación

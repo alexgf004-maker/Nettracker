@@ -3103,10 +3103,16 @@ test.describe('Análisis de reclamos', () => {
     await page.locator('.graf-pagina input[type=file]').setInputFiles({ name: 'CR192026100.txt', mimeType: 'text/plain', buffer: Buffer.from(txtTension({ stotal: true })) });
     await page.locator('#ar-kva').fill('100'); await page.locator('#ar-kva').press('Tab');
     const carga = () => page.evaluate(async () => (await import('/js/views/analisis-reclamo.js')).calculoReclamo().t.carga.max);
-    // Tensión en 13200 V con STOTAL: pregunta, con 13200/240 propuesto, y avisa que la carga es 4 veces el trafo
+    // Tensión en 13200 V con STOTAL: pregunta y avisa que la carga es 4 veces el trafo. El multiplicador no se deduce
+    // del TXT: sin la relación del TP escrita va vacío y lo pide
     const pregunta = page.locator('.carga-pregunta');
     await expect(pregunta).toContainText('¿Se midió en BT con multiplicador de tensión?');
     await expect(pregunta).toContainText('400.0 kVA, 4.0 veces el trafo de 100 kVA');
+    await expect(page.locator('#ar-carga-factor')).toHaveValue('');
+    await pregunta.getByRole('button', { name: 'Sí, corregir la cargabilidad' }).click();
+    await expect(page.locator('.toast')).toContainText('Escribe el multiplicador con que se programó el equipo');
+    // Con la relación del TP escrita, la propone
+    await page.locator('#ar-relv').fill('13200/240'); await page.locator('#ar-relv').press('Tab');
     await expect(page.locator('#ar-carga-factor')).toHaveValue('13200/240');
     expect(await carga()).toBe(400);
     await pregunta.getByRole('button', { name: 'Sí, corregir la cargabilidad' }).click();

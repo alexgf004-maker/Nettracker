@@ -109,7 +109,7 @@ export function setParamReclamo(campo, valor) {
 // Cargabilidad de una medición de BT proyectada a MT: factor confirmado (divide STOTAL) o null si es MT real
 export function confirmarCargaReclamo(valor) {
   const a = analisisActivo(); if (!a) return;
-  if (valor !== null && !factorMultiplicador(valor)) return showToast('Escribe el multiplicador como 13200/240 o como un número (55)');
+  if (valor !== null && !factorMultiplicador(valor)) return showToast('Escribe el multiplicador con que se programó el equipo, como 13200/240 o como un número (55)');
   a.params.cargaFactor = valor === null ? '' : String(valor).replace(/\s/g, '');
   a.params.cargaRevisada = true;
   a.cambios = true;

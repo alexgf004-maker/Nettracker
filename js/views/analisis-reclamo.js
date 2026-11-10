@@ -525,8 +525,8 @@ function preguntaCarga(a, c) {
   const kva = Number(a.params.kva) || 0; const max = c.t?.carga?.max;
   const veces = kva && max ? max / kva : 0;
   return `<div class="aviso aviso-amarillo carga-pregunta"><i class="ic ic-alerta"></i><div>
-    <b>¿Se midió en BT con multiplicador de tensión?</b> La tensión viene en nivel de MT (${fmt(q.nominal)} V) y el TXT trae STOTAL. Si se midió en BT y el equipo se programó con un multiplicador para proyectar a MT, la STOTAL sale multiplicada por ese mismo factor y la cargabilidad queda muy alta.${veces > 1.5 ? ` Ahora la carga máxima es ${fmt(max, 1)} kVA, ${fmt(veces, 1)} veces el trafo de ${fmt(kva)} kVA.` : ''}
-    <div class="carga-pregunta-fila"><label>Multiplicador <input id="ar-carga-factor" value="${esc(q.sugerido)}" placeholder="Ej. 13200/240"></label>
+    <b>¿Se midió en BT con multiplicador de tensión?</b> La tensión viene en nivel de MT (cerca de ${fmt(q.nominal)} V) y el TXT trae STOTAL. Si se midió en BT y el equipo se programó con un multiplicador para proyectar a MT, la STOTAL sale multiplicada por ese mismo factor y la cargabilidad queda muy alta. Escribe el multiplicador con que se programó.${veces > 1.5 ? ` Ahora la carga máxima es ${fmt(max, 1)} kVA, ${fmt(veces, 1)} veces el trafo de ${fmt(kva)} kVA.` : ''}
+    <div class="carga-pregunta-fila"><label>Multiplicador <input id="ar-carga-factor" value="${esc(q.sugerido)}" placeholder="Ej. 13200/240 o 7240/240"></label>
       <button class="b b-p b-chico" onclick="confirmarCargaReclamo(document.getElementById('ar-carga-factor').value)">Sí, corregir la cargabilidad</button>
       <button class="b b-g b-chico" onclick="confirmarCargaReclamo(null)">No, es MT real</button></div></div></div>`;
 }
