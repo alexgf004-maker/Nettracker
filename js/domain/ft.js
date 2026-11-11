@@ -7,7 +7,7 @@
 import { corteSubida, CR_OBLIGATORIOS, instalacionDeCaso } from './resultados.js';
 import { ordenarCasos } from './listados.js';
 import { minutosDeFecha } from './analisis.js';
-import { diasEntre, hoyLocal, sumarDias } from './trabajo.js';
+import { diasEntre, hoyLocal, MESES, sumarDias } from './trabajo.js';
 
 export const DIAS_SOLUCION_FT = 90;
 export const RUTAS_FT = ['Estudio y propuesta de obras', 'Transferencia de alimentador', 'CPT DELSUR y Planificación'];
@@ -114,6 +114,24 @@ export function plazoFT(x) {
   return { clave: 'en_plazo', texto: `En plazo: día ${x.dias} de ${DIAS_SOLUCION_FT}`, color: '#0057b8' };
 }
 const num = v => { const n = parseFloat(v); return Number.isFinite(n) && n !== 0 ? n : null; };
+const fechaDMA = f => (f ? String(f).split('-').reverse().join('/') : '');
+const paso = v => (v ? `Sí, el ${fechaDMA(v.fecha)}${v.por ? ` (${v.por})` : ''}` : 'Pendiente');
+// Datos de cada punto (pedido del equipo: los del caso y los del seguimiento, no solo código y FebNoPer). Las columnas
+// del listado van igual que en el mapa del listado; en My Maps salen como tabla. [[columna, valor]]
+export function datosPuntoFT(x, inst, lat, lng) {
+  const c = x.caso; const feb = c.resultado?.febNoPer; const ft = x.ft || {}; const rem = x.remedicionInstalada;
+  return [
+    ['NC', c.nc || ''], ['CÓDIGO SIGET', x.codigo || ''], ['NOMBRE', c.nombre || ''], ['DIRECCIÓN', c.direccion || c.direccionEnte || inst?.lugar || ''],
+    ['CORTE', c.ct || ''], ['MEDIDOR', c.medidor || ''], ['ALIMENTADOR', c.alimentador || ''], ['URBANIDAD', c.urbanidad || ''],
+    ['TIPO DE INSTALACIÓN', c.tipoInstalacion || ''],
+    ['CAMPAÑA', x.tipo === 'reclamo' ? 'Reclamo' : x.mes ? `${MESES[x.mes - 1]} ${x.anio}` : ''], ['ÁREA', x.area || ''],
+    ['FEBNOPER', feb === undefined || feb === '' ? '' : `${feb} %`], ['PLAZO', plazoFT(x).texto],
+    [x.inicioTXT ? 'INICIO (SEGÚN EL TXT)' : 'INSTALACIÓN', fechaDMA(x.inicio)], ['FECHA LÍMITE', fechaDMA(x.limite)],
+    ['AVISO A DELSUR', paso(ft.aviso)], ['SUBIDO AL SISTEMA', paso(ft.sistema)], ['RESUMEN PUNTO MEDIDO', paso(ft.resumen)],
+    ['RUTA DE SOLUCIÓN', ft.ruta || ''], ['REMEDICIÓN', rem ? `${rem.codigo} ${rem.retirado ? 'retirada' : 'en campo'} desde el ${fechaDMA(rem.fecha)}` : ''],
+    ['LATITUD', lat], ['LONGITUD', lng],
+  ];
+}
 // Puntos del mapa: GPS de la instalación de la medición y, si no tiene, el del listado del caso
 export function puntosFT(lista, registros) {
   const puntos = []; const sinGPS = [];
@@ -123,19 +141,22 @@ export function puntosFT(lista, registros) {
     if (lat === null || lng === null) { sinGPS.push(x.codigo); return; }
     const feb = x.caso.resultado?.febNoPer;
     puntos.push({ lat, lng, codigo: x.codigo, febNoPer: feb === undefined || feb === '' ? '' : `${feb} %`, nombre: x.caso.nombre || '',
-      direccion: x.caso.direccion || x.caso.direccionEnte || inst?.lugar || '', area: x.area || '', tipo: x.tipo, plazo: plazoFT(x), limite: x.limite || '' });
+      direccion: x.caso.direccion || x.caso.direccionEnte || inst?.lugar || '', area: x.area || '', tipo: x.tipo, plazo: plazoFT(x), limite: x.limite || '',
+      datos: datosPuntoFT(x, inst, lat, lng) });
   });
   return { puntos, sinGPS };
 }
 const xml = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const ESTILOS_KML = { vencido: 'red', por_vencer: 'orange', en_plazo: 'blu', sin_fecha: 'wht' };
-// KML para importar en Google My Maps (un pin por caso, color por plazo; el detalle lleva FebNoPer, usuario y dirección)
+// KML para importar en Google My Maps (un pin por caso, color por plazo). El detalle lleva lo principal y la tabla de
+// datos (ExtendedData) todos los del caso y del seguimiento, como el mapa del listado
 export function kmlFT(puntos, titulo) {
   const estilos = Object.entries(ESTILOS_KML).map(([k, c]) => `<Style id="${k}"><IconStyle><Icon><href>https://maps.google.com/mapfiles/kml/paddle/${c}-circle.png</href></Icon></IconStyle></Style>`).join('');
   const marcas = puntos.map(p => {
     const fecha = p.limite ? p.limite.split('-').reverse().join('/') : '';
     const detalle = [`FebNoPer: ${p.febNoPer || '—'}`, p.plazo.texto + (fecha ? ` (hasta el ${fecha})` : ''), p.nombre, p.direccion, p.tipo === 'reclamo' ? `Reclamo · ${p.area}` : p.area].filter(Boolean).join('\n');
-    return `<Placemark><name>${xml(p.codigo)}${p.febNoPer ? ` · ${xml(p.febNoPer)}` : ''}</name><description>${xml(detalle)}</description><styleUrl>#${p.plazo.clave}</styleUrl><Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`;
+    const tabla = (p.datos || []).map(([k, v]) => `<Data name="${xml(k)}"><value>${xml(v)}</value></Data>`).join('');
+    return `<Placemark><name>${xml(p.codigo)}${p.febNoPer ? ` · ${xml(p.febNoPer)}` : ''}</name><description>${xml(detalle)}</description><styleUrl>#${p.plazo.clave}</styleUrl><ExtendedData>${tabla}</ExtendedData><Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`;
   }).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${xml(titulo)}</name>${estilos}\n${marcas}\n</Document></kml>\n`;
 }
