@@ -2594,6 +2594,11 @@ test.describe('Precampaña', () => {
     expect(r.kml).toContain('<Placemark><name>CR1O2026205 · 5 %</name>');
     expect(r.kml).toContain('<coordinates>-89.2,13.605,0</coordinates>');
     expect(r.kml).toContain('COLONIA X, CALLE 1, 12, SANTA TECLA, LA LIBERTAD');
+    // Todos los datos del caso y del seguimiento en la tabla del punto (como el mapa del listado)
+    expect(r.kml).toContain('<Data name="NC"><value>5</value></Data><Data name="CÓDIGO SIGET"><value>CR1O2026205</value></Data>');
+    expect(r.kml).toContain('<Data name="CORTE"><value></value></Data><Data name="MEDIDOR">');
+    expect(r.kml).toContain('<Data name="AVISO A DELSUR"><value>Pendiente</value></Data>');
+    expect(r.kml).toContain('<Data name="CAMPAÑA"><value>Agosto 2026</value></Data>');
     // Seguimiento FT: los que no se suben van aparte; el mapa y el KML con los abiertos
     await app.ejecutar(() => switchTab('ft'));
     await expect(page.locator('.section-title', { hasText: 'No se suben al sistema (1)' })).toBeVisible();
