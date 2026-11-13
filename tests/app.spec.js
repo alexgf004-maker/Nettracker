@@ -3143,6 +3143,40 @@ test.describe('Análisis de reclamos', () => {
     expect((await app.escrituras()).length).toBe(0);
   });
 
+  test('Graficar: recortar eligiendo en la tabla de registros (hora y voltajes) y bajar el TXT recortado', async ({ page }) => {
+    const errores = []; page.on('pageerror', e => errores.push(e.message));
+    app = await abrirApp(page);
+    await cerrarAlerta(page);
+    await nav(page, 'Graficar');
+    await page.locator('.graf-pagina input[type=file]').setInputFiles({ name: 'CR192026100.txt', mimeType: 'text/plain', buffer: Buffer.from(txtTension()) });
+    await page.getByRole('button', { name: 'Elegir en la tabla de registros' }).click();
+    const rc = page.locator('.recorte-modal');
+    await expect(rc).toContainText('Recortar CR192026100.txt');
+    await expect(rc).toContainText('TXT completo144 registros01/09/2026 00:00 → 01/09/2026 23:50');
+    await rc.locator('.tabla-recorte').first().locator('tr').nth(3).getByRole('button', { name: 'Empezar aquí' }).click();
+    await rc.locator('.tabla-recorte').last().locator('tr', { hasText: '01/09/2026 23:30' }).getByRole('button', { name: 'Terminar aquí' }).click();
+    await expect(rc.locator('.queda')).toContainText('140 registros01/09/2026 00:20 → 01/09/2026 23:30');
+    // TXT recortado (mismo nombre, sin los registros quitados)
+    const descarga = page.waitForEvent('download');
+    await rc.getByRole('button', { name: 'Bajar TXT recortado' }).click();
+    const d = await descarga;
+    expect(d.suggestedFilename()).toBe('CR192026100.txt');
+    const lineas = require('fs').readFileSync(await d.path(), 'utf8').split('\r\n');
+    expect(lineas.length).toBe(141);
+    expect(lineas[1].startsWith('01/09/2026 00:20:00')).toBe(true);
+    // Aplicar: queda como el recorte desde/hasta de la medición
+    await rc.getByRole('button', { name: 'Aplicar recorte y recalcular' }).click();
+    await expect(rc).toHaveCount(0);
+    await expect(page.locator('#ar-recorte-desde')).toHaveValue('2026-09-01T00:20');
+    await expect(page.locator('#ar-recorte-hasta')).toHaveValue('2026-09-01T23:30');
+    await expect(page.locator('.aviso-recorte')).toContainText('140 de 144 registros');
+    // Al volver a abrir la tabla, sigue marcado donde empieza y termina
+    await page.getByRole('button', { name: 'Elegir en la tabla de registros' }).click();
+    await expect(page.locator('#rc-ini')).toHaveValue('2');
+    await expect(page.locator('#rc-fin')).toHaveValue('2');
+    expect(errores).toEqual([]);
+  });
+
   test('Graficar: medición de BT proyectada a MT con multiplicador: la app pregunta y corrige la cargabilidad', async ({ page }) => {
     const errores = []; page.on('pageerror', e => errores.push(e.message));
     app = await abrirApp(page);

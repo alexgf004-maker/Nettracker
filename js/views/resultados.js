@@ -285,7 +285,8 @@ export function renderProcesando() {
 const cacheRegistros = { texto: null, r: null };
 export function renderRecorteModal() {
   const rc = state.recorteTXT;
-  const a = txtEnMemoriaDe(rc.clave, rc.id);
+  const reclamo = rc.origen === 'reclamo';
+  const a = reclamo ? { nombre: rc.nombre, texto: rc.texto } : txtEnMemoriaDe(rc.clave, rc.id);
   if (!a) return '';
   const fuente = a.original ?? a.texto;
   if (cacheRegistros.texto !== fuente) Object.assign(cacheRegistros, { texto: fuente, r: registrosTXT(fuente) });
@@ -315,7 +316,10 @@ export function renderRecorteModal() {
   html += `<div class="recorte-sec">Inicio del TXT</div>${tabla(ini, 'ini')}`;
   if (nIni + nFin < total) html += `<button class="recorte-mas" onclick="verMasRecorte()">Ver 12 más · faltan ${total - nIni - nFin} registros en medio</button>`;
   if (nFin) html += `<div class="recorte-sec">Final del TXT</div>${tabla(fin, 'fin')}`;
-  html += `<div class="analisis-pie"><button class="btn btn-primary" onclick="aplicarRecorte()">Aplicar recorte y recalcular</button>
+  html += reclamo
+    ? `<div class="analisis-pie"><button class="btn btn-primary" onclick="aplicarRecorteTablaReclamo()">Aplicar recorte y recalcular</button>
+    <button class="btn btn-secondary" onclick="bajarRecortadoReclamo()">Bajar TXT recortado</button><div class="page-sub">Con el TXT de tensión y el de armónicos se recortan los dos con las mismas fechas.</div></div>`
+    : `<div class="analisis-pie"><button class="btn btn-primary" onclick="aplicarRecorte()">Aplicar recorte y recalcular</button>
     <button class="btn btn-secondary" onclick="bajarRecortado()">Bajar TXT recortado para DELSUR</button></div>`;
   return html + '</div></div>';
 }

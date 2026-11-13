@@ -5,7 +5,9 @@ import { db, get, ref, update } from '../firebase.js';
 import { nuevaProyeccionTap, PLACAS_TAP } from '../domain/tap.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
-import { campoDeMinutos, catalogoSeries, factorMultiplicador, fasesConTension, fasesDe, leerTension, MAX_UNIDADES_COMBO, resumenGuardado, sugerirNominal, tipoDeTXT } from '../domain/reclamo.js';
+import { registrosTXT } from '../domain/recorte.js';
+import { bajarTexto } from './resultados.js';
+import { campoDeMinutos, minutosDeCampo, recortarTXT, catalogoSeries, factorMultiplicador, fasesConTension, fasesDe, leerTension, MAX_UNIDADES_COMBO, resumenGuardado, sugerirNominal, tipoDeTXT } from '../domain/reclamo.js';
 import { hoyLocal, normalizarCodigo } from '../domain/trabajo.js';
 import { minutosDeFecha } from '../domain/analisis.js';
 import { analisisActivo, calculoReclamo, periodoParcial } from '../views/analisis-reclamo.js';
@@ -147,6 +149,38 @@ export function recorteDelZoomReclamo() {
   a.params.recorte = { desde: campoDeMinutos(base + Math.floor(a.zoom.desde)), hasta: campoDeMinutos(base + Math.ceil(a.zoom.hasta)) };
   a.zoom = null; a.cambios = true;
   render();
+}
+// Recortar viendo la tabla de horas y voltajes (la misma ventana que en campañas; pedido del equipo, sobre todo para
+// Graficar). Se elige con el TXT de tensión (o el de armónicos si solo está ese) y el recorte queda como desde/hasta.
+const archivoTabla = a => a?.tension || a?.armonicos;
+export function abrirRecorteTablaReclamo() {
+  const a = analisisActivo(); const f = archivoTabla(a); if (!f) return;
+  const r = registrosTXT(f.texto); if (!r.total) return showToast('El TXT no trae registros');
+  const mins = r.filas.map(d => minutosDeFecha(d.fecha));
+  const desde = minutosDeCampo(a.params.recorte?.desde); const hasta = minutosDeCampo(a.params.recorte?.hasta);
+  const ini = desde === null ? 0 : Math.max(0, mins.findIndex(m => m >= desde));
+  let k = mins.length - 1; if (hasta !== null) while (k > ini && mins[k] > hasta) k--;
+  state.recorteTXT = { origen: 'reclamo', nombre: `${f.nombre}.txt`, texto: f.texto, ini, fin: mins.length - 1 - k, ver: 12, total: r.total };
+  render();
+}
+// Desde y hasta (minutos) de la fila donde empieza y donde termina
+function limitesTabla(rc) {
+  const r = registrosTXT(rc.texto); const m = i => minutosDeFecha(r.filas[i]?.fecha);
+  return { desde: rc.ini ? m(rc.ini) : null, hasta: rc.fin ? m(rc.total - 1 - rc.fin) : null };
+}
+export function aplicarRecorteTablaReclamo() {
+  const rc = state.recorteTXT; const a = analisisActivo(); if (!rc || !a) return;
+  const { desde, hasta } = limitesTabla(rc);
+  a.params.recorte = desde !== null || hasta !== null ? { desde: desde !== null ? campoDeMinutos(desde) : '', hasta: hasta !== null ? campoDeMinutos(hasta) : '' } : null;
+  a.zoom = null; a.cambios = true; state.recorteTXT = null;
+  render();
+}
+// Los TXT recortados (tensión y armónicos, con las mismas fechas), con su nombre
+export function bajarRecortadoReclamo() {
+  const rc = state.recorteTXT; const a = analisisActivo(); if (!rc || !a) return;
+  const { desde, hasta } = limitesTabla(rc);
+  ['tension', 'armonicos'].filter(t => a[t]).forEach((t, i) => setTimeout(() => bajarTexto(`${a[t].nombre}.txt`, recortarTXT(a[t].texto, desde, hasta)), i * 400));
+  showToast(`TXT recortado: ${rc.total - rc.ini - rc.fin} de ${rc.total} registros`);
 }
 export function quitarRecorteReclamo() { const a = analisisActivo(); if (!a) return; a.params.recorte = null; a.zoom = null; a.cambios = true; render(); }
 export function setVistaReclamo(vista) { const a = analisisActivo(); if (a) { a.vista = vista; render(); } }
