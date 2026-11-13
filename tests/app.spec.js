@@ -3170,6 +3170,12 @@ test.describe('Análisis de reclamos', () => {
     await expect(page.locator('#ar-recorte-desde')).toHaveValue('2026-09-01T00:20');
     await expect(page.locator('#ar-recorte-hasta')).toHaveValue('2026-09-01T23:30');
     await expect(page.locator('.aviso-recorte')).toContainText('140 de 144 registros');
+    // También se baja con el recorte ya aplicado, sin abrir la tabla
+    const descarga2 = page.waitForEvent('download');
+    await page.locator('.recorte-bloque').getByRole('button', { name: 'Bajar TXT recortado' }).click();
+    const d2 = await descarga2;
+    expect(d2.suggestedFilename()).toBe('CR192026100.txt');
+    expect(require('fs').readFileSync(await d2.path(), 'utf8').split('\r\n').length).toBe(141);
     // Al volver a abrir la tabla, sigue marcado donde empieza y termina
     await page.getByRole('button', { name: 'Elegir en la tabla de registros' }).click();
     await expect(page.locator('#rc-ini')).toHaveValue('2');
