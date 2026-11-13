@@ -16,7 +16,7 @@ import { renderImportMultModal, renderMultModal } from './multiplicadores.js';
 import { renderGraficasModal } from './graficas.js';
 import { renderAnalisisReclamo, renderGraficar } from './analisis-reclamo.js';
 import { nuevoGraficar } from '../actions/analisis-reclamo.js';
-import { renderAnalisisModal, renderProcesando, renderResultadoModal } from './resultados.js';
+import { renderAnalisisModal, renderProcesando, renderRecorteModal, renderResultadoModal } from './resultados.js';
 import { renderFT, renderFTModal } from './ft.js';
 import { renderCampanas, renderRequerimientos } from './trabajo.js';
 import { renderNuevoReclamo, renderPuntoReclamo, renderReclamos } from './expedientes.js';
@@ -98,6 +98,7 @@ export function render() {
   if (state.firmasMemo) html += renderFirmasMemo();
   if (state.firmaInsp?.memo) html += modalFirma(state.firmaInsp.memo.sub, { nombre: state.firmaInsp.memo.nombre });
   if (state.analisisTXT) html += renderAnalisisModal();
+  if (state.recorteTXT) html += renderRecorteModal(); // encima de la vista previa del análisis
   if (state.ftEdit) html += renderFTModal();
   if (state.showConfigCartas) html += renderConfigCartas();
   if (state.nuevoReclamo) html += renderNuevoReclamo();

@@ -9,7 +9,7 @@ import {
 } from '../actions/documentos.js';
 import { abrirMultiplicador, cambiarMultiplicador, crearValidacionTap, cerrarImportMultiplicadores, cerrarMultiplicador, exportarMultiplicadores, exportarPorValidar, guardarImportMultiplicadores, guardarMultiplicador, importarMultiplicadores, procesarMultiplicadores, usarHistorico } from '../actions/multiplicadores.js';
 import { abrirEquipoFecha, asignarEquipo, asignarFecha, buscarEquipoFecha, cerrarEquipoFecha, cerrarProgramacion, copiarFecha, elegirEquipoFecha, enviarFechaADespachos, exportarFecha, guardarProgramacion, importarProgramacion, procesarProgramacion, setDatoFecha, setFechaTab } from '../actions/fechas.js';
-import { abrirResultado, analizarArchivos, analizarTXT, cerrarAnalisis, cerrarGraficas, cerrarResultado, exportarAnalisis, exportarCuadroResumen, exportarSeries, guardarAnalisis, guardarResultado, recalcularTXT, verGraficas, corregirInstalacionBT, corregirDatoMedicion, descargarTXTCorregido, descargarCorregidosAnalisis, corregirArchivosTXT } from '../actions/resultados.js';
+import { abrirResultado, analizarArchivos, analizarTXT, cerrarAnalisis, cerrarGraficas, cerrarResultado, exportarAnalisis, exportarCuadroResumen, exportarSeries, guardarAnalisis, guardarResultado, recalcularTXT, verGraficas, corregirInstalacionBT, corregirDatoMedicion, descargarTXTCorregido, descargarCorregidosAnalisis, corregirArchivosTXT, abrirRecorte, cerrarRecorte, verMasRecorte, setRecorte, aplicarRecorte, bajarRecortado } from '../actions/resultados.js';
 import { moverCursorGrafica, salirCursorGrafica } from '../views/graficas.js';
 import { agregarComboReclamo, limpiarComboReclamo, limpiarGraficar, quitarComboReclamo, restablecerZoomReclamo, setZoomReclamo, toggleEscalaReclamo, toggleSerieComboReclamo } from '../actions/analisis-reclamo.js';
 import { abrirAnalisisReclamo, cargarTXTReclamo, confirmarCargaReclamo, quitarCargaReclamo, cerrarAnalisisReclamo, guardarAnalisisReclamo, quitarRecorteReclamo, recorteDelZoomReclamo, setParamReclamo, setRecorteReclamo, setTapReclamo, setVistaReclamo, subirTXTReclamo } from '../actions/analisis-reclamo.js';
@@ -64,7 +64,7 @@ window.setMultField = (k, v) => {
 Object.assign(window, { setFechaTab, copiarFecha, asignarFecha, asignarEquipo, abrirEquipoFecha, cerrarEquipoFecha, elegirEquipoFecha, buscarEquipoFecha, setDatoFecha, exportarFecha, enviarFechaADespachos, importarProgramacion, procesarProgramacion, guardarProgramacion, cerrarProgramacion });
 
 // Resultados
-Object.assign(window, { descargarTXTCorregido, descargarCorregidosAnalisis, corregirArchivosTXT, abrirResultado, cerrarResultado, guardarResultado, exportarCuadroResumen, analizarTXT, analizarArchivos, recalcularTXT, corregirInstalacionBT, corregirDatoMedicion, cerrarAnalisis, guardarAnalisis, exportarAnalisis });
+Object.assign(window, { abrirRecorte, cerrarRecorte, verMasRecorte, setRecorte, aplicarRecorte, bajarRecortado, descargarTXTCorregido, descargarCorregidosAnalisis, corregirArchivosTXT, abrirResultado, cerrarResultado, guardarResultado, exportarCuadroResumen, analizarTXT, analizarArchivos, recalcularTXT, corregirInstalacionBT, corregirDatoMedicion, cerrarAnalisis, guardarAnalisis, exportarAnalisis });
 window.setResultadoOpcion = (k, v) => { state.resultadoForm[k] = v; render(); };
 window.setResultadoField = (k, v) => { state.resultadoForm[k] = v; };
 

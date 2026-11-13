@@ -8,6 +8,7 @@ import { codigoConSistema } from '../domain/listados.js';
 import { corteSubida, CR_OBLIGATORIOS, cuadroResumen, ESTADOS_CUADRO } from '../domain/resultados.js';
 import { hojaConEstilo } from '../excel.js';
 import { extraerSeries, fechaDePunto, txtDesdeSerie } from '../domain/series.js';
+import { quitarRegistros, registrosTXT } from '../domain/recorte.js';
 import { agruparCampanas, flujoBT, hoyLocal, MESES } from '../domain/trabajo.js';
 import { filasResultados } from '../views/resultados.js';
 import { render } from '../views/render.js';
@@ -215,10 +216,44 @@ async function analizar(clave, g, archivos) {
     const analisis = flujoBT(g.area)
       ? analizarMedicionBT(a.nombre, a.texto, { tipoInstalacion: caso.tipoInstalacion, urbanidad: caso.urbanidad })
       : analizarMedicion(a.nombre, a.texto, { configuracion: caso.mult?.configuracion, alimentador: caso.alimentador, urbanidad: caso.urbanidad });
+    if (a.recorte) analisis.recorte = a.recorte; // registros quitados al inicio y al final (queda en el resultado)
     filas.push({ id, codigo: caso.codigo || caso.codigoEnte, analisis, resultado: resultadoDeAnalisis(analisis), manual: !!caso.resultado && caso.resultado.origen !== 'txt', series: extraerSeries(a.texto) });
   }
   filas.sort((x, y) => x.codigo.localeCompare(y.codigo));
   state.analisisTXT = { clave, filas, sinCaso };
+}
+
+// ── RECORTAR REGISTROS ── (pedido del equipo: quitar registros del inicio o del final para que encaje con la planilla)
+// El TXT recortado reemplaza al de memoria (se guarda el original para cambiar el recorte); se vuelve a analizar.
+export function abrirRecorte(clave, id) {
+  const a = txtEnMemoria[clave]?.[id]; if (!a) return showToast('Vuelve a subir el TXT para recortarlo');
+  state.recorteTXT = { clave, id, ini: a.recorte?.ini || 0, fin: a.recorte?.fin || 0, ver: 12, total: registrosTXT(a.original ?? a.texto).total };
+  render();
+}
+export function cerrarRecorte() { state.recorteTXT = null; render(); }
+export function verMasRecorte() { if (state.recorteTXT) { state.recorteTXT.ver += 12; render(); } }
+// campo 'ini' | 'fin': cuántos registros se quitan (siempre queda al menos uno)
+export function setRecorte(campo, valor) {
+  const r = state.recorteTXT; if (!r || !['ini', 'fin'].includes(campo)) return;
+  const otro = campo === 'ini' ? r.fin : r.ini;
+  r[campo] = Math.min(Math.max(0, Math.floor(Number(valor) || 0)), Math.max(0, r.total - 1 - otro));
+  render();
+}
+export function aplicarRecorte() {
+  const r = state.recorteTXT; const a = r && txtEnMemoria[r.clave]?.[r.id]; if (!a) return;
+  const original = a.original ?? a.texto;
+  if (r.ini || r.fin) Object.assign(a, { original, texto: quitarRegistros(original, r.ini, r.fin), recorte: { ini: r.ini, fin: r.fin, total: r.total } });
+  else { a.texto = original; delete a.original; delete a.recorte; }
+  state.recorteTXT = null;
+  const imp = state.analisisTXT;
+  const archivos = imp?.clave === r.clave ? imp.filas.map(f => txtEnMemoria[r.clave]?.[f.id]).filter(Boolean) : [a];
+  return analizarArchivos(r.clave, archivos);
+}
+// El TXT recortado listo para DELSUR (mismo nombre; corregido si venía con tabuladores o columnas repetidas)
+export function bajarRecortado() {
+  const r = state.recorteTXT; const a = r && txtEnMemoria[r.clave]?.[r.id]; if (!a) return;
+  bajarTexto(a.nombre, corregirTXT(quitarRegistros(a.original ?? a.texto, r.ini, r.fin)).texto);
+  showToast(`${a.nombre} recortado: ${r.total - r.ini - r.fin} de ${r.total} registros`);
 }
 
 export async function analizarTXT(clave, files) {
@@ -238,6 +273,7 @@ export function recalcularTXT(clave) {
   if (archivos.length) return analizarArchivos(clave, archivos);
   return recalcularDesdeSeries(clave);
 }
+export const txtEnMemoriaDe = (clave, id) => txtEnMemoria[clave]?.[id];
 export const hayTXTEnMemoria = clave => Object.keys(txtEnMemoria[clave] || {}).length > 0;
 // Casos que se pueden recalcular sin el TXT (se analizaron y se guardaron sus registros)
 export const recalculablesBT = clave => Object.entries(state.campanas?.[clave]?.casos || {}).filter(([, c]) => c.resultado?.origen === 'txt' && c.resultado.graficas);

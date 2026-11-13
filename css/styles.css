@@ -1947,3 +1947,26 @@ button.dib-est-item { cursor: pointer; } button.dib-est-item:hover { color: var(
 .carga-pregunta-fila { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
 .carga-pregunta-fila label { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 12.5px; }
 .carga-pregunta-fila input { width: 120px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; font: inherit; }
+
+/* Recortar registros del TXT de campaña */
+.recorte-resumen { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 10px; }
+.recorte-resumen > div { background: var(--bg); border-radius: 10px; padding: 8px 10px; font-size: 12px; color: var(--text2); }
+.recorte-resumen > div.queda { background: var(--primary-light); }
+.recorte-resumen b { display: block; font-size: 15px; color: var(--text); margin: 2px 0; }
+.recorte-num { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 4px; }
+.recorte-num label { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; }
+.recorte-num input { width: 64px; padding: 7px 8px; border: 1px solid var(--border); border-radius: 8px; font: inherit; }
+.recorte-sec { font-size: 11px; font-weight: 800; color: var(--text3); text-transform: uppercase; letter-spacing: .6px; margin: 14px 0 4px; }
+.tabla-recorte { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.tabla-recorte th { text-align: left; font-size: 10px; color: var(--text3); text-transform: uppercase; padding: 6px 4px; border-bottom: 1px solid var(--border); }
+.tabla-recorte td { padding: 4px; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+.tabla-recorte td.n { color: var(--text3); font-size: 11px; }
+.tabla-recorte td.mono { white-space: nowrap; }
+.tabla-recorte td.bajo { color: #dc2626; font-weight: 700; }
+.tabla-recorte td.inactiva { color: var(--text3); }
+.tabla-recorte tr.quitado td:not(.acc) { opacity: .38; text-decoration: line-through; }
+.tabla-recorte td.acc { text-align: right; }
+.corte-tag { display: inline-block; background: var(--primary); color: #fff; font-size: 10.5px; font-weight: 800; padding: 3px 8px; border-radius: 20px; white-space: nowrap; }
+.recorte-mas { display: block; width: 100%; border: 0; background: none; color: var(--primary); font: 700 12px var(--font); padding: 8px; cursor: pointer; }
+.txt-recorte { display: block; font-size: 11px; color: var(--primary); font-weight: 700; margin: 2px 0; }
+td.mono > .b-chico { margin-top: 4px; }
