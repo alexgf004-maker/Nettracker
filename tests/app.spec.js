@@ -2490,6 +2490,49 @@ test.describe('Precampaña', () => {
     expect(r.serie).toBe(120.5); // las gráficas también
   });
 
+  test('recortar registros del inicio y del final de un TXT de campaña: se ve la hora y los voltajes, se recalcula y se baja recortado', async ({ page }) => {
+    app = await abrirApp(page, { usuario: 'Francisco Chulo', datos: conCampanaBT() });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-BT'); setCampanaVista('resultados'); });
+    // Los 2 primeros registros sin voltaje (el equipo todavía sin conectar) y el último con una fase caída
+    const txt = hacerTXT({ v: i => (i < 2 ? [0, 0, 0] : i === 699 ? [96, 0, 0] : [120, 120, 0]) });
+    await page.locator('.res-fija label', { hasText: 'Analizar TXT' }).locator('input').setInputFiles([{ name: 'CR1O2026001.txt', mimeType: 'text/plain', buffer: Buffer.from(txt) }]);
+    const fila = page.locator('.modal .tabla-casos tr', { hasText: 'CR1O2026001' });
+    await expect(fila).toContainText('700');
+    await fila.getByRole('button', { name: 'Recortar' }).click();
+    const rc = page.locator('.recorte-modal');
+    await expect(rc).toContainText('TXT completo700 registros01/10/2026 08:00 → 08/10/2026 14:45');
+    await expect(rc.locator('.tabla-recorte').first().locator('tr').nth(1).locator('td.bajo')).toHaveCount(2); // V1 y V2 en cero; V3 no se usa
+    // Empezar en el registro 3 y terminar en el penúltimo
+    await rc.locator('.tabla-recorte').first().locator('tr').nth(3).getByRole('button', { name: 'Empezar aquí' }).click();
+    await rc.locator('.tabla-recorte').last().locator('tr', { hasText: '08/10/2026 14:30' }).getByRole('button', { name: 'Terminar aquí' }).click();
+    await expect(page.locator('#rc-ini')).toHaveValue('2');
+    await expect(page.locator('#rc-fin')).toHaveValue('1');
+    await expect(rc.locator('.queda')).toContainText('697 registros01/10/2026 08:30 → 08/10/2026 14:30');
+    await expect(rc.locator('tr.quitado')).toHaveCount(3);
+    await page.locator('#rc-fin').fill('3'); await page.locator('#rc-fin').press('Tab');
+    await expect(rc.locator('.queda')).toContainText('695 registros');
+    // TXT recortado para DELSUR: mismo nombre, encabezado y BOM, sin los registros quitados
+    const descarga = page.waitForEvent('download');
+    await rc.getByRole('button', { name: 'Bajar TXT recortado para DELSUR' }).click();
+    const d = await descarga;
+    expect(d.suggestedFilename()).toBe('CR1O2026001.txt');
+    const bajado = require('fs').readFileSync(await d.path(), 'utf8');
+    const lineas = bajado.split('\r\n');
+    expect(lineas.length).toBe(696);
+    expect(lineas[0]).toBe(txt.split('\r\n')[0]);
+    expect(lineas[1].startsWith('01/10/2026 08:30:00,120,120,0')).toBe(true);
+    expect(lineas[695].startsWith('08/10/2026 14:00:00')).toBe(true);
+    // Aplicar: se recalcula con los registros que quedan y el recorte queda en el resultado
+    await rc.getByRole('button', { name: 'Aplicar recorte y recalcular' }).click();
+    await expect(rc).toHaveCount(0);
+    await expect(fila).toContainText('695');
+    await expect(fila).toContainText('Recortado: −2 al inicio, −3 al final');
+    await page.getByRole('button', { name: 'Guardar resultados' }).click();
+    const escritura = (await app.escrituras()).findLast(([, r]) => r === 'campanas/2026-10_CPT-BT')[2];
+    expect(escritura['casos/CR1O2026001/resultado'].analisis).toMatchObject({ registros: 695, inicio: '01/10/2026 08:30:00', recorte: { ini: 2, fin: 3, total: 700 } });
+  });
+
   test('TXT con columnas repetidas (2 o 3 veces): se analiza con un juego y se baja corregido como lo acepta DELSUR', async ({ page }) => {
     const comas = hacerTXT({ v: () => [120.5, 119.25, 121] });
     const triple = comas.split('\r\n').map(l => { const c = l.replace(/^\ufeff/, '').split(','); return (l.startsWith('\ufeff') ? '\ufeff' : '') + [...c, ...c, ...c].join('\t'); }).join('\r\n').replace(/(\d)\.(\d)/g, '$1,$2');

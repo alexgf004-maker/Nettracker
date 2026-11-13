@@ -4,7 +4,8 @@ import { corteSubida, CR_OBLIGATORIOS, instalacionDeCaso, MEDICION, PERTURBACION
 import { agruparCampanas, flujoBT, hoyLocal } from '../domain/trabajo.js';
 import { casosFT, DIAS_SOLUCION_FT, perturbacionesFT } from '../domain/ft.js';
 import { state } from '../state.js';
-import { hayTXTEnMemoria, recalculablesBT } from '../actions/resultados.js';
+import { hayTXTEnMemoria, recalculablesBT, txtEnMemoriaDe } from '../actions/resultados.js';
+import { registrosTXT, voltajeBajo } from '../domain/recorte.js';
 import { digitoInstalacion, INSTALACIONES_BT } from '../domain/analisis-bt.js';
 import { nivelDeAlimentador, UMBRAL_FT } from '../domain/analisis.js';
 import { escapeHtml, fmtDate } from '../utils.js';
@@ -260,7 +261,8 @@ export function renderAnalisisModal() {
     const instalacion = bt
       ? `<select class="sel-instalacion" aria-label="Instalación de ${esc(a.archivo)}" onchange="corregirInstalacionBT('${imp.clave}', '${id}', this.value)">${digitoInstalacion(a.tipoInstalacion) ? '' : '<option value="">—</option>'}${Object.entries(INSTALACIONES_BT).map(([d, t]) => `<option value="${d}" ${Number(d) === digitoInstalacion(a.tipoInstalacion) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select><small>${a.nivelTension || '—'} V · ${esc(a.urbanidad || '—')}</small>`
       : `${esc(a.tipoInstalacion)}<input class="sel-instalacion" aria-label="Alimentador de ${esc(a.archivo)}" value="${esc(state.campanas?.[imp.clave]?.casos?.[id]?.alimentador)}" placeholder="Alimentador" onchange="corregirDatoMedicion('${imp.clave}', '${id}', 'alimentador', this.value)"><small>${a.nivelTension || '—'} V · ${esc(a.urbanidad || '—')}</small>`;
-    html += `<tr><td class="mono"><b>${esc(a.archivo)}</b></td><td><span class="tag ${CLASE_ESTADO[a.estado]}">${a.estado === 'ADVERTENCIA' ? 'POR REVISAR' : a.estado}</span></td>
+    const recorte = a.recorte ? `<small class="txt-recorte">Recortado: ${a.recorte.ini ? `−${a.recorte.ini} al inicio` : ''}${a.recorte.ini && a.recorte.fin ? ', ' : ''}${a.recorte.fin ? `−${a.recorte.fin} al final` : ''}</small>` : '';
+    html += `<tr><td class="mono"><b>${esc(a.archivo)}</b>${recorte}${imp.desdeSeries ? '' : `<button class="b b-g b-chico" onclick="abrirRecorte('${imp.clave}', '${id}')"><i class="ic ic-archivo-editar"></i> Recortar</button>`}</td><td><span class="tag ${CLASE_ESTADO[a.estado]}">${a.estado === 'ADVERTENCIA' ? 'POR REVISAR' : a.estado}</span></td>
       <td class="mono ${typeof a.febNoPer === 'number' && a.febNoPer > UMBRAL_FT ? 'txt-rojo' : ''}">${fnp(a.febNoPer)}</td><td class="mono">${a.registros}</td><td>${esc(a.intervalo)}</td>
       <td>${instalacion}</td><td class="col-dir">${esc(a.detalle)}${a.avisoFormato ? `<br><b class="txt-rojo">${esc(a.avisoFormato)}</b>${imp.desdeSeries ? '' : `<br><button class="b b-g b-chico" onclick="descargarTXTCorregido('${imp.clave}', '${id}')"><i class="ic ic-descargar"></i> TXT corregido</button>`}` : ''}</td></tr>`;
   });
@@ -277,4 +279,43 @@ export function renderProcesando() {
   const pct = Math.round((p.hecho * 100) / (p.total || 1));
   return `<div class="modal-overlay proc-overlay"><div class="proc-caja" id="procesando" role="status" aria-live="polite"><div class="spinner"></div>
     <b>${esc(p.titulo)}…</b><span class="proc-num">${p.hecho} de ${p.total}</span><div class="proc-barra"><i style="width:${pct}%"></i></div><small>Puede tardar unos segundos con muchas mediciones</small></div></div>`;
+}
+
+// Recortar registros del TXT: hora y voltajes del inicio y del final para decidir dónde cortar
+const cacheRegistros = { texto: null, r: null };
+export function renderRecorteModal() {
+  const rc = state.recorteTXT;
+  const a = txtEnMemoriaDe(rc.clave, rc.id);
+  if (!a) return '';
+  const fuente = a.original ?? a.texto;
+  if (cacheRegistros.texto !== fuente) Object.assign(cacheRegistros, { texto: fuente, r: registrosTXT(fuente) });
+  const r = cacheRegistros.r; const total = r.total;
+  const ultimo = total - 1 - rc.fin; const quedan = Math.max(0, total - rc.ini - rc.fin);
+  const fecha = f => esc(String(f || '').replace(/:00$/, ''));
+  const v = (x, k) => (x === null ? '—' : x.toFixed(1));
+  const fila = (d, i, tipo) => {
+    const quitado = tipo === 'ini' ? i < rc.ini : i > ultimo;
+    const aqui = tipo === 'ini' ? i === rc.ini : i === ultimo;
+    const accion = aqui ? `<span class="corte-tag">${tipo === 'ini' ? 'Empieza aquí' : 'Termina aquí'}</span>`
+      : `<button class="b b-g b-chico" onclick="setRecorte('${tipo}', ${tipo === 'ini' ? i : total - 1 - i})">${tipo === 'ini' ? 'Empezar aquí' : 'Terminar aquí'}</button>`;
+    return `<tr class="${quitado ? 'quitado' : ''}"><td class="n">${d.n}</td><td class="mono">${fecha(d.fecha)}</td>${d.v.map((x, k) => `<td class="${voltajeBajo(x, k, r) ? 'bajo' : ''} ${r.activas[k] ? '' : 'inactiva'}">${v(x, k)}</td>`).join('')}<td class="acc">${accion}</td></tr>`;
+  };
+  const tabla = (lista, tipo) => `<table class="tabla-recorte"><thead><tr><th>#</th><th>Fecha y hora</th><th>V1</th><th>V2</th><th>V3</th><th></th></tr></thead><tbody>${lista.map(([d, i]) => fila(d, i, tipo)).join('')}</tbody></table>`;
+  // Inicio: los primeros (y hasta donde está el corte); final: los últimos
+  const nIni = Math.min(total, Math.max(rc.ver, rc.ini + 3)); const nFin = Math.min(total - nIni, Math.max(rc.ver, rc.fin + 3));
+  const ini = r.filas.slice(0, nIni).map((d, i) => [d, i]);
+  const fin = r.filas.slice(total - nFin).map((d, j) => [d, total - nFin + j]);
+  const primero = r.filas[rc.ini]; const final = r.filas[ultimo];
+  let html = '<div class="modal-overlay"><div class="modal hoja recorte-modal">';
+  html += `<div class="modal-head"><div class="modal-titulo">Recortar ${esc(a.nombre)}</div><button class="modal-cerrar" onclick="cerrarRecorte()" title="Cerrar">✕</button></div>`;
+  html += `<div class="recorte-resumen"><div>TXT completo<b>${total} registros</b>${fecha(r.filas[0]?.fecha)} → ${fecha(r.filas[total - 1]?.fecha)}</div>
+    <div class="queda">Queda<b>${quedan} registros</b>${fecha(primero?.fecha)} → ${fecha(final?.fecha)}</div></div>`;
+  html += `<div class="recorte-num"><label>Quitar al inicio <input id="rc-ini" type="number" min="0" inputmode="numeric" value="${rc.ini}" onchange="setRecorte('ini', this.value)"></label>
+    <label>Quitar al final <input id="rc-fin" type="number" min="0" inputmode="numeric" value="${rc.fin}" onchange="setRecorte('fin', this.value)"></label></div>`;
+  html += `<div class="recorte-sec">Inicio del TXT</div>${tabla(ini, 'ini')}`;
+  if (nIni + nFin < total) html += `<button class="recorte-mas" onclick="verMasRecorte()">Ver 12 más · faltan ${total - nIni - nFin} registros en medio</button>`;
+  if (nFin) html += `<div class="recorte-sec">Final del TXT</div>${tabla(fin, 'fin')}`;
+  html += `<div class="analisis-pie"><button class="btn btn-primary" onclick="aplicarRecorte()">Aplicar recorte y recalcular</button>
+    <button class="btn btn-secondary" onclick="bajarRecortado()">Bajar TXT recortado para DELSUR</button></div>`;
+  return html + '</div></div>';
 }
