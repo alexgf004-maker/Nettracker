@@ -1,5 +1,5 @@
 // Pestaña Multiplicadores de una campaña: resumen por estado, tabla y editor de cada caso
-import { ordenarCasos } from '../domain/listados.js';
+import { codigosPorAjustar, ordenarCasos } from '../domain/listados.js';
 import {
   calcularMultiplicador, redDeCaso, CONFIGURACIONES, CR_OBLIGATORIOS_MT, estadosDe, GRUPOS_ESTADO, grupoDeEstado, historicoDe, POSICIONES_TAP,
   casosPorValidar, redondear, resumenMultiplicadores, TENSIONES_BT, usuariosParaValidacion,
@@ -9,6 +9,16 @@ import { state } from '../state.js';
 import { escapeHtml, fmtDate } from '../utils.js';
 
 const esc = s => escapeHtml(s ?? '');
+
+// DA/DF con el código que no coincide con su configuración: se pregunta antes de cambiarlo (también en Fechas)
+export function avisoCodigosSistema(c) {
+  const lista = codigosPorAjustar(c.casos);
+  if (!lista.length) return '';
+  return `<div class="aviso aviso-amarillo codigos-sistema"><i class="ic ic-alerta"></i><div>
+    <b>${lista.length === 1 ? 'Una perturbación tiene' : `${lista.length} perturbaciones tienen`} el código que no coincide con su configuración.</b> El dígito del tipo de instalación (1 monofásico, 2 bifásico, 3 trifásico) tiene que ser el mismo que se pone en el analizador. ¿Cambio el código?
+    <ul>${lista.map(x => `<li><span class="mono">${esc(x.codigo)}</span> → <b class="mono">${esc(x.nuevo)}</b> <small>(${esc(x.configuracion)})</small> <button class="b b-g b-chico" onclick="ajustarCodigosSistema('${c.clave}', ['${x.id}'])">Cambiar</button></li>`).join('')}</ul>
+    ${lista.length > 1 ? `<button class="b b-p b-chico" onclick="ajustarCodigosSistema('${c.clave}')">Cambiar los ${lista.length}</button>` : ''}</div></div>`;
+}
 
 const TG_GRUPO = { listos: 'verde', por_resolver: 'ambar', no_se_miden: 'gris' };
 const tgEstado = e => (e ? `<span class="tg ${TG_GRUPO[grupoDeEstado(e)]}">${esc(e)}</span>` : '<span class="falta">Sin estado</span>');
@@ -21,7 +31,7 @@ export function renderMultiplicadores(c) {
   const filtro = state.multFiltro || 'todos';
   const visibles = casos.filter(x => filtro === 'todos' || grupoDeEstado(x.mult?.estado) === filtro);
 
-  let html = '<div class="bloque">';
+  let html = avisoCodigosSistema(c) + '<div class="bloque">';
   html += '<div class="bloque-head"><div class="bloque-titulo">Multiplicadores</div></div>';
   const CLASE = { listos: 't-verde', por_resolver: 't-ambar', no_se_miden: 't-gris' };
   const ICONO = { listos: 'check', por_resolver: 'alerta', no_se_miden: 'x' };

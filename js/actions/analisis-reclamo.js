@@ -175,12 +175,25 @@ export function aplicarRecorteTablaReclamo() {
   a.zoom = null; a.cambios = true; state.recorteTXT = null;
   render();
 }
-// Los TXT recortados (tensión y armónicos, con las mismas fechas), con su nombre
+// Los TXT recortados (tensión y armónicos, con las mismas fechas), con su nombre. El primero se baja en el mismo clic
+// (algunos celulares no dejan descargar si se hace después); el segundo, un momento después.
+function bajarTXTRecortados(a, desde, hasta) {
+  const tipos = ['tension', 'armonicos'].filter(t => a[t]);
+  const bajar = t => bajarTexto(`${a[t].nombre}.txt`, recortarTXT(a[t].texto, desde, hasta));
+  tipos.forEach((t, i) => (i ? setTimeout(() => bajar(t), i * 600) : bajar(t)));
+  return tipos.length;
+}
 export function bajarRecortadoReclamo() {
   const rc = state.recorteTXT; const a = analisisActivo(); if (!rc || !a) return;
   const { desde, hasta } = limitesTabla(rc);
-  ['tension', 'armonicos'].filter(t => a[t]).forEach((t, i) => setTimeout(() => bajarTexto(`${a[t].nombre}.txt`, recortarTXT(a[t].texto, desde, hasta)), i * 400));
+  bajarTXTRecortados(a, desde, hasta);
   showToast(`TXT recortado: ${rc.total - rc.ini - rc.fin} de ${rc.total} registros`);
+}
+// Con el recorte ya aplicado (desde/hasta de la medición)
+export function bajarTXTRecortadoReclamo() {
+  const a = analisisActivo(); const r = a?.params.recorte; if (!r) return;
+  const n = bajarTXTRecortados(a, minutosDeCampo(r.desde), minutosDeCampo(r.hasta));
+  showToast(n > 1 ? 'Se bajan los dos TXT recortados (tensión y armónicos)' : 'TXT recortado descargado');
 }
 export function quitarRecorteReclamo() { const a = analisisActivo(); if (!a) return; a.params.recorte = null; a.zoom = null; a.cambios = true; render(); }
 export function setVistaReclamo(vista) { const a = analisisActivo(); if (a) { a.vista = vista; render(); } }

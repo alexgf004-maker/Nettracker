@@ -4,6 +4,7 @@ import { flujoBT, MESES } from '../domain/trabajo.js';
 import { fmtDate } from '../utils.js';
 import { ordenarCasos } from '../domain/listados.js';
 import { redDeCaso, calcularMultiplicador, grupoDeEstado } from '../domain/multiplicadores.js';
+import { avisoCodigosSistema } from './multiplicadores.js';
 import { state } from '../state.js';
 import { descargable } from '../actions/descargas.js';
 import { instalacionDeCaso } from '../domain/resultados.js';
@@ -25,7 +26,7 @@ export function renderFechas(c) {
   // En BT no hay multiplicadores: todos los casos del listado se programan
   const sinFecha = casos.filter(x => !x.programa?.fecha && (bt || grupoDeEstado(x.mult?.estado) === 'listos')).length;
   const quien = bt ? ['caso no tiene', 'casos no tienen'] : ['caso listo para medir no tiene', 'casos listos para medir no tienen'];
-  let html = '<div class="bloque">';
+  let html = avisoCodigosSistema(c) + '<div class="bloque">';
   html += `<div class="bloque-head"><div class="bloque-titulo">Programación de instalaciones</div>
     <label class="b b-p"><i class="ic ic-subir"></i> Importar programación<input type="file" accept=".xlsx,.xls" hidden onchange="importarProgramacion(this.files)"></label></div>`;
   html += sinFecha
