@@ -186,6 +186,18 @@ export function codigoConSistema(codigo, sistema) {
   const m = RE_PERTURBACION.exec(codigo || '');
   return m ? `${m[1]}${m[2]}${m[3]}${m[4]}${m[5]}${sistema}${m[7]}` : codigo;
 }
+// Dígito del sistema según la configuración de los multiplicadores (confirmado: Estrella 2 hilos cuenta como bifásico)
+export const SISTEMA_DE_CONFIGURACION = { 'Monofásico': 1, 'Bifásico': 2, 'Estrella 2 hilos': 2, 'Estrella': 3, 'Delta': 3 };
+// DA/DF cuyo código no coincide con la configuración declarada en multiplicadores (pedido del equipo: el código que se
+// pone en los analizadores tiene que ser consistente con la instalación). No se cambia solo: se pregunta antes.
+// casos: [{ id, codigo, codigoEnte, mult }] → [{ id, codigo, nuevo, configuracion }]
+export function codigosPorAjustar(casos) {
+  return (casos || []).map(c => {
+    const codigo = c.codigo || c.codigoEnte; const actual = sistemaDeCodigo(codigo);
+    const s = SISTEMA_DE_CONFIGURACION[c.mult?.configuracion];
+    return actual && s && s !== actual ? { id: c.id, codigo, nuevo: codigoConSistema(codigo, s), configuracion: c.mult.configuracion } : null;
+  }).filter(Boolean);
+}
 
 // Orden de la tabla: CR, luego DA, luego DF, cada uno por código
 const ORDEN_TIPO = { CR: 0, DA: 1, DF: 2 };

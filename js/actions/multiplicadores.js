@@ -2,7 +2,7 @@
 import { db, push, ref, set, update, validacionesRef } from '../firebase.js';
 import { state } from '../state.js';
 import { showToast } from '../ui.js';
-import { kmlMapa, ordenarCasos } from '../domain/listados.js';
+import { codigosPorAjustar, kmlMapa, ordenarCasos } from '../domain/listados.js';
 import { aplicarDeCR, casosPorValidar, COLORES_POR_VALIDAR, estadoAutomatico, multiplicadorDeCR, relacionadosDeCR, filasMultiplicadores, filasPorValidar, historicoDe, leerMultiplicadoresExcel, planificarMultiplicadores, redDeCaso, sugerenciaMultiplicador, usuariosParaValidacion } from '../domain/multiplicadores.js';
 import { leerArchivo } from './campanas.js';
 import { hoyLocal, MESES } from '../domain/trabajo.js';
@@ -101,6 +101,21 @@ export function escribirMultiplicador(clave, id, datos, { red = 0, aviso = false
 }
 
 // Validación de TAP con los Pendiente de validar de la campaña (sin subir Excel): se abre en Validaciones de TAP
+// Cambiar el código de las DA/DF para que coincida con su configuración (ids: los que se confirman; vacío = todos)
+export function ajustarCodigosSistema(clave, ids = null) {
+  const g = state.campanas?.[clave]; if (!g) return;
+  const casos = Object.entries(g.casos || {}).map(([id, c]) => ({ ...c, id }));
+  const lista = codigosPorAjustar(casos).filter(x => !ids || ids.includes(x.id));
+  if (!lista.length) return;
+  const datos = {};
+  lista.forEach(x => {
+    const c = g.casos[x.id]; c.codigo = x.nuevo; c.manual = { ...(c.manual || {}), codigo: true };
+    datos[`casos/${x.id}/codigo`] = x.nuevo; datos[`casos/${x.id}/manual/codigo`] = true;
+  });
+  update(ref(db, 'campanas/' + clave), datos).then(() => showToast(lista.length === 1 ? `Código cambiado: ${lista[0].codigo} → ${lista[0].nuevo}` : `${lista.length} códigos cambiados según su configuración`));
+  render();
+}
+
 export function crearValidacionTap(clave) {
   const g = state.campanas?.[clave]; if (!g) return;
   const casos = Object.entries(g.casos || {}).map(([cid, c]) => ({ ...c, id: c.id || cid }));

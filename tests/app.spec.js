@@ -1294,6 +1294,32 @@ test.describe('Precampaña', () => {
     DA1O2026011O00: caso('DA1O2026011O00', '222', { crRelacionado: 'CR1O2026202' }),
   } } } });
 
+  test('DA/DF: si el código no coincide con la configuración de multiplicadores, se pregunta antes de cambiarlo', async ({ page }) => {
+    const datos = conCampana();
+    const casos = datos.campanas['2026-10_CPT-MT'].casos;
+    casos.DA1O2026011O00.mult = { configuracion: 'Delta', estado: 'Listo para medir' }; // dígito 1 → trifásico 3
+    casos.DF1O2026012O00 = caso('DF1O2026012O00', '111', { crRelacionado: 'CR1O2026201', mult: { configuracion: 'Estrella 2 hilos' } }); // ya es 2
+    app = await abrirApp(page, { datos });
+    await cerrarAlerta(page);
+    const r = await page.evaluate(async () => {
+      const m = await import('/js/domain/listados.js');
+      return m.codigosPorAjustar([{ id: 'a', codigo: 'DA1O2026011O00', mult: { configuracion: 'Monofásico' } }, { id: 'b', codigo: 'DA1O2026011O00', mult: { configuracion: 'Estrella' } }, { id: 'c', codigo: 'DF1O2026013O00', mult: { configuracion: 'Bifásico' } }, { id: 'd', codigo: 'CR1O2026201', mult: { configuracion: 'Delta' } }, { id: 'e', codigo: 'DA1O2026011O00', mult: {} }]);
+    });
+    expect(r).toEqual([{ id: 'b', codigo: 'DA1O2026011O00', nuevo: 'DA1O2026013O00', configuracion: 'Estrella' }, { id: 'c', codigo: 'DF1O2026013O00', nuevo: 'DF1O2026012O00', configuracion: 'Bifásico' }]);
+    // En Multiplicadores y en Fechas sale la pregunta; no cambia nada hasta confirmar
+    await app.ejecutar(() => { abrirCampanaTrabajo('2026-10_CPT-MT'); setCampanaVista('multiplicadores'); });
+    const aviso = page.locator('.codigos-sistema');
+    await expect(aviso).toContainText('Una perturbación tiene el código que no coincide con su configuración');
+    await expect(aviso).toContainText('DA1O2026011O00 → DA1O2026013O00 (Delta)');
+    expect((await app.escrituras()).filter(([, ruta]) => ruta === 'campanas/2026-10_CPT-MT')).toEqual([]);
+    await app.ejecutar(() => setCampanaVista('fechas'));
+    await expect(aviso).toContainText('DA1O2026011O00 → DA1O2026013O00');
+    await aviso.getByRole('button', { name: 'Cambiar' }).click();
+    await expect(page.locator('.toast')).toContainText('Código cambiado: DA1O2026011O00 → DA1O2026013O00');
+    await expect(aviso).toHaveCount(0);
+    expect((await app.escrituras()).find(([, ruta]) => ruta === 'campanas/2026-10_CPT-MT')[2]).toEqual({ 'casos/DA1O2026011O00/codigo': 'DA1O2026013O00', 'casos/DA1O2026011O00/manual/codigo': true });
+  });
+
   test('importar los listados del ente arma las campañas por área y liga DA/DF a su CR', async ({ page }) => {
     app = await abrirApp(page, { excel: true });
     await cerrarAlerta(page);

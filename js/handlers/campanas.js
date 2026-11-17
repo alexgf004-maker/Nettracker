@@ -7,7 +7,7 @@ import {
   abrirConfigCartas, abrirDocumentos, cargarLogo, cerrarConfigCartas, cerrarDocumentos, desmarcarPaso, excluirTodos, generarDocumentos,
   guardarConfigCartas, marcarPaso, toggleExcluirCaso,
 } from '../actions/documentos.js';
-import { abrirMultiplicador, cambiarMultiplicador, crearValidacionTap, cerrarImportMultiplicadores, cerrarMultiplicador, exportarMultiplicadores, exportarPorValidar, guardarImportMultiplicadores, guardarMultiplicador, importarMultiplicadores, procesarMultiplicadores, usarHistorico } from '../actions/multiplicadores.js';
+import { ajustarCodigosSistema, abrirMultiplicador, cambiarMultiplicador, crearValidacionTap, cerrarImportMultiplicadores, cerrarMultiplicador, exportarMultiplicadores, exportarPorValidar, guardarImportMultiplicadores, guardarMultiplicador, importarMultiplicadores, procesarMultiplicadores, usarHistorico } from '../actions/multiplicadores.js';
 import { abrirEquipoFecha, asignarEquipo, asignarFecha, buscarEquipoFecha, cerrarEquipoFecha, cerrarProgramacion, copiarFecha, elegirEquipoFecha, enviarFechaADespachos, exportarFecha, guardarProgramacion, importarProgramacion, procesarProgramacion, setDatoFecha, setFechaTab } from '../actions/fechas.js';
 import { abrirResultado, analizarArchivos, analizarTXT, cerrarAnalisis, cerrarGraficas, cerrarResultado, exportarAnalisis, exportarCuadroResumen, exportarSeries, guardarAnalisis, guardarResultado, recalcularTXT, verGraficas, corregirInstalacionBT, corregirDatoMedicion, descargarTXTCorregido, descargarCorregidosAnalisis, corregirArchivosTXT, abrirRecorte, cerrarRecorte, verMasRecorte, setRecorte, aplicarRecorte, bajarRecortado } from '../actions/resultados.js';
 import { moverCursorGrafica, salirCursorGrafica } from '../views/graficas.js';
@@ -42,7 +42,7 @@ window.setCasoField = (k, v) => { state.casoForm[k] = v; };
 window.setCasoSistema = s => { state.casoForm.codigo = codigoConSistema(state.casoForm.codigo, s); render(); };
 
 // Multiplicadores
-Object.assign(window, { crearValidacionTap, cambiarMultiplicador, abrirMultiplicador, cerrarMultiplicador, guardarMultiplicador, usarHistorico, exportarMultiplicadores, exportarPorValidar, importarMultiplicadores, procesarMultiplicadores, guardarImportMultiplicadores, cerrarImportMultiplicadores });
+Object.assign(window, { ajustarCodigosSistema, crearValidacionTap, cambiarMultiplicador, abrirMultiplicador, cerrarMultiplicador, guardarMultiplicador, usarHistorico, exportarMultiplicadores, exportarPorValidar, importarMultiplicadores, procesarMultiplicadores, guardarImportMultiplicadores, cerrarImportMultiplicadores });
 window.setCampanaVista = v => { state.campanaVista = v; render(); };
 window.setMultFiltro = f => { state.multFiltro = f; render(); };
 window.setResultadosFiltro = f => { state.resultadosFiltro = f; render(); };
