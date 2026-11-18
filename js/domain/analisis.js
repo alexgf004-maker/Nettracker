@@ -192,6 +192,7 @@ export function analizarMedicion(nombre, texto, datos = {}) {
     else if (p1 <= UMBRAL_FASE_PCT) { estadoFases = 'INVALIDA'; detalleFases = `Monofásico sin tensión en V1(${pct(p1)})`; }
   } else if (fam === 'bi') {
     if (p3 > UMBRAL_FASE_PCT) { estadoFases = 'INVALIDA'; detalleFases = `Bifásico con tensión en V3(${pct(p3)})`; }
+    else if (p1 <= UMBRAL_FASE_PCT || p2 <= UMBRAL_FASE_PCT) { estadoFases = 'INVALIDA'; detalleFases = `Bifásico sin tensión en ${[p1 <= UMBRAL_FASE_PCT ? `V1(${pct(p1)})` : '', p2 <= UMBRAL_FASE_PCT ? `V2(${pct(p2)})` : ''].filter(Boolean).join(' ni ')}`; }
   } else if (fam === 'tri') {
     if (p1 <= UMBRAL_FASE_PCT || p2 <= UMBRAL_FASE_PCT || p3 <= UMBRAL_FASE_PCT) { estadoFases = 'INVALIDA'; detalleFases = `Trifásico: V1(${pct(p1)}) V2(${pct(p2)}) V3(${pct(p3)})`; }
   } else { estadoFases = 'SIN INFO'; detalleFases = `Tipo de instalación no reconocido: ${r.tipoInstalacion}`; }
@@ -226,6 +227,12 @@ export function analizarMedicion(nombre, texto, datos = {}) {
   else if (mixto) { estado = 'FALLIDA'; detalle = mixto; } // la causa de fondo: con un solo nominal los registros salen inválidos o FT
   else if (!encontrado) { estado = 'ADVERTENCIA'; detalle = `Al caso le falta el nivel de tensión (alimentador) y la urbanidad: ${nombreSinExt}`; }
   else if (r.columnas !== reglas.columnas) { estado = 'ADVERTENCIA'; detalle = `Número de columnas incorrecto: ${r.columnas} (se esperan ${reglas.columnas})`; }
+  // Si faltan registros válidos porque el tipo de instalación no coincide con las fases del TXT, se dice la causa de fondo
+  // (pedido del equipo: antes solo decía "Insuficientes registros válidos: 0" o "ERROR ALIM.")
+  else if (validos < reglas.minimo && estadoFases === 'INVALIDA') {
+    estado = 'FALLIDA';
+    detalle = `${detalleFases}: el tipo de instalación ${esPerturb ? 'del código' : 'del caso'} no coincide con las fases del TXT. Revisa la configuración en multiplicadores o la conexión del equipo (registros válidos: ${validos} de ${total})`;
+  }
   else if (validos < reglas.minimo) { estado = 'FALLIDA'; detalle = `Insuficientes registros válidos: ${validos} (mínimo ${reglas.minimo})`; }
   else if (predominante === -1) { estado = 'FALLIDA'; detalle = `Intervalo predominante NO es de ${reglas.intervalo} min. Registros: ${total}`; }
   else if (estadoFases === 'INVALIDA') { estado = 'FALLIDA'; detalle = detalleFases; }

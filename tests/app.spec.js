@@ -2771,6 +2771,7 @@ test.describe('Precampaña', () => {
       perturb: hacerTXT({ n: 1100, paso: 10, columnas: 197, v: () => [13200, 13200, 13200] }),
       perturbLN: hacerTXT({ n: 1100, paso: 10, columnas: 197, v: () => [7620, 7620, 7620] }),
       perturbMono: hacerTXT({ n: 1100, paso: 10, columnas: 197, v: () => [7620, 0, 0] }),
+      perturbBiSinV2: hacerTXT({ n: 1100, paso: 10, columnas: 197, v: () => [13300, 0, 0] }),
       vacio: '',
     };
     const r = await page.evaluate(async t => {
@@ -2792,6 +2793,8 @@ test.describe('Precampaña', () => {
         perturb: a('DA1O2026013O00.txt', t.perturb, { configuracion: '', alimentador: 'AL013-13200', urbanidad: 'U' }),
         perturbLN: a('DA1O2026013O00.txt', t.perturbLN, { configuracion: '', alimentador: 'AL013-13200', urbanidad: 'U' }),
         perturbMono: a('DF1O2026011O00.txt', t.perturbMono, { configuracion: '', alimentador: 'AL013-13200', urbanidad: 'U' }),
+        perturbBiSinV2: a('DF1N2026012O00.txt', t.perturbBiSinV2, { configuracion: 'Bifásico', alimentador: 'AL013-23000', urbanidad: 'U' }),
+        perturbMonoBien: a('DF1N2026011O00.txt', t.perturbBiSinV2, { configuracion: '', alimentador: 'AL013-23000', urbanidad: 'U' }),
         vacio: a('CR1O2026201.txt', t.vacio),
         resultadoFT: m.resultadoDeAnalisis(m.analizarMedicion('CR1O2026201.txt', t.ft, tri)),
         resultadoOk: m.resultadoDeAnalisis(m.analizarMedicion('CR1O2026201.txt', t.valida, tri)),
@@ -2812,6 +2815,9 @@ test.describe('Precampaña', () => {
     expect(r.perturb).toEqual(['VALIDA', 'Registros: 1100 | Trifásico | Fases OK', 0]);
     expect(r.perturbLN).toEqual(['FALLIDA', 'Insuficientes registros válidos: 0 (mínimo 1008)', 'ERROR ALIM.']);
     expect(r.perturbMono).toEqual(['VALIDA', 'Registros: 1100 | Monofásico | Fases OK', 0]);
+    // El código dice bifásico pero el TXT solo trae V1: se dice la causa de fondo (no solo "Insuficientes registros válidos: 0")
+    expect(r.perturbBiSinV2).toEqual(['FALLIDA', 'Bifásico sin tensión en V2(0%): el tipo de instalación del código no coincide con las fases del TXT. Revisa la configuración en multiplicadores o la conexión del equipo (registros válidos: 0 de 1100)', 'ERROR ALIM.']);
+    expect(r.perturbMonoBien).toEqual(['VALIDA', 'Registros: 1100 | Monofásico | Fases OK', 0]); // el mismo TXT con el código monofásico
     expect(r.vacio).toEqual(['FALLIDA', 'Archivo TXT vacío o sin datos', 'N/D']);
     expect(r.resultadoFT).toEqual({ medicion: 'valida', febNoPer: 10, tolerancia: 'fuera' });
     expect(r.resultadoOk).toEqual({ medicion: 'valida', febNoPer: 0, tolerancia: 'dentro' });
