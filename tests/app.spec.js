@@ -1345,6 +1345,62 @@ test.describe('Precampaña', () => {
     await expect(page.locator('.camp-card', { hasText: 'Octubre 2026' })).toContainText('Paso actual: Precampaña');
   });
 
+  test('listados formato 2027 (Número DGEHM): obligatorios y puntos a medir del listado, y las DA/DF van a MT o BT según el control de puntos', async ({ page }) => {
+    // Mismo formato que los listados 2027: título, renglón con obligatorios o puntos a medir, notas y la tabla
+    const listado2027 = (nombre, subtitulo, resumen, enc, casos) => excel(nombre, [
+      ['', '', 'CAMPAÑA DE CONTROL DEL PRODUCTO TÉCNICO — PERTURBACIONES'], ['', '', subtitulo], [resumen],
+      ['Este listado corresponde solo a la campaña de flicker; la campaña de armónicos se entrega en un archivo aparte.'], ['Nota'], [], enc, ...casos,
+    ], 'Listado');
+    const ENC_PERT = ['Número DGEHM', 'Tipo Campaña', 'Lugar de Colocación', 'Id del Usuario', 'Nombre del Usuario', 'Dirección', 'Fecha Colocación'];
+    const archivos = [
+      listado2027('CPTR_2027-01_Enero_DELSUR_MT.xlsx', 'Datos de usuarios seleccionados · Media tensión · Año de control 2027',
+        'Distribuidora: DELSUR      |      Período: Enero 2027      |      Obligatorios: 2 (órdenes 1 a 2)      |      Reemplazo: 1 (órdenes 3 a 3)      |      Total del listado: 3',
+        ['Número DGEHM', 'Id del Usuario', 'Nombre del Usuario', 'Dirección', 'Fecha Colocación'],
+        [['CR112027201', '111', 'EMPRESA UNO', 'LA LIBERTAD, SANTA TECLA, COLONIA X', ''], ['CR112027202', '222', 'EMPRESA DOS', 'SAN SALVADOR, CENTRO', ''], ['CR112027203', '333', 'EMPRESA TRES', 'LA PAZ, ZACATECOLUCA', '']]),
+      listado2027('CPTP_2027-01_Enero_DELSUR_Flicker.xlsx', 'Datos de puntos seleccionados · Flicker · Año de control 2027',
+        'Distribuidora: DELSUR      |      Período: Enero 2027      |      Campaña: Flicker      |      Puntos a medir: 2', ENC_PERT,
+        [['DF112027011O00', 'Flicker', 'Usuario', '701', 'USUARIO A', 'LA LIBERTAD, X', ''], ['DF112027021O00', 'Flicker', 'Usuario', '702', 'USUARIO B', 'LA LIBERTAD, Y', '']]),
+      listado2027('CPTP_2027-01_Enero_DELSUR_Armonicos.xlsx', 'Datos de puntos seleccionados · Armónicos · Año de control 2027',
+        'Distribuidora: DELSUR      |      Período: Enero 2027      |      Campaña: Armónicos      |      Puntos a medir: 1', ENC_PERT,
+        [['DA112027011O00', 'Armónicos', 'Usuario', '703', 'USUARIO C', 'LA LIBERTAD, Z', '']]),
+    ];
+    const control = excel('Control de puntos enero.xlsx', [
+      ['CONF', 'Punto de Control', 'NC', 'Tipo de punto de control', 'Nivel de Tensión', 'Tipo de Instalacion', 'URBANIDAD', 'CENTROMTBT', 'AL', 'TENSION'],
+      [1, 'DF112027011O00', 701, 'B', 'MT', 'TRIFÁSICO', 'U', 'DS1', 'AL013', 23000],
+      [2, 'DF112027021O00', 702, 'B', 'BT', 'MONOFÁSICO', 'U', 'CT2', 'AL014', 23000],
+      [3, 'DA112027011O00', 703, 'B', 'BT', 'BIFÁSICO', 'R', 'CT3', 'AL015', 13200],
+    ], 'LISTADO');
+    app = await abrirApp(page, { excel: true });
+    await cerrarAlerta(page);
+    await app.ejecutar(() => { switchTab('campanas'); abrirImportListados(); });
+    // Sin el control de puntos no se sabe el área de las DA/DF (son de usuarios distintos a los CR)
+    await page.locator('.modal input[type=file]').setInputFiles(archivos);
+    const modal = page.locator('.modal');
+    await expect(modal).toContainText('Media tensión (CR) · 3 casos · 2 obligatorios · 1 de reemplazo');
+    await expect(modal).toContainText('Flicker (DF) · 2 casos · 2 a medir');
+    await expect(modal).toContainText('Armónicos (DA) · 1 casos · 1 a medir');
+    await expect(modal).toContainText('DF112027011O00: el usuario 701 no está en los listados de CR; sube también el control de puntos');
+    // Con el control de puntos, cada una va a MT o BT según su nivel de tensión
+    await page.locator('.modal input[type=file]').setInputFiles([...archivos, control]);
+    await expect(modal).toContainText('Control de puntos · 3 puntos');
+    await expect(modal.locator('.fila', { hasText: 'Enero 2027 · CPT MT' })).toContainText('3 CR · 1 DF');
+    await expect(modal.locator('.fila', { hasText: 'Enero 2027 · CPT BT' })).toContainText('1 DA · 1 DF');
+    await expect(modal.locator('.avisos-lista')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Guardar campañas' }).click();
+    const escrituras = await app.escrituras();
+    const mt = escrituras.find(([, ruta]) => ruta === 'campanas/2027-01_CPT-MT')[2];
+    expect(mt).toMatchObject({ obligatorios: 2, reemplazo: 1, 'aSubir/DF': 2, 'aSubir/DA': 1, 'casos/CR112027201/direccionEnte': 'LA LIBERTAD, SANTA TECLA, COLONIA X', 'casos/DF112027011O00/tipo': 'DF' });
+    const bt = escrituras.find(([, ruta]) => ruta === 'campanas/2027-01_CPT-BT')[2];
+    expect(bt).toMatchObject({ 'aSubir/DF': 2, 'aSubir/DA': 1, 'casos/DA112027011O00/nc': '703', 'casos/DF112027021O00/tipo': 'DF' });
+    expect(bt.obligatorios).toBeUndefined(); // BT no vino en estos listados: se usan los 105 de siempre
+    const r = await page.evaluate(async () => {
+      const m = await import('/js/domain/resultados.js');
+      const campanas = { a: { anio: 2027, mes: 1, area: 'CPT MT', obligatorios: 35, aSubir: { DA: 8, DF: 8 } }, b: { anio: 2027, mes: 1, area: 'CPT BT' } };
+      return [m.obligatoriosDe(campanas.a), m.obligatoriosDe(campanas.b), m.aSubirDe(campanas, { anio: 2027, mes: 1 }, 'DF'), m.aSubirDe(campanas, { anio: 2026, mes: 10 }, 'DF')];
+    });
+    expect(r).toEqual([35, 105, 8, 9]);
+  });
+
   test('volver a importar no cambia el código corregido', async ({ page }) => {
     const datos = conCampana();
     datos.campanas['2026-10_CPT-MT'].casos.DA1O2026011O00.codigo = 'DA1O2026013O00';

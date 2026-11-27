@@ -5,7 +5,7 @@ import { showToast } from '../ui.js';
 import { analizarMedicion, corregirTXT, filasResumenAnalisis, resultadoDeAnalisis } from '../domain/analisis.js';
 import { analizarMedicionBT, analizarSeriesBT, INSTALACIONES_BT } from '../domain/analisis-bt.js';
 import { codigoConSistema } from '../domain/listados.js';
-import { corteSubida, CR_OBLIGATORIOS, cuadroResumen, ESTADOS_CUADRO } from '../domain/resultados.js';
+import { corteSubida, cuadroResumen, ESTADOS_CUADRO, obligatoriosDe } from '../domain/resultados.js';
 import { hojaConEstilo } from '../excel.js';
 import { extraerSeries, fechaDePunto, txtDesdeSerie } from '../domain/series.js';
 import { quitarRegistros, registrosTXT } from '../domain/recorte.js';
@@ -51,7 +51,7 @@ export function exportarCuadroResumen(clave) {
   if (!c) return;
   const filas = filasResultados(c);
   const { cr, otros } = cuadroResumen(filas);
-  const obligatorios = CR_OBLIGATORIOS[c.area];
+  const obligatorios = obligatoriosDe(state.campanas?.[c.clave], c.area);
   const corte = obligatorios ? corteSubida(filas, obligatorios) : null;
   const ws = {};
   const AZUL = '002060';

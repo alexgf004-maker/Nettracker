@@ -11,7 +11,7 @@ import { escapeHtml, fmtDate } from '../utils.js';
 import { avancePrecampana, renderCasosCampana, renderPrecampana } from './casos.js';
 import { contarTipos, faltantes } from '../domain/listados.js';
 import { grupoDeEstado, resumenMultiplicadores } from '../domain/multiplicadores.js';
-import { PERTURBACIONES_A_SUBIR, resumenResultados, subidaPerturbaciones } from '../domain/resultados.js';
+import { aSubirDe, resumenResultados, subidaPerturbaciones } from '../domain/resultados.js';
 import { renderFechas } from './fechas.js';
 import { esPerturbacion } from '../domain/ft.js';
 import { renderMultiplicadores } from './multiplicadores.js';
@@ -89,7 +89,7 @@ function pestanaPerturbaciones(c) {
   if (!c.casos.some(x => x.tipo === 'DA' || x.tipo === 'DF')) return [];
   const todas = filasPerturbacionesMes(c);
   const estado = ['DA', 'DF'].filter(t => todas.some(f => f.caso.tipo === t))
-    .map(t => `${Math.min(subidaPerturbaciones(todas.filter(f => f.caso.tipo === t)).validas, PERTURBACIONES_A_SUBIR)}/${PERTURBACIONES_A_SUBIR} ${t}`).join(' · ');
+    .map(t => { const n = aSubirDe(state.campanas, c, t); return `${Math.min(subidaPerturbaciones(todas.filter(f => f.caso.tipo === t), n).validas, n)}/${n} ${t}`; }).join(' · ');
   return [['perturbaciones', 'DA y DF', 'antena', estado]];
 }
 
