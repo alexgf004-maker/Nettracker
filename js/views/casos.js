@@ -63,12 +63,13 @@ export function renderImportListados() {
   const imp = state.importListados;
   let html = '<div class="modal-overlay"><div class="modal hoja">';
   html += '<div class="modal-head"><div class="modal-titulo">Importar listados del ente</div><button class="modal-cerrar" onclick="cerrarImportListados()" title="Cerrar">✕</button></div>';
-  html += '<div class="page-sub" style="margin-bottom:12px">Sube los listados de MT, BT, armónicos (DA) y flicker (FK); pueden ir todos juntos. Los DA y DF se ligan al CR del mismo usuario y toman su área.</div>';
+  html += '<div class="page-sub" style="margin-bottom:12px">Sube los listados de MT, BT, armónicos (DA) y flicker (FK); pueden ir todos juntos. Los DA y DF se ligan al CR del mismo usuario y toman su área. Si son de usuarios distintos a los CR (formato 2027), sube también el control de puntos: su nivel de tensión dice si son de MT o BT.</div>';
   html += `<label class="zona-archivo"><i class="ic ic-subir"></i><span>${imp ? 'Elegir otros archivos' : 'Elegir archivos de Excel'}</span><input type="file" accept=".xlsx,.xls" multiple hidden onchange="leerListadosEnte(this.files)"></label>`;
   if (imp) {
     html += '<div class="section-title" style="margin-top:14px">Archivos</div><div class="filas">';
     imp.archivos.forEach(a => {
-      html += `<div class="fila"><div class="fila-main"><div class="fila-titulo">${esc(a.nombre)}</div><div class="fila-sub">${a.error ? `<span class="txt-rojo">${esc(a.error)}</span>` : `${NIVEL[a.nivel] || 'Tipo no reconocido'} · ${a.casos.length} casos`}</div></div></div>`;
+      const reglas = [a.obligatorios ? `${a.obligatorios} obligatorios` : '', a.reemplazo ? `${a.reemplazo} de reemplazo` : '', a.aSubir ? `${a.aSubir} a medir` : ''].filter(Boolean).join(' · ');
+      html += `<div class="fila"><div class="fila-main"><div class="fila-titulo">${esc(a.nombre)}</div><div class="fila-sub">${a.error ? `<span class="txt-rojo">${esc(a.error)}</span>` : a.control ? `Control de puntos · ${a.puntos} puntos (para saber si las DA/DF son de MT o BT)` : `${NIVEL[a.nivel] || 'Tipo no reconocido'} · ${a.casos.length} casos${reglas ? ` · ${reglas}` : ''}`}</div></div></div>`;
     });
     html += '</div>';
     if (imp.campanas.length) {

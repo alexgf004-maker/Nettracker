@@ -4,7 +4,7 @@
 // - el caso solo se cierra con una remedición que demuestre que el voltaje se normalizó
 // - pasados los 90 días se penalizan los 90 días y la compensación diaria sigue hasta solucionarlo
 //   (el cálculo de montos todavía no está definido: solo se anota la compensación informada)
-import { corteSubida, CR_OBLIGATORIOS, instalacionDeCaso } from './resultados.js';
+import { corteSubida, instalacionDeCaso, obligatoriosDe } from './resultados.js';
 import { ordenarCasos } from './listados.js';
 import { minutosDeFecha } from './analisis.js';
 import { diasEntre, hoyLocal, MESES, sumarDias } from './trabajo.js';
@@ -49,7 +49,7 @@ export function inicioDelTXT(caso) {
 // obligatorios (38 en MT, 105 en BT); los que quedan después del corte no llevan seguimiento FT. Mientras no se
 // completan los obligatorios no hay corte y todos los FT se siguen. Devuelve el Set de ids que no se suben.
 export function noSeSuben(g) {
-  const obligatorios = CR_OBLIGATORIOS[g?.area];
+  const obligatorios = obligatoriosDe(g);
   if (!obligatorios) return new Set();
   const casos = Object.entries(g.casos || {}).map(([id, caso]) => ({ ...caso, _id: id }));
   const filas = ordenarCasos(casos).map(caso => ({ caso, resultado: { medicion: caso.resultado?.medicion || '' } }));

@@ -43,10 +43,20 @@ export function cerrarImportListados() {
 }
 
 // archivos: [{ nombre, hojas, orden }]. Separado de la lectura para poder probarlo sin archivos.
+// Formato 2027: las DA/DF son de puntos distintos a los CR; si junto a los listados viene el control de puntos, su nivel de
+// tensión dice si cada DA/DF es de MT o BT (un archivo que no es listado se prueba como control de puntos).
 export function procesarListados(archivos) {
-  const leidos = archivos.map(a => ({ nombre: a.nombre, ...leerListadoEnte(primeraHoja(a), a.nombre) }));
-  const { campanas, avisos } = armarCampanas(leidos.filter(l => !l.error && l.nivel));
-  leidos.filter(l => !l.error && !l.nivel).forEach(l => avisos.push(`${l.nombre}: no se reconoce si es MT, BT, DA o FK`));
+  let control = null;
+  const leidos = archivos.map(a => {
+    const l = { nombre: a.nombre, ...leerListadoEnte(primeraHoja(a), a.nombre) };
+    if (!l.error) return l;
+    const cp = leerControlPuntos(a.hojas?.LISTADO || primeraHoja(a));
+    if (cp.error) return l;
+    control = { datos: { ...control?.datos, ...cp.datos }, porCodigo: { ...control?.porCodigo, ...cp.porCodigo } };
+    return { nombre: a.nombre, control: true, puntos: Object.keys(cp.porCodigo).length || Object.keys(cp.datos).length };
+  });
+  const { campanas, avisos } = armarCampanas(leidos.filter(l => !l.error && l.nivel), control);
+  leidos.filter(l => !l.error && !l.nivel && !l.control).forEach(l => avisos.push(`${l.nombre}: no se reconoce si es MT, BT, DA o FK`));
   state.importListados = { archivos: leidos, campanas, avisos };
   render();
 }
@@ -83,6 +93,10 @@ export async function guardarImportListados() {
   const escrituras = imp.campanas.map(c => {
     const previos = casosGuardados(c.clave);
     const datos = { anio: c.anio, mes: c.mes, area: c.area, importado: { ...firma(), archivos: imp.archivos.filter(a => !a.error).map(a => a.nombre) } };
+    // Del listado (formato 2027): obligatorios y reemplazos de CR, y cuántas DA y DF se suben en el mes
+    if (c.obligatorios) datos.obligatorios = c.obligatorios;
+    if (c.reemplazo) datos.reemplazo = c.reemplazo;
+    Object.entries(c.aSubir || {}).forEach(([t, n]) => { datos[`aSubir/${t}`] = n; });
     for (const [id, caso] of Object.entries(c.casos)) {
       const base = `casos/${id}/`;
       Object.assign(datos, {

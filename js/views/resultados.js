@@ -1,6 +1,6 @@
 // Pestaña Resultados de una campaña (cuadro resumen) y su editor
 import { ordenarCasos } from '../domain/listados.js';
-import { corteSubida, CR_OBLIGATORIOS, instalacionDeCaso, MEDICION, PERTURBACIONES_A_SUBIR, resultadoCaso, resumenResultados, situacionCaso, subidaPerturbaciones } from '../domain/resultados.js';
+import { aSubirDe, corteSubida, instalacionDeCaso, MEDICION, obligatoriosDe, resultadoCaso, resumenResultados, situacionCaso, subidaPerturbaciones } from '../domain/resultados.js';
 import { agruparCampanas, flujoBT, hoyLocal } from '../domain/trabajo.js';
 import { casosFT, DIAS_SOLUCION_FT, perturbacionesFT } from '../domain/ft.js';
 import { state } from '../state.js';
@@ -96,7 +96,7 @@ export function renderResultados(c) {
   // 1. Resumen y acciones
   html += '<div class="bloque">';
   html += '<div class="bloque-head"><div class="bloque-titulo">Resultados de la campaña</div></div>';
-  const obligatorios = CR_OBLIGATORIOS[c.area];
+  const obligatorios = obligatoriosDe(state.campanas?.[c.clave], c.area);
   const corte = obligatorios ? corteSubida(filas, obligatorios) : null;
   if (obligatorios) {
     const ok = n.crValidas >= obligatorios;
@@ -169,11 +169,13 @@ export function renderPerturbaciones(c) {
   if (!todas.length) return '<div class="empty"><div class="empty-text">No hay DA ni DF este mes.</div></div>';
   let html = '<div class="bloque bloque-pert">';
   html += `<div class="bloque-head"><div class="bloque-titulo">DA y DF del mes · MT y BT</div></div>`;
-  html += `<details class="ayuda"><summary><i class="ic ic-ayuda"></i> ¿Cómo se reparten?</summary><p>El ente manda las DA y DF de MT y BT juntas y se suben ${PERTURBACIONES_A_SUBIR} de cada tipo: en orden de código, las primeras ${PERTURBACIONES_A_SUBIR} válidas, sin importar el área. Si una sale fallida o no se mide, entra la siguiente.</p></details>`;
+  const nDA = aSubirDe(state.campanas, c, 'DA'); const nDF = aSubirDe(state.campanas, c, 'DF');
+  html += `<details class="ayuda"><summary><i class="ic ic-ayuda"></i> ¿Cómo se reparten?</summary><p>Las DA y DF del mes de MT y BT van juntas. Se suben ${nDA === nDF ? nDA : `${nDA} DA y ${nDF} DF`} (lo que dice el listado del ente; si no lo trae, 9): en orden de código, las primeras válidas, sin importar el área. Si una sale fallida o no se mide, entra la siguiente, si la hay.</p></details>`;
   ['DA', 'DF'].forEach(tipo => {
     const filas = todas.filter(f => f.caso.tipo === tipo);
     if (!filas.length) return;
-    const s = subidaPerturbaciones(filas);
+    const PERTURBACIONES_A_SUBIR = aSubirDe(state.campanas, c, tipo);
+    const s = subidaPerturbaciones(filas, PERTURBACIONES_A_SUBIR);
     const areas = Object.entries(s.porArea).sort(([a], [b]) => a.localeCompare(b));
     const pie = s.corte
       ? `<b class="txt-corte">Se sube hasta ${esc(s.corte)}</b>`

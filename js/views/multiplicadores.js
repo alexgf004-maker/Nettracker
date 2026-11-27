@@ -1,10 +1,11 @@
 // Pestaña Multiplicadores de una campaña: resumen por estado, tabla y editor de cada caso
 import { codigosPorAjustar, ordenarCasos } from '../domain/listados.js';
 import {
-  calcularMultiplicador, redDeCaso, CONFIGURACIONES, CR_OBLIGATORIOS_MT, estadosDe, GRUPOS_ESTADO, grupoDeEstado, historicoDe, POSICIONES_TAP,
+  calcularMultiplicador, redDeCaso, CONFIGURACIONES, estadosDe, GRUPOS_ESTADO, grupoDeEstado, historicoDe, POSICIONES_TAP,
   casosPorValidar, redondear, resumenMultiplicadores, TENSIONES_BT, usuariosParaValidacion,
 } from '../domain/multiplicadores.js';
 import { MESES, nombreCampana } from '../domain/trabajo.js';
+import { obligatoriosDe } from '../domain/resultados.js';
 import { state } from '../state.js';
 import { escapeHtml, fmtDate } from '../utils.js';
 
@@ -37,6 +38,7 @@ export function renderMultiplicadores(c) {
   const ICONO = { listos: 'check', por_resolver: 'alerta', no_se_miden: 'x' };
   html += '<div class="tiles resumen-mult">' + GRUPOS_ESTADO.map(([k, label]) => `<button class="tile ${CLASE[k]} ${filtro === k ? 'sel' : ''} ${r.porGrupo[k] ? '' : 'vacio'}" onclick="setMultFiltro('${filtro === k ? 'todos' : k}')"><i class="ic ic-${ICONO[k]}"></i><span class="v">${r.porGrupo[k]}</span><span class="l">${label}</span></button>`).join('') + '</div>';
   if (c.area === 'CPT MT') {
+    const CR_OBLIGATORIOS_MT = obligatoriosDe(state.campanas?.[c.clave], c.area);
     const ok = r.crListos >= CR_OBLIGATORIOS_MT;
     html += `<div class="meta aviso ${ok ? 'ok' : ''}"><div class="meta-tx">${r.crListos} de ${CR_OBLIGATORIOS_MT} CR obligatorios listos para medir<small>${Object.entries(r.porEstado).sort((a, b) => b[1] - a[1]).map(([e, n]) => `${n} ${esc(e || 'sin estado')}`).join(' · ')}</small></div>
       <div class="meta-barra"><i style="width:${Math.min(100, Math.round(r.crListos * 100 / CR_OBLIGATORIOS_MT))}%"></i></div><div class="meta-num">${r.crListos}<small> / ${CR_OBLIGATORIOS_MT}</small></div></div>`;

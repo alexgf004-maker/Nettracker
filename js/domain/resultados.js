@@ -89,6 +89,8 @@ export function comentarioCuadro(f, estado) {
 
 // CR que se suben al sistema por área
 export const CR_OBLIGATORIOS = { 'CPT MT': 38, 'CPT BT': 105 };
+// Los del listado de la campaña (formato 2027: "Obligatorios: 35"; confirmado leerlos del listado) o, si no los trae, los fijos
+export const obligatoriosDe = (g, area = g?.area) => Number(g?.obligatorios) || CR_OBLIGATORIOS[area] || 0;
 
 // Hasta qué medición se sube al sistema: en orden de código, se cuentan los CR con medición válida
 // (DT o FT) hasta completar los obligatorios. Devuelve { codigo, contados, faltan }.
@@ -113,6 +115,12 @@ export function cuadroResumen(filas) {
 // revueltas), las primeras 9 válidas. Si una falla, entra la siguiente (la 10, la 11…). `filas` son las de
 // filasResultados de las dos campañas del mes, cada una con su `area`.
 export const PERTURBACIONES_A_SUBIR = 9;
+// Cuántas DA o DF se suben en el mes: "Puntos a medir: N" del listado (formato 2027; confirmado leerlo del listado), guardado
+// en las campañas del mes; si no lo trae, las 9 de siempre. c: { anio, mes }
+export function aSubirDe(campanas, c, tipo) {
+  const g = Object.values(campanas || {}).find(x => x?.anio === c?.anio && x?.mes === c?.mes && x?.aSubir?.[tipo]);
+  return Number(g?.aSubir?.[tipo]) || PERTURBACIONES_A_SUBIR;
+}
 const codigoFila = f => f.caso.codigo || f.caso.codigoEnte;
 const noSeMide = f => f.resultado.medicion === 'fallida' || f.resultado.medicion === 'no_medida' || f.situacion.clave === 'sin_medir';
 

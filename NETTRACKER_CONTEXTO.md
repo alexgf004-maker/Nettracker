@@ -195,6 +195,14 @@ Componentes en `css/styles.css` (sección "REDISEÑO DE CAMPAÑAS"); usarlos en 
 
 ## Precampaña (etapa 2, primera parte)
 En **Campañas → Importar listados del ente** se suben los cuatro Excel del ente (MT, BT, DA y FK). Los datos empiezan debajo de "Número SIGET"; la dirección viene en tres columnas (colonia, calle, número).
+
+Formato 2027 (pedido del equipo; archivos CPTR_…_MT, CPTP_…_Flicker y CPTP_…_Armonicos). La tabla empieza en "Número DGEHM" y la dirección viene en una sola columna. El tipo sale del primer renglón del título que lo nombra ("· Media tensión ·", "· Flicker ·", "· Armónicos ·"), porque las notas de abajo mencionan el otro tipo; también del nombre del archivo, y en DA/DF del código. Del encabezado se leen, confirmado leerlos del listado:
+- en los CR, "Obligatorios: N" y "Reemplazo: N", que se guardan en la campaña (`obligatorios`, `reemplazo`);
+- en DA/DF, "Puntos a medir: N", que se guarda en las campañas del mes (`aSubir/DA`, `aSubir/DF`).
+
+`obligatoriosDe(g)` y `aSubirDe(campanas, c, tipo)` en domain/resultados.js los usan en el corte de subida, Multiplicadores, Seguimiento FT y la pestaña DA y DF. Si un listado no los trae, siguen 38 MT, 105 BT y 9 perturbaciones.
+
+Las DA/DF de 2027 son de puntos distintos a los CR. Si el usuario no está en los CR, el área sale del "Nivel de Tensión" del control de puntos (confirmado, `areaDeNivel`). El control de puntos se sube junto con los listados en la misma importación: el archivo que no es listado se prueba como control de puntos. Sin él, se avisa qué DA/DF no tienen área.
 - Los CR toman el área de su listado (MT → CPT MT, BT → CPT BT).
 - Cada DA y DF es un usuario que ya está entre los CR: se liga por NC (`crRelacionado`) y toma su área. Si el NC no aparece en ningún CR, se avisa y no se importa.
 - Cada caso se guarda en `campanas/{clave}/casos/{código del ente}` con `codigoEnte`, `codigo`, `tipo`, `nc`, `nombre`, `direccionEnte`, `municipio` y `depto`. Volver a importar actualiza los datos del ente sin tocar lo completado ni el código corregido.

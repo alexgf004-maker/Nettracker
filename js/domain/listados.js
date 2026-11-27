@@ -24,22 +24,39 @@ const columna = (encabezados, nombres) => encabezados.findIndex(h => nombres.inc
 // ── LISTADOS DEL ENTE ──
 
 const TITULOS = { 'MEDIA TENSION': 'MT', 'BAJA TENSION': 'BT', 'ARMONICO': 'DA', 'ARMONICOS': 'DA', 'FLICKER': 'DF' };
+// Formato 2027 (pedido del equipo): el título dice "Datos de usuarios seleccionados · Media tensión · …" o
+// "Datos de puntos seleccionados · Flicker · …". Vale el primer renglón que nombre el tipo (los de abajo explican y
+// pueden mencionar el otro tipo de perturbación).
+const TITULOS_EN_TEXTO = [['MEDIA TENSION', 'MT'], ['BAJA TENSION', 'BT'], ['ARMONICO', 'DA'], ['FLICKER', 'DF']];
+const nivelDeTexto = t => { const n = normalizar(t); return TITULOS[n] || TITULOS_EN_TEXTO.find(([k]) => n.includes(k))?.[1] || null; };
+// Del encabezado del formato 2027: "Obligatorios: 35", "Reemplazo: 9", "Puntos a medir: 8"
+function numeroDelEncabezado(filas, etiqueta) {
+  for (const f of filas) for (const c of f || []) { const m = new RegExp(`${etiqueta}\\s*:\\s*(\\d+)`).exec(normalizar(c)); if (m) return Number(m[1]); }
+  return null;
+}
 
-// Lee un listado del ente (MT, BT, DA o FK). Los datos empiezan debajo de "Número SIGET".
-// La dirección viene partida en varias columnas (colonia, calle, número) entre "Dirección" y "Fecha Colocación".
+// Lee un listado del ente (MT, BT, DA o FK). Los datos empiezan debajo de "Número SIGET" (o "Número DGEHM", formato 2027).
+// La dirección viene partida en varias columnas (colonia, calle, número) entre "Dirección" y "Fecha Colocación"
+// (en el formato 2027 viene en una sola). Devuelve también, si el listado los trae, los obligatorios y reemplazos (CR) o
+// los puntos a medir (DA/DF).
 export function leerListadoEnte(filas, nombreArchivo = '') {
-  const h = filaEncabezados(filas, ['NUMERO SIGET', 'ID DEL USUARIO']);
-  if (h < 0) return { error: 'No se encontró la fila "Número SIGET" / "Id del Usuario"' };
+  let h = filaEncabezados(filas, ['NUMERO SIGET', 'ID DEL USUARIO']);
+  if (h < 0) h = filaEncabezados(filas, ['NUMERO DGEHM', 'ID DEL USUARIO']);
+  if (h < 0) return { error: 'No se encontró la fila "Número DGEHM" (o "Número SIGET") / "Id del Usuario"' };
   const enc = filas[h].map(normalizar);
   const col = {
-    codigo: enc.indexOf('NUMERO SIGET'), nc: enc.indexOf('ID DEL USUARIO'), nombre: enc.indexOf('NOMBRE DEL USUARIO'),
+    codigo: enc.findIndex(x => x === 'NUMERO SIGET' || x === 'NUMERO DGEHM'), nc: enc.indexOf('ID DEL USUARIO'), nombre: enc.indexOf('NOMBRE DEL USUARIO'),
     direccion: enc.indexOf('DIRECCION'), fecha: enc.indexOf('FECHA COLOCACION'), depto: enc.indexOf('DEPARTAMENTO'), municipio: enc.indexOf('MUNICIPIO'),
   };
   const finDireccion = [col.fecha, col.depto, col.municipio].filter(c => c > col.direccion).sort((a, b) => a - b)[0] ?? col.direccion + 1;
 
   let nivel = null;
-  filas.slice(0, h).forEach(f => (f || []).forEach(c => { const t = TITULOS[normalizar(c)]; if (t) nivel = t; }));
-  if (!nivel) { const n = normalizar(nombreArchivo); nivel = ['MT', 'BT', 'DA', 'FK', 'DF'].find(t => n.includes('_' + t + '_')) || null; if (nivel === 'FK') nivel = 'DF'; }
+  for (const f of filas.slice(0, h)) { for (const c of f || []) { nivel = nivelDeTexto(c); if (nivel) break; } if (nivel) break; }
+  if (!nivel) {
+    const n = normalizar(nombreArchivo).replace(/\.[A-Z]+$/, '_');
+    nivel = ['MT', 'BT', 'DA', 'FK', 'DF'].find(t => n.includes('_' + t + '_')) || (n.includes('FLICKER') ? 'DF' : n.includes('ARMONICO') ? 'DA' : null);
+    if (nivel === 'FK') nivel = 'DF';
+  }
 
   const casos = [];
   for (const f of filas.slice(h + 1)) {
@@ -52,24 +69,46 @@ export function leerListadoEnte(filas, nombreArchivo = '') {
       municipio: texto(f[col.municipio]), depto: texto(f[col.depto]),
     });
   }
-  return { nivel, casos };
+  // DA y DF: el código manda (aunque el título no se reconozca)
+  const prefijos = [...new Set(casos.map(c => c.codigo.slice(0, 2)))];
+  if (prefijos.length === 1 && (prefijos[0] === 'DA' || prefijos[0] === 'DF')) nivel = prefijos[0];
+  const encabezado = filas.slice(0, h);
+  const extra = nivel === 'DA' || nivel === 'DF'
+    ? { aSubir: numeroDelEncabezado(encabezado, 'PUNTOS A MEDIR') }
+    : { obligatorios: numeroDelEncabezado(encabezado, 'OBLIGATORIOS'), reemplazo: numeroDelEncabezado(encabezado, 'REEMPLAZO') };
+  Object.keys(extra).forEach(k => { if (extra[k] === null) delete extra[k]; });
+  return { nivel, casos, ...extra };
 }
 
 export const AREA_NIVEL = { MT: 'CPT MT', BT: 'CPT BT' };
 export const claveArea = area => area.replace(/\s+/g, '-');
 
+// Nivel de tensión del control de puntos (MT o BT)
+export const areaDeNivel = v => { const n = normalizar(v); return /\bMEDIA\b|^MT\b/.test(n) ? 'CPT MT' : /\bBAJA\b|^BT\b/.test(n) ? 'CPT BT' : null; };
+
 // Une los listados en campañas por mes/año y área.
-// Los CR toman el área de su listado (MT o BT); los DA y DF, la del CR del mismo usuario (NC).
-export function armarCampanas(listados) {
+// Los CR toman el área de su listado (MT o BT); los DA y DF, la del CR del mismo usuario (NC). En el formato 2027 las
+// perturbaciones son de puntos distintos: si el usuario no está en los CR, el área sale del nivel de tensión del control
+// de puntos (confirmado), si se sube en la misma importación (control: { datos, porCodigo } de leerControlPuntos).
+// Los obligatorios del listado de CR y los puntos a medir de DA/DF quedan en la campaña.
+export function armarCampanas(listados, control = null) {
   const avisos = [];
   const campanas = {};
   const areaPorNC = {};
   const crPorNC = {};
+  // Obligatorios por mes y área (del listado de CR) y puntos a medir por mes y tipo (de los de DA/DF; valen para MT y BT)
+  const reglas = {}; const reglasMes = {};
+  listados.forEach(l => {
+    const p = periodoCampana(l.casos?.[0]?.codigo || ''); if (!p) return;
+    if ((l.nivel === 'MT' || l.nivel === 'BT') && l.obligatorios) reglas[`${claveCampana(p)}_${AREA_NIVEL[l.nivel]}`] = { obligatorios: l.obligatorios, ...(l.reemplazo ? { reemplazo: l.reemplazo } : {}) };
+    if ((l.nivel === 'DA' || l.nivel === 'DF') && l.aSubir) (reglasMes[claveCampana(p)] ??= {})[l.nivel] = l.aSubir;
+  });
   const agregar = (caso, area, extra = {}) => {
     const periodo = periodoCampana(caso.codigo);
     if (!periodo) { avisos.push(`${caso.codigo}: no se pudo leer el mes y año del código`); return; }
     const clave = claveCampana(periodo) + '_' + claveArea(area);
     campanas[clave] ??= { clave, ...periodo, area, casos: {} };
+    Object.assign(campanas[clave], reglas[`${claveCampana(periodo)}_${area}`] || {}, reglasMes[claveCampana(periodo)] ? { aSubir: { ...campanas[clave].aSubir, ...reglasMes[claveCampana(periodo)] } } : {});
     campanas[clave].casos[caso.codigo] = { ...caso, tipo: subtipoCampana(caso.codigo), area, ...extra };
   };
 
@@ -82,8 +121,13 @@ export function armarCampanas(listados) {
   }
   for (const l of listados.filter(l => l.nivel === 'DA' || l.nivel === 'DF')) {
     for (const c of l.casos) {
-      if (!areaPorNC[c.nc]) { avisos.push(`${c.codigo}: el usuario ${c.nc} no está en los listados de CR, no se sabe a qué área pertenece`); continue; }
-      agregar(c, areaPorNC[c.nc], { crRelacionado: crPorNC[c.nc] });
+      if (areaPorNC[c.nc]) { agregar(c, areaPorNC[c.nc], { crRelacionado: crPorNC[c.nc] }); continue; }
+      const nivel = control && (control.porCodigo?.[c.codigo]?.nivel || control.datos?.[c.nc]?.nivel);
+      const area = nivel ? areaDeNivel(nivel) : null;
+      if (area) { agregar(c, area); continue; }
+      avisos.push(control
+        ? `${c.codigo}: el usuario ${c.nc} no está en los CR ni tiene nivel de tensión en el control de puntos${nivel ? ` ("${nivel}")` : ''}; no se sabe si es de MT o BT`
+        : `${c.codigo}: el usuario ${c.nc} no está en los listados de CR; sube también el control de puntos para saber si es de MT o BT`);
     }
   }
   return { campanas: Object.values(campanas).sort((a, b) => a.clave.localeCompare(b.clave)), avisos };
